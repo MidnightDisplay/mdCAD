@@ -13,8 +13,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
     # use our own minimal shell.html
     target_link_options(${PROJECT_NAME} PRIVATE --shell-file ../../web/shell.html)
-    # link with WebGL2
-    target_link_options(${PROJECT_NAME} PRIVATE -sUSE_WEBGL2=1)
+    # link with WebGPU
+    target_link_options(${PROJECT_NAME} PRIVATE "SHELL:--use-port=emdawnwebgpu" -sASYNCIFY)
     # WASM+JS size optimizations
     target_link_options(${PROJECT_NAME} PRIVATE -sNO_FILESYSTEM=1 -sASSERTIONS=0 -sSINGLE_FILE -sMALLOC=emmalloc)
 endif()

@@ -29,6 +29,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "-framework Cocoa"
         "-framework MetalKit"
         "-framework Metal")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
+    target_compile_options(libsokol PRIVATE "SHELL:--use-port=emdawnwebgpu")
+    target_link_options(libsokol PUBLIC "SHELL:--use-port=emdawnwebgpu" -sASYNCIFY)
 else()
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     if (CMAKE_SYSTEM_NAME STREQUAL Linux)
