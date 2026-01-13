@@ -30,6 +30,26 @@ emcmake cmake -B build-web && cmake --build build-web
 ```
 
 Build:
-``` bash 
+``` bash
 cmake --build build-web
+```
+
+### Running the web build
+
+Open directly in browser (works because `-sSINGLE_FILE` is set):
+``` bash
+# macOS
+open build-web/bin/skl_tmp.html
+
+# Linux
+xdg-open build-web/bin/skl_tmp.html
+
+# Windows
+start build-web/bin/skl_tmp.html
+```
+
+Or serve with a local web server:
+``` bash
+python3 -m http.server 8000 -d build-web/bin
+# Then open http://localhost:8000/skl_tmp.html
 ```

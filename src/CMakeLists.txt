@@ -6,7 +6,7 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} libsokol)
+target_link_libraries(${PROJECT_NAME} libsokol libcimgui)
 
 # Emscripten-specific linker options
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
@@ -16,7 +16,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     # link with WebGL2
     target_link_options(${PROJECT_NAME} PRIVATE -sUSE_WEBGL2=1)
     # WASM+JS size optimizations
-    target_link_options(${PROJECT_NAME} PRIVATE -sNO_FILESYSTEM=1 -sASSERTIONS=0 -sSINGLE_FILE -sMALLOC=emmalloc --closure=1)
+    target_link_options(${PROJECT_NAME} PRIVATE -sNO_FILESYSTEM=1 -sASSERTIONS=0 -sSINGLE_FILE -sMALLOC=emmalloc)
 endif()
 
 # explicitly strip dead code

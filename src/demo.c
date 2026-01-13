@@ -10,7 +10,6 @@
 #include "sokol_time.h"
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
-#define SOKOL_IMGUI_IMPL
 #include "sokol_imgui.h"
 
 static struct {
@@ -19,7 +18,7 @@ static struct {
 
 static void init(void) {
     sg_setup(&(sg_desc){
-        .context = sapp_sgcontext(),
+        .environment = sglue_environment(),
         .logger.func = slog_func,
     });
     simgui_setup(&(simgui_desc_t){ 0 });
@@ -46,7 +45,7 @@ static void frame(void) {
     igEnd();
     /*=== UI CODE ENDS HERE ===*/
 
-    sg_begin_default_pass(&state.pass_action, sapp_width(), sapp_height());
+    sg_begin_pass(&(sg_pass){ .swapchain = sglue_swapchain(), .action = state.pass_action });
     simgui_render();
     sg_end_pass();
     sg_commit();
