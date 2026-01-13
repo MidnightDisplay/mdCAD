@@ -4,6 +4,12 @@ build-*/
 cmake-build-*/
 out/
 
+# Node.js
+node_modules/
+
+# Test output
+scripts/test-output/
+
 # IDE
 .idea/
 .vscode/
