@@ -149,12 +149,13 @@ static const vertex_t cube_vertices[] = {
 };
 
 static const uint16_t cube_indices[] = {
-    0,  1,  2,   0,  2,  3,   // front
-    4,  5,  6,   4,  6,  7,   // back
-    8,  9,  10,  8,  10, 11,  // right
-    12, 13, 14,  12, 14, 15,  // left
-    16, 17, 18,  16, 18, 19,  // top
-    20, 21, 22,  20, 22, 23,  // bottom
+    // CCW winding when viewed from outside (for correct backface culling)
+    0,  2,  1,   0,  3,  2,   // front
+    4,  6,  5,   4,  7,  6,   // back
+    8,  10, 9,   8,  11, 10,  // right
+    12, 14, 13,  12, 15, 14,  // left
+    16, 18, 17,  16, 19, 18,  // top
+    20, 22, 21,  20, 23, 22,  // bottom
 };
 
 //------------------------------------------------------------------------------
@@ -199,7 +200,7 @@ static const char* vs_source =
     "struct vs_params {\n"
     "    float4x4 mvp;\n"
     "};\n"
-    "vertex vs_out _main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
+    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
     "    vs_out out;\n"
     "    out.pos = params.mvp * float4(in.position, 1.0);\n"
     "    out.normal = in.normal;\n"
@@ -212,7 +213,7 @@ static const char* fs_source =
     "struct fs_in {\n"
     "    float3 normal;\n"
     "};\n"
-    "fragment float4 _main(fs_in in [[stage_in]]) {\n"
+    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
     "    float3 color = in.normal * 0.5 + 0.5;\n"
     "    return float4(color, 1.0);\n"
     "}\n";
