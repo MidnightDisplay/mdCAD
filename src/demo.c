@@ -21,262 +21,13 @@
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "sokol_imgui.h"
-#include <math.h>
+
+// Project modules
+#include "math3d.h"
+#include "primitives.h"
+#include "shaders/cube_shaders.h"
+
 #include <string.h>
-
-//------------------------------------------------------------------------------
-// Simple math helpers
-//------------------------------------------------------------------------------
-typedef struct { float x, y, z; } vec3_t;
-typedef struct { float m[16]; } mat4_t;
-
-static mat4_t mat4_identity(void) {
-    mat4_t m = {0};
-    m.m[0] = m.m[5] = m.m[10] = m.m[15] = 1.0f;
-    return m;
-}
-
-static mat4_t mat4_mul(mat4_t a, mat4_t b) {
-    mat4_t result = {0};
-    for (int col = 0; col < 4; col++) {
-        for (int row = 0; row < 4; row++) {
-            result.m[col * 4 + row] =
-                a.m[0 * 4 + row] * b.m[col * 4 + 0] +
-                a.m[1 * 4 + row] * b.m[col * 4 + 1] +
-                a.m[2 * 4 + row] * b.m[col * 4 + 2] +
-                a.m[3 * 4 + row] * b.m[col * 4 + 3];
-        }
-    }
-    return result;
-}
-
-static mat4_t mat4_perspective(float fovy, float aspect, float near, float far) {
-    mat4_t m = {0};
-    float f = 1.0f / tanf(fovy * 0.5f);
-    m.m[0] = f / aspect;
-    m.m[5] = f;
-    m.m[10] = (far + near) / (near - far);
-    m.m[11] = -1.0f;
-    m.m[14] = (2.0f * far * near) / (near - far);
-    return m;
-}
-
-static mat4_t mat4_lookat(vec3_t eye, vec3_t target, vec3_t up) {
-    // Forward (from target to eye for RH coordinate system)
-    vec3_t f = {
-        target.x - eye.x,
-        target.y - eye.y,
-        target.z - eye.z
-    };
-    float f_len = sqrtf(f.x*f.x + f.y*f.y + f.z*f.z);
-    f.x /= f_len; f.y /= f_len; f.z /= f_len;
-
-    // Right = f x up
-    vec3_t r = {
-        f.y * up.z - f.z * up.y,
-        f.z * up.x - f.x * up.z,
-        f.x * up.y - f.y * up.x
-    };
-    float r_len = sqrtf(r.x*r.x + r.y*r.y + r.z*r.z);
-    r.x /= r_len; r.y /= r_len; r.z /= r_len;
-
-    // True up = r x f
-    vec3_t u = {
-        r.y * f.z - r.z * f.y,
-        r.z * f.x - r.x * f.z,
-        r.x * f.y - r.y * f.x
-    };
-
-    mat4_t m = mat4_identity();
-    m.m[0] = r.x;  m.m[4] = r.y;  m.m[8]  = r.z;
-    m.m[1] = u.x;  m.m[5] = u.y;  m.m[9]  = u.z;
-    m.m[2] = -f.x; m.m[6] = -f.y; m.m[10] = -f.z;
-    m.m[12] = -(r.x * eye.x + r.y * eye.y + r.z * eye.z);
-    m.m[13] = -(u.x * eye.x + u.y * eye.y + u.z * eye.z);
-    m.m[14] = (f.x * eye.x + f.y * eye.y + f.z * eye.z);
-    return m;
-}
-
-static mat4_t mat4_rotate_y(float angle) {
-    mat4_t m = mat4_identity();
-    float c = cosf(angle);
-    float s = sinf(angle);
-    m.m[0] = c;   m.m[8] = s;
-    m.m[2] = -s;  m.m[10] = c;
-    return m;
-}
-
-//------------------------------------------------------------------------------
-// Cube vertex data: position (vec3) + normal (vec3)
-//------------------------------------------------------------------------------
-typedef struct {
-    float px, py, pz;   // position
-    float nx, ny, nz;   // normal
-} vertex_t;
-
-// Cube centered at origin, size 1.0
-static const vertex_t cube_vertices[] = {
-    // Front face (z = +0.5), normal (0, 0, 1)
-    { -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f },
-    {  0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f },
-    {  0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f },
-    { -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f },
-    // Back face (z = -0.5), normal (0, 0, -1)
-    {  0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f },
-    { -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f },
-    { -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f },
-    {  0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f },
-    // Right face (x = +0.5), normal (1, 0, 0)
-    {  0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f },
-    {  0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f },
-    {  0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f },
-    {  0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f },
-    // Left face (x = -0.5), normal (-1, 0, 0)
-    { -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f },
-    { -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f },
-    { -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f },
-    { -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f },
-    // Top face (y = +0.5), normal (0, 1, 0)
-    { -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f },
-    {  0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f },
-    {  0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f },
-    { -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f },
-    // Bottom face (y = -0.5), normal (0, -1, 0)
-    { -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f },
-    {  0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f },
-    {  0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f },
-    { -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f },
-};
-
-static const uint16_t cube_indices[] = {
-    // CCW winding when viewed from outside (for correct backface culling)
-    0,  2,  1,   0,  3,  2,   // front
-    4,  6,  5,   4,  7,  6,   // back
-    8,  10, 9,   8,  11, 10,  // right
-    12, 14, 13,  12, 15, 14,  // left
-    16, 18, 17,  16, 19, 18,  // top
-    20, 22, 21,  20, 23, 22,  // bottom
-};
-
-//------------------------------------------------------------------------------
-// Shader sources
-//------------------------------------------------------------------------------
-#if defined(SOKOL_GLCORE)
-// OpenGL 3.3 GLSL
-static const char* vs_source =
-    "#version 330\n"
-    "uniform mat4 mvp;\n"
-    "layout(location=0) in vec3 position;\n"
-    "layout(location=1) in vec3 normal;\n"
-    "out vec3 v_normal;\n"
-    "void main() {\n"
-    "    gl_Position = mvp * vec4(position, 1.0);\n"
-    "    v_normal = normal;\n"
-    "}\n";
-
-static const char* fs_source =
-    "#version 330\n"
-    "in vec3 v_normal;\n"
-    "out vec4 frag_color;\n"
-    "void main() {\n"
-    "    // Map normal from [-1,1] to [0,1] for RGB color\n"
-    "    vec3 color = v_normal * 0.5 + 0.5;\n"
-    "    frag_color = vec4(color, 1.0);\n"
-    "}\n";
-
-#elif defined(SOKOL_METAL)
-// Metal Shading Language
-static const char* vs_source =
-    "#include <metal_stdlib>\n"
-    "using namespace metal;\n"
-    "struct vs_in {\n"
-    "    float3 position [[attribute(0)]];\n"
-    "    float3 normal [[attribute(1)]];\n"
-    "};\n"
-    "struct vs_out {\n"
-    "    float4 pos [[position]];\n"
-    "    float3 normal;\n"
-    "};\n"
-    "struct vs_params {\n"
-    "    float4x4 mvp;\n"
-    "};\n"
-    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
-    "    vs_out out;\n"
-    "    out.pos = params.mvp * float4(in.position, 1.0);\n"
-    "    out.normal = in.normal;\n"
-    "    return out;\n"
-    "}\n";
-
-static const char* fs_source =
-    "#include <metal_stdlib>\n"
-    "using namespace metal;\n"
-    "struct fs_in {\n"
-    "    float3 normal;\n"
-    "};\n"
-    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
-    "    float3 color = in.normal * 0.5 + 0.5;\n"
-    "    return float4(color, 1.0);\n"
-    "}\n";
-
-#elif defined(SOKOL_WGPU)
-// WebGPU WGSL
-static const char* vs_source =
-    "struct vs_params {\n"
-    "    mvp: mat4x4<f32>,\n"
-    "};\n"
-    "@group(0) @binding(0) var<uniform> params: vs_params;\n"
-    "struct vs_out {\n"
-    "    @builtin(position) pos: vec4<f32>,\n"
-    "    @location(0) normal: vec3<f32>,\n"
-    "};\n"
-    "@vertex\n"
-    "fn vs_main(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>) -> vs_out {\n"
-    "    var out: vs_out;\n"
-    "    out.pos = params.mvp * vec4<f32>(position, 1.0);\n"
-    "    out.normal = normal;\n"
-    "    return out;\n"
-    "}\n";
-
-static const char* fs_source =
-    "@fragment\n"
-    "fn fs_main(@location(0) normal: vec3<f32>) -> @location(0) vec4<f32> {\n"
-    "    let color = normal * 0.5 + 0.5;\n"
-    "    return vec4<f32>(color, 1.0);\n"
-    "}\n";
-
-#elif defined(SOKOL_D3D11)
-// HLSL
-static const char* vs_source =
-    "cbuffer vs_params : register(b0) {\n"
-    "    float4x4 mvp;\n"
-    "};\n"
-    "struct vs_in {\n"
-    "    float3 position : POSITION;\n"
-    "    float3 normal : NORMAL;\n"
-    "};\n"
-    "struct vs_out {\n"
-    "    float3 normal : NORMAL;\n"
-    "    float4 pos : SV_Position;\n"
-    "};\n"
-    "vs_out main(vs_in inp) {\n"
-    "    vs_out outp;\n"
-    "    outp.pos = mul(mvp, float4(inp.position, 1.0));\n"
-    "    outp.normal = inp.normal;\n"
-    "    return outp;\n"
-    "}\n";
-
-static const char* fs_source =
-    "struct fs_in {\n"
-    "    float3 normal : NORMAL;\n"
-    "};\n"
-    "float4 main(fs_in inp) : SV_Target0 {\n"
-    "    float3 color = inp.normal * 0.5 + 0.5;\n"
-    "    return float4(color, 1.0);\n"
-    "}\n";
-
-#else
-#error "Unknown graphics backend"
-#endif
 
 //------------------------------------------------------------------------------
 // Application state
@@ -411,17 +162,26 @@ static void init(void) {
         .colors[0] = { .load_action = SG_LOADACTION_CLEAR, .clear_value = { 0.1f, 0.1f, 0.1f, 1.0f } }
     };
 
+    // Get cube mesh data
+    mesh_t cube = mesh_cube();
+
     // Create vertex buffer
     sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.vertex_buffer = true,
-        .data = SG_RANGE(cube_vertices),
+        .data = {
+            .ptr = cube.vertices,
+            .size = cube.vertex_count * sizeof(vertex_t)
+        },
         .label = "cube-vertices"
     });
 
     // Create index buffer
     sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.index_buffer = true,
-        .data = SG_RANGE(cube_indices),
+        .data = {
+            .ptr = cube.indices,
+            .size = cube.index_count * sizeof(uint16_t)
+        },
         .label = "cube-indices"
     });
 
@@ -435,12 +195,12 @@ static void init(void) {
     // Create shader
     sg_shader shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = {
-            .source = vs_source,
-            .entry = "vs_main",  // WGSL entry point (ignored on other backends)
+            .source = cube_vs_source,
+            .entry = "vs_main",
         },
         .fragment_func = {
-            .source = fs_source,
-            .entry = "fs_main",  // WGSL entry point (ignored on other backends)
+            .source = cube_fs_source,
+            .entry = "fs_main",
         },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,
