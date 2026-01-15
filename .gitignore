@@ -18,6 +18,9 @@ scripts/test-output/
 *~
 .DS_Store
 
+# Claude Session Checkpoints
+.claude/CHECKPOINT.md
+
 # Compiled files
 *.o
 *.obj
