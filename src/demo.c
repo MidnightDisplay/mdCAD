@@ -30,6 +30,42 @@
 #include <string.h>
 
 //------------------------------------------------------------------------------
+// Web localStorage for ImGui settings persistence
+//------------------------------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+EM_JS(char*, imgui_load_ini_from_storage, (), {
+    var ini = localStorage.getItem('imgui_ini');
+    if (!ini) return 0;
+    var len = lengthBytesUTF8(ini) + 1;
+    var buf = _malloc(len);
+    stringToUTF8(ini, buf, len);
+    return buf;
+});
+
+EM_JS(void, imgui_save_ini_to_storage, (const char* ini_data), {
+    var ini = UTF8ToString(ini_data);
+    localStorage.setItem('imgui_ini', ini);
+});
+
+// Flag to trigger save from visibility change
+static bool g_should_save_ini = false;
+
+EM_JS(void, imgui_setup_visibility_handler, (), {
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            Module._imgui_mark_should_save();
+        }
+    });
+});
+
+EMSCRIPTEN_KEEPALIVE void imgui_mark_should_save(void) {
+    g_should_save_ini = true;
+}
+#endif
+
+//------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
 #define OFFSCREEN_WIDTH 512
@@ -133,12 +169,26 @@ static void init(void) {
 
     // Setup ImGui with docking enabled
     simgui_setup(&(simgui_desc_t){
+#ifndef __EMSCRIPTEN__
+        .ini_filename = "imgui.ini",
+#endif
         .logger.func = slog_func,
     });
 
     // Enable docking
     ImGuiIO* io = igGetIO_Nil();
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+#ifdef __EMSCRIPTEN__
+    // Load ImGui settings from localStorage
+    char* ini_data = imgui_load_ini_from_storage();
+    if (ini_data) {
+        igLoadIniSettingsFromMemory(ini_data, 0);
+        free(ini_data);
+    }
+    // Setup handler to save when tab becomes hidden
+    imgui_setup_visibility_handler();
+#endif
 
     // Initial clear color (cornflower blue)
     state.clear_color[0] = 0.39f;
@@ -244,6 +294,17 @@ static void init(void) {
 // Frame
 //------------------------------------------------------------------------------
 static void frame(void) {
+#ifdef __EMSCRIPTEN__
+    // Save ImGui settings when tab becomes hidden
+    if (g_should_save_ini) {
+        g_should_save_ini = false;
+        const char* ini_data = igSaveIniSettingsToMemory(NULL);
+        if (ini_data) {
+            imgui_save_ini_to_storage(ini_data);
+        }
+    }
+#endif
+
     // Calculate delta time
     uint64_t now = stm_now();
     float dt = (float)stm_sec(stm_diff(now, state.last_time));
@@ -362,6 +423,13 @@ static void frame(void) {
 // Cleanup
 //------------------------------------------------------------------------------
 static void cleanup(void) {
+#ifdef __EMSCRIPTEN__
+    // Save ImGui settings to localStorage before shutdown
+    const char* ini_data = igSaveIniSettingsToMemory(NULL);
+    if (ini_data) {
+        imgui_save_ini_to_storage(ini_data);
+    }
+#endif
     sg_destroy_view(state.color_att_view);
     sg_destroy_view(state.depth_att_view);
     sg_destroy_view(state.tex_view);

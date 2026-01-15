@@ -18,9 +18,12 @@ scripts/test-output/
 *~
 .DS_Store
 
-# Claude Stuff
+# Claude stuff
 .claude/CHECKPOINT.md
 CLAUDE.md
+
+# Imgui
+imgui.ini
 
 # Compiled files
 *.o
