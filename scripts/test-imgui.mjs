@@ -30,15 +30,29 @@ await page.setViewport({ width: 800, height: 600 });
 page.on('console', msg => console.log(`[CONSOLE] ${msg.text()}`));
 page.on('pageerror', err => console.log(`[ERROR] ${err.message}`));
 
-// Helper to get pixel color at a point
+// Helper to get pixel color from a screenshot at a point
 async function getPixelColor(x, y) {
-    return await page.evaluate(({ x, y }) => {
-        const canvas = document.querySelector('canvas');
-        const ctx = canvas.getContext('webgl2') || canvas.getContext('webgl');
-        const pixels = new Uint8Array(4);
-        ctx.readPixels(x, canvas.height - y, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, pixels);
-        return { r: pixels[0], g: pixels[1], b: pixels[2] };
-    }, { x, y });
+    // Take a screenshot and read pixel from the PNG buffer
+    const screenshot = await page.screenshot({ encoding: 'binary' });
+    // PNG format: 8-byte signature, then chunks. We'll use a simple approach:
+    // Parse PNG to get pixel data using pngjs-like parsing
+    // For simplicity, decode using canvas in Node context via page
+    const color = await page.evaluate(async ({ x, y, base64 }) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const pixel = ctx.getImageData(x, y, 1, 1).data;
+                resolve({ r: pixel[0], g: pixel[1], b: pixel[2] });
+            };
+            img.src = 'data:image/png;base64,' + base64;
+        });
+    }, { x, y, base64: screenshot.toString('base64') });
+    return color;
 }
 
 // Helper to drag from one point to another
