@@ -24,6 +24,8 @@
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
 #include "ui/ui_camera_debug.h"
+#include "dynamic_lines.h"
+#include "ui/ui_lines_controls.h"
 
 #include <math.h>
 
@@ -45,11 +47,16 @@ static struct {
     // Scene state
     orbit_camera_t camera;
     uint64_t last_time;
+    float elapsed_time;
+
+    // Dynamic lines
+    dynamic_lines_t lines;
 
     // UI state
     ui_controls_state_t controls;
     ui_viewport_state_t viewport;
     ui_camera_debug_state_t camera_debug;
+    ui_lines_controls_state_t lines_controls;
 } state;
 
 //------------------------------------------------------------------------------
@@ -89,6 +96,10 @@ static void init(void) {
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
     ui_viewport_init(&state.viewport, &state.viewport_rt, &state.camera);
     ui_camera_debug_init(&state.camera_debug, &state.camera);
+
+    // Initialize dynamic lines
+    dynamic_lines_init(&state.lines);
+    ui_lines_controls_init(&state.lines_controls, &state.lines);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -196,11 +207,15 @@ static void frame(void) {
     ui_controls_draw(&state.controls);
     ui_viewport_draw(&state.viewport);
     ui_camera_debug_draw(&state.camera_debug);
+    ui_lines_controls_draw(&state.lines_controls);
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
 
-    //=== RENDER CUBE TO OFFSCREEN TARGET ===
+    // Update elapsed time for animation
+    state.elapsed_time += dt;
+
+    //=== RENDER CUBE AND LINES TO OFFSCREEN TARGET ===
 
     int vp_width = state.viewport_rt.width;
     int vp_height = state.viewport_rt.height;
@@ -214,7 +229,10 @@ static void frame(void) {
 
     vs_params_t vs_params = { .mvp = mvp };
 
-    // Offscreen pass - render the cube
+    // Update dynamic lines vertex buffer
+    dynamic_lines_update(&state.lines, state.elapsed_time);
+
+    // Offscreen pass - render the cube and lines
     sg_begin_pass(&(sg_pass){
         .action = state.offscreen_pass_action,
         .attachments = {
@@ -222,10 +240,17 @@ static void frame(void) {
             .depth_stencil = state.viewport_rt.depth_att_view,
         }
     });
+
+    // Draw cube
     sg_apply_pipeline(state.pip);
     sg_apply_bindings(&state.bind);
     sg_apply_uniforms(0, &SG_RANGE(vs_params));
     sg_draw(0, 36, 1);
+
+    // Draw dynamic lines
+    mat4_t lines_mvp = mat4_mul(vp_mat, mat4_identity());
+    dynamic_lines_draw(&state.lines, lines_mvp);
+
     sg_end_pass();
 
     //=== MAIN PASS - RENDER IMGUI ===
@@ -244,6 +269,7 @@ static void frame(void) {
 //------------------------------------------------------------------------------
 static void cleanup(void) {
     imgui_storage_shutdown();
+    dynamic_lines_shutdown(&state.lines);
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();
     sg_shutdown();
