@@ -227,6 +227,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .window_title = "Sokol Cube Viewport",
         .width = 1280,
         .height = 720,
+        .high_dpi = true,
         .icon.sokol_default = true,
         .logger.func = slog_func,
     };

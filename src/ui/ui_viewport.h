@@ -7,6 +7,7 @@
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "sokol_imgui.h"
+#include "sokol_app.h"
 #include "../render_target.h"
 #include "../orbit_camera.h"
 
@@ -40,20 +41,25 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
     igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){0, 0});
     igBegin("3D Viewport", NULL, ImGuiWindowFlags_None);
 
-    // Get available content region size
+    // Get available content region size (in logical/point units)
     ImVec2 content_size = igGetContentRegionAvail();
-    int vp_width = (int)content_size.x;
-    int vp_height = (int)content_size.y;
+    int logical_width = (int)content_size.x;
+    int logical_height = (int)content_size.y;
 
     // Ensure minimum size
-    if (vp_width < RENDER_TARGET_MIN_SIZE) vp_width = RENDER_TARGET_MIN_SIZE;
-    if (vp_height < RENDER_TARGET_MIN_SIZE) vp_height = RENDER_TARGET_MIN_SIZE;
+    if (logical_width < RENDER_TARGET_MIN_SIZE) logical_width = RENDER_TARGET_MIN_SIZE;
+    if (logical_height < RENDER_TARGET_MIN_SIZE) logical_height = RENDER_TARGET_MIN_SIZE;
+
+    // Scale by DPI for sharp rendering on HiDPI displays
+    float dpi_scale = sapp_dpi_scale();
+    int rt_width = (int)(logical_width * dpi_scale);
+    int rt_height = (int)(logical_height * dpi_scale);
 
     // Check if size changed
-    if (vp_width != vp->content_width || vp_height != vp->content_height) {
-        vp->content_width = vp_width;
-        vp->content_height = vp_height;
-        render_target_resize(vp->render_target, vp_width, vp_height);
+    if (logical_width != vp->content_width || logical_height != vp->content_height) {
+        vp->content_width = logical_width;
+        vp->content_height = logical_height;
+        render_target_resize(vp->render_target, rt_width, rt_height);
         size_changed = true;
     }
 
@@ -63,7 +69,7 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
         vp->render_target->sampler
     );
     ImTextureRef_c tex_ref = { ._TexID = tex_id };
-    igImage(tex_ref, (ImVec2_c){(float)vp_width, (float)vp_height},
+    igImage(tex_ref, (ImVec2_c){(float)logical_width, (float)logical_height},
             (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
 
     // Handle camera input when mouse is over the viewport image
