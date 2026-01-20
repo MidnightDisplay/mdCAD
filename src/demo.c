@@ -2,16 +2,8 @@
 // Sokol + cimgui demo with dockspace and 3D viewport rendering a cube
 //------------------------------------------------------------------------------
 
-// Define backend before includes (same as sokol.c)
-#if defined(_WIN32)
-#define SOKOL_D3D11
-#elif defined(__EMSCRIPTEN__)
-#define SOKOL_WGPU
-#elif defined(__APPLE__)
-#define SOKOL_METAL
-#else
-#define SOKOL_GLCORE
-#endif
+// Platform detection must be first (before Sokol includes)
+#include "platform.h"
 
 #include "sokol_app.h"
 #include "sokol_gfx.h"
@@ -26,134 +18,36 @@
 #include "math3d.h"
 #include "primitives.h"
 #include "shaders/cube_shaders.h"
+#include "imgui_storage.h"
+#include "render_target.h"
+#include "ui/ui_controls.h"
+#include "ui/ui_viewport.h"
 
-#include <string.h>
-
-//------------------------------------------------------------------------------
-// Web localStorage for ImGui settings persistence
-//------------------------------------------------------------------------------
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-
-EM_JS(char*, imgui_load_ini_from_storage, (), {
-    var ini = localStorage.getItem('imgui_ini');
-    if (!ini) return 0;
-    var len = lengthBytesUTF8(ini) + 1;
-    var buf = _malloc(len);
-    stringToUTF8(ini, buf, len);
-    return buf;
-});
-
-EM_JS(void, imgui_save_ini_to_storage, (const char* ini_data), {
-    var ini = UTF8ToString(ini_data);
-    localStorage.setItem('imgui_ini', ini);
-});
-
-// Flag to trigger save from visibility change
-static bool g_should_save_ini = false;
-
-EM_JS(void, imgui_setup_visibility_handler, (), {
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-            Module._imgui_mark_should_save();
-        }
-    });
-});
-
-EMSCRIPTEN_KEEPALIVE void imgui_mark_should_save(void) {
-    g_should_save_ini = true;
-}
-#endif
+#include <math.h>
 
 //------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
-#define OFFSCREEN_WIDTH 512
-#define OFFSCREEN_HEIGHT 512
-
 typedef struct {
     mat4_t mvp;
 } vs_params_t;
 
 static struct {
-    // Offscreen rendering
-    sg_image color_img;
-    sg_image depth_img;
-    sg_view color_att_view;
-    sg_view depth_att_view;
-    sg_view tex_view;
+    // Rendering
+    render_target_t viewport_rt;
     sg_pass_action offscreen_pass_action;
+    sg_pass_action main_pass_action;
     sg_pipeline pip;
     sg_bindings bind;
-    sg_sampler sampler;
 
-    // Main pass
-    sg_pass_action main_pass_action;
-
-    // State
-    float clear_color[3];
+    // Scene state
     float rotation;
     uint64_t last_time;
 
-    // Viewport size tracking
-    int viewport_width;
-    int viewport_height;
+    // UI state
+    ui_controls_state_t controls;
+    ui_viewport_state_t viewport;
 } state;
-
-//------------------------------------------------------------------------------
-// Recreate offscreen resources when viewport size changes
-//------------------------------------------------------------------------------
-static void create_offscreen_resources(int width, int height) {
-    // Destroy old resources if they exist
-    if (state.color_img.id) {
-        sg_destroy_view(state.color_att_view);
-        sg_destroy_view(state.depth_att_view);
-        sg_destroy_view(state.tex_view);
-        sg_destroy_image(state.color_img);
-        sg_destroy_image(state.depth_img);
-    }
-
-    // Create color render target
-    state.color_img = sg_make_image(&(sg_image_desc){
-        .usage.color_attachment = true,
-        .width = width,
-        .height = height,
-        .pixel_format = SG_PIXELFORMAT_RGBA8,
-        .sample_count = 1,
-        .label = "offscreen-color"
-    });
-
-    // Create depth buffer
-    state.depth_img = sg_make_image(&(sg_image_desc){
-        .usage.depth_stencil_attachment = true,
-        .width = width,
-        .height = height,
-        .pixel_format = SG_PIXELFORMAT_DEPTH,
-        .sample_count = 1,
-        .label = "offscreen-depth"
-    });
-
-    // Create color attachment view
-    state.color_att_view = sg_make_view(&(sg_view_desc){
-        .color_attachment.image = state.color_img,
-        .label = "color-att-view"
-    });
-
-    // Create depth attachment view
-    state.depth_att_view = sg_make_view(&(sg_view_desc){
-        .depth_stencil_attachment.image = state.depth_img,
-        .label = "depth-att-view"
-    });
-
-    // Create texture view for sampling in ImGui
-    state.tex_view = sg_make_view(&(sg_view_desc){
-        .texture.image = state.color_img,
-        .label = "tex-view"
-    });
-
-    state.viewport_width = width;
-    state.viewport_height = height;
-}
 
 //------------------------------------------------------------------------------
 // Init
@@ -169,7 +63,7 @@ static void init(void) {
 
     // Setup ImGui with docking enabled
     simgui_setup(&(simgui_desc_t){
-#ifndef __EMSCRIPTEN__
+#ifndef PLATFORM_WEB
         .ini_filename = "imgui.ini",
 #endif
         .logger.func = slog_func,
@@ -179,33 +73,15 @@ static void init(void) {
     ImGuiIO* io = igGetIO_Nil();
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-#ifdef __EMSCRIPTEN__
-    // Load ImGui settings from localStorage
-    char* ini_data = imgui_load_ini_from_storage();
-    if (ini_data) {
-        igLoadIniSettingsFromMemory(ini_data, 0);
-        free(ini_data);
-    }
-    // Setup handler to save when tab becomes hidden
-    imgui_setup_visibility_handler();
-#endif
+    // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
+    imgui_storage_init();
 
-    // Initial clear color (cornflower blue)
-    state.clear_color[0] = 0.39f;
-    state.clear_color[1] = 0.58f;
-    state.clear_color[2] = 0.93f;
+    // Initialize render target
+    render_target_init(&state.viewport_rt);
 
-    // Create initial offscreen resources
-    create_offscreen_resources(OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
-
-    // Offscreen pass action
-    state.offscreen_pass_action = (sg_pass_action){
-        .colors[0] = {
-            .load_action = SG_LOADACTION_CLEAR,
-            .clear_value = { state.clear_color[0], state.clear_color[1], state.clear_color[2], 1.0f }
-        },
-        .depth = { .load_action = SG_LOADACTION_CLEAR, .clear_value = 1.0f }
-    };
+    // Initialize UI modules
+    ui_controls_init(&state.controls, &state.rotation, &state.offscreen_pass_action);
+    ui_viewport_init(&state.viewport, &state.viewport_rt);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -233,13 +109,6 @@ static void init(void) {
             .size = cube.index_count * sizeof(uint16_t)
         },
         .label = "cube-indices"
-    });
-
-    // Create sampler for ImGui to display the render target
-    state.sampler = sg_make_sampler(&(sg_sampler_desc){
-        .min_filter = SG_FILTER_LINEAR,
-        .mag_filter = SG_FILTER_LINEAR,
-        .label = "viewport-sampler"
     });
 
     // Create shader
@@ -294,16 +163,8 @@ static void init(void) {
 // Frame
 //------------------------------------------------------------------------------
 static void frame(void) {
-#ifdef __EMSCRIPTEN__
-    // Save ImGui settings when tab becomes hidden
-    if (g_should_save_ini) {
-        g_should_save_ini = false;
-        const char* ini_data = igSaveIniSettingsToMemory(NULL);
-        if (ini_data) {
-            imgui_save_ini_to_storage(ini_data);
-        }
-    }
-#endif
+    // Handle ImGui settings persistence
+    imgui_storage_frame();
 
     // Calculate delta time
     uint64_t now = stm_now();
@@ -323,58 +184,14 @@ static void frame(void) {
         .dpi_scale = sapp_dpi_scale(),
     });
 
-    //=== UI CODE ===
-
-    // Create dockspace over the entire viewport
+    //=== UI ===
     igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
-
-    // Control window
-    igBegin("Controls", NULL, ImGuiWindowFlags_None);
-    igText("3D Viewport Settings");
-    igSeparator();
-    if (igColorEdit3("Clear Color", state.clear_color, ImGuiColorEditFlags_None)) {
-        // Update pass action when color changes
-        state.offscreen_pass_action.colors[0].clear_value.r = state.clear_color[0];
-        state.offscreen_pass_action.colors[0].clear_value.g = state.clear_color[1];
-        state.offscreen_pass_action.colors[0].clear_value.b = state.clear_color[2];
-    }
-    igText("Rotation: %.2f rad", state.rotation);
-    if (igButton("Reset Rotation", (ImVec2){0, 0})) {
-        state.rotation = 0.0f;
-    }
-    igEnd();
-
-    // 3D Viewport window
-    igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (ImVec2){0, 0});
-    igBegin("3D Viewport", NULL, ImGuiWindowFlags_None);
-
-    // Get available content region size
-    ImVec2 content_size = igGetContentRegionAvail();
-    int vp_width = (int)content_size.x;
-    int vp_height = (int)content_size.y;
-
-    // Ensure minimum size
-    if (vp_width < 64) vp_width = 64;
-    if (vp_height < 64) vp_height = 64;
-
-    // Recreate offscreen resources if size changed
-    if (vp_width != state.viewport_width || vp_height != state.viewport_height) {
-        create_offscreen_resources(vp_width, vp_height);
-    }
-
-    // Display the rendered image using ImGui
-    uint64_t tex_id = simgui_imtextureid_with_sampler(state.tex_view, state.sampler);
-    ImTextureRef_c tex_ref = { ._TexID = tex_id };
-    igImage(tex_ref, (ImVec2_c){(float)vp_width, (float)vp_height},
-            (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
-
-    igEnd();
-    igPopStyleVar(1);
+    ui_controls_draw(&state.controls);
+    ui_viewport_draw(&state.viewport);
 
     //=== RENDER CUBE TO OFFSCREEN TARGET ===
 
     // Calculate MVP matrix for isometric-like view
-    // Camera positioned at 45-degree angle to see 3 faces of the cube
     float cam_dist = 3.0f;
     float cam_height = 2.0f;
     float cam_angle = 0.785398f; // 45 degrees
@@ -385,6 +202,9 @@ static void frame(void) {
     };
     vec3_t target = { 0.0f, 0.0f, 0.0f };
     vec3_t up = { 0.0f, 1.0f, 0.0f };
+
+    int vp_width = state.viewport_rt.width;
+    int vp_height = state.viewport_rt.height;
 
     mat4_t view = mat4_lookat(eye, target, up);
     mat4_t proj = mat4_perspective(0.785398f, (float)vp_width / (float)vp_height, 0.1f, 100.0f);
@@ -398,8 +218,8 @@ static void frame(void) {
     sg_begin_pass(&(sg_pass){
         .action = state.offscreen_pass_action,
         .attachments = {
-            .colors[0] = state.color_att_view,
-            .depth_stencil = state.depth_att_view,
+            .colors[0] = state.viewport_rt.color_att_view,
+            .depth_stencil = state.viewport_rt.depth_att_view,
         }
     });
     sg_apply_pipeline(state.pip);
@@ -423,18 +243,8 @@ static void frame(void) {
 // Cleanup
 //------------------------------------------------------------------------------
 static void cleanup(void) {
-#ifdef __EMSCRIPTEN__
-    // Save ImGui settings to localStorage before shutdown
-    const char* ini_data = igSaveIniSettingsToMemory(NULL);
-    if (ini_data) {
-        imgui_save_ini_to_storage(ini_data);
-    }
-#endif
-    sg_destroy_view(state.color_att_view);
-    sg_destroy_view(state.depth_att_view);
-    sg_destroy_view(state.tex_view);
-    sg_destroy_image(state.color_img);
-    sg_destroy_image(state.depth_img);
+    imgui_storage_shutdown();
+    render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();
     sg_shutdown();
 }

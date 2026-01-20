@@ -1,15 +1,9 @@
 // sokol implementation library on non-Apple platforms
 #define SOKOL_IMPL
-#if defined(_WIN32)
-#define SOKOL_D3D11
-#elif defined(__EMSCRIPTEN__)
-#define SOKOL_WGPU
-#elif defined(__APPLE__)
-// NOTE: on macOS, sokol.c is compiled explicitely as ObjC
-#define SOKOL_METAL
-#else
-#define SOKOL_GLCORE33
-#endif
+
+// Platform detection (shared with src/demo.c)
+#include "../../src/platform.h"
+
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_log.h"
