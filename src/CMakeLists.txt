@@ -4,7 +4,27 @@ set(SOURCES
     demo.c
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+# iOS requires MACOSX_BUNDLE for app packaging
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(IOS_RESOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/LaunchScreen.storyboard
+    )
+    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${SOURCES} ${IOS_RESOURCES})
+    # Compile as Objective-C for UIKit/Foundation access
+    target_compile_options(${PROJECT_NAME} PRIVATE -x objective-c)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/../ios/Info.plist
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.skl.tmp"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"  # iPhone and iPad
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "14.0"
+        RESOURCE "${IOS_RESOURCES}"
+        LINKER_LANGUAGE OBJC
+    )
+else()
+    add_executable(${PROJECT_NAME} ${SOURCES})
+endif()
 
 target_link_libraries(${PROJECT_NAME} libsokol libcimgui)
 
@@ -25,4 +45,6 @@ if (CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_SYSTEM_NAME STREQUAL Emscr
 endif()
 
 # this hack removes the xxx-CMakeForceLinker.cxx dummy file
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
+endif()

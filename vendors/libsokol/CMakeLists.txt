@@ -20,7 +20,17 @@ set(SOKOL_HEADERS
     ${libsokol_SOURCE_DIR}/sokol_log.h
     ${libsokol_SOURCE_DIR}/sokol_time.h)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
+    target_compile_options(libsokol PRIVATE -x objective-c)
+    set_target_properties(libsokol PROPERTIES LINKER_LANGUAGE OBJC)
+    target_link_libraries(libsokol PUBLIC
+        "-framework Foundation"
+        "-framework UIKit"
+        "-framework MetalKit"
+        "-framework Metal"
+        "-framework AudioToolbox")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     target_compile_options(libsokol PRIVATE -x objective-c)
     set_target_properties(libsokol PROPERTIES LINKER_LANGUAGE OBJC)

@@ -14,8 +14,13 @@
     #define SOKOL_WGPU
     #define PLATFORM_WEB
 #elif defined(__APPLE__)
+    #include <TargetConditionals.h>
     #define SOKOL_METAL
-    #define PLATFORM_MACOS
+    #if TARGET_OS_IPHONE
+        #define PLATFORM_IOS
+    #else
+        #define PLATFORM_MACOS
+    #endif
 #else
     #define SOKOL_GLCORE
     #define PLATFORM_LINUX

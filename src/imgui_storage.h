@@ -4,8 +4,69 @@
 #ifndef IMGUI_STORAGE_H
 #define IMGUI_STORAGE_H
 
+#include "platform.h"
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
+
+//------------------------------------------------------------------------------
+// iOS NSUserDefaults persistence
+//------------------------------------------------------------------------------
+#ifdef PLATFORM_IOS
+#import <UIKit/UIKit.h>
+
+static bool g_imgui_ios_should_save = false;
+static id g_imgui_ios_observer = nil;
+
+static inline char* imgui_storage_ios_load(void) {
+    @autoreleasepool {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSString *ini = [defaults stringForKey:@"imgui_ini"];
+        if (!ini || ini.length == 0) return NULL;
+
+        const char *utf8 = [ini UTF8String];
+        size_t len = strlen(utf8) + 1;
+        char *buf = (char*)malloc(len);
+        memcpy(buf, utf8, len);
+        return buf;
+    }
+}
+
+static inline void imgui_storage_ios_save(const char* ini_data) {
+    @autoreleasepool {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSString *ini = [NSString stringWithUTF8String:ini_data];
+        [defaults setObject:ini forKey:@"imgui_ini"];
+        [defaults synchronize];
+    }
+}
+
+static inline void imgui_storage_ios_mark_should_save(void) {
+    g_imgui_ios_should_save = true;
+}
+
+static inline void imgui_storage_ios_setup_handlers(void) {
+    @autoreleasepool {
+        g_imgui_ios_observer = [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationWillResignActiveNotification
+            object:nil
+            queue:[NSOperationQueue mainQueue]
+            usingBlock:^(NSNotification *note) {
+                imgui_storage_ios_mark_should_save();
+            }];
+    }
+}
+
+static inline void imgui_storage_ios_cleanup_handlers(void) {
+    @autoreleasepool {
+        if (g_imgui_ios_observer) {
+            [[NSNotificationCenter defaultCenter] removeObserver:g_imgui_ios_observer];
+            g_imgui_ios_observer = nil;
+        }
+    }
+}
+
+#endif // PLATFORM_IOS
 
 //------------------------------------------------------------------------------
 // Web localStorage persistence
@@ -51,7 +112,14 @@ EMSCRIPTEN_KEEPALIVE void imgui_storage_mark_should_save(void) {
 // Initialize ImGui settings persistence
 // Call after simgui_setup() and setting ConfigFlags
 static inline void imgui_storage_init(void) {
-#ifdef PLATFORM_WEB
+#ifdef PLATFORM_IOS
+    char* ini_data = imgui_storage_ios_load();
+    if (ini_data) {
+        igLoadIniSettingsFromMemory(ini_data, 0);
+        free(ini_data);
+    }
+    imgui_storage_ios_setup_handlers();
+#elif defined(PLATFORM_WEB)
     char* ini_data = imgui_storage_load_js();
     if (ini_data) {
         igLoadIniSettingsFromMemory(ini_data, 0);
@@ -59,13 +127,21 @@ static inline void imgui_storage_init(void) {
     }
     imgui_storage_setup_handlers_js();
 #endif
-    // Native: simgui_setup() handles ini_filename automatically
+    // Native macOS/Linux/Windows: simgui_setup() handles ini_filename automatically
 }
 
 // Call once per frame (early in frame)
-// Handles deferred saves triggered by visibility change
+// Handles deferred saves triggered by visibility change / app backgrounding
 static inline void imgui_storage_frame(void) {
-#ifdef PLATFORM_WEB
+#ifdef PLATFORM_IOS
+    if (g_imgui_ios_should_save) {
+        g_imgui_ios_should_save = false;
+        const char* ini_data = igSaveIniSettingsToMemory(NULL);
+        if (ini_data) {
+            imgui_storage_ios_save(ini_data);
+        }
+    }
+#elif defined(PLATFORM_WEB)
     if (g_imgui_should_save) {
         g_imgui_should_save = false;
         const char* ini_data = igSaveIniSettingsToMemory(NULL);
@@ -79,13 +155,19 @@ static inline void imgui_storage_frame(void) {
 // Save settings before shutdown
 // Call before simgui_shutdown()
 static inline void imgui_storage_shutdown(void) {
-#ifdef PLATFORM_WEB
+#ifdef PLATFORM_IOS
+    const char* ini_data = igSaveIniSettingsToMemory(NULL);
+    if (ini_data) {
+        imgui_storage_ios_save(ini_data);
+    }
+    imgui_storage_ios_cleanup_handlers();
+#elif defined(PLATFORM_WEB)
     const char* ini_data = igSaveIniSettingsToMemory(NULL);
     if (ini_data) {
         imgui_storage_save_js(ini_data);
     }
 #endif
-    // Native: simgui_shutdown() handles saving automatically
+    // Native macOS/Linux/Windows: simgui_shutdown() handles saving automatically
 }
 
 #endif // IMGUI_STORAGE_H
