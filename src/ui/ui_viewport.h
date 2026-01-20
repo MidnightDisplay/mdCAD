@@ -8,12 +8,14 @@
 #include "cimgui.h"
 #include "sokol_imgui.h"
 #include "../render_target.h"
+#include "../orbit_camera.h"
 
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
 typedef struct {
     render_target_t* render_target;  // Pointer to the render target to display
+    orbit_camera_t* camera;          // Pointer to the orbital camera
     int content_width;
     int content_height;
 } ui_viewport_state_t;
@@ -23,8 +25,9 @@ typedef struct {
 //------------------------------------------------------------------------------
 
 // Initialize viewport state
-static inline void ui_viewport_init(ui_viewport_state_t* vp, render_target_t* rt) {
+static inline void ui_viewport_init(ui_viewport_state_t* vp, render_target_t* rt, orbit_camera_t* cam) {
     vp->render_target = rt;
+    vp->camera = cam;
     vp->content_width = 0;
     vp->content_height = 0;
 }
@@ -62,6 +65,21 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
     ImTextureRef_c tex_ref = { ._TexID = tex_id };
     igImage(tex_ref, (ImVec2_c){(float)vp_width, (float)vp_height},
             (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
+
+    // Handle camera input when mouse is over the viewport image
+    if (vp->camera) {
+        bool hovered = igIsItemHovered(ImGuiHoveredFlags_None);
+
+        ImGuiIO* io = igGetIO_Nil();
+        float dx = io->MouseDelta.x;
+        float dy = io->MouseDelta.y;
+        float wheel = io->MouseWheel;
+        bool left = io->MouseDown[0];
+        bool middle = io->MouseDown[2];
+        bool shift = (io->KeyMods & ImGuiMod_Shift) != 0;
+
+        orbit_camera_handle_input(vp->camera, hovered, dx, dy, wheel, left, middle, shift);
+    }
 
     igEnd();
     igPopStyleVar(1);

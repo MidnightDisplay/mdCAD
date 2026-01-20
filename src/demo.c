@@ -20,8 +20,10 @@
 #include "shaders/cube_shaders.h"
 #include "imgui_storage.h"
 #include "render_target.h"
+#include "orbit_camera.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
+#include "ui/ui_camera_debug.h"
 
 #include <math.h>
 
@@ -41,12 +43,13 @@ static struct {
     sg_bindings bind;
 
     // Scene state
-    float rotation;
+    orbit_camera_t camera;
     uint64_t last_time;
 
     // UI state
     ui_controls_state_t controls;
     ui_viewport_state_t viewport;
+    ui_camera_debug_state_t camera_debug;
 } state;
 
 //------------------------------------------------------------------------------
@@ -79,9 +82,13 @@ static void init(void) {
     // Initialize render target
     render_target_init(&state.viewport_rt);
 
+    // Initialize camera
+    orbit_camera_init(&state.camera);
+
     // Initialize UI modules
-    ui_controls_init(&state.controls, &state.rotation, &state.offscreen_pass_action);
-    ui_viewport_init(&state.viewport, &state.viewport_rt);
+    ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
+    ui_viewport_init(&state.viewport, &state.viewport_rt, &state.camera);
+    ui_camera_debug_init(&state.camera_debug, &state.camera);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -155,8 +162,6 @@ static void init(void) {
         .vertex_buffers[0] = vbuf,
         .index_buffer = ibuf
     };
-
-    state.rotation = 0.0f;
 }
 
 //------------------------------------------------------------------------------
@@ -171,11 +176,13 @@ static void frame(void) {
     float dt = (float)stm_sec(stm_diff(now, state.last_time));
     state.last_time = now;
 
-    // Rotate cube slowly
-    state.rotation += dt * 0.5f;
-
     const int width = sapp_width();
     const int height = sapp_height();
+
+    // Update camera begin frame (check if mouse buttons released)
+    ImGuiIO* io = igGetIO_Nil();
+    bool any_mouse_down = io->MouseDown[0] || io->MouseDown[1] || io->MouseDown[2];
+    orbit_camera_begin_frame(&state.camera, any_mouse_down);
 
     simgui_new_frame(&(simgui_frame_desc_t){
         .width = width,
@@ -188,27 +195,20 @@ static void frame(void) {
     igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
     ui_controls_draw(&state.controls);
     ui_viewport_draw(&state.viewport);
+    ui_camera_debug_draw(&state.camera_debug);
+
+    // Update camera (apply inertia after UI has processed input)
+    orbit_camera_update(&state.camera, dt);
 
     //=== RENDER CUBE TO OFFSCREEN TARGET ===
-
-    // Calculate MVP matrix for isometric-like view
-    float cam_dist = 3.0f;
-    float cam_height = 2.0f;
-    float cam_angle = 0.785398f; // 45 degrees
-    vec3_t eye = {
-        cam_dist * sinf(cam_angle),
-        cam_height,
-        cam_dist * cosf(cam_angle)
-    };
-    vec3_t target = { 0.0f, 0.0f, 0.0f };
-    vec3_t up = { 0.0f, 1.0f, 0.0f };
 
     int vp_width = state.viewport_rt.width;
     int vp_height = state.viewport_rt.height;
 
-    mat4_t view = mat4_lookat(eye, target, up);
+    // Get view matrix from orbital camera
+    mat4_t view = orbit_camera_get_view_matrix(&state.camera);
     mat4_t proj = mat4_perspective(0.785398f, (float)vp_width / (float)vp_height, 0.1f, 100.0f);
-    mat4_t model = mat4_rotate_y(state.rotation);
+    mat4_t model = mat4_identity();  // Cube is static, camera moves
     mat4_t vp_mat = mat4_mul(proj, view);
     mat4_t mvp = mat4_mul(vp_mat, model);
 

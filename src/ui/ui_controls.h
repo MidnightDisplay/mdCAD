@@ -7,13 +7,14 @@
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "sokol_gfx.h"
+#include "../orbit_camera.h"
 
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
 typedef struct {
     float clear_color[3];
-    float* rotation;                      // Pointer to rotation value (shared state)
+    orbit_camera_t* camera;               // Pointer to orbital camera
     sg_pass_action* offscreen_pass_action; // Pointer to pass action to update
 } ui_controls_state_t;
 
@@ -22,12 +23,12 @@ typedef struct {
 //------------------------------------------------------------------------------
 
 // Initialize controls state
-static inline void ui_controls_init(ui_controls_state_t* ctrl, float* rotation, sg_pass_action* pass_action) {
+static inline void ui_controls_init(ui_controls_state_t* ctrl, orbit_camera_t* camera, sg_pass_action* pass_action) {
     // Initial clear color (cornflower blue)
     ctrl->clear_color[0] = 0.39f;
     ctrl->clear_color[1] = 0.58f;
     ctrl->clear_color[2] = 0.93f;
-    ctrl->rotation = rotation;
+    ctrl->camera = camera;
     ctrl->offscreen_pass_action = pass_action;
 
     // Initialize pass action with default clear color
@@ -54,10 +55,14 @@ static inline void ui_controls_draw(ui_controls_state_t* ctrl) {
         ctrl->offscreen_pass_action->colors[0].clear_value.b = ctrl->clear_color[2];
     }
 
-    igText("Rotation: %.2f rad", *ctrl->rotation);
+    igSeparator();
+    igText("Camera Controls:");
+    igBulletText("Left drag: Orbit");
+    igBulletText("Middle drag / Shift+Left: Pan");
+    igBulletText("Scroll: Zoom");
 
-    if (igButton("Reset Rotation", (ImVec2){0, 0})) {
-        *ctrl->rotation = 0.0f;
+    if (igButton("Reset Camera", (ImVec2){0, 0})) {
+        orbit_camera_reset(ctrl->camera);
     }
 
     igEnd();
