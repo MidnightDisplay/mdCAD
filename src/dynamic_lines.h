@@ -58,8 +58,9 @@ typedef struct {
     float wiggle_frequency;
     float line_length;
 
-    // RNG state (for reproducible regeneration)
+    // RNG state
     uint32_t rng_state;
+    uint32_t seed_counter;  // Increments on each regeneration for variety
 } dynamic_lines_t;
 
 //------------------------------------------------------------------------------
@@ -101,14 +102,14 @@ static inline vec3_t lines_random_direction(dynamic_lines_t* dl) {
 // Regeneration functions
 //------------------------------------------------------------------------------
 static inline void dynamic_lines_regenerate_positions(dynamic_lines_t* dl) {
-    dl->rng_state = 12345u;  // Reset for reproducible positions
+    dl->rng_state = 12345u + dl->seed_counter++ * 111u;
     for (int i = 0; i < LINES_COUNT; i++) {
         dl->lines[i].base_pos = lines_random_point_in_sphere(dl, dl->sphere_radius);
     }
 }
 
 static inline void dynamic_lines_regenerate_directions(dynamic_lines_t* dl) {
-    dl->rng_state = 67890u;  // Different seed for directions
+    dl->rng_state = 67890u + dl->seed_counter++ * 222u;
     for (int i = 0; i < LINES_COUNT; i++) {
         dl->lines[i].direction = lines_random_direction(dl);
         dl->lines[i].motion_dir = lines_random_direction(dl);
@@ -117,7 +118,7 @@ static inline void dynamic_lines_regenerate_directions(dynamic_lines_t* dl) {
 }
 
 static inline void dynamic_lines_regenerate_colors(dynamic_lines_t* dl) {
-    dl->rng_state = 13579u;  // Different seed for colors
+    dl->rng_state = 13579u + dl->seed_counter++ * 333u;
     for (int i = 0; i < LINES_COUNT; i++) {
         // Generate vibrant colors by using HSV-like approach
         float hue = lines_randf(dl);
@@ -164,6 +165,7 @@ static inline void dynamic_lines_init(dynamic_lines_t* dl) {
     dl->wiggle_frequency = LINES_DEFAULT_WIGGLE_FREQUENCY;
     dl->line_length = LINES_DEFAULT_LINE_LENGTH;
     dl->rng_state = 12345u;
+    dl->seed_counter = 0u;
 
     // Generate initial line data
     dynamic_lines_regenerate_all(dl);
