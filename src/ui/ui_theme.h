@@ -210,46 +210,46 @@ static inline void ui_theme_apply_catppuccin_frappe(void) {
     colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.514f, 0.545f, 0.655f, 1.00f};     // #838ba7 (Overlay1)
 
     // Checkmark and sliders - Lavender accent
-    colors[ImGuiCol_CheckMark]              = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // #babbf1 (Lavender)
-    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // #babbf1 (Lavender)
     colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.549f, 0.667f, 0.933f, 1.00f};     // #8caaee (Blue)
 
     // Buttons
     colors[ImGuiCol_Button]                 = (ImVec4){0.318f, 0.341f, 0.427f, 1.00f};     // #51576d (Surface1)
-    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.729f, 0.733f, 0.945f, 0.80f};     // #babbf1 (Lavender)
-    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.792f, 0.619f, 0.902f, 0.80f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // #babbf1 (Lavender)
 
     // Headers
     colors[ImGuiCol_Header]                 = (ImVec4){0.318f, 0.341f, 0.427f, 1.00f};     // #51576d (Surface1)
-    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.729f, 0.733f, 0.945f, 0.60f};     // #babbf1 (Lavender)
-    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.729f, 0.733f, 0.945f, 0.80f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.792f, 0.619f, 0.902f, 0.60f};     // #babbf1 (Lavender)
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.792f, 0.619f, 0.902f, 0.80f};     // #babbf1 (Lavender)
 
     // Separators
     colors[ImGuiCol_Separator]              = (ImVec4){0.384f, 0.408f, 0.502f, 1.00f};     // #626880 (Surface2)
-    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.729f, 0.733f, 0.945f, 0.60f};     // Lavender
-    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // Lavender
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.792f, 0.619f, 0.902f, 0.60f};     // Lavender
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // Lavender
 
     // Resize grip
     colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.384f, 0.408f, 0.502f, 0.50f};     // Surface2
-    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.729f, 0.733f, 0.945f, 0.60f};     // Lavender
-    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // Lavender
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.792f, 0.619f, 0.902f, 0.60f};     // Lavender
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // Lavender
 
     // Tabs
     colors[ImGuiCol_Tab]                    = (ImVec4){0.161f, 0.173f, 0.235f, 1.00f};     // #292c3c (Mantle)
-    colors[ImGuiCol_TabHovered]             = (ImVec4){0.729f, 0.733f, 0.945f, 0.80f};     // Lavender
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.792f, 0.619f, 0.902f, 0.80f};     // Lavender
     colors[ImGuiCol_TabSelected]            = (ImVec4){0.318f, 0.341f, 0.427f, 1.00f};     // #51576d (Surface1)
-    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // Lavender
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // Lavender
     colors[ImGuiCol_TabDimmed]              = (ImVec4){0.137f, 0.149f, 0.204f, 1.00f};     // Crust
     colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.255f, 0.271f, 0.349f, 1.00f};     // Surface0
     colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.514f, 0.545f, 0.655f, 1.00f}; // Overlay1
 
     // Docking
-    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.729f, 0.733f, 0.945f, 0.50f};     // Lavender
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.792f, 0.619f, 0.902f, 0.50f};     // Lavender
     colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.137f, 0.149f, 0.204f, 1.00f};     // Crust
 
     // Plots - using theme accent colors
     colors[ImGuiCol_PlotLines]              = (ImVec4){0.549f, 0.667f, 0.933f, 1.00f};     // Blue
-    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.906f, 0.510f, 0.518f, 1.00f};     // Red #e78284
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.906f, 0.510f, 0.518f, 1.00f};     // Red rgb(231, 130, 132)
     colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.651f, 0.820f, 0.537f, 1.00f};     // Green #a6d189
     colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.898f, 0.784f, 0.565f, 1.00f};     // Yellow #e5c890
 
@@ -261,9 +261,9 @@ static inline void ui_theme_apply_catppuccin_frappe(void) {
     colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.776f, 0.816f, 0.961f, 0.03f};     // Text @ 3%
 
     // Selection and highlights
-    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.729f, 0.733f, 0.945f, 0.30f};     // Lavender
-    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.729f, 0.733f, 0.945f, 0.90f};     // Lavender
-    colors[ImGuiCol_NavCursor]              = (ImVec4){0.729f, 0.733f, 0.945f, 1.00f};     // Lavender
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.792f, 0.619f, 0.902f, 0.30f};     // Lavender #BABAF1 #BABAF1 202, 158, 230 #ca9ee6 0.792f, 0.619f, 0.902f | 0.729f, 0.733f, 0.945f
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.792f, 0.619f, 0.902f, 0.90f};     // Lavender
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.792f, 0.619f, 0.902f, 1.00f};     // Lavender
     colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.776f, 0.816f, 0.961f, 0.70f};     // Text
     colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.137f, 0.149f, 0.204f, 0.50f};     // Crust
     colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.137f, 0.149f, 0.204f, 0.50f};     // Crust
