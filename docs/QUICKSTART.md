@@ -17,6 +17,35 @@ Quick build & run:
 ninja -C build -d stats && ./build/bin/skl_tmp
 ```
 
+## iOS build using Xcode
+
+Clean, configure and generate Xcode project:
+``` bash
+rm -rf build-ios && cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
+```
+
+Configure only (if build-ios doesn't exist):
+``` bash
+cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
+```
+
+Open in Xcode:
+``` bash
+open build-ios/skl_tmp.xcodeproj
+```
+
+Build from command line for simulator:
+``` bash
+xcodebuild -project build-ios/skl_tmp.xcodeproj -scheme skl_tmp -sdk iphonesimulator -configuration Release
+```
+
+Build from command line for device (requires code signing):
+``` bash
+xcodebuild -project build-ios/skl_tmp.xcodeproj -scheme skl_tmp -sdk iphoneos -configuration Release
+```
+
+**Note:** For device builds, you'll need to configure code signing in Xcode (open the project, select your team in Signing & Capabilities).
+
 ## Web build using emscripten
 
 Clean, configure and build using Emscripten:

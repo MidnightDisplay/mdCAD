@@ -79,7 +79,7 @@ static void init(void) {
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Apply Visual Studio theme
-    ui_theme_apply_visual_studio();
+    ui_theme_apply_catppuccin_frappe();
 
     // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
     imgui_storage_init();

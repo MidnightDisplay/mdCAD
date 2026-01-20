@@ -31,7 +31,7 @@ static inline void ui_lines_controls_draw(ui_lines_controls_state_t* state) {
         igSeparator();
 
         // Regeneration buttons
-        igTextColored((ImVec4){1.0f, 1.0f, 0.5f, 1.0f}, "Regenerate");
+        igText("Regenerate");
         if (igButton("All", (ImVec2){0, 0})) {
             dynamic_lines_regenerate_all(dl);
         }
@@ -51,7 +51,7 @@ static inline void ui_lines_controls_draw(ui_lines_controls_state_t* state) {
         igSeparator();
 
         // Parameter sliders
-        igTextColored((ImVec4){1.0f, 1.0f, 0.5f, 1.0f}, "Parameters");
+        igText("Parameters");
 
         bool positions_changed = false;
         positions_changed |= igSliderFloat("Sphere Radius", &dl->sphere_radius, 1.0f, 20.0f, "%.1f", 0);
