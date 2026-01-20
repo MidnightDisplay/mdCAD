@@ -16,47 +16,42 @@
 
 // Project modules
 #include "math3d.h"
-#include "primitives.h"
-#include "shaders/cube_shaders.h"
 #include "imgui_storage.h"
 #include "render_target.h"
 #include "orbit_camera.h"
+#include "static_cube.h"
+#include "dynamic_lines.h"
+#include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
 #include "ui/ui_camera_debug.h"
-#include "dynamic_lines.h"
 #include "ui/ui_lines_controls.h"
-
-#include <math.h>
+#include "ui/ui_visibility.h"
 
 //------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
-typedef struct {
-    mat4_t mvp;
-} vs_params_t;
-
 static struct {
     // Rendering
     render_target_t viewport_rt;
     sg_pass_action offscreen_pass_action;
     sg_pass_action main_pass_action;
-    sg_pipeline pip;
-    sg_bindings bind;
+
+    // Renderables
+    static_cube_t cube;
+    dynamic_lines_t lines;
 
     // Scene state
     orbit_camera_t camera;
     uint64_t last_time;
     float elapsed_time;
 
-    // Dynamic lines
-    dynamic_lines_t lines;
-
     // UI state
     ui_controls_state_t controls;
     ui_viewport_state_t viewport;
     ui_camera_debug_state_t camera_debug;
     ui_lines_controls_state_t lines_controls;
+    ui_visibility_state_t visibility;
 } state;
 
 //------------------------------------------------------------------------------
@@ -83,6 +78,9 @@ static void init(void) {
     ImGuiIO* io = igGetIO_Nil();
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+    // Apply Visual Studio theme
+    ui_theme_apply_visual_studio();
+
     // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
     imgui_storage_init();
 
@@ -92,86 +90,20 @@ static void init(void) {
     // Initialize camera
     orbit_camera_init(&state.camera);
 
+    // Initialize renderables
+    static_cube_init(&state.cube);
+    dynamic_lines_init(&state.lines);
+
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
     ui_viewport_init(&state.viewport, &state.viewport_rt, &state.camera);
     ui_camera_debug_init(&state.camera_debug, &state.camera);
-
-    // Initialize dynamic lines
-    dynamic_lines_init(&state.lines);
     ui_lines_controls_init(&state.lines_controls, &state.lines);
+    ui_visibility_init(&state.visibility);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
         .colors[0] = { .load_action = SG_LOADACTION_CLEAR, .clear_value = { 0.1f, 0.1f, 0.1f, 1.0f } }
-    };
-
-    // Get cube mesh data
-    mesh_t cube = mesh_cube();
-
-    // Create vertex buffer
-    sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
-        .usage.vertex_buffer = true,
-        .data = {
-            .ptr = cube.vertices,
-            .size = cube.vertex_count * sizeof(vertex_t)
-        },
-        .label = "cube-vertices"
-    });
-
-    // Create index buffer
-    sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
-        .usage.index_buffer = true,
-        .data = {
-            .ptr = cube.indices,
-            .size = cube.index_count * sizeof(uint16_t)
-        },
-        .label = "cube-indices"
-    });
-
-    // Create shader
-    sg_shader shd = sg_make_shader(&(sg_shader_desc){
-        .vertex_func = {
-            .source = cube_vs_source,
-            .entry = "vs_main",
-        },
-        .fragment_func = {
-            .source = cube_fs_source,
-            .entry = "fs_main",
-        },
-        .uniform_blocks[0] = {
-            .stage = SG_SHADERSTAGE_VERTEX,
-            .size = sizeof(vs_params_t),
-            .layout = SG_UNIFORMLAYOUT_STD140,
-            .glsl_uniforms[0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" }
-        },
-        .label = "cube-shader"
-    });
-
-    // Create pipeline
-    state.pip = sg_make_pipeline(&(sg_pipeline_desc){
-        .shader = shd,
-        .layout = {
-            .attrs = {
-                [0] = { .format = SG_VERTEXFORMAT_FLOAT3 },  // position
-                [1] = { .format = SG_VERTEXFORMAT_FLOAT3 }   // normal
-            }
-        },
-        .index_type = SG_INDEXTYPE_UINT16,
-        .cull_mode = SG_CULLMODE_BACK,
-        .depth = {
-            .compare = SG_COMPAREFUNC_LESS_EQUAL,
-            .write_enabled = true,
-            .pixel_format = SG_PIXELFORMAT_DEPTH
-        },
-        .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-        .label = "cube-pipeline"
-    });
-
-    // Setup bindings
-    state.bind = (sg_bindings){
-        .vertex_buffers[0] = vbuf,
-        .index_buffer = ibuf
     };
 }
 
@@ -208,6 +140,7 @@ static void frame(void) {
     ui_viewport_draw(&state.viewport);
     ui_camera_debug_draw(&state.camera_debug);
     ui_lines_controls_draw(&state.lines_controls);
+    ui_visibility_draw(&state.visibility);
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
@@ -215,7 +148,7 @@ static void frame(void) {
     // Update elapsed time for animation
     state.elapsed_time += dt;
 
-    //=== RENDER CUBE AND LINES TO OFFSCREEN TARGET ===
+    //=== RENDER TO OFFSCREEN TARGET ===
 
     int vp_width = state.viewport_rt.width;
     int vp_height = state.viewport_rt.height;
@@ -223,16 +156,13 @@ static void frame(void) {
     // Get view matrix from orbital camera
     mat4_t view = orbit_camera_get_view_matrix(&state.camera);
     mat4_t proj = mat4_perspective(0.785398f, (float)vp_width / (float)vp_height, 0.1f, 100.0f);
-    mat4_t model = mat4_identity();  // Cube is static, camera moves
     mat4_t vp_mat = mat4_mul(proj, view);
-    mat4_t mvp = mat4_mul(vp_mat, model);
+    mat4_t mvp = mat4_mul(vp_mat, mat4_identity());
 
-    vs_params_t vs_params = { .mvp = mvp };
-
-    // Update dynamic lines vertex buffer
+    // Update dynamic lines vertex buffer (always update even if hidden, for smooth animation)
     dynamic_lines_update(&state.lines, state.elapsed_time);
 
-    // Offscreen pass - render the cube and lines
+    // Offscreen pass - render visible objects
     sg_begin_pass(&(sg_pass){
         .action = state.offscreen_pass_action,
         .attachments = {
@@ -241,15 +171,15 @@ static void frame(void) {
         }
     });
 
-    // Draw cube
-    sg_apply_pipeline(state.pip);
-    sg_apply_bindings(&state.bind);
-    sg_apply_uniforms(0, &SG_RANGE(vs_params));
-    sg_draw(0, 36, 1);
+    // Draw cube if visible
+    if (state.visibility.show_cube) {
+        static_cube_draw(&state.cube, mvp);
+    }
 
-    // Draw dynamic lines
-    mat4_t lines_mvp = mat4_mul(vp_mat, mat4_identity());
-    dynamic_lines_draw(&state.lines, lines_mvp);
+    // Draw dynamic lines if visible
+    if (state.visibility.show_lines) {
+        dynamic_lines_draw(&state.lines, mvp);
+    }
 
     sg_end_pass();
 
@@ -269,6 +199,7 @@ static void frame(void) {
 //------------------------------------------------------------------------------
 static void cleanup(void) {
     imgui_storage_shutdown();
+    static_cube_shutdown(&state.cube);
     dynamic_lines_shutdown(&state.lines);
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();

@@ -24,10 +24,9 @@ typedef struct {
 
 // Initialize controls state
 static inline void ui_controls_init(ui_controls_state_t* ctrl, orbit_camera_t* camera, sg_pass_action* pass_action) {
-    // Initial clear color (cornflower blue)
-    ctrl->clear_color[0] = 0.39f;
-    ctrl->clear_color[1] = 0.58f;
-    ctrl->clear_color[2] = 0.93f;
+    ctrl->clear_color[0] = 0.20f;
+    ctrl->clear_color[1] = 0.20f;
+    ctrl->clear_color[2] = 0.216f;
     ctrl->camera = camera;
     ctrl->offscreen_pass_action = pass_action;
 
