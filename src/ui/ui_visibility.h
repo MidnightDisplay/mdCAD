@@ -17,7 +17,8 @@
 typedef struct {
     bool show_cube;
     bool show_lines;
-    // Add new visibility flags here as you add more objects
+    bool show_instanced_lines;
+    bool show_instanced_polylines;
 } ui_visibility_state_t;
 
 //------------------------------------------------------------------------------
@@ -26,17 +27,18 @@ typedef struct {
 
 static inline void ui_visibility_init(ui_visibility_state_t* vis) {
     vis->show_cube = false;
-    vis->show_lines = true;
-    // Initialize new flags to true by default
+    vis->show_lines = false;
+    vis->show_instanced_lines = true;
+    vis->show_instanced_polylines = true;
 }
 
 static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
     igBegin("Visibility", NULL, 0);
 
     igCheckbox("Show Cube", &vis->show_cube);
-    igCheckbox("Show Lines", &vis->show_lines);
-    // Add new checkboxes here:
-    // igCheckbox("Show NewObject", &vis->show_new_object);
+    igCheckbox("Show Lines (thin)", &vis->show_lines);
+    igCheckbox("Show Instanced Lines (thick)", &vis->show_instanced_lines);
+    igCheckbox("Show Instanced Polylines", &vis->show_instanced_polylines);
 
     igEnd();
 }

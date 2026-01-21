@@ -21,11 +21,14 @@
 #include "orbit_camera.h"
 #include "static_cube.h"
 #include "dynamic_lines.h"
+#include "instanced_lines.h"
+#include "instanced_polylines.h"
 #include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
 #include "ui/ui_camera_debug.h"
 #include "ui/ui_lines_controls.h"
+#include "ui/ui_thick_lines_controls.h"
 #include "ui/ui_visibility.h"
 
 //------------------------------------------------------------------------------
@@ -40,6 +43,8 @@ static struct {
     // Renderables
     static_cube_t cube;
     dynamic_lines_t lines;
+    instanced_lines_t instanced_lines;
+    instanced_polylines_t instanced_polylines;
 
     // Scene state
     orbit_camera_t camera;
@@ -51,6 +56,7 @@ static struct {
     ui_viewport_state_t viewport;
     ui_camera_debug_state_t camera_debug;
     ui_lines_controls_state_t lines_controls;
+    ui_thick_lines_controls_state_t thick_lines_controls;
     ui_visibility_state_t visibility;
 } state;
 
@@ -93,12 +99,15 @@ static void init(void) {
     // Initialize renderables
     static_cube_init(&state.cube);
     dynamic_lines_init(&state.lines);
+    instanced_lines_init(&state.instanced_lines);
+    instanced_polylines_init(&state.instanced_polylines);
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
     ui_viewport_init(&state.viewport, &state.viewport_rt, &state.camera);
     ui_camera_debug_init(&state.camera_debug, &state.camera);
     ui_lines_controls_init(&state.lines_controls, &state.lines);
+    ui_thick_lines_controls_init(&state.thick_lines_controls, &state.instanced_lines, &state.instanced_polylines);
     ui_visibility_init(&state.visibility);
 
     // Main pass action (just clear to dark gray)
@@ -140,6 +149,7 @@ static void frame(void) {
     ui_viewport_draw(&state.viewport);
     ui_camera_debug_draw(&state.camera_debug);
     ui_lines_controls_draw(&state.lines_controls);
+    ui_thick_lines_controls_draw(&state.thick_lines_controls);
     ui_visibility_draw(&state.visibility);
 
     // Update camera (apply inertia after UI has processed input)
@@ -161,6 +171,11 @@ static void frame(void) {
 
     // Update dynamic lines vertex buffer (always update even if hidden, for smooth animation)
     dynamic_lines_update(&state.lines, state.elapsed_time);
+    instanced_lines_update(&state.instanced_lines, state.elapsed_time);
+    instanced_polylines_update(&state.instanced_polylines, state.elapsed_time);
+
+    // Calculate aspect ratio for thick line rendering
+    float aspect_ratio = (float)vp_width / (float)vp_height;
 
     // Offscreen pass - render visible objects
     sg_begin_pass(&(sg_pass){
@@ -179,6 +194,16 @@ static void frame(void) {
     // Draw dynamic lines if visible
     if (state.visibility.show_lines) {
         dynamic_lines_draw(&state.lines, mvp);
+    }
+
+    // Draw instanced thick lines if visible
+    if (state.visibility.show_instanced_lines) {
+        instanced_lines_draw(&state.instanced_lines, mvp, aspect_ratio);
+    }
+
+    // Draw instanced polylines if visible
+    if (state.visibility.show_instanced_polylines) {
+        instanced_polylines_draw(&state.instanced_polylines, mvp, aspect_ratio);
     }
 
     sg_end_pass();
@@ -201,6 +226,8 @@ static void cleanup(void) {
     imgui_storage_shutdown();
     static_cube_shutdown(&state.cube);
     dynamic_lines_shutdown(&state.lines);
+    instanced_lines_shutdown(&state.instanced_lines);
+    instanced_polylines_shutdown(&state.instanced_polylines);
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();
     sg_shutdown();
