@@ -16,7 +16,7 @@
 //------------------------------------------------------------------------------
 // Configuration
 //------------------------------------------------------------------------------
-#define LINES_COUNT 10000
+#define LINES_COUNT 10
 #define LINES_DEFAULT_SPHERE_RADIUS 5.0f
 #define LINES_DEFAULT_WIGGLE_AMPLITUDE 0.3f
 #define LINES_DEFAULT_WIGGLE_FREQUENCY 2.0f

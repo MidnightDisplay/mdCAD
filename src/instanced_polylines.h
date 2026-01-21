@@ -19,7 +19,7 @@
 // Configuration
 //------------------------------------------------------------------------------
 #define POLYLINES_COUNT 5
-#define POLYLINE_POINTS 40
+#define POLYLINE_POINTS 15
 #define POLYLINES_MAX_SEGMENTS (POLYLINES_COUNT * (POLYLINE_POINTS - 1))
 #define POLYLINES_MAX_JOINS (POLYLINES_COUNT * (POLYLINE_POINTS - 2))
 #define POLYLINES_CAP_SEGMENTS 12

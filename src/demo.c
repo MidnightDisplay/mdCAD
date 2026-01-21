@@ -23,6 +23,8 @@
 #include "dynamic_lines.h"
 #include "instanced_lines.h"
 #include "instanced_polylines.h"
+#include "instanced_lines_alpha.h"
+#include "gcode_polyline.h"
 #include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
@@ -30,6 +32,7 @@
 #include "ui/ui_lines_controls.h"
 #include "ui/ui_thick_lines_controls.h"
 #include "ui/ui_visibility.h"
+#include "ui/ui_gcode_controls.h"
 
 //------------------------------------------------------------------------------
 // Application state
@@ -45,6 +48,9 @@ static struct {
     dynamic_lines_t lines;
     instanced_lines_t instanced_lines;
     instanced_polylines_t instanced_polylines;
+    instanced_lines_alpha_t alpha_lines;
+    gcode_polyline_t gcode_polyline;
+    bool gcode_loaded;
 
     // Scene state
     orbit_camera_t camera;
@@ -58,6 +64,7 @@ static struct {
     ui_lines_controls_state_t lines_controls;
     ui_thick_lines_controls_state_t thick_lines_controls;
     ui_visibility_state_t visibility;
+    ui_gcode_controls_state_t gcode_controls;
 } state;
 
 //------------------------------------------------------------------------------
@@ -101,6 +108,10 @@ static void init(void) {
     dynamic_lines_init(&state.lines);
     instanced_lines_init(&state.instanced_lines);
     instanced_polylines_init(&state.instanced_polylines);
+    instanced_lines_alpha_init(&state.alpha_lines);
+
+    // Load G-code file
+    state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
@@ -109,6 +120,9 @@ static void init(void) {
     ui_lines_controls_init(&state.lines_controls, &state.lines);
     ui_thick_lines_controls_init(&state.thick_lines_controls, &state.instanced_lines, &state.instanced_polylines);
     ui_visibility_init(&state.visibility);
+    ui_gcode_controls_init(&state.gcode_controls,
+        state.gcode_loaded ? &state.gcode_polyline : NULL,
+        &state.alpha_lines);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -151,6 +165,7 @@ static void frame(void) {
     ui_lines_controls_draw(&state.lines_controls);
     ui_thick_lines_controls_draw(&state.thick_lines_controls);
     ui_visibility_draw(&state.visibility);
+    ui_gcode_controls_draw(&state.gcode_controls);
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
@@ -173,6 +188,10 @@ static void frame(void) {
     dynamic_lines_update(&state.lines, state.elapsed_time);
     instanced_lines_update(&state.instanced_lines, state.elapsed_time);
     instanced_polylines_update(&state.instanced_polylines, state.elapsed_time);
+    instanced_lines_alpha_update(&state.alpha_lines, state.elapsed_time);
+    if (state.gcode_loaded) {
+        gcode_polyline_update(&state.gcode_polyline);
+    }
 
     // Calculate aspect ratio for thick line rendering
     float aspect_ratio = (float)vp_width / (float)vp_height;
@@ -206,6 +225,17 @@ static void frame(void) {
         instanced_polylines_draw(&state.instanced_polylines, mvp, aspect_ratio);
     }
 
+    // Draw alpha-blended objects (after opaque objects)
+    // G-code path
+    if (state.visibility.show_gcode_path && state.gcode_loaded) {
+        gcode_polyline_draw(&state.gcode_polyline, mvp, aspect_ratio);
+    }
+
+    // Alpha-blended animated lines
+    if (state.visibility.show_alpha_lines) {
+        instanced_lines_alpha_draw(&state.alpha_lines, mvp, aspect_ratio);
+    }
+
     sg_end_pass();
 
     //=== MAIN PASS - RENDER IMGUI ===
@@ -228,6 +258,10 @@ static void cleanup(void) {
     dynamic_lines_shutdown(&state.lines);
     instanced_lines_shutdown(&state.instanced_lines);
     instanced_polylines_shutdown(&state.instanced_polylines);
+    instanced_lines_alpha_shutdown(&state.alpha_lines);
+    if (state.gcode_loaded) {
+        gcode_polyline_shutdown(&state.gcode_polyline);
+    }
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();
     sg_shutdown();
