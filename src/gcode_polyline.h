@@ -34,12 +34,39 @@ typedef struct {
     float x, y, z;
 } gcode_template_vertex_t;
 
+// Old segment instance (2 points) - kept for caps
 typedef struct {
     float ax, ay, az;
     float bx, by, bz;
     float r, g, b, a;
 } gcode_segment_instance_t;
 
+// Intermediate segment instance (4 points: pA, pB, pC, pD)
+typedef struct {
+    float pAx, pAy, pAz;
+    float pBx, pBy, pBz;
+    float pCx, pCy, pCz;
+    float pDx, pDy, pDz;
+    float r, g, b, a;
+} gcode_intermediate_segment_t;
+
+// Terminal segment instance (3 points: pA, pB, pC)
+typedef struct {
+    float pAx, pAy, pAz;
+    float pBx, pBy, pBz;
+    float pCx, pCy, pCz;
+    float r, g, b, a;
+} gcode_terminal_segment_t;
+
+// Pie-slice join instance (3 points: pA, pB, pC)
+typedef struct {
+    float pAx, pAy, pAz;  // previous point
+    float pBx, pBy, pBz;  // join center
+    float pCx, pCy, pCz;  // next point
+    float r, g, b, a;
+} gcode_pie_join_instance_t;
+
+// Old join instance (1 point) - kept for reference
 typedef struct {
     float px, py, pz;
     float r, g, b, a;
@@ -53,34 +80,65 @@ typedef struct {
 } gcode_polyline_params_t;
 
 typedef struct {
-    // GPU resources for segments
-    sg_pipeline segment_pip;
-    sg_buffer segment_template_vbuf;
-    sg_buffer segment_template_ibuf;
-    sg_buffer segment_instance_buf;
-    sg_shader segment_shd;
-    int segment_template_vertex_count;
-    int segment_template_index_count;
+    mat4_t mvp;
+    float line_width;
+    float aspect_ratio;
+    float join_resolution;
+    float _pad;
+} gcode_pie_join_params_t;
 
-    // GPU resources for joins
-    sg_pipeline join_pip;
-    sg_buffer join_template_vbuf;
-    sg_buffer join_template_ibuf;
-    sg_buffer join_instance_buf;
-    sg_shader join_shd;
-    int join_template_vertex_count;
-    int join_template_index_count;
+typedef struct {
+    // GPU resources for intermediate segments (miter-adjusted at both ends)
+    sg_pipeline intermediate_pip;
+    sg_buffer intermediate_template_vbuf;
+    sg_buffer intermediate_template_ibuf;
+    sg_buffer intermediate_instance_buf;
+    sg_shader intermediate_shd;
+    int intermediate_template_vertex_count;
+    int intermediate_template_index_count;
+
+    // GPU resources for terminal segments (miter-adjusted at one end)
+    sg_pipeline terminal_pip;
+    sg_buffer terminal_template_vbuf;
+    sg_buffer terminal_template_ibuf;
+    sg_buffer terminal_start_instance_buf;  // First segment
+    sg_buffer terminal_end_instance_buf;    // Last segment
+    sg_shader terminal_shd;
+    int terminal_template_vertex_count;
+    int terminal_template_index_count;
+
+    // GPU resources for pie-slice joins
+    sg_pipeline pie_join_pip;
+    sg_buffer pie_join_template_vbuf;
+    sg_buffer pie_join_template_ibuf;
+    sg_buffer pie_join_instance_buf;
+    sg_shader pie_join_shd;
+    int pie_join_template_vertex_count;
+    int pie_join_template_index_count;
+
+    // GPU resources for caps (semicircles at start and end)
+    sg_pipeline cap_pip;
+    sg_buffer cap_template_vbuf;
+    sg_buffer cap_template_ibuf;
+    sg_buffer cap_instance_buf;
+    sg_shader cap_shd;
+    int cap_template_vertex_count;
+    int cap_template_index_count;
 
     // Path data
     gcode_path_t path;
 
     // Instance data (dynamically allocated)
-    gcode_segment_instance_t* segments;
-    gcode_join_instance_t* joins;
-    int segment_count;
-    int join_count;
-    int max_segments;
-    int max_joins;
+    gcode_intermediate_segment_t* intermediate_segments;
+    gcode_terminal_segment_t* terminal_start;  // First segment (single)
+    gcode_terminal_segment_t* terminal_end;    // Last segment (single)
+    gcode_pie_join_instance_t* pie_joins;
+    gcode_segment_instance_t* caps;
+    int intermediate_count;
+    int pie_join_count;
+    int cap_count;
+    int max_intermediate;
+    int max_pie_joins;
 
     // Parameters
     float line_width;
@@ -89,10 +147,431 @@ typedef struct {
     float timeline_position;   // 0.0 - 1.0
     float base_alpha;          // Base transparency (0.0 - 1.0)
     float highlight_width;     // Width of highlight fade (0.0 - 0.5)
+    bool debug_colors;         // Use different colors for each component
 } gcode_polyline_t;
 
 //------------------------------------------------------------------------------
-// Join shader (same as instanced_polylines.h)
+// Intermediate segment shader with proper miter joins
+// Takes 4 points: pA (before segment), pB (segment start), pC (segment end), pD (after segment)
+// Implements miter-adjusted vertices at both ends to prevent overlaps
+//------------------------------------------------------------------------------
+#if defined(SOKOL_METAL)
+static const char* gcode_intermediate_segment_vs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct vs_in {\n"
+    "    float3 template_pos [[attribute(0)]];\n"
+    "    float3 pA [[attribute(1)]];\n"  // point before segment start
+    "    float3 pB [[attribute(2)]];\n"  // segment start
+    "    float3 pC [[attribute(3)]];\n"  // segment end
+    "    float3 pD [[attribute(4)]];\n"  // point after segment end
+    "    float4 color [[attribute(5)]];\n"
+    "};\n"
+    "struct vs_out {\n"
+    "    float4 pos [[position]];\n"
+    "    float4 color;\n"
+    "};\n"
+    "struct vs_params {\n"
+    "    float4x4 mvp;\n"
+    "    float line_width;\n"
+    "    float aspect_ratio;\n"
+    "};\n"
+    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
+    "    vs_out out;\n"
+    "    \n"
+    "    // Transform all 4 points to clip space\n"
+    "    float4 clipA = params.mvp * float4(in.pA, 1.0);\n"
+    "    float4 clipB = params.mvp * float4(in.pB, 1.0);\n"
+    "    float4 clipC = params.mvp * float4(in.pC, 1.0);\n"
+    "    float4 clipD = params.mvp * float4(in.pD, 1.0);\n"
+    "    \n"
+    "    // Convert to NDC (screen space)\n"
+    "    float2 ndcA = clipA.xy / clipA.w;\n"
+    "    float2 ndcB = clipB.xy / clipB.w;\n"
+    "    float2 ndcC = clipC.xy / clipC.w;\n"
+    "    float2 ndcD = clipD.xy / clipD.w;\n"
+    "    \n"
+    "    // Apply aspect ratio correction to get proper screen coordinates\n"
+    "    ndcA.x *= params.aspect_ratio;\n"
+    "    ndcB.x *= params.aspect_ratio;\n"
+    "    ndcC.x *= params.aspect_ratio;\n"
+    "    ndcD.x *= params.aspect_ratio;\n"
+    "    \n"
+    "    // Determine which end we're at based on template Z\n"
+    "    // z=0: at pB (start), z=1: at pC (end)\n"
+    "    float2 p0, p1, p2;\n"
+    "    float2 pos = float2(in.template_pos.z, in.template_pos.y);  // z=0/1 for ends, y=+-0.5 for sides\n"
+    "    float4 baseClip;\n"
+    "    \n"
+    "    if (in.template_pos.z < 0.5) {\n"
+    "        // At B end (start of segment): compute miter using A-B-C\n"
+    "        p0 = ndcA; p1 = ndcB; p2 = ndcC;\n"
+    "        baseClip = clipB;\n"
+    "    } else {\n"
+    "        // At C end (end of segment): compute miter using D-C-B (reversed)\n"
+    "        p0 = ndcD; p1 = ndcC; p2 = ndcB;\n"
+    "        pos = float2(1.0 - in.template_pos.z, -in.template_pos.y);  // flip template\n"
+    "        baseClip = clipC;\n"
+    "    }\n"
+    "    \n"
+    "    // Compute direction vectors\n"
+    "    float2 d01 = p1 - p0;  // incoming direction (to p1)\n"
+    "    float2 d21 = p1 - p2;  // reversed outgoing (to p1)\n"
+    "    float2 d12 = p2 - p1;  // outgoing direction (from p1)\n"
+    "    \n"
+    "    float len01 = length(d01);\n"
+    "    float len12 = length(d12);\n"
+    "    \n"
+    "    // Safe normalized directions (fallback to arbitrary direction if degenerate)\n"
+    "    float2 dir01 = (len01 > 0.0001) ? d01 / len01 : float2(1.0, 0.0);\n"
+    "    float2 dir12 = (len12 > 0.0001) ? d12 / len12 : float2(1.0, 0.0);\n"
+    "    \n"
+    "    // Tangent: average of incoming and outgoing directions\n"
+    "    float2 tangentSum = dir01 + dir12;\n"
+    "    float tangentLen = length(tangentSum);\n"
+    "    float2 tangent = (tangentLen > 0.0001) ? tangentSum / tangentLen : float2(-dir01.y, dir01.x);\n"
+    "    \n"
+    "    // Normal: perpendicular to tangent\n"
+    "    float2 normal = float2(-tangent.y, tangent.x);\n"
+    "    \n"
+    "    // Perpendicular to incoming edge (for miter calculation)\n"
+    "    float2 p01Norm = float2(-dir01.y, dir01.x);\n"
+    "    \n"
+    "    // Sigma: which side the bend is on\n"
+    "    float sigma = sign(dot(d01 + d21, normal));\n"
+    "    if (abs(sigma) < 0.001) sigma = 1.0;  // Default if straight\n"
+    "    \n"
+    "    // Dot product for miter calculation (with safety clamp)\n"
+    "    float dotNP = dot(normal, p01Norm);\n"
+    "    float minDot = 0.1;  // Prevent extreme miter for acute angles\n"
+    "    if (abs(dotNP) < minDot) {\n"
+    "        dotNP = (dotNP >= 0.0) ? minDot : -minDot;\n"
+    "    }\n"
+    "    \n"
+    "    float2 offset;\n"
+    "    float halfWidth = params.line_width * 0.5;\n"
+    "    \n"
+    "    if (sign(pos.y) == -sigma) {\n"
+    "        // Intersecting vertex - use miter point\n"
+    "        // This is the inside of the bend where segments would overlap\n"
+    "        float2 miterOffset = normal * (-sigma) * halfWidth / dotNP;\n"
+    "        offset = miterOffset;\n"
+    "    } else {\n"
+    "        // Non-intersecting vertex - standard rectangle corner\n"
+    "        // This is the outside of the bend\n"
+    "        float2 yBasis = float2(-dir12.y, dir12.x);  // perpendicular to segment direction\n"
+    "        offset = yBasis * halfWidth * sign(pos.y) * 2.0;  // *2 because pos.y is +-0.5\n"
+    "    }\n"
+    "    \n"
+    "    // Undo aspect ratio correction for final position\n"
+    "    offset.x /= params.aspect_ratio;\n"
+    "    \n"
+    "    out.pos = baseClip;\n"
+    "    out.pos.xy += offset * baseClip.w;\n"
+    "    out.color = in.color;\n"
+    "    return out;\n"
+    "}\n";
+
+static const char* gcode_intermediate_segment_fs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct fs_in {\n"
+    "    float4 color;\n"
+    "};\n"
+    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
+    "    return in.color;\n"
+    "}\n";
+
+//------------------------------------------------------------------------------
+// Terminal segment shader - miter at one end only
+// Takes 3 points: pA (cap end), pB (miter end), pC (neighbor for miter calc)
+// z=0 vertices: flat end at pA (cap side)
+// z=1 vertices: miter-adjusted at pB (join side)
+//------------------------------------------------------------------------------
+static const char* gcode_terminal_segment_vs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct vs_in {\n"
+    "    float3 template_pos [[attribute(0)]];\n"
+    "    float3 pA [[attribute(1)]];\n"  // cap end (flat)
+    "    float3 pB [[attribute(2)]];\n"  // miter end
+    "    float3 pC [[attribute(3)]];\n"  // neighbor for miter
+    "    float4 color [[attribute(4)]];\n"
+    "};\n"
+    "struct vs_out {\n"
+    "    float4 pos [[position]];\n"
+    "    float4 color;\n"
+    "};\n"
+    "struct vs_params {\n"
+    "    float4x4 mvp;\n"
+    "    float line_width;\n"
+    "    float aspect_ratio;\n"
+    "};\n"
+    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
+    "    vs_out out;\n"
+    "    \n"
+    "    // Transform all points to clip space\n"
+    "    float4 clipA = params.mvp * float4(in.pA, 1.0);\n"
+    "    float4 clipB = params.mvp * float4(in.pB, 1.0);\n"
+    "    float4 clipC = params.mvp * float4(in.pC, 1.0);\n"
+    "    \n"
+    "    // Convert to NDC and apply aspect ratio\n"
+    "    float2 ndcA = clipA.xy / clipA.w;\n"
+    "    float2 ndcB = clipB.xy / clipB.w;\n"
+    "    float2 ndcC = clipC.xy / clipC.w;\n"
+    "    ndcA.x *= params.aspect_ratio;\n"
+    "    ndcB.x *= params.aspect_ratio;\n"
+    "    ndcC.x *= params.aspect_ratio;\n"
+    "    \n"
+    "    // Direction from A to B (segment direction)\n"
+    "    float2 dAB = ndcB - ndcA;\n"
+    "    float lenAB = length(dAB);\n"
+    "    float2 dirAB = (lenAB > 0.0001) ? dAB / lenAB : float2(1.0, 0.0);\n"
+    "    \n"
+    "    // Perpendicular to segment\n"
+    "    float2 perp = float2(-dirAB.y, dirAB.x);\n"
+    "    \n"
+    "    float halfWidth = params.line_width * 0.5;\n"
+    "    float2 offset;\n"
+    "    float4 baseClip;\n"
+    "    \n"
+    "    if (in.template_pos.z < 0.5) {\n"
+    "        // At A end (cap side) - simple perpendicular offset\n"
+    "        baseClip = clipA;\n"
+    "        offset = perp * in.template_pos.y * params.line_width;  // y is +-0.5\n"
+    "    } else {\n"
+    "        // At B end (miter side) - compute miter using A-B-C\n"
+    "        baseClip = clipB;\n"
+    "        \n"
+    "        // Direction from B to C (outgoing direction)\n"
+    "        float2 dBC = ndcC - ndcB;\n"
+    "        float lenBC = length(dBC);\n"
+    "        float2 dirBC = (lenBC > 0.0001) ? dBC / lenBC : float2(1.0, 0.0);\n"
+    "        \n"
+    "        // Incoming direction (A to B)\n"
+    "        float2 dirAB_in = dirAB;\n"
+    "        \n"
+    "        // Tangent: average of incoming and outgoing\n"
+    "        float2 tangentSum = dirAB_in + dirBC;\n"
+    "        float tangentLen = length(tangentSum);\n"
+    "        float2 tangent = (tangentLen > 0.0001) ? tangentSum / tangentLen : float2(-dirAB_in.y, dirAB_in.x);\n"
+    "        \n"
+    "        // Normal perpendicular to tangent\n"
+    "        float2 normal = float2(-tangent.y, tangent.x);\n"
+    "        \n"
+    "        // Perpendicular to incoming segment (for miter math)\n"
+    "        float2 p01Norm = float2(-dirAB_in.y, dirAB_in.x);\n"
+    "        \n"
+    "        // Sigma: which side the bend is on\n"
+    "        float2 dBA = -dAB;  // B to A\n"
+    "        float2 dCB = ndcB - ndcC;  // C to B\n"
+    "        float sigma = sign(dot(dBA + dCB, normal));\n"
+    "        if (abs(sigma) < 0.001) sigma = 1.0;\n"
+    "        \n"
+    "        // Miter dot product with safety clamp\n"
+    "        float dotNP = dot(normal, p01Norm);\n"
+    "        float minDot = 0.1;\n"
+    "        if (abs(dotNP) < minDot) {\n"
+    "            dotNP = (dotNP >= 0.0) ? minDot : -minDot;\n"
+    "        }\n"
+    "        \n"
+    "        float posY = in.template_pos.y;  // +-0.5\n"
+    "        \n"
+    "        if (sign(posY) == -sigma) {\n"
+    "            // Intersecting vertex - use miter\n"
+    "            offset = normal * (-sigma) * halfWidth / dotNP;\n"
+    "        } else {\n"
+    "            // Non-intersecting - standard rectangle\n"
+    "            float2 yBasis = float2(-dirBC.y, dirBC.x);\n"
+    "            offset = yBasis * halfWidth * sign(posY) * 2.0;\n"
+    "        }\n"
+    "    }\n"
+    "    \n"
+    "    // Undo aspect ratio correction\n"
+    "    offset.x /= params.aspect_ratio;\n"
+    "    \n"
+    "    out.pos = baseClip;\n"
+    "    out.pos.xy += offset * baseClip.w;\n"
+    "    out.color = in.color;\n"
+    "    return out;\n"
+    "}\n";
+
+static const char* gcode_terminal_segment_fs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct fs_in {\n"
+    "    float4 color;\n"
+    "};\n"
+    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
+    "    return in.color;\n"
+    "}\n";
+
+//------------------------------------------------------------------------------
+// Pie-slice round join shader - fills only the angular gap at bends
+// Takes 3 points: pA (prev), pB (join center), pC (next)
+// Template vertices have x = id (0=center, 1..n = arc positions)
+// The pie slice fills the gap between the two segments on the outside of the bend
+//------------------------------------------------------------------------------
+static const char* gcode_pie_join_vs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct vs_in {\n"
+    "    float3 template_pos [[attribute(0)]];\n"
+    "    float3 pA [[attribute(1)]];\n"  // previous point
+    "    float3 pB [[attribute(2)]];\n"  // join center
+    "    float3 pC [[attribute(3)]];\n"  // next point
+    "    float4 color [[attribute(4)]];\n"
+    "};\n"
+    "struct vs_out {\n"
+    "    float4 pos [[position]];\n"
+    "    float4 color;\n"
+    "};\n"
+    "struct vs_params {\n"
+    "    float4x4 mvp;\n"
+    "    float line_width;\n"
+    "    float aspect_ratio;\n"
+    "    float join_resolution;\n"
+    "};\n"
+    "\n"
+    "// Helper to normalize angle to [0, 2*PI)\n"
+    "float normalizeAngle(float a) {\n"
+    "    const float PI2 = 6.28318530718;\n"
+    "    while (a < 0.0) a += PI2;\n"
+    "    while (a >= PI2) a -= PI2;\n"
+    "    return a;\n"
+    "}\n"
+    "\n"
+    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
+    "    vs_out out;\n"
+    "    const float PI = 3.14159265359;\n"
+    "    \n"
+    "    // Transform points to clip space\n"
+    "    float4 clipA = params.mvp * float4(in.pA, 1.0);\n"
+    "    float4 clipB = params.mvp * float4(in.pB, 1.0);\n"
+    "    float4 clipC = params.mvp * float4(in.pC, 1.0);\n"
+    "    \n"
+    "    // Convert to NDC and apply aspect ratio\n"
+    "    float2 ndcA = clipA.xy / clipA.w;\n"
+    "    float2 ndcB = clipB.xy / clipB.w;\n"
+    "    float2 ndcC = clipC.xy / clipC.w;\n"
+    "    ndcA.x *= params.aspect_ratio;\n"
+    "    ndcB.x *= params.aspect_ratio;\n"
+    "    ndcC.x *= params.aspect_ratio;\n"
+    "    \n"
+    "    // Compute directions from B to neighbors\n"
+    "    float2 toA = ndcA - ndcB;\n"
+    "    float2 toC = ndcC - ndcB;\n"
+    "    float lenA = length(toA);\n"
+    "    float lenC = length(toC);\n"
+    "    toA = (lenA > 0.0001) ? toA / lenA : float2(1.0, 0.0);\n"
+    "    toC = (lenC > 0.0001) ? toC / lenC : float2(1.0, 0.0);\n"
+    "    \n"
+    "    // Compute angles (perpendicular to edges, pointing outward from line)\n"
+    "    // For edge A-B: perpendicular is perpendicular to (B-A) = -toA\n"
+    "    // For edge B-C: perpendicular is perpendicular to (C-B) = toC\n"
+    "    float2 perpAB = float2(toA.y, -toA.x);   // perpendicular to A->B, rotated 90 CW\n"
+    "    float2 perpBC = float2(-toC.y, toC.x);   // perpendicular to B->C, rotated 90 CCW\n"
+    "    \n"
+    "    // Determine bend direction using cross product\n"
+    "    float cross = toA.x * toC.y - toA.y * toC.x;\n"
+    "    float sigma = sign(cross);  // positive = CCW bend, negative = CW bend\n"
+    "    if (abs(sigma) < 0.001) {\n"
+    "        // Nearly straight - collapse join to nothing\n"
+    "        out.pos = clipB;\n"
+    "        out.color = in.color;\n"
+    "        return out;\n"
+    "    }\n"
+    "    \n"
+    "    // The pie slice fills the outside of the bend\n"
+    "    // On the outside, we need to go from one segment's edge to the other\n"
+    "    // Start angle: perpendicular to incoming segment (A-B), on outside\n"
+    "    // End angle: perpendicular to outgoing segment (B-C), on outside\n"
+    "    \n"
+    "    float2 startDir, endDir;\n"
+    "    if (sigma > 0.0) {\n"
+    "        // CCW bend - outside is on the right\n"
+    "        startDir = float2(toA.y, -toA.x);   // perpendicular to toA, pointing right\n"
+    "        endDir = float2(-toC.y, toC.x);     // perpendicular to toC, pointing right\n"
+    "    } else {\n"
+    "        // CW bend - outside is on the left\n"
+    "        startDir = float2(-toA.y, toA.x);   // perpendicular to toA, pointing left\n"
+    "        endDir = float2(toC.y, -toC.x);     // perpendicular to toC, pointing left\n"
+    "    }\n"
+    "    \n"
+    "    float startAngle = atan2(startDir.y, startDir.x);\n"
+    "    float endAngle = atan2(endDir.y, endDir.x);\n"
+    "    \n"
+    "    // Ensure we go the short way around (the actual gap)\n"
+    "    float angleDiff = endAngle - startAngle;\n"
+    "    if (sigma > 0.0) {\n"
+    "        // CCW bend - we want to go CCW from start to end\n"
+    "        if (angleDiff < 0.0) angleDiff += 2.0 * PI;\n"
+    "        if (angleDiff > PI) {\n"
+    "            // We're going the wrong way, swap\n"
+    "            float tmp = startAngle;\n"
+    "            startAngle = endAngle;\n"
+    "            endAngle = tmp;\n"
+    "            angleDiff = endAngle - startAngle;\n"
+    "            if (angleDiff < 0.0) angleDiff += 2.0 * PI;\n"
+    "        }\n"
+    "    } else {\n"
+    "        // CW bend - we want to go CW from start to end (negative direction)\n"
+    "        if (angleDiff > 0.0) angleDiff -= 2.0 * PI;\n"
+    "        if (angleDiff < -PI) {\n"
+    "            // We're going the wrong way, swap\n"
+    "            float tmp = startAngle;\n"
+    "            startAngle = endAngle;\n"
+    "            endAngle = tmp;\n"
+    "            angleDiff = endAngle - startAngle;\n"
+    "            if (angleDiff > 0.0) angleDiff -= 2.0 * PI;\n"
+    "        }\n"
+    "    }\n"
+    "    \n"
+    "    float id = in.template_pos.x;\n"
+    "    float resolution = params.join_resolution;\n"
+    "    \n"
+    "    float2 offset;\n"
+    "    if (id < 0.5) {\n"
+    "        // Center vertex\n"
+    "        offset = float2(0.0, 0.0);\n"
+    "    } else {\n"
+    "        // Arc vertex - interpolate angle within the pie slice\n"
+    "        float t = (id - 1.0) / resolution;\n"
+    "        float angle = startAngle + t * angleDiff;\n"
+    "        offset = 0.5 * float2(cos(angle), sin(angle));\n"
+    "    }\n"
+    "    \n"
+    "    offset *= params.line_width;\n"
+    "    offset.x /= params.aspect_ratio;\n"
+    "    \n"
+    "    out.pos = clipB;\n"
+    "    out.pos.xy += offset * clipB.w;\n"
+    "    out.color = in.color;\n"
+    "    return out;\n"
+    "}\n";
+
+static const char* gcode_pie_join_fs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct fs_in {\n"
+    "    float4 color;\n"
+    "};\n"
+    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
+    "    return in.color;\n"
+    "}\n";
+
+#else
+// Placeholder for other backends - will implement if Metal version works
+static const char* gcode_intermediate_segment_vs_source = "";
+static const char* gcode_intermediate_segment_fs_source = "";
+static const char* gcode_terminal_segment_vs_source = "";
+static const char* gcode_terminal_segment_fs_source = "";
+static const char* gcode_pie_join_vs_source = "";
+static const char* gcode_pie_join_fs_source = "";
+#endif
+
+//------------------------------------------------------------------------------
+// Legacy join shader (for full circle joins - keeping for reference)
 //------------------------------------------------------------------------------
 #if defined(SOKOL_GLCORE)
 static const char* gcode_join_vs_source =
@@ -223,15 +702,17 @@ static const char* gcode_join_fs_source =
 //------------------------------------------------------------------------------
 // Template geometry generation
 //------------------------------------------------------------------------------
+
+// Segment template: rectangle body ONLY (no caps) to prevent overlap at joins
 static inline void gcode_generate_segment_template(
     gcode_template_vertex_t* vertices, int* vertex_count,
-    uint16_t* indices, int* index_count,
-    int cap_segments
+    uint16_t* indices, int* index_count
 ) {
     int vi = 0;
     int ii = 0;
 
-    // Main rectangle
+    // Main rectangle body only - no caps!
+    // This prevents alpha overlap at joins where segments meet
     vertices[vi++] = (gcode_template_vertex_t){ 0.0f, -0.5f, 0.0f };
     vertices[vi++] = (gcode_template_vertex_t){ 0.0f,  0.5f, 0.0f };
     vertices[vi++] = (gcode_template_vertex_t){ 0.0f, -0.5f, 1.0f };
@@ -240,40 +721,74 @@ static inline void gcode_generate_segment_template(
     indices[ii++] = 0; indices[ii++] = 2; indices[ii++] = 1;
     indices[ii++] = 1; indices[ii++] = 2; indices[ii++] = 3;
 
-    // Left semicircle cap
-    int cap_a_center = vi;
+    *vertex_count = vi;
+    *index_count = ii;
+}
+
+// Cap template: semicircle at z=0 (point A side) for terminal vertices
+// Used to cap the start and end of the polyline
+static inline void gcode_generate_cap_template(
+    gcode_template_vertex_t* vertices, int* vertex_count,
+    uint16_t* indices, int* index_count,
+    int cap_segments
+) {
+    int vi = 0;
+    int ii = 0;
+
+    // Semicircle at z=0 (extends in negative direction from point A)
+    // Center vertex
     vertices[vi++] = (gcode_template_vertex_t){ 0.0f, 0.0f, 0.0f };
+
+    // Semicircle edge vertices (from 90° to 270°, i.e., the left half)
     for (int i = 0; i <= cap_segments; i++) {
         float angle = 3.14159265359f * 0.5f + 3.14159265359f * (float)i / (float)cap_segments;
         float x = cosf(angle) * 0.5f;
         float y = sinf(angle) * 0.5f;
         vertices[vi++] = (gcode_template_vertex_t){ x, y, 0.0f };
     }
-    for (int i = 0; i < cap_segments; i++) {
-        indices[ii++] = cap_a_center;
-        indices[ii++] = cap_a_center + 1 + i;
-        indices[ii++] = cap_a_center + 2 + i;
-    }
 
-    // Right semicircle cap
-    int cap_b_center = vi;
-    vertices[vi++] = (gcode_template_vertex_t){ 0.0f, 0.0f, 1.0f };
-    for (int i = 0; i <= cap_segments; i++) {
-        float angle = -3.14159265359f * 0.5f + 3.14159265359f * (float)i / (float)cap_segments;
-        float x = cosf(angle) * 0.5f;
-        float y = sinf(angle) * 0.5f;
-        vertices[vi++] = (gcode_template_vertex_t){ x, y, 1.0f };
-    }
+    // Triangle fan
     for (int i = 0; i < cap_segments; i++) {
-        indices[ii++] = cap_b_center;
-        indices[ii++] = cap_b_center + 1 + i;
-        indices[ii++] = cap_b_center + 2 + i;
+        indices[ii++] = 0;
+        indices[ii++] = 1 + i;
+        indices[ii++] = 2 + i;
     }
 
     *vertex_count = vi;
     *index_count = ii;
 }
 
+// Pie-slice join template: triangle fan for angular fill
+// The template_pos.x stores the vertex ID (0=center, 1..n=arc vertices)
+// The shader computes the actual angle based on the neighboring segments
+static inline void gcode_generate_pie_join_template(
+    gcode_template_vertex_t* vertices, int* vertex_count,
+    uint16_t* indices, int* index_count,
+    int resolution
+) {
+    int vi = 0;
+    int ii = 0;
+
+    // Vertex 0: center (id=0)
+    vertices[vi++] = (gcode_template_vertex_t){ 0.0f, 0.0f, 0.0f };
+
+    // Vertices 1..resolution+1: arc points (id=1..resolution+1)
+    for (int i = 0; i <= resolution; i++) {
+        vertices[vi++] = (gcode_template_vertex_t){ (float)(i + 1), 0.0f, 0.0f };
+    }
+
+    // Triangle fan from center
+    for (int i = 0; i < resolution; i++) {
+        indices[ii++] = 0;           // center
+        indices[ii++] = 1 + i;       // current arc vertex
+        indices[ii++] = 2 + i;       // next arc vertex
+    }
+
+    *vertex_count = vi;
+    *index_count = ii;
+}
+
+// Legacy full circle join template (kept for reference)
 static inline void gcode_generate_join_template(
     gcode_template_vertex_t* vertices, int* vertex_count,
     uint16_t* indices, int* index_count,
@@ -342,282 +857,517 @@ static inline bool gcode_polyline_init(gcode_polyline_t* gp, const char* gcode_f
     gp->timeline_position = 0.5f;
     gp->base_alpha = GCODE_POLYLINE_DEFAULT_BASE_ALPHA;
     gp->highlight_width = GCODE_POLYLINE_DEFAULT_HIGHLIGHT_WIDTH;
+    gp->debug_colors = true;
+
+    // Calculate counts
+    // For a polyline with n points: n-1 segments, n-2 joins
+    // Segments: first (terminal), intermediate (n-3), last (terminal)
+    // If n < 4, there are no intermediate segments
+    int n = gp->path.count;
+    gp->max_intermediate = (n >= 4) ? (n - 3) : 0;  // Segments 1 to n-3 (indices)
+    gp->max_pie_joins = (n >= 3) ? (n - 2) : 0;     // Joins at vertices 1 to n-2
 
     // Allocate instance arrays
-    gp->max_segments = gp->path.count - 1;
-    gp->max_joins = gp->path.count - 2;
-    gp->segments = (gcode_segment_instance_t*)malloc(gp->max_segments * sizeof(gcode_segment_instance_t));
-    gp->joins = (gcode_join_instance_t*)malloc(gp->max_joins * sizeof(gcode_join_instance_t));
-    gp->segment_count = 0;
-    gp->join_count = 0;
+    gp->intermediate_segments = NULL;
+    if (gp->max_intermediate > 0) {
+        gp->intermediate_segments = (gcode_intermediate_segment_t*)malloc(
+            gp->max_intermediate * sizeof(gcode_intermediate_segment_t));
+    }
 
-    // Generate segment template
-    int max_seg_vertices = 4 + 2 * (GCODE_POLYLINE_CAP_SEGMENTS + 2);
-    int max_seg_indices = 6 + 2 * GCODE_POLYLINE_CAP_SEGMENTS * 3;
+    gp->terminal_start = (gcode_terminal_segment_t*)malloc(sizeof(gcode_terminal_segment_t));
+    gp->terminal_end = (gcode_terminal_segment_t*)malloc(sizeof(gcode_terminal_segment_t));
 
+    gp->pie_joins = NULL;
+    if (gp->max_pie_joins > 0) {
+        gp->pie_joins = (gcode_pie_join_instance_t*)malloc(
+            gp->max_pie_joins * sizeof(gcode_pie_join_instance_t));
+    }
+
+    gp->caps = (gcode_segment_instance_t*)malloc(2 * sizeof(gcode_segment_instance_t));
+
+    gp->intermediate_count = 0;
+    gp->pie_join_count = 0;
+    gp->cap_count = 0;
+
+    // Generate segment template (rectangle only)
+    int max_seg_vertices = 4;
+    int max_seg_indices = 6;
     gcode_template_vertex_t* seg_verts = (gcode_template_vertex_t*)malloc(max_seg_vertices * sizeof(gcode_template_vertex_t));
     uint16_t* seg_indices = (uint16_t*)malloc(max_seg_indices * sizeof(uint16_t));
 
-    gcode_generate_segment_template(
-        seg_verts, &gp->segment_template_vertex_count,
-        seg_indices, &gp->segment_template_index_count,
-        GCODE_POLYLINE_CAP_SEGMENTS
-    );
+    gcode_generate_segment_template(seg_verts, &gp->intermediate_template_vertex_count,
+                                     seg_indices, &gp->intermediate_template_index_count);
 
-    gp->segment_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+    gp->intermediate_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.vertex_buffer = true,
-        .data = { .ptr = seg_verts, .size = gp->segment_template_vertex_count * sizeof(gcode_template_vertex_t) },
-        .label = "gcode-segment-template-vbuf"
+        .data = { .ptr = seg_verts, .size = gp->intermediate_template_vertex_count * sizeof(gcode_template_vertex_t) },
+        .label = "gcode-intermediate-template-vbuf"
+    });
+    gp->intermediate_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.index_buffer = true,
+        .data = { .ptr = seg_indices, .size = gp->intermediate_template_index_count * sizeof(uint16_t) },
+        .label = "gcode-intermediate-template-ibuf"
     });
 
-    gp->segment_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
+    // Terminal segments use same template
+    gp->terminal_template_vertex_count = gp->intermediate_template_vertex_count;
+    gp->terminal_template_index_count = gp->intermediate_template_index_count;
+    gp->terminal_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .data = { .ptr = seg_verts, .size = gp->terminal_template_vertex_count * sizeof(gcode_template_vertex_t) },
+        .label = "gcode-terminal-template-vbuf"
+    });
+    gp->terminal_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.index_buffer = true,
-        .data = { .ptr = seg_indices, .size = gp->segment_template_index_count * sizeof(uint16_t) },
-        .label = "gcode-segment-template-ibuf"
+        .data = { .ptr = seg_indices, .size = gp->terminal_template_index_count * sizeof(uint16_t) },
+        .label = "gcode-terminal-template-ibuf"
     });
 
     free(seg_verts);
     free(seg_indices);
 
-    // Generate join template
-    int max_join_vertices = GCODE_POLYLINE_JOIN_SEGMENTS + 2;
-    int max_join_indices = GCODE_POLYLINE_JOIN_SEGMENTS * 3;
+    // Generate pie-slice join template
+    int pie_resolution = GCODE_POLYLINE_JOIN_SEGMENTS;
+    int max_pie_vertices = pie_resolution + 2;
+    int max_pie_indices = pie_resolution * 3;
+    gcode_template_vertex_t* pie_verts = (gcode_template_vertex_t*)malloc(max_pie_vertices * sizeof(gcode_template_vertex_t));
+    uint16_t* pie_indices = (uint16_t*)malloc(max_pie_indices * sizeof(uint16_t));
 
-    gcode_template_vertex_t* join_verts = (gcode_template_vertex_t*)malloc(max_join_vertices * sizeof(gcode_template_vertex_t));
-    uint16_t* join_indices = (uint16_t*)malloc(max_join_indices * sizeof(uint16_t));
+    gcode_generate_pie_join_template(pie_verts, &gp->pie_join_template_vertex_count,
+                                      pie_indices, &gp->pie_join_template_index_count,
+                                      pie_resolution);
 
-    gcode_generate_join_template(
-        join_verts, &gp->join_template_vertex_count,
-        join_indices, &gp->join_template_index_count,
-        GCODE_POLYLINE_JOIN_SEGMENTS
-    );
-
-    gp->join_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+    gp->pie_join_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.vertex_buffer = true,
-        .data = { .ptr = join_verts, .size = gp->join_template_vertex_count * sizeof(gcode_template_vertex_t) },
-        .label = "gcode-join-template-vbuf"
+        .data = { .ptr = pie_verts, .size = gp->pie_join_template_vertex_count * sizeof(gcode_template_vertex_t) },
+        .label = "gcode-pie-join-template-vbuf"
     });
-
-    gp->join_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
+    gp->pie_join_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.index_buffer = true,
-        .data = { .ptr = join_indices, .size = gp->join_template_index_count * sizeof(uint16_t) },
-        .label = "gcode-join-template-ibuf"
+        .data = { .ptr = pie_indices, .size = gp->pie_join_template_index_count * sizeof(uint16_t) },
+        .label = "gcode-pie-join-template-ibuf"
     });
 
-    free(join_verts);
-    free(join_indices);
+    free(pie_verts);
+    free(pie_indices);
 
-    // Create instance buffers (stream for per-frame updates when timeline changes)
-    gp->segment_instance_buf = sg_make_buffer(&(sg_buffer_desc){
+    // Generate cap template
+    int max_cap_vertices = GCODE_POLYLINE_CAP_SEGMENTS + 2;
+    int max_cap_indices = GCODE_POLYLINE_CAP_SEGMENTS * 3;
+    gcode_template_vertex_t* cap_verts = (gcode_template_vertex_t*)malloc(max_cap_vertices * sizeof(gcode_template_vertex_t));
+    uint16_t* cap_indices = (uint16_t*)malloc(max_cap_indices * sizeof(uint16_t));
+
+    gcode_generate_cap_template(cap_verts, &gp->cap_template_vertex_count,
+                                 cap_indices, &gp->cap_template_index_count,
+                                 GCODE_POLYLINE_CAP_SEGMENTS);
+
+    gp->cap_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .data = { .ptr = cap_verts, .size = gp->cap_template_vertex_count * sizeof(gcode_template_vertex_t) },
+        .label = "gcode-cap-template-vbuf"
+    });
+    gp->cap_template_ibuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.index_buffer = true,
+        .data = { .ptr = cap_indices, .size = gp->cap_template_index_count * sizeof(uint16_t) },
+        .label = "gcode-cap-template-ibuf"
+    });
+
+    free(cap_verts);
+    free(cap_indices);
+
+    // Create instance buffers
+    size_t intermediate_buf_size = (gp->max_intermediate > 0) ?
+        gp->max_intermediate * sizeof(gcode_intermediate_segment_t) : 64;
+    gp->intermediate_instance_buf = sg_make_buffer(&(sg_buffer_desc){
         .usage.vertex_buffer = true,
         .usage.stream_update = true,
-        .size = gp->max_segments * sizeof(gcode_segment_instance_t),
-        .label = "gcode-segment-instance-buf"
+        .size = intermediate_buf_size,
+        .label = "gcode-intermediate-instance-buf"
     });
 
-    gp->join_instance_buf = sg_make_buffer(&(sg_buffer_desc){
+    gp->terminal_start_instance_buf = sg_make_buffer(&(sg_buffer_desc){
         .usage.vertex_buffer = true,
         .usage.stream_update = true,
-        .size = gp->max_joins * sizeof(gcode_join_instance_t),
-        .label = "gcode-join-instance-buf"
+        .size = sizeof(gcode_terminal_segment_t),
+        .label = "gcode-terminal-start-instance-buf"
     });
 
-    // Segment shader (reuse instanced line shader)
-    gp->segment_shd = sg_make_shader(&(sg_shader_desc){
+    gp->terminal_end_instance_buf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .usage.stream_update = true,
+        .size = sizeof(gcode_terminal_segment_t),
+        .label = "gcode-terminal-end-instance-buf"
+    });
+
+    size_t pie_join_buf_size = (gp->max_pie_joins > 0) ?
+        gp->max_pie_joins * sizeof(gcode_pie_join_instance_t) : 64;
+    gp->pie_join_instance_buf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .usage.stream_update = true,
+        .size = pie_join_buf_size,
+        .label = "gcode-pie-join-instance-buf"
+    });
+
+    gp->cap_instance_buf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .usage.stream_update = true,
+        .size = 2 * sizeof(gcode_segment_instance_t),
+        .label = "gcode-cap-instance-buf"
+    });
+
+    // Create shaders
+    gp->intermediate_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = { .source = gcode_intermediate_segment_vs_source, .entry = "vs_main" },
+        .fragment_func = { .source = gcode_intermediate_segment_fs_source, .entry = "fs_main" },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(gcode_polyline_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "gcode-intermediate-shader"
+    });
+
+    gp->terminal_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = { .source = gcode_terminal_segment_vs_source, .entry = "vs_main" },
+        .fragment_func = { .source = gcode_terminal_segment_fs_source, .entry = "fs_main" },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(gcode_polyline_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "gcode-terminal-shader"
+    });
+
+    gp->pie_join_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = { .source = gcode_pie_join_vs_source, .entry = "vs_main" },
+        .fragment_func = { .source = gcode_pie_join_fs_source, .entry = "fs_main" },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(gcode_pie_join_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "gcode-pie-join-shader"
+    });
+
+    gp->cap_shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = { .source = instanced_line_vs_source, .entry = "vs_main" },
         .fragment_func = { .source = instanced_line_fs_source, .entry = "fs_main" },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,
             .size = sizeof(gcode_polyline_params_t),
             .layout = SG_UNIFORMLAYOUT_STD140,
-            .glsl_uniforms = {
-                [0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" },
-                [1] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "line_width" },
-                [2] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "aspect_ratio" },
-            }
         },
-        .label = "gcode-segment-shader"
+        .label = "gcode-cap-shader"
     });
 
-    // Segment pipeline with alpha blending
-    gp->segment_pip = sg_make_pipeline(&(sg_pipeline_desc){
-        .shader = gp->segment_shd,
+    // Alpha blending configuration (reused by all pipelines)
+    sg_blend_state alpha_blend = {
+        .enabled = true,
+        .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
+        .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+        .op_rgb = SG_BLENDOP_ADD,
+        .src_factor_alpha = SG_BLENDFACTOR_ONE,
+        .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+        .op_alpha = SG_BLENDOP_ADD,
+    };
+
+    // Intermediate segment pipeline (4 points: pA, pB, pC, pD + color)
+    gp->intermediate_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = gp->intermediate_shd,
         .layout = {
             .buffers = {
                 [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
                 [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
             },
             .attrs = {
-                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },
-                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },
-                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },
-                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 24 },
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },  // template_pos
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },   // pA
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },  // pB
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },  // pC
+                [4] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 36 },  // pD
+                [5] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 48 },  // color
             }
         },
         .index_type = SG_INDEXTYPE_UINT16,
         .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
-        .depth = {
-            .compare = SG_COMPAREFUNC_LESS_EQUAL,
-            .write_enabled = false,  // Disable for transparency
-            .pixel_format = SG_PIXELFORMAT_DEPTH
-        },
-        .colors[0] = {
-            .pixel_format = SG_PIXELFORMAT_RGBA8,
-            .blend = {
-                .enabled = true,
-                .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
-                .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .op_rgb = SG_BLENDOP_ADD,
-                .src_factor_alpha = SG_BLENDFACTOR_ONE,
-                .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .op_alpha = SG_BLENDOP_ADD,
-            },
-        },
+        .depth = { .compare = SG_COMPAREFUNC_LESS_EQUAL, .write_enabled = false, .pixel_format = SG_PIXELFORMAT_DEPTH },
+        .colors[0] = { .pixel_format = SG_PIXELFORMAT_RGBA8, .blend = alpha_blend },
         .cull_mode = SG_CULLMODE_NONE,
-        .label = "gcode-segment-pipeline"
+        .label = "gcode-intermediate-pipeline"
     });
 
-    // Join shader
-    gp->join_shd = sg_make_shader(&(sg_shader_desc){
-        .vertex_func = { .source = gcode_join_vs_source, .entry = "vs_main" },
-        .fragment_func = { .source = gcode_join_fs_source, .entry = "fs_main" },
-        .uniform_blocks[0] = {
-            .stage = SG_SHADERSTAGE_VERTEX,
-            .size = sizeof(gcode_polyline_params_t),
-            .layout = SG_UNIFORMLAYOUT_STD140,
-            .glsl_uniforms = {
-                [0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" },
-                [1] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "line_width" },
-                [2] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "aspect_ratio" },
-            }
-        },
-        .label = "gcode-join-shader"
-    });
-
-    // Join pipeline with alpha blending
-    gp->join_pip = sg_make_pipeline(&(sg_pipeline_desc){
-        .shader = gp->join_shd,
+    // Terminal segment pipeline (3 points: pA, pB, pC + color)
+    gp->terminal_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = gp->terminal_shd,
         .layout = {
             .buffers = {
                 [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
                 [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
             },
             .attrs = {
-                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },
-                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },
-                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 12 },
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },  // template_pos
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },   // pA
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },  // pB
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },  // pC
+                [4] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 36 },  // color
             }
         },
         .index_type = SG_INDEXTYPE_UINT16,
         .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
-        .depth = {
-            .compare = SG_COMPAREFUNC_LESS_EQUAL,
-            .write_enabled = false,  // Disable for transparency
-            .pixel_format = SG_PIXELFORMAT_DEPTH
-        },
-        .colors[0] = {
-            .pixel_format = SG_PIXELFORMAT_RGBA8,
-            .blend = {
-                .enabled = true,
-                .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
-                .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .op_rgb = SG_BLENDOP_ADD,
-                .src_factor_alpha = SG_BLENDFACTOR_ONE,
-                .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .op_alpha = SG_BLENDOP_ADD,
-            },
-        },
+        .depth = { .compare = SG_COMPAREFUNC_LESS_EQUAL, .write_enabled = false, .pixel_format = SG_PIXELFORMAT_DEPTH },
+        .colors[0] = { .pixel_format = SG_PIXELFORMAT_RGBA8, .blend = alpha_blend },
         .cull_mode = SG_CULLMODE_NONE,
-        .label = "gcode-join-pipeline"
+        .label = "gcode-terminal-pipeline"
+    });
+
+    // Pie-slice join pipeline (3 points: pA, pB, pC + color)
+    gp->pie_join_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = gp->pie_join_shd,
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },  // template_pos (id)
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },   // pA
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },  // pB
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },  // pC
+                [4] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 36 },  // color
+            }
+        },
+        .index_type = SG_INDEXTYPE_UINT16,
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = { .compare = SG_COMPAREFUNC_LESS_EQUAL, .write_enabled = false, .pixel_format = SG_PIXELFORMAT_DEPTH },
+        .colors[0] = { .pixel_format = SG_PIXELFORMAT_RGBA8, .blend = alpha_blend },
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "gcode-pie-join-pipeline"
+    });
+
+    // Cap pipeline (2 points: pA, pB + color) - uses standard instanced line shader
+    gp->cap_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = gp->cap_shd,
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },  // template_pos
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },   // point_a
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },  // point_b
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 24 },  // color
+            }
+        },
+        .index_type = SG_INDEXTYPE_UINT16,
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = { .compare = SG_COMPAREFUNC_LESS_EQUAL, .write_enabled = false, .pixel_format = SG_PIXELFORMAT_DEPTH },
+        .colors[0] = { .pixel_format = SG_PIXELFORMAT_RGBA8, .blend = alpha_blend },
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "gcode-cap-pipeline"
     });
 
     return true;
 }
 
+// Helper to scale a point
+static inline void gcode_scale_point(gcode_point_t* p, float scale, float* ox, float* oy, float* oz) {
+    *ox = p->x * scale;
+    *oy = p->z * scale;  // Swap Y and Z for proper orientation
+    *oz = p->y * scale;
+}
+
 static inline void gcode_polyline_update(gcode_polyline_t* gp) {
     if (gp->path.count < 2) return;
 
-    gp->segment_count = 0;
-    gp->join_count = 0;
+    gp->intermediate_count = 0;
+    gp->pie_join_count = 0;
+    gp->cap_count = 0;
 
     float total_len = gp->path.total_length;
     if (total_len < 0.001f) total_len = 1.0f;
 
-    // Build segments with timeline-based alpha
-    for (int i = 0; i < gp->path.count - 1; i++) {
-        gcode_point_t* pa = &gp->path.points[i];
-        gcode_point_t* pb = &gp->path.points[i + 1];
+    int n = gp->path.count;
 
-        // Calculate normalized position along path (midpoint of segment)
-        float len_at_a = gp->path.cumulative_lengths[i];
-        float len_at_b = gp->path.cumulative_lengths[i + 1];
-        float segment_pos = (len_at_a + len_at_b) * 0.5f / total_len;
+    // Helper to compute alpha at a position
+    #define COMPUTE_ALPHA(pos) ({ \
+        float distance = fabsf((pos) - gp->timeline_position); \
+        float fade_zone = gp->highlight_width; \
+        if (fade_zone < 0.001f) fade_zone = 0.001f; \
+        float highlight = 1.0f - gcode_smoothstep(0.0f, fade_zone, distance); \
+        gp->base_alpha + (1.0f - gp->base_alpha) * highlight; \
+    })
 
-        // Calculate alpha based on distance from timeline position
-        float distance = fabsf(segment_pos - gp->timeline_position);
-        // Use highlight_width as the fade zone
-        float fade_zone = gp->highlight_width;
-        if (fade_zone < 0.001f) fade_zone = 0.001f;
+    // First segment (terminal start): P0-P1 with neighbor P2
+    // For terminal shader: pA=P0, pB=P1, pC=P2
+    if (n >= 2) {
+        gcode_terminal_segment_t* ts = gp->terminal_start;
+        float seg_pos = (gp->path.cumulative_lengths[0] + gp->path.cumulative_lengths[1]) * 0.5f / total_len;
+        float alpha = COMPUTE_ALPHA(seg_pos);
 
-        float highlight = 1.0f - gcode_smoothstep(0.0f, fade_zone, distance);
-        float alpha = gp->base_alpha + (1.0f - gp->base_alpha) * highlight;
+        gcode_scale_point(&gp->path.points[0], gp->scale, &ts->pAx, &ts->pAy, &ts->pAz);
+        gcode_scale_point(&gp->path.points[1], gp->scale, &ts->pBx, &ts->pBy, &ts->pBz);
+        if (n >= 3) {
+            gcode_scale_point(&gp->path.points[2], gp->scale, &ts->pCx, &ts->pCy, &ts->pCz);
+        } else {
+            // No neighbor, use P1 as dummy
+            ts->pCx = ts->pBx; ts->pCy = ts->pBy; ts->pCz = ts->pBz;
+        }
 
-        gcode_segment_instance_t* seg = &gp->segments[gp->segment_count++];
-        seg->ax = pa->x * gp->scale;
-        seg->ay = pa->z * gp->scale;  // Swap Y and Z for proper orientation
-        seg->az = pa->y * gp->scale;
-        seg->bx = pb->x * gp->scale;
-        seg->by = pb->z * gp->scale;
-        seg->bz = pb->y * gp->scale;
-        seg->r = gp->color_r;
-        seg->g = gp->color_g;
-        seg->b = gp->color_b;
+        // Debug: CYAN for start terminal
+        if (gp->debug_colors) {
+            ts->r = 0.0f; ts->g = 1.0f; ts->b = 1.0f;
+        } else {
+            ts->r = gp->color_r; ts->g = gp->color_g; ts->b = gp->color_b;
+        }
+        ts->a = alpha;
+    }
+
+    // Last segment (terminal end): P(n-2)-P(n-1) with neighbor P(n-3)
+    // For terminal shader: pA = cap end (z=0), pB = miter end (z=1), pC = neighbor
+    // We want the cap at P(n-1) and miter at P(n-2), so we REVERSE the point order:
+    //   pA = P(n-1) (cap end, flat)
+    //   pB = P(n-2) (miter end, joins with intermediate segments)
+    //   pC = P(n-3) (neighbor for miter calculation)
+    // This draws the segment "backwards" but that's intentional for correct miter placement
+    if (n >= 2) {
+        gcode_terminal_segment_t* te = gp->terminal_end;
+        int last = n - 1;
+        float seg_pos = (gp->path.cumulative_lengths[last-1] + gp->path.cumulative_lengths[last]) * 0.5f / total_len;
+        float alpha = COMPUTE_ALPHA(seg_pos);
+
+        // pA = P(n-1) - cap end (where the end cap goes)
+        gcode_scale_point(&gp->path.points[last], gp->scale, &te->pAx, &te->pAy, &te->pAz);
+        // pB = P(n-2) - miter end (joins with previous segment)
+        gcode_scale_point(&gp->path.points[last-1], gp->scale, &te->pBx, &te->pBy, &te->pBz);
+        // pC = P(n-3) - neighbor for miter calculation (or P(n-2) if n < 3)
+        if (n >= 3) {
+            gcode_scale_point(&gp->path.points[last-2], gp->scale, &te->pCx, &te->pCy, &te->pCz);
+        } else {
+            // Only 2 points, no neighbor - use pB as dummy
+            te->pCx = te->pBx; te->pCy = te->pBy; te->pCz = te->pBz;
+        }
+
+        // Debug: MAGENTA for end terminal
+        if (gp->debug_colors) {
+            te->r = 1.0f; te->g = 0.0f; te->b = 1.0f;
+        } else {
+            te->r = gp->color_r; te->g = gp->color_g; te->b = gp->color_b;
+        }
+        te->a = alpha;
+    }
+
+    // Intermediate segments: P(i)-P(i+1) for i = 1 to n-3
+    // Each needs: pA=P(i-1), pB=P(i), pC=P(i+1), pD=P(i+2)
+    for (int i = 1; i <= n - 3; i++) {
+        gcode_intermediate_segment_t* seg = &gp->intermediate_segments[gp->intermediate_count++];
+        float seg_pos = (gp->path.cumulative_lengths[i] + gp->path.cumulative_lengths[i+1]) * 0.5f / total_len;
+        float alpha = COMPUTE_ALPHA(seg_pos);
+
+        gcode_scale_point(&gp->path.points[i-1], gp->scale, &seg->pAx, &seg->pAy, &seg->pAz);
+        gcode_scale_point(&gp->path.points[i], gp->scale, &seg->pBx, &seg->pBy, &seg->pBz);
+        gcode_scale_point(&gp->path.points[i+1], gp->scale, &seg->pCx, &seg->pCy, &seg->pCz);
+        gcode_scale_point(&gp->path.points[i+2], gp->scale, &seg->pDx, &seg->pDy, &seg->pDz);
+
+        // Debug: RED for intermediate segments
+        if (gp->debug_colors) {
+            seg->r = 1.0f; seg->g = 0.3f; seg->b = 0.3f;
+        } else {
+            seg->r = gp->color_r; seg->g = gp->color_g; seg->b = gp->color_b;
+        }
         seg->a = alpha;
     }
 
-    // Build joins at interior vertices
-    for (int i = 1; i < gp->path.count - 1; i++) {
-        gcode_point_t* p = &gp->path.points[i];
-
-        // Calculate normalized position
+    // Pie-slice joins at interior vertices: P(i) for i = 1 to n-2
+    // Each needs: pA=P(i-1), pB=P(i), pC=P(i+1)
+    for (int i = 1; i <= n - 2; i++) {
+        gcode_pie_join_instance_t* join = &gp->pie_joins[gp->pie_join_count++];
         float pos = gp->path.cumulative_lengths[i] / total_len;
+        float alpha = COMPUTE_ALPHA(pos);
 
-        // Calculate alpha
-        float distance = fabsf(pos - gp->timeline_position);
-        float fade_zone = gp->highlight_width;
-        if (fade_zone < 0.001f) fade_zone = 0.001f;
+        gcode_scale_point(&gp->path.points[i-1], gp->scale, &join->pAx, &join->pAy, &join->pAz);
+        gcode_scale_point(&gp->path.points[i], gp->scale, &join->pBx, &join->pBy, &join->pBz);
+        gcode_scale_point(&gp->path.points[i+1], gp->scale, &join->pCx, &join->pCy, &join->pCz);
 
-        float highlight = 1.0f - gcode_smoothstep(0.0f, fade_zone, distance);
-        float alpha = gp->base_alpha + (1.0f - gp->base_alpha) * highlight;
-
-        gcode_join_instance_t* join = &gp->joins[gp->join_count++];
-        join->px = p->x * gp->scale;
-        join->py = p->z * gp->scale;
-        join->pz = p->y * gp->scale;
-        join->r = gp->color_r;
-        join->g = gp->color_g;
-        join->b = gp->color_b;
+        // Debug: YELLOW for joins
+        if (gp->debug_colors) {
+            join->r = 1.0f; join->g = 1.0f; join->b = 0.3f;
+        } else {
+            join->r = gp->color_r; join->g = gp->color_g; join->b = gp->color_b;
+        }
         join->a = alpha;
     }
 
+    // Caps at start (P0) and end (P(n-1))
+    // Start cap
+    {
+        gcode_segment_instance_t* cap = &gp->caps[gp->cap_count++];
+        float alpha = COMPUTE_ALPHA(0.0f);
+
+        gcode_scale_point(&gp->path.points[0], gp->scale, &cap->ax, &cap->ay, &cap->az);
+        gcode_scale_point(&gp->path.points[1], gp->scale, &cap->bx, &cap->by, &cap->bz);
+
+        // Debug: BLUE for start cap
+        if (gp->debug_colors) {
+            cap->r = 0.3f; cap->g = 0.5f; cap->b = 1.0f;
+        } else {
+            cap->r = gp->color_r; cap->g = gp->color_g; cap->b = gp->color_b;
+        }
+        cap->a = alpha;
+    }
+
+    // End cap
+    {
+        gcode_segment_instance_t* cap = &gp->caps[gp->cap_count++];
+        float alpha = COMPUTE_ALPHA(1.0f);
+
+        gcode_scale_point(&gp->path.points[n-1], gp->scale, &cap->ax, &cap->ay, &cap->az);
+        gcode_scale_point(&gp->path.points[n-2], gp->scale, &cap->bx, &cap->by, &cap->bz);
+
+        // Debug: GREEN for end cap
+        if (gp->debug_colors) {
+            cap->r = 0.3f; cap->g = 1.0f; cap->b = 0.3f;
+        } else {
+            cap->r = gp->color_r; cap->g = gp->color_g; cap->b = gp->color_b;
+        }
+        cap->a = alpha;
+    }
+
+    #undef COMPUTE_ALPHA
+
     // Upload instance data
-    if (gp->segment_count > 0) {
-        sg_update_buffer(gp->segment_instance_buf, &(sg_range){
-            .ptr = gp->segments,
-            .size = gp->segment_count * sizeof(gcode_segment_instance_t)
+    if (gp->intermediate_count > 0) {
+        sg_update_buffer(gp->intermediate_instance_buf, &(sg_range){
+            .ptr = gp->intermediate_segments,
+            .size = gp->intermediate_count * sizeof(gcode_intermediate_segment_t)
         });
     }
 
-    if (gp->join_count > 0) {
-        sg_update_buffer(gp->join_instance_buf, &(sg_range){
-            .ptr = gp->joins,
-            .size = gp->join_count * sizeof(gcode_join_instance_t)
+    sg_update_buffer(gp->terminal_start_instance_buf, &(sg_range){
+        .ptr = gp->terminal_start,
+        .size = sizeof(gcode_terminal_segment_t)
+    });
+
+    sg_update_buffer(gp->terminal_end_instance_buf, &(sg_range){
+        .ptr = gp->terminal_end,
+        .size = sizeof(gcode_terminal_segment_t)
+    });
+
+    if (gp->pie_join_count > 0) {
+        sg_update_buffer(gp->pie_join_instance_buf, &(sg_range){
+            .ptr = gp->pie_joins,
+            .size = gp->pie_join_count * sizeof(gcode_pie_join_instance_t)
         });
     }
+
+    sg_update_buffer(gp->cap_instance_buf, &(sg_range){
+        .ptr = gp->caps,
+        .size = gp->cap_count * sizeof(gcode_segment_instance_t)
+    });
 }
 
 static inline void gcode_polyline_draw(gcode_polyline_t* gp, mat4_t mvp, float aspect_ratio) {
-    if (gp->segment_count == 0) return;
+    if (gp->path.count < 2) return;
 
     gcode_polyline_params_t params = {
         .mvp = mvp,
@@ -625,52 +1375,111 @@ static inline void gcode_polyline_draw(gcode_polyline_t* gp, mat4_t mvp, float a
         .aspect_ratio = aspect_ratio,
     };
 
-    // Draw segments
-    sg_apply_pipeline(gp->segment_pip);
+    gcode_pie_join_params_t pie_params = {
+        .mvp = mvp,
+        .line_width = gp->line_width,
+        .aspect_ratio = aspect_ratio,
+        .join_resolution = (float)GCODE_POLYLINE_JOIN_SEGMENTS,
+    };
+
+    // Draw terminal start segment
+    sg_apply_pipeline(gp->terminal_pip);
     sg_apply_bindings(&(sg_bindings){
-        .vertex_buffers = {
-            [0] = gp->segment_template_vbuf,
-            [1] = gp->segment_instance_buf,
-        },
-        .index_buffer = gp->segment_template_ibuf,
+        .vertex_buffers = { [0] = gp->terminal_template_vbuf, [1] = gp->terminal_start_instance_buf },
+        .index_buffer = gp->terminal_template_ibuf,
     });
     sg_apply_uniforms(0, &SG_RANGE(params));
-    sg_draw(0, gp->segment_template_index_count, gp->segment_count);
+    sg_draw(0, gp->terminal_template_index_count, 1);
 
-    // Draw joins
-    if (gp->join_count > 0) {
-        sg_apply_pipeline(gp->join_pip);
+    // Draw terminal end segment
+    sg_apply_bindings(&(sg_bindings){
+        .vertex_buffers = { [0] = gp->terminal_template_vbuf, [1] = gp->terminal_end_instance_buf },
+        .index_buffer = gp->terminal_template_ibuf,
+    });
+    sg_apply_uniforms(0, &SG_RANGE(params));
+    sg_draw(0, gp->terminal_template_index_count, 1);
+
+    // Draw intermediate segments
+    if (gp->intermediate_count > 0) {
+        sg_apply_pipeline(gp->intermediate_pip);
         sg_apply_bindings(&(sg_bindings){
-            .vertex_buffers = {
-                [0] = gp->join_template_vbuf,
-                [1] = gp->join_instance_buf,
-            },
-            .index_buffer = gp->join_template_ibuf,
+            .vertex_buffers = { [0] = gp->intermediate_template_vbuf, [1] = gp->intermediate_instance_buf },
+            .index_buffer = gp->intermediate_template_ibuf,
         });
         sg_apply_uniforms(0, &SG_RANGE(params));
-        sg_draw(0, gp->join_template_index_count, gp->join_count);
+        sg_draw(0, gp->intermediate_template_index_count, gp->intermediate_count);
+    }
+
+    // Draw pie-slice joins
+    if (gp->pie_join_count > 0) {
+        sg_apply_pipeline(gp->pie_join_pip);
+        sg_apply_bindings(&(sg_bindings){
+            .vertex_buffers = { [0] = gp->pie_join_template_vbuf, [1] = gp->pie_join_instance_buf },
+            .index_buffer = gp->pie_join_template_ibuf,
+        });
+        sg_apply_uniforms(0, &SG_RANGE(pie_params));
+        sg_draw(0, gp->pie_join_template_index_count, gp->pie_join_count);
+    }
+
+    // Draw caps
+    if (gp->cap_count > 0) {
+        sg_apply_pipeline(gp->cap_pip);
+        sg_apply_bindings(&(sg_bindings){
+            .vertex_buffers = { [0] = gp->cap_template_vbuf, [1] = gp->cap_instance_buf },
+            .index_buffer = gp->cap_template_ibuf,
+        });
+        sg_apply_uniforms(0, &SG_RANGE(params));
+        sg_draw(0, gp->cap_template_index_count, gp->cap_count);
     }
 }
 
 static inline void gcode_polyline_shutdown(gcode_polyline_t* gp) {
-    sg_destroy_pipeline(gp->segment_pip);
-    sg_destroy_pipeline(gp->join_pip);
-    sg_destroy_shader(gp->segment_shd);
-    sg_destroy_shader(gp->join_shd);
-    sg_destroy_buffer(gp->segment_template_vbuf);
-    sg_destroy_buffer(gp->segment_template_ibuf);
-    sg_destroy_buffer(gp->segment_instance_buf);
-    sg_destroy_buffer(gp->join_template_vbuf);
-    sg_destroy_buffer(gp->join_template_ibuf);
-    sg_destroy_buffer(gp->join_instance_buf);
+    sg_destroy_pipeline(gp->intermediate_pip);
+    sg_destroy_pipeline(gp->terminal_pip);
+    sg_destroy_pipeline(gp->pie_join_pip);
+    sg_destroy_pipeline(gp->cap_pip);
 
-    if (gp->segments) {
-        free(gp->segments);
-        gp->segments = NULL;
+    sg_destroy_shader(gp->intermediate_shd);
+    sg_destroy_shader(gp->terminal_shd);
+    sg_destroy_shader(gp->pie_join_shd);
+    sg_destroy_shader(gp->cap_shd);
+
+    sg_destroy_buffer(gp->intermediate_template_vbuf);
+    sg_destroy_buffer(gp->intermediate_template_ibuf);
+    sg_destroy_buffer(gp->intermediate_instance_buf);
+
+    sg_destroy_buffer(gp->terminal_template_vbuf);
+    sg_destroy_buffer(gp->terminal_template_ibuf);
+    sg_destroy_buffer(gp->terminal_start_instance_buf);
+    sg_destroy_buffer(gp->terminal_end_instance_buf);
+
+    sg_destroy_buffer(gp->pie_join_template_vbuf);
+    sg_destroy_buffer(gp->pie_join_template_ibuf);
+    sg_destroy_buffer(gp->pie_join_instance_buf);
+
+    sg_destroy_buffer(gp->cap_template_vbuf);
+    sg_destroy_buffer(gp->cap_template_ibuf);
+    sg_destroy_buffer(gp->cap_instance_buf);
+
+    if (gp->intermediate_segments) {
+        free(gp->intermediate_segments);
+        gp->intermediate_segments = NULL;
     }
-    if (gp->joins) {
-        free(gp->joins);
-        gp->joins = NULL;
+    if (gp->terminal_start) {
+        free(gp->terminal_start);
+        gp->terminal_start = NULL;
+    }
+    if (gp->terminal_end) {
+        free(gp->terminal_end);
+        gp->terminal_end = NULL;
+    }
+    if (gp->pie_joins) {
+        free(gp->pie_joins);
+        gp->pie_joins = NULL;
+    }
+    if (gp->caps) {
+        free(gp->caps);
+        gp->caps = NULL;
     }
 
     gcode_path_shutdown(&gp->path);

@@ -70,7 +70,7 @@ static inline void ui_gcode_controls_draw(ui_gcode_controls_state_t* state) {
 
         // Path info
         igText("Points: %d", state->gcode->path.count);
-        igText("Segments: %d", state->gcode->segment_count);
+        igText("Segments: %d", state->gcode->intermediate_count + 2);  // +2 for terminal segments
         igText("Path Length: %.1f mm", state->gcode->path.total_length);
 
         float width, height, depth;
