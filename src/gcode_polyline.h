@@ -337,9 +337,9 @@ static const char* gcode_terminal_segment_vs_source =
     "    float4 baseClip;\n"
     "    \n"
     "    if (in.template_pos.z < 0.5) {\n"
-    "        // At A end (cap side) - simple perpendicular offset\n"
+    "        // At A end (cap side) - simple perpendicular offset, full width\n"
     "        baseClip = clipA;\n"
-    "        offset = perp * in.template_pos.y * params.line_width;  // y is +-0.5\n"
+    "        offset = perp * in.template_pos.y * params.line_width * 2.0;  // y is +-0.5, *2 for full width\n"
     "    } else {\n"
     "        // At B end (miter side) - compute miter using A-B-C\n"
     "        baseClip = clipB;\n"
@@ -737,10 +737,11 @@ static inline void gcode_generate_cap_template(
     vertices[vi++] = (gcode_template_vertex_t){ 0.0f, 0.0f, 0.0f };
 
     // Semicircle edge vertices (from 90° to 270°, i.e., the left half)
+    // Radius 1.0 so that after shader multiplies by line_width, we get full width to match segments
     for (int i = 0; i <= cap_segments; i++) {
         float angle = 3.14159265359f * 0.5f + 3.14159265359f * (float)i / (float)cap_segments;
-        float x = cosf(angle) * 0.5f;
-        float y = sinf(angle) * 0.5f;
+        float x = cosf(angle) * 1.0f;
+        float y = sinf(angle) * 1.0f;
         vertices[vi++] = (gcode_template_vertex_t){ x, y, 0.0f };
     }
 
