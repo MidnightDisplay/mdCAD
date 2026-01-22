@@ -87,6 +87,15 @@ static inline void ui_gcode_controls_draw(ui_gcode_controls_state_t* state) {
         // Line width control
         igSliderFloat("Line Width", &state->gcode->line_width, 0.005f, 0.1f, "%.3f", 0);
 
+        // Miter angle limit (for round joins)
+        igSliderFloat("Miter Limit", &state->gcode->miter_angle_limit, 90.0f, 180.0f, "%.0f deg", 0);
+        if (igIsItemHovered(0)) {
+            igSetTooltip("Above this angle, joins become semicircles");
+        }
+
+        // Debug colors checkbox
+        igCheckbox("Debug Colors", &state->gcode->debug_colors);
+
         igSpacing();
 
         // Color picker

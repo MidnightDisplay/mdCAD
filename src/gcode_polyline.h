@@ -84,7 +84,7 @@ typedef struct {
     float line_width;
     float aspect_ratio;
     float join_resolution;
-    float _pad;
+    float miter_angle_limit;  // Angle threshold in radians (above this, use semicircle)
 } gcode_pie_join_params_t;
 
 typedef struct {
@@ -147,6 +147,7 @@ typedef struct {
     float timeline_position;   // 0.0 - 1.0
     float base_alpha;          // Base transparency (0.0 - 1.0)
     float highlight_width;     // Width of highlight fade (0.0 - 0.5)
+    float miter_angle_limit;   // Angle threshold in degrees (above this, use semicircle join)
     bool debug_colors;         // Use different colors for each component
 } gcode_polyline_t;
 
@@ -433,6 +434,7 @@ static const char* gcode_pie_join_vs_source =
     "    float line_width;\n"
     "    float aspect_ratio;\n"
     "    float join_resolution;\n"
+    "    float miter_angle_limit;\n"  // Angle in radians above which we use semicircle
     "};\n"
     "\n"
     "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
@@ -505,25 +507,34 @@ static const char* gcode_pie_join_vs_source =
     "    \n"
     "    float2 offset;\n"
     "    \n"
+    "    // Find the angle between the two segment normals (used for both center and arc)\n"
+    "    float cosTheta = clamp(dot(abn, cbn), -1.0, 1.0);\n"
+    "    float theta = acos(cosTheta);  // Angle between normals = bend angle\n"
+    "    \n"
+    "    // Check if angle exceeds miter limit (use semicircle for sharp bends)\n"
+    "    bool useSemicircle = (theta > params.miter_angle_limit);\n"
+    "    \n"
     "    if (id < 0.5) {\n"
-    "        // Center vertex (id == 0): positioned at the miter intersection point\n"
-    "        // This is the inside of the bend where segments meet\n"
-    "        float dotYBasisAbn = dot(yBasis, abn);\n"
-    "        if (abs(dotYBasisAbn) < 0.001) dotYBasisAbn = 0.001;  // prevent division by zero\n"
-    "        offset = -halfWidth * yBasis * sigma / dotYBasisAbn;\n"
+    "        // Center vertex (id == 0)\n"
+    "        if (useSemicircle) {\n"
+    "            // For sharp bends, keep center at pointB (semicircle join)\n"
+    "            offset = float2(0.0, 0.0);\n"
+    "        } else {\n"
+    "            // For normal bends, position at miter intersection point\n"
+    "            float dotYBasisAbn = dot(yBasis, abn);\n"
+    "            if (abs(dotYBasisAbn) < 0.001) dotYBasisAbn = 0.001;  // prevent division by zero\n"
+    "            offset = -halfWidth * yBasis * sigma / dotYBasisAbn;\n"
+    "        }\n"
     "    } else {\n"
     "        // Arc vertex: positioned along the circular arc on the outside of the bend\n"
-    "        // Find the angle between the two segment normals\n"
-    "        float cosTheta = clamp(dot(abn, cbn), -1.0, 1.0);\n"
-    "        float theta = acos(cosTheta);\n"
-    "        \n"
     "        // Calculate the angle for this vertex\n"
     "        // sigma * 0.5 * PI puts us at the starting edge\n"
     "        // Then we interpolate through theta\n"
     "        float vertexAngle = (sigma * 0.5 * PI) + (-0.5 * theta) + (theta * (id - 1.0) / resolution);\n"
     "        \n"
     "        // Convert angle to position using basis vectors\n"
-    "        float2 pos = halfWidth * float2(cos(vertexAngle), sin(vertexAngle));\n"
+    "        // Arc radius = line_width (full width, not half) to match segment edges\n"
+    "        float2 pos = params.line_width * float2(cos(vertexAngle), sin(vertexAngle));\n"
     "        offset = xBasis * pos.x + yBasis * pos.y;\n"
     "    }\n"
     "    \n"
@@ -843,6 +854,7 @@ static inline bool gcode_polyline_init(gcode_polyline_t* gp, const char* gcode_f
     gp->timeline_position = 0.5f;
     gp->base_alpha = GCODE_POLYLINE_DEFAULT_BASE_ALPHA;
     gp->highlight_width = GCODE_POLYLINE_DEFAULT_HIGHLIGHT_WIDTH;
+    gp->miter_angle_limit = 150.0f;  // Default: use semicircle for angles > 150 degrees
     gp->debug_colors = true;
 
     // Calculate counts
@@ -1366,6 +1378,7 @@ static inline void gcode_polyline_draw(gcode_polyline_t* gp, mat4_t mvp, float a
         .line_width = gp->line_width,
         .aspect_ratio = aspect_ratio,
         .join_resolution = (float)GCODE_POLYLINE_JOIN_SEGMENTS,
+        .miter_angle_limit = gp->miter_angle_limit * 3.14159265359f / 180.0f,  // Convert degrees to radians
     };
 
     // Draw terminal start segment
