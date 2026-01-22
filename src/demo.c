@@ -111,7 +111,8 @@ static void init(void) {
     instanced_lines_alpha_init(&state.alpha_lines);
 
     // Load G-code file
-    state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
+    //state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
+    state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/Triceratops.gcode");
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);

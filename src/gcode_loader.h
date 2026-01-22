@@ -16,7 +16,7 @@
 //------------------------------------------------------------------------------
 // Configuration
 //------------------------------------------------------------------------------
-#define GCODE_MAX_POINTS 100000
+#define GCODE_MAX_POINTS 300000
 #define GCODE_LINE_BUFFER_SIZE 256
 
 //------------------------------------------------------------------------------
@@ -58,12 +58,12 @@ static inline bool gcode_parse_param(const char* line, char param, float* value)
     return false;
 }
 
-// Check if a line is a G1 command
-static inline bool gcode_is_g1(const char* line) {
+// Check if a line is a G1 or G0 command
+static inline bool gcode_is_g1_or_g0(const char* line) {
     // Skip whitespace
     while (*line == ' ' || *line == '\t') line++;
-    // Check for G1 or g1
-    if ((line[0] == 'G' || line[0] == 'g') && line[1] == '1' &&
+    // Check for G1, g1, G0 or g0
+    if ((line[0] == 'G' || line[0] == 'g') && (line[1] == '1' || line[1] == '0') &&
         (line[2] == ' ' || line[2] == '\t' || line[2] == '\0' || line[2] == '\r' || line[2] == '\n')) {
         return true;
     }
@@ -139,7 +139,7 @@ static inline bool gcode_path_load(gcode_path_t* path, const char* filename) {
         }
 
         // Check for G1 command
-        if (gcode_is_g1(line)) {
+        if (gcode_is_g1_or_g0(line)) {
             float x = current_x, y = current_y, z = current_z;
             bool has_x = gcode_parse_param(line, 'X', &x);
             bool has_y = gcode_parse_param(line, 'Y', &y);
