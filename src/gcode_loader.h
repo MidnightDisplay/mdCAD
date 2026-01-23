@@ -167,6 +167,69 @@ static inline bool gcode_path_load(gcode_path_t* path, const char* filename) {
     return path->count > 0;
 }
 
+// Load G-code from memory buffer (for embedded data)
+static inline bool gcode_path_load_from_memory(gcode_path_t* path, const char* data, unsigned int size) {
+    if (!data || size == 0) {
+        return false;
+    }
+
+    char line[GCODE_LINE_BUFFER_SIZE];
+    float current_x = 0.0f, current_y = 0.0f, current_z = 0.0f;
+    bool has_position = false;
+
+    const char* ptr = data;
+    const char* end = data + size;
+
+    while (ptr < end) {
+        // Read a line into the buffer
+        int i = 0;
+        while (ptr < end && i < GCODE_LINE_BUFFER_SIZE - 1) {
+            char c = *ptr++;
+            if (c == '\n') {
+                break;
+            }
+            if (c != '\r') {
+                line[i++] = c;
+            }
+        }
+        line[i] = '\0';
+
+        // Skip empty lines
+        if (i == 0) continue;
+
+        // Skip comments
+        if (line[0] == ';') {
+            continue;
+        }
+
+        // Check for G1 command
+        if (gcode_is_g1_or_g0(line)) {
+            float x = current_x, y = current_y, z = current_z;
+            bool has_x = gcode_parse_param(line, 'X', &x);
+            bool has_y = gcode_parse_param(line, 'Y', &y);
+            bool has_z = gcode_parse_param(line, 'Z', &z);
+
+            // Only add point if there's actual movement
+            if (has_x || has_y || has_z) {
+                // Skip pure Z moves at the start (nozzle lift commands)
+                if (!has_position && !has_x && !has_y) {
+                    current_z = z;
+                    continue;
+                }
+
+                current_x = x;
+                current_y = y;
+                current_z = z;
+                has_position = true;
+
+                gcode_path_add_point(path, current_x, current_y, current_z);
+            }
+        }
+    }
+
+    return path->count > 0;
+}
+
 static inline void gcode_path_center(gcode_path_t* path) {
     if (path->count == 0) return;
 
