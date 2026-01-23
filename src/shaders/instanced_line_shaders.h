@@ -69,6 +69,59 @@ static const char* instanced_line_fs_source =
     "}\n";
 
 //------------------------------------------------------------------------------
+// OpenGL ES 3.0 GLSL (Android)
+//------------------------------------------------------------------------------
+#elif defined(SOKOL_GLES3)
+
+static const char* instanced_line_vs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "precision highp int;\n"
+    "uniform mat4 mvp;\n"
+    "uniform float line_width;\n"
+    "uniform float aspect_ratio;\n"
+    "layout(location=0) in vec3 template_pos;\n"
+    "layout(location=1) in vec3 point_a;\n"
+    "layout(location=2) in vec3 point_b;\n"
+    "layout(location=3) in vec4 color;\n"
+    "out vec4 v_color;\n"
+    "void main() {\n"
+    "    // Transform endpoints to clip space\n"
+    "    vec4 clip_a = mvp * vec4(point_a, 1.0);\n"
+    "    vec4 clip_b = mvp * vec4(point_b, 1.0);\n"
+    "    // Convert to NDC\n"
+    "    vec2 ndc_a = clip_a.xy / clip_a.w;\n"
+    "    vec2 ndc_b = clip_b.xy / clip_b.w;\n"
+    "    // Compute direction and perpendicular in screen space\n"
+    "    vec2 dir = ndc_b - ndc_a;\n"
+    "    float len = length(dir);\n"
+    "    if (len < 0.0001) dir = vec2(1.0, 0.0);\n"
+    "    else dir = dir / len;\n"
+    "    vec2 perp = vec2(-dir.y, dir.x);\n"
+    "    // Correct for aspect ratio\n"
+    "    perp.x /= aspect_ratio;\n"
+    "    dir.x /= aspect_ratio;\n"
+    "    // Select endpoint based on template z (0=A, 1=B)\n"
+    "    vec4 base_clip = mix(clip_a, clip_b, template_pos.z);\n"
+    "    // Compute screen-space offset\n"
+    "    vec2 offset = dir * template_pos.x + perp * template_pos.y;\n"
+    "    offset *= line_width;\n"
+    "    // Apply offset in clip space\n"
+    "    gl_Position = base_clip;\n"
+    "    gl_Position.xy += offset * base_clip.w;\n"
+    "    v_color = color;\n"
+    "}\n";
+
+static const char* instanced_line_fs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "in vec4 v_color;\n"
+    "out vec4 frag_color;\n"
+    "void main() {\n"
+    "    frag_color = v_color;\n"
+    "}\n";
+
+//------------------------------------------------------------------------------
 // Metal Shading Language
 //------------------------------------------------------------------------------
 #elif defined(SOKOL_METAL)
@@ -250,7 +303,7 @@ static const char* instanced_line_fs_source =
     "}\n";
 
 #else
-#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
+#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
 #endif
 
 #endif // INSTANCED_LINE_SHADERS_H

@@ -24,7 +24,7 @@
 #include "instanced_lines.h"
 #include "instanced_polylines.h"
 #include "instanced_lines_alpha.h"
-#include "gcode_polyline.h"
+#include "instanced_alpha_polylines.h"
 #include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
@@ -49,7 +49,7 @@ static struct {
     instanced_lines_t instanced_lines;
     instanced_polylines_t instanced_polylines;
     instanced_lines_alpha_t alpha_lines;
-    gcode_polyline_t gcode_polyline;
+    instanced_alpha_polylines_t gcode_polyline;
     bool gcode_loaded;
 
     // Scene state
@@ -111,8 +111,8 @@ static void init(void) {
     instanced_lines_alpha_init(&state.alpha_lines);
 
     // Load G-code file
-    //state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
-    state.gcode_loaded = gcode_polyline_init(&state.gcode_polyline, "models/gcode/Triceratops.gcode");
+    //state.gcode_loaded = instanced_alpha_polylines_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
+    state.gcode_loaded = instanced_alpha_polylines_init(&state.gcode_polyline, "models/gcode/Triceratops.gcode");
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
@@ -191,7 +191,7 @@ static void frame(void) {
     instanced_polylines_update(&state.instanced_polylines, state.elapsed_time);
     instanced_lines_alpha_update(&state.alpha_lines, state.elapsed_time);
     if (state.gcode_loaded) {
-        gcode_polyline_update(&state.gcode_polyline);
+        instanced_alpha_polylines_update(&state.gcode_polyline);
     }
 
     // Calculate aspect ratio for thick line rendering
@@ -229,7 +229,7 @@ static void frame(void) {
     // Draw alpha-blended objects (after opaque objects)
     // G-code path
     if (state.visibility.show_gcode_path && state.gcode_loaded) {
-        gcode_polyline_draw(&state.gcode_polyline, mvp, aspect_ratio);
+        instanced_alpha_polylines_draw(&state.gcode_polyline, mvp, aspect_ratio);
     }
 
     // Alpha-blended animated lines
@@ -261,7 +261,7 @@ static void cleanup(void) {
     instanced_polylines_shutdown(&state.instanced_polylines);
     instanced_lines_alpha_shutdown(&state.alpha_lines);
     if (state.gcode_loaded) {
-        gcode_polyline_shutdown(&state.gcode_polyline);
+        instanced_alpha_polylines_shutdown(&state.gcode_polyline);
     }
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();

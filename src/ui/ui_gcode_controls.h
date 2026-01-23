@@ -10,14 +10,14 @@
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
-#include "../gcode_polyline.h"
+#include "../instanced_alpha_polylines.h"
 #include "../instanced_lines_alpha.h"
 
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
 typedef struct {
-    gcode_polyline_t* gcode;
+    instanced_alpha_polylines_t* gcode;
     instanced_lines_alpha_t* alpha_lines;
 
     // UI state
@@ -33,7 +33,7 @@ typedef struct {
 
 static inline void ui_gcode_controls_init(
     ui_gcode_controls_state_t* state,
-    gcode_polyline_t* gcode,
+    instanced_alpha_polylines_t* gcode,
     instanced_lines_alpha_t* alpha_lines
 ) {
     state->gcode = gcode;

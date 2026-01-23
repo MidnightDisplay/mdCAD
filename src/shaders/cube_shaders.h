@@ -31,6 +31,35 @@ static const char* cube_fs_source =
     "}\n";
 
 //------------------------------------------------------------------------------
+// OpenGL ES 3.0 GLSL (Android)
+//------------------------------------------------------------------------------
+#elif defined(SOKOL_GLES3)
+
+static const char* cube_vs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "precision highp int;\n"
+    "uniform mat4 mvp;\n"
+    "layout(location=0) in vec3 position;\n"
+    "layout(location=1) in vec3 normal;\n"
+    "out vec3 v_normal;\n"
+    "void main() {\n"
+    "    gl_Position = mvp * vec4(position, 1.0);\n"
+    "    v_normal = normal;\n"
+    "}\n";
+
+static const char* cube_fs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "in vec3 v_normal;\n"
+    "out vec4 frag_color;\n"
+    "void main() {\n"
+    "    // Map normal from [-1,1] to [0,1] for RGB color\n"
+    "    vec3 color = v_normal * 0.5 + 0.5;\n"
+    "    frag_color = vec4(color, 1.0);\n"
+    "}\n";
+
+//------------------------------------------------------------------------------
 // Metal Shading Language
 //------------------------------------------------------------------------------
 #elif defined(SOKOL_METAL)
@@ -130,7 +159,7 @@ static const char* cube_fs_source =
     "}\n";
 
 #else
-#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
+#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
 #endif
 
 #endif // CUBE_SHADERS_H
