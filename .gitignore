@@ -19,7 +19,7 @@ scripts/test-output/
 .DS_Store
 
 # Claude stuff
-.claude/CHECKPOINT.md
+.claude/
 CLAUDE.md
 
 # Imgui
