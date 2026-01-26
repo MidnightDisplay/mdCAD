@@ -7,11 +7,22 @@ endif()
 
 set(FETCHCONTENT_QUIET OFF)
 
-project(
-    skl_tmp
-    VERSION 0.1.0
-    LANGUAGES CXX C OBJC
+# Android doesn't support Objective-C
+if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    # 16KB page alignment for Android 15+ compatibility
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+    project(
+        skl_tmp
+        VERSION 0.1.0
+        LANGUAGES CXX C
     )
+else()
+    project(
+        skl_tmp
+        VERSION 0.1.0
+        LANGUAGES CXX C OBJC
+    )
+endif()
 
 # set(DAWN_FETCH_DEPENDENCIES ON)
 # add_subdirectory("dawn" EXCLUDE_FROM_ALL)

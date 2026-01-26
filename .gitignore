@@ -42,3 +42,12 @@ cmake_install.cmake
 Makefile
 *.cmake
 !cmake/*.cmake
+
+# Android
+android/.gradle/
+android/.idea/
+android/app/.cxx/
+android/app/build/
+android/local.properties
+*.apk
+*.aab

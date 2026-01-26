@@ -43,6 +43,13 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     target_compile_options(libsokol PRIVATE "SHELL:--use-port=emdawnwebgpu")
     target_link_options(libsokol PUBLIC "SHELL:--use-port=emdawnwebgpu" -sASYNCIFY)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
+    target_link_libraries(libsokol PUBLIC
+        GLESv3
+        EGL
+        android
+        log)
 else()
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     if (CMAKE_SYSTEM_NAME STREQUAL Linux)

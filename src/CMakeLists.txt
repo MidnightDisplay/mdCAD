@@ -22,6 +22,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         RESOURCE "${IOS_RESOURCES}"
         LINKER_LANGUAGE OBJC
     )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    # Android requires shared library for NativeActivity
+    add_library(${PROJECT_NAME} SHARED ${SOURCES})
+    # Force ANativeActivity_onCreate to be exported
+    target_link_options(${PROJECT_NAME} PRIVATE -u ANativeActivity_onCreate)
+    # 16KB page alignment for Android 15+ compatibility
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,-z,max-page-size=16384)
 else()
     add_executable(${PROJECT_NAME} ${SOURCES})
 endif()
@@ -39,8 +46,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     target_link_options(${PROJECT_NAME} PRIVATE -sNO_FILESYSTEM=1 -sASSERTIONS=0 -sSINGLE_FILE -sMALLOC=emmalloc)
 endif()
 
-# explicitly strip dead code
-if (CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_SYSTEM_NAME STREQUAL Emscripten)
+# explicitly strip dead code (macOS/iOS only - Android uses --gc-sections)
+if (CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_SYSTEM_NAME STREQUAL Emscripten AND NOT CMAKE_SYSTEM_NAME STREQUAL Android)
     target_link_options(${PROJECT_NAME} PRIVATE LINKER:-dead_strip)
 endif()
 

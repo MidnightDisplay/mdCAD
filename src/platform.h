@@ -13,6 +13,9 @@
 #elif defined(__EMSCRIPTEN__)
     #define SOKOL_WGPU
     #define PLATFORM_WEB
+#elif defined(__ANDROID__)
+    #define SOKOL_GLES3
+    #define PLATFORM_ANDROID
 #elif defined(__APPLE__)
     #include <TargetConditionals.h>
     #define SOKOL_METAL
