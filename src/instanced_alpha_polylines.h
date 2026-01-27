@@ -17,8 +17,15 @@
 #include <math.h>
 #include <stdlib.h>
 
-// Embedded G-code data for web and iOS builds (no filesystem access)
-#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
+#ifdef PLATFORM_ANDROID
+#include <android/log.h>
+#define ALPHA_POLY_LOG(...) __android_log_print(ANDROID_LOG_INFO, "alpha_polylines", __VA_ARGS__)
+#else
+#define ALPHA_POLY_LOG(...) ((void)0)
+#endif
+
+// Embedded G-code data for platforms without filesystem access
+#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS) || defined(PLATFORM_ANDROID)
 #include "gcode_benchy_embedded.h"
 #endif
 
@@ -298,10 +305,12 @@ static inline bool instanced_alpha_polylines_init(instanced_alpha_polylines_t* g
     // Initialize path
     gcode_path_init(&gp->path);
 
-    // Load G-code - use embedded data on web/iOS, file on desktop
-#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
-    (void)gcode_filename;  // Unused on web/iOS
+    // Load G-code - use embedded data on platforms without filesystem, file on desktop
+#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS) || defined(PLATFORM_ANDROID)
+    (void)gcode_filename;  // Unused on these platforms
+    ALPHA_POLY_LOG("Loading embedded G-code, size=%u", gcode_benchy_size);
     if (!gcode_path_load_from_memory(&gp->path, gcode_benchy_data, gcode_benchy_size)) {
+        ALPHA_POLY_LOG("Failed to load G-code from memory!");
         return false;
     }
 #else
@@ -309,6 +318,8 @@ static inline bool instanced_alpha_polylines_init(instanced_alpha_polylines_t* g
         return false;
     }
 #endif
+
+    ALPHA_POLY_LOG("G-code loaded: %d points, total_length=%.2f", gp->path.count, gp->path.total_length);
 
     // Center the path
     gcode_path_center(&gp->path);
@@ -529,6 +540,13 @@ static inline bool instanced_alpha_polylines_init(instanced_alpha_polylines_t* g
         .label = "gcode-cap-shader"
     });
 
+    // Check shader compilation status
+    ALPHA_POLY_LOG("Shader states: intermediate=%d, terminal=%d, pie_join=%d, cap=%d",
+        sg_query_shader_state(gp->intermediate_shd),
+        sg_query_shader_state(gp->terminal_shd),
+        sg_query_shader_state(gp->pie_join_shd),
+        sg_query_shader_state(gp->cap_shd));
+
     // Alpha blending configuration (reused by all pipelines)
     sg_blend_state alpha_blend = {
         .enabled = true,
@@ -635,6 +653,16 @@ static inline bool instanced_alpha_polylines_init(instanced_alpha_polylines_t* g
         .cull_mode = SG_CULLMODE_NONE,
         .label = "gcode-cap-pipeline"
     });
+
+    // Check pipeline creation status
+    ALPHA_POLY_LOG("Pipeline states: intermediate=%d, terminal=%d, pie_join=%d, cap=%d",
+        sg_query_pipeline_state(gp->intermediate_pip),
+        sg_query_pipeline_state(gp->terminal_pip),
+        sg_query_pipeline_state(gp->pie_join_pip),
+        sg_query_pipeline_state(gp->cap_pip));
+
+    ALPHA_POLY_LOG("Init complete: max_intermediate=%d, max_pie_joins=%d",
+        gp->max_intermediate, gp->max_pie_joins);
 
     return true;
 }

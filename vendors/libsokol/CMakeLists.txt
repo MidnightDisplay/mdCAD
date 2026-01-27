@@ -9,6 +9,9 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(libsokol)
 
+# Note: For full gamepad support on Android, apply patches/sokol_android_gamepad.patch
+# to the fetched sokol_app.h. The touchpad remote works without the patch.
+
 FetchContent_GetProperties(libcimgui)
 
 set(SOKOL_HEADERS

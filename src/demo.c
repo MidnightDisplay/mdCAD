@@ -25,6 +25,7 @@
 #include "instanced_polylines.h"
 #include "instanced_lines_alpha.h"
 #include "instanced_alpha_polylines.h"
+#include "gamepad_input.h"
 #include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
@@ -54,8 +55,10 @@ static struct {
 
     // Scene state
     orbit_camera_t camera;
+    gamepad_state_t gamepad;
     uint64_t last_time;
     float elapsed_time;
+    bool ui_visible;
 
     // UI state
     ui_controls_state_t controls;
@@ -100,8 +103,10 @@ static void init(void) {
     // Initialize render target
     render_target_init(&state.viewport_rt);
 
-    // Initialize camera
+    // Initialize camera and gamepad
     orbit_camera_init(&state.camera);
+    gamepad_init(&state.gamepad);
+    state.ui_visible = true;
 
     // Initialize renderables
     static_cube_init(&state.cube);
@@ -151,6 +156,64 @@ static void frame(void) {
     bool any_mouse_down = io->MouseDown[0] || io->MouseDown[1] || io->MouseDown[2];
     orbit_camera_begin_frame(&state.camera, any_mouse_down);
 
+    // Update gamepad state
+    gamepad_begin_frame(&state.gamepad);
+    gamepad_update(&state.gamepad, dt);
+
+    // Apply gamepad input to camera
+    if (state.gamepad.connected) {
+        float orbit_x, orbit_y, pan_x, pan_y, zoom;
+        gamepad_get_orbit_input(&state.gamepad, &orbit_x, &orbit_y);
+        gamepad_get_pan_input(&state.gamepad, &pan_x, &pan_y);
+        zoom = gamepad_get_zoom_input(&state.gamepad);
+
+        orbit_camera_apply_gamepad(&state.camera, orbit_x, orbit_y, pan_x, pan_y, zoom, dt);
+
+        // Camera reset (L1 + R1 held)
+        if (gamepad_should_reset(&state.gamepad)) {
+            orbit_camera_reset(&state.camera);
+        }
+
+        // A button: Toggle UI visibility
+        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_A)) {
+            state.ui_visible = !state.ui_visible;
+        }
+
+        // Y button: Cycle themes
+        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_Y)) {
+            static int current_theme = 0;
+            current_theme = (current_theme + 1) % 3;
+            switch (current_theme) {
+                case 0: ui_theme_apply_catppuccin_frappe(); break;
+                case 1: ui_theme_apply_visual_studio(); break;
+                case 2: ui_theme_apply_ios_light(); break;
+            }
+            // Sync clear color with theme
+            float r, g, b;
+            ui_theme_get_frame_bg(&r, &g, &b);
+            state.offscreen_pass_action.colors[0].clear_value = (sg_color){r, g, b, 1.0f};
+        }
+
+        // Start button: Toggle all UI panels
+        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_START)) {
+            state.ui_visible = !state.ui_visible;
+        }
+
+        // D-pad up/down: Timeline scrub (if G-code loaded)
+        if (state.gcode_loaded) {
+            if (gamepad_button_held(&state.gamepad, GAMEPAD_BUTTON_DPAD_UP)) {
+                state.gcode_polyline.timeline_position += dt * 0.2f;
+                if (state.gcode_polyline.timeline_position > 1.0f)
+                    state.gcode_polyline.timeline_position = 1.0f;
+            }
+            if (gamepad_button_held(&state.gamepad, GAMEPAD_BUTTON_DPAD_DOWN)) {
+                state.gcode_polyline.timeline_position -= dt * 0.2f;
+                if (state.gcode_polyline.timeline_position < 0.0f)
+                    state.gcode_polyline.timeline_position = 0.0f;
+            }
+        }
+    }
+
     simgui_new_frame(&(simgui_frame_desc_t){
         .width = width,
         .height = height,
@@ -160,13 +223,19 @@ static void frame(void) {
 
     //=== UI ===
     igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
-    ui_controls_draw(&state.controls);
+
+    // Draw UI panels if visible
+    if (state.ui_visible) {
+        ui_controls_draw(&state.controls);
+        ui_camera_debug_draw(&state.camera_debug);
+        ui_lines_controls_draw(&state.lines_controls);
+        ui_thick_lines_controls_draw(&state.thick_lines_controls);
+        ui_visibility_draw(&state.visibility);
+        ui_gcode_controls_draw(&state.gcode_controls);
+    }
+
+    // Viewport is always drawn (contains the 3D content)
     ui_viewport_draw(&state.viewport);
-    ui_camera_debug_draw(&state.camera_debug);
-    ui_lines_controls_draw(&state.lines_controls);
-    ui_thick_lines_controls_draw(&state.thick_lines_controls);
-    ui_visibility_draw(&state.visibility);
-    ui_gcode_controls_draw(&state.gcode_controls);
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
@@ -272,6 +341,15 @@ static void cleanup(void) {
 // Event handling
 //------------------------------------------------------------------------------
 static void event(const sapp_event* ev) {
+    // Handle gamepad input first
+    gamepad_handle_event(&state.gamepad, ev);
+
+    // Handle app suspend (Android/iOS) - save ImGui settings
+    if (ev->type == SAPP_EVENTTYPE_SUSPENDED) {
+        imgui_storage_mark_should_save();
+    }
+
+    // Forward to ImGui
     simgui_handle_event(ev);
 }
 
