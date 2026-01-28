@@ -19,6 +19,11 @@ typedef struct {
     orbit_camera_t* camera;          // Pointer to the orbital camera
     int content_width;
     int content_height;
+
+    // For GPU picking
+    float window_pos_x;              // Window content position (screen coords)
+    float window_pos_y;
+    bool hovered;                    // Is viewport image hovered this frame
 } ui_viewport_state_t;
 
 //------------------------------------------------------------------------------
@@ -31,6 +36,9 @@ static inline void ui_viewport_init(ui_viewport_state_t* vp, render_target_t* rt
     vp->camera = cam;
     vp->content_width = 0;
     vp->content_height = 0;
+    vp->window_pos_x = 0;
+    vp->window_pos_y = 0;
+    vp->hovered = false;
 }
 
 // Draw the 3D Viewport window
@@ -63,6 +71,11 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
         size_changed = true;
     }
 
+    // Get the content region screen position (for pick buffer coordinate conversion)
+    ImVec2_c cursor_screen_pos = igGetCursorScreenPos();
+    vp->window_pos_x = cursor_screen_pos.x;
+    vp->window_pos_y = cursor_screen_pos.y;
+
     // Display the rendered image using ImGui
     uint64_t tex_id = simgui_imtextureid_with_sampler(
         vp->render_target->tex_view,
@@ -73,8 +86,10 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
             (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
 
     // Handle camera input when mouse is over the viewport image
+    vp->hovered = igIsItemHovered(ImGuiHoveredFlags_None);
+
     if (vp->camera) {
-        bool hovered = igIsItemHovered(ImGuiHoveredFlags_None);
+        bool hovered = vp->hovered;
 
         ImGuiIO* io = igGetIO_Nil();
         float dx = io->MouseDelta.x;

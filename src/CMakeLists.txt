@@ -4,6 +4,11 @@ set(SOURCES
     demo.c
 )
 
+# Add Metal-specific Objective-C source on Apple platforms
+if(APPLE)
+    list(APPEND SOURCES gpu/pick_readback_metal.m)
+endif()
+
 # iOS requires MACOSX_BUNDLE for app packaging
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(IOS_RESOURCES
@@ -33,7 +38,7 @@ else()
     add_executable(${PROJECT_NAME} ${SOURCES})
 endif()
 
-target_link_libraries(${PROJECT_NAME} libsokol libcimgui)
+target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static)
 
 # Emscripten-specific linker options
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)

@@ -5,4 +5,5 @@
 #add_subdirectory(entt)
 add_subdirectory(libcimgui)
 add_subdirectory(libsokol)
+add_subdirectory(flecs)
 

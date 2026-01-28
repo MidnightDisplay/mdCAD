@@ -35,6 +35,12 @@
 #include "ui/ui_visibility.h"
 #include "ui/ui_gcode_controls.h"
 
+// ECS modules
+#include "ecs/ecs_world.h"
+#include "ecs/ecs_scene.h"
+#include "gpu/pick_buffer.h"
+#include "ui/ui_pick_debug.h"
+
 //------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
@@ -68,6 +74,14 @@ static struct {
     ui_thick_lines_controls_state_t thick_lines_controls;
     ui_visibility_state_t visibility;
     ui_gcode_controls_state_t gcode_controls;
+
+    // ECS state
+    ecs_world_state_t ecs_world;
+    ecs_scene_t ecs_scene;
+
+    // GPU Picking state
+    pick_buffer_t pick_buffer;
+    ui_pick_debug_state_t pick_debug;
 } state;
 
 //------------------------------------------------------------------------------
@@ -129,6 +143,41 @@ static void init(void) {
     ui_gcode_controls_init(&state.gcode_controls,
         state.gcode_loaded ? &state.gcode_polyline : NULL,
         &state.alpha_lines);
+
+    // Initialize ECS world and scene
+    ecs_world_init(&state.ecs_world);
+    ecs_scene_init(&state.ecs_scene, &state.ecs_world);
+
+    // Initialize GPU picking
+    pick_buffer_init(&state.pick_buffer);
+    ui_pick_debug_init(&state.pick_debug, &state.pick_buffer);
+
+    // Wire up pick debug window toggle to visibility controls
+    ui_visibility_set_pick_debug_ptr(&state.visibility, &state.pick_debug.window_open);
+
+    // Create test ECS entities using the scene API
+    {
+        // RGB axis lines (visible in 3D viewport)
+        scene_add_line(&state.ecs_scene,
+            vec3_make(-2.0f, 0.0f, 0.0f), vec3_make(2.0f, 0.0f, 0.0f),
+            vec4_make(1.0f, 0.2f, 0.2f, 1.0f), 0.03f);  // Red X axis
+
+        scene_add_line(&state.ecs_scene,
+            vec3_make(0.0f, -2.0f, 0.0f), vec3_make(0.0f, 2.0f, 0.0f),
+            vec4_make(0.2f, 1.0f, 0.2f, 1.0f), 0.03f);  // Green Y axis
+
+        scene_add_line(&state.ecs_scene,
+            vec3_make(0.0f, 0.0f, -2.0f), vec3_make(0.0f, 0.0f, 2.0f),
+            vec4_make(0.2f, 0.2f, 1.0f, 1.0f), 0.03f);  // Blue Z axis
+
+        // Test points at axis endpoints
+        scene_add_point(&state.ecs_scene,
+            vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X
+        scene_add_point(&state.ecs_scene,
+            vec3_make(0.0f, 2.0f, 0.0f), vec4_make(0.4f, 1.0f, 0.4f, 1.0f), 0.08f);  // +Y
+        scene_add_point(&state.ecs_scene,
+            vec3_make(0.0f, 0.0f, 2.0f), vec4_make(0.4f, 0.4f, 1.0f, 1.0f), 0.08f);  // +Z
+    }
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -232,6 +281,7 @@ static void frame(void) {
         ui_thick_lines_controls_draw(&state.thick_lines_controls);
         ui_visibility_draw(&state.visibility);
         ui_gcode_controls_draw(&state.gcode_controls);
+        ui_pick_debug_draw(&state.pick_debug);
     }
 
     // Viewport is always drawn (contains the 3D content)
@@ -239,6 +289,10 @@ static void frame(void) {
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
+
+    // Update ECS world and scene
+    ecs_world_progress(&state.ecs_world, dt);
+    ecs_scene_update(&state.ecs_scene);
 
     // Update elapsed time for animation
     state.elapsed_time += dt;
@@ -306,7 +360,44 @@ static void frame(void) {
         instanced_lines_alpha_draw(&state.alpha_lines, mvp, aspect_ratio);
     }
 
+    // Draw ECS scene entities (lines, points, etc.)
+    if (state.visibility.show_ecs_entities) {
+        ecs_scene_draw(&state.ecs_scene, mvp, aspect_ratio);
+    }
+
     sg_end_pass();
+
+    //=== GPU PICKING PASS ===
+    // Update pick buffer center from mouse position (relative to viewport)
+    if (state.viewport.hovered) {
+        float mouse_x = io->MousePos.x;
+        float mouse_y = io->MousePos.y;
+
+        // Convert to normalized viewport coordinates (0-1)
+        float vp_x = (mouse_x - state.viewport.window_pos_x) / (float)vp_width;
+        float vp_y = (mouse_y - state.viewport.window_pos_y) / (float)vp_height;
+
+        // Clamp to viewport bounds
+        if (vp_x >= 0.0f && vp_x <= 1.0f && vp_y >= 0.0f && vp_y <= 1.0f) {
+            pick_buffer_set_center(&state.pick_buffer, vp_x, vp_y, (float)vp_width, (float)vp_height);
+
+            // Populate pick buffer with ECS entities (only if visible)
+            pick_buffer_begin_frame(&state.pick_buffer);
+            if (state.visibility.show_ecs_entities) {
+                ecs_scene_populate_pick_buffer(&state.ecs_scene, &state.pick_buffer);
+            }
+
+            // Render pick pass
+            pick_buffer_render(&state.pick_buffer, view, proj);
+
+            // Readback and update hover state (Note: readback not yet implemented)
+            pick_buffer_readback(&state.pick_buffer);
+            pick_buffer_update_hover(&state.pick_buffer);
+
+            // Update ECS hover state based on pick result
+            ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+        }
+    }
 
     //=== MAIN PASS - RENDER IMGUI ===
     sg_begin_pass(&(sg_pass){
@@ -324,6 +415,14 @@ static void frame(void) {
 //------------------------------------------------------------------------------
 static void cleanup(void) {
     imgui_storage_shutdown();
+
+    // Shutdown GPU picking
+    pick_buffer_shutdown(&state.pick_buffer);
+
+    // Shutdown ECS scene and world
+    ecs_scene_shutdown(&state.ecs_scene);
+    ecs_world_shutdown(&state.ecs_world);
+
     static_cube_shutdown(&state.cube);
     dynamic_lines_shutdown(&state.lines);
     instanced_lines_shutdown(&state.instanced_lines);

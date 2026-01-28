@@ -21,6 +21,10 @@ typedef struct {
     bool show_instanced_polylines;
     bool show_alpha_lines;
     bool show_gcode_path;
+
+    // ECS & Debug
+    bool show_ecs_entities;
+    bool *show_pick_debug;  // Pointer to external pick debug window state
 } ui_visibility_state_t;
 
 //------------------------------------------------------------------------------
@@ -32,8 +36,14 @@ static inline void ui_visibility_init(ui_visibility_state_t* vis) {
     vis->show_lines = false;
     vis->show_instanced_lines = false;
     vis->show_instanced_polylines = false;
-    vis->show_alpha_lines = true;      // Alpha lines visible by default
-    vis->show_gcode_path = true;       // G-code path visible by default
+    vis->show_alpha_lines = false;      // Alpha lines visible by default
+    vis->show_gcode_path = false;       // G-code path visible by default
+    vis->show_ecs_entities = true;     // ECS entities visible by default
+    vis->show_pick_debug = NULL;       // Set via setter
+}
+
+static inline void ui_visibility_set_pick_debug_ptr(ui_visibility_state_t* vis, bool *pick_debug_open) {
+    vis->show_pick_debug = pick_debug_open;
 }
 
 static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
@@ -48,6 +58,14 @@ static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
     igSeparatorText("Alpha-Blended");
     igCheckbox("Show Alpha Lines", &vis->show_alpha_lines);
     igCheckbox("Show G-code Path", &vis->show_gcode_path);
+
+    igSeparatorText("ECS Scene");
+    igCheckbox("Show ECS Entities", &vis->show_ecs_entities);
+
+    igSeparatorText("Debug Windows");
+    if (vis->show_pick_debug) {
+        igCheckbox("Pick Buffer Debug", vis->show_pick_debug);
+    }
 
     igEnd();
 }

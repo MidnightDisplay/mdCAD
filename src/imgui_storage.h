@@ -288,15 +288,16 @@ static inline void imgui_storage_shutdown(void) {
 
 // Mark that settings should be saved on next frame
 // Call when app is about to be suspended/backgrounded
+// Note: PLATFORM_WEB version is defined above with EMSCRIPTEN_KEEPALIVE
+#ifndef PLATFORM_WEB
 static inline void imgui_storage_mark_should_save(void) {
 #ifdef PLATFORM_IOS
     imgui_storage_ios_mark_should_save();
 #elif defined(PLATFORM_ANDROID)
     imgui_storage_android_mark_should_save();
-#elif defined(PLATFORM_WEB)
-    g_imgui_should_save = true;
 #endif
     // Native platforms save automatically via ini file
 }
+#endif
 
 #endif // IMGUI_STORAGE_H
