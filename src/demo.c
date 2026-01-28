@@ -373,12 +373,18 @@ static void frame(void) {
         float mouse_x = io->MousePos.x;
         float mouse_y = io->MousePos.y;
 
+        // Use logical viewport size (not DPI-scaled render target size) for coordinate conversion
+        // Mouse coordinates and window_pos are in logical screen coordinates
+        float logical_vp_width = (float)state.viewport.content_width;
+        float logical_vp_height = (float)state.viewport.content_height;
+
         // Convert to normalized viewport coordinates (0-1)
-        float vp_x = (mouse_x - state.viewport.window_pos_x) / (float)vp_width;
-        float vp_y = (mouse_y - state.viewport.window_pos_y) / (float)vp_height;
+        float vp_x = (mouse_x - state.viewport.window_pos_x) / logical_vp_width;
+        float vp_y = (mouse_y - state.viewport.window_pos_y) / logical_vp_height;
 
         // Clamp to viewport bounds
         if (vp_x >= 0.0f && vp_x <= 1.0f && vp_y >= 0.0f && vp_y <= 1.0f) {
+            // Pass the actual render target dimensions for proper zoom calculation
             pick_buffer_set_center(&state.pick_buffer, vp_x, vp_y, (float)vp_width, (float)vp_height);
 
             // Populate pick buffer with ECS entities (only if visible)
