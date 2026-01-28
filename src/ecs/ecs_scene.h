@@ -293,6 +293,33 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                 t->dirty = false;
             }
 
+            // Handle visibility: hidden entities get degenerate instance data
+            if (!r->visible) {
+                // Set degenerate instance data to effectively hide the entity
+                switch (g->type) {
+                    case GEOM_LINE: {
+                        // Zero-length line at origin with zero alpha
+                        vec3_t zero = vec3_make(0.0f, 0.0f, 0.0f);
+                        vec4_t invisible = vec4_make(0.0f, 0.0f, 0.0f, 0.0f);
+                        geom_line_batch_set(&scene->batches.lines, (int)r->instance_slot,
+                                            zero, zero, invisible);
+                        break;
+                    }
+                    case GEOM_POINT: {
+                        // Point at far distance with zero alpha
+                        vec3_t far_away = vec3_make(1e10f, 1e10f, 1e10f);
+                        vec4_t invisible = vec4_make(0.0f, 0.0f, 0.0f, 0.0f);
+                        geom_point_batch_set(&scene->batches.points, (int)r->instance_slot,
+                                             far_away, invisible);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                r->instance_dirty = false;
+                continue;  // Skip to next entity
+            }
+
             // Determine render color: Selected > Hovered > Normal
             vec4_t render_color = g->color;
             if (ecs_has_id(w->world, e, w->Selected_tag)) {

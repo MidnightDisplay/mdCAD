@@ -41,6 +41,8 @@
 #include "selection.h"
 #include "gpu/pick_buffer.h"
 #include "ui/ui_pick_debug.h"
+#include "ui/ui_entity_inspector.h"
+#include "ui/ui_scene_hierarchy.h"
 
 //------------------------------------------------------------------------------
 // Application state
@@ -86,6 +88,10 @@ static struct {
     // GPU Picking state
     pick_buffer_t pick_buffer;
     ui_pick_debug_state_t pick_debug;
+
+    // Entity management UI
+    ui_entity_inspector_state_t entity_inspector;
+    ui_scene_hierarchy_state_t scene_hierarchy;
 } state;
 
 //------------------------------------------------------------------------------
@@ -170,6 +176,10 @@ static void init(void) {
 
     // Wire up selection count to visibility panel
     ui_visibility_set_selection_count_ptr(&state.visibility, &state.selection.count);
+
+    // Initialize entity management UI
+    ui_entity_inspector_init(&state.entity_inspector, &state.selection, &state.ecs_world);
+    ui_scene_hierarchy_init(&state.scene_hierarchy, &state.selection, &state.ecs_scene);
 
     // Create test ECS entities using the scene API
     {
@@ -298,6 +308,31 @@ static void frame(void) {
         ui_visibility_draw(&state.visibility);
         ui_gcode_controls_draw(&state.gcode_controls);
         ui_pick_debug_draw(&state.pick_debug);
+        ui_entity_inspector_draw(&state.entity_inspector);
+        ui_scene_hierarchy_draw(&state.scene_hierarchy);
+    }
+
+    // Handle Delete key for entity deletion
+    // Delete or Backspace (macOS) deletes selected entities
+    if (!io->WantCaptureKeyboard) {
+        if (igIsKeyPressed_Bool(ImGuiKey_Delete, false) ||
+            igIsKeyPressed_Bool(ImGuiKey_Backspace, false)) {
+            // Copy selection to temp array since we'll be modifying it
+            int count = state.selection.count;
+            if (count > 0) {
+                ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
+                selection_copy_entities(&state.selection, to_delete, count);
+
+                // Clear selection first (before deleting entities)
+                selection_clear(&state.selection);
+
+                // Delete all entities
+                for (int i = 0; i < count; i++) {
+                    scene_remove_entity(&state.ecs_scene, to_delete[i]);
+                }
+                free(to_delete);
+            }
+        }
     }
 
     // Viewport is always drawn (contains the 3D content)

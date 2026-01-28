@@ -202,4 +202,24 @@ static inline void selection_handle_click(selection_buffer_t *sel,
     }
 }
 
+//------------------------------------------------------------------------------
+// Bulk Operations
+//------------------------------------------------------------------------------
+
+// Get array of selected entities (returns pointer to internal array)
+// Use count from selection_count() to iterate
+static inline ecs_entity_t* selection_get_entities(selection_buffer_t *sel) {
+    return sel->entities;
+}
+
+// Copy selected entities to provided array (caller must ensure sufficient capacity)
+// Returns number of entities copied
+static inline int selection_copy_entities(selection_buffer_t *sel, ecs_entity_t *out, int max_count) {
+    int count = (sel->count < max_count) ? sel->count : max_count;
+    for (int i = 0; i < count; i++) {
+        out[i] = sel->entities[i];
+    }
+    return count;
+}
+
 #endif // SELECTION_H
