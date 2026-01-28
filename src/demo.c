@@ -331,6 +331,9 @@ static void frame(void) {
                     scene_remove_entity(&state.ecs_scene, to_delete[i]);
                 }
                 free(to_delete);
+
+                // Mark scene hierarchy cache dirty
+                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
             }
         }
     }
@@ -496,6 +499,9 @@ static void cleanup(void) {
 
     // Shutdown selection buffer
     selection_shutdown(&state.selection);
+
+    // Shutdown scene hierarchy (frees cache)
+    ui_scene_hierarchy_shutdown(&state.scene_hierarchy);
 
     // Shutdown ECS scene and world
     ecs_scene_shutdown(&state.ecs_scene);
