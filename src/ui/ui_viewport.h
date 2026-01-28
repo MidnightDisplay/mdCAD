@@ -24,6 +24,11 @@ typedef struct {
     float window_pos_x;              // Window content position (screen coords)
     float window_pos_y;
     bool hovered;                    // Is viewport image hovered this frame
+
+    // For selection
+    bool clicked;                    // Was viewport clicked this frame (left button)
+    bool shift_held;                 // Is shift key held during click
+    bool ctrl_held;                  // Is ctrl/cmd key held during click
 } ui_viewport_state_t;
 
 //------------------------------------------------------------------------------
@@ -39,6 +44,9 @@ static inline void ui_viewport_init(ui_viewport_state_t* vp, render_target_t* rt
     vp->window_pos_x = 0;
     vp->window_pos_y = 0;
     vp->hovered = false;
+    vp->clicked = false;
+    vp->shift_held = false;
+    vp->ctrl_held = false;
 }
 
 // Draw the 3D Viewport window
@@ -88,16 +96,34 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
     // Handle camera input when mouse is over the viewport image
     vp->hovered = igIsItemHovered(ImGuiHoveredFlags_None);
 
+    // Get IO state
+    ImGuiIO* io = igGetIO_Nil();
+    bool shift = (io->KeyMods & ImGuiMod_Shift) != 0;
+    bool ctrl = (io->KeyMods & ImGuiMod_Ctrl) != 0;
+
+    // Detect click on viewport (mouse button just pressed while hovering)
+    // Only register click if not dragging (mouse hasn't moved significantly)
+    vp->clicked = false;
+    vp->shift_held = false;
+    vp->ctrl_held = false;
+
+    if (vp->hovered && igIsMouseClicked_Bool(0, false)) {
+        // Check if this is a simple click (not the start of a drag)
+        // We'll confirm the click when mouse is released in the same spot
+        // For now, register click on mouse down
+        vp->clicked = true;
+        vp->shift_held = shift;
+        vp->ctrl_held = ctrl;
+    }
+
     if (vp->camera) {
         bool hovered = vp->hovered;
 
-        ImGuiIO* io = igGetIO_Nil();
         float dx = io->MouseDelta.x;
         float dy = io->MouseDelta.y;
         float wheel = io->MouseWheel;
         bool left = io->MouseDown[0];
         bool middle = io->MouseDown[2];
-        bool shift = (io->KeyMods & ImGuiMod_Shift) != 0;
 
         orbit_camera_handle_input(vp->camera, hovered, dx, dy, wheel, left, middle, shift);
     }

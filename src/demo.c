@@ -38,6 +38,7 @@
 // ECS modules
 #include "ecs/ecs_world.h"
 #include "ecs/ecs_scene.h"
+#include "selection.h"
 #include "gpu/pick_buffer.h"
 #include "ui/ui_pick_debug.h"
 
@@ -78,6 +79,9 @@ static struct {
     // ECS state
     ecs_world_state_t ecs_world;
     ecs_scene_t ecs_scene;
+
+    // Selection state
+    selection_buffer_t selection;
 
     // GPU Picking state
     pick_buffer_t pick_buffer;
@@ -148,12 +152,24 @@ static void init(void) {
     ecs_world_init(&state.ecs_world);
     ecs_scene_init(&state.ecs_scene, &state.ecs_world);
 
+    // Initialize selection buffer
+    selection_init(&state.selection, &state.ecs_world);
+
     // Initialize GPU picking
     pick_buffer_init(&state.pick_buffer);
     ui_pick_debug_init(&state.pick_debug, &state.pick_buffer);
 
     // Wire up pick debug window toggle to visibility controls
     ui_visibility_set_pick_debug_ptr(&state.visibility, &state.pick_debug.window_open);
+
+    // Wire up ECS thickness controls to visibility panel
+    ui_visibility_set_ecs_thickness_ptrs(&state.visibility,
+        &state.ecs_scene.batches.lines.line_width,
+        &state.ecs_scene.batches.points.point_size,
+        &state.pick_buffer.thickness_multiplier);
+
+    // Wire up selection count to visibility panel
+    ui_visibility_set_selection_count_ptr(&state.visibility, &state.selection.count);
 
     // Create test ECS entities using the scene API
     {
@@ -368,6 +384,15 @@ static void frame(void) {
     sg_end_pass();
 
     //=== GPU PICKING PASS ===
+    // Handle clicks when viewport is hovered but outside the valid picking area
+    // or when ECS entities are not visible
+    if (state.viewport.clicked && !state.visibility.show_ecs_entities) {
+        // Clicked on viewport with ECS hidden - clear selection unless modifiers held
+        selection_handle_click(&state.selection, 0,
+                               state.viewport.shift_held,
+                               state.viewport.ctrl_held);
+    }
+
     // Update pick buffer center from mouse position (relative to viewport)
     if (state.viewport.hovered) {
         float mouse_x = io->MousePos.x;
@@ -402,6 +427,15 @@ static void frame(void) {
 
             // Update ECS hover state based on pick result
             ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+
+            // Handle click selection
+            if (state.viewport.clicked) {
+                uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
+                ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
+                selection_handle_click(&state.selection, clicked_entity,
+                                       state.viewport.shift_held,
+                                       state.viewport.ctrl_held);
+            }
         }
     }
 
@@ -424,6 +458,9 @@ static void cleanup(void) {
 
     // Shutdown GPU picking
     pick_buffer_shutdown(&state.pick_buffer);
+
+    // Shutdown selection buffer
+    selection_shutdown(&state.selection);
 
     // Shutdown ECS scene and world
     ecs_scene_shutdown(&state.ecs_scene);

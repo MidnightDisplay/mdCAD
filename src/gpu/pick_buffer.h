@@ -97,6 +97,9 @@ typedef struct {
     float zoom_factor;          // Computed zoom factor for line width scaling
     uint32_t hovered_pick_id;   // Currently hovered entity's pick ID (0 = none)
 
+    // Configurable parameters
+    float thickness_multiplier; // Multiplier for line/point thickness (>= 1.0)
+
     // Debug visualization
     bool debug_enabled;
 } pick_buffer_t;
@@ -183,6 +186,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     pb->debug_enabled = false;
     pb->hovered_pick_id = 0;
     pb->zoom_factor = 1.0f;  // Default zoom factor
+    pb->thickness_multiplier = 1.0f;  // Default: same thickness as visual rendering
 
     // Create render target
     pb->color_img = sg_make_image(&(sg_image_desc){
@@ -531,8 +535,8 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
     mat4_t mvp = pick_buffer_compute_mvp(pb, view, proj);
 
     // Scale line width by zoom factor so lines appear the same screen-pixel size
-    // as in the main viewport. This is critical for accurate picking.
-    float scaled_line_width = PICK_BUFFER_LINE_WIDTH * pb->zoom_factor;
+    // as in the main viewport. Apply thickness_multiplier for easier picking.
+    float scaled_line_width = PICK_BUFFER_LINE_WIDTH * pb->zoom_factor * pb->thickness_multiplier;
 
     // Begin pick pass
     sg_begin_pass(&(sg_pass){

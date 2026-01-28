@@ -245,15 +245,19 @@ static inline void scene_set_position(ecs_scene_t *scene, ecs_entity_t e, vec3_t
 static inline void ecs_scene_update(ecs_scene_t *scene) {
     ecs_world_state_t *w = scene->world;
 
-    // Get theme-aware hover color once per frame
-    // Use a bright yellow as default hover color
-    vec4_t hover_color = vec4_make(1.0f, 1.0f, 0.0f, 1.0f);
+    // Get theme-aware hover and selection colors once per frame
+    // Use defaults in case ImGui not ready
+    vec4_t hover_color = vec4_make(1.0f, 1.0f, 0.0f, 1.0f);      // Yellow
+    vec4_t selection_color = vec4_make(1.0f, 0.5f, 0.0f, 1.0f);  // Orange
 
-    // Try to get theme color (may fail if ImGui not ready)
+    // Try to get theme colors (may fail if ImGui not ready)
     ImGuiStyle* style = igGetStyle();
     if (style) {
-        ImVec4 col = style->Colors[ImGuiCol_HeaderHovered];
-        hover_color = vec4_make(col.x, col.y, col.z, 1.0f);
+        ImVec4 hover_col = style->Colors[ImGuiCol_HeaderHovered];
+        hover_color = vec4_make(hover_col.x, hover_col.y, hover_col.z, 1.0f);
+
+        ImVec4 select_col = style->Colors[ImGuiCol_HeaderActive];
+        selection_color = vec4_make(select_col.x, select_col.y, select_col.z, 1.0f);
     }
 
     // Query all entities with geometry and renderable
@@ -289,12 +293,13 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                 t->dirty = false;
             }
 
-            // Determine render color: use hover color if entity is hovered
+            // Determine render color: Selected > Hovered > Normal
             vec4_t render_color = g->color;
-            if (ecs_has_id(w->world, e, w->Hovered_tag)) {
+            if (ecs_has_id(w->world, e, w->Selected_tag)) {
+                render_color = selection_color;
+            } else if (ecs_has_id(w->world, e, w->Hovered_tag)) {
                 render_color = hover_color;
             }
-            // TODO: Also check for Selected tag when selection is implemented
 
             // Update instance data based on geometry type
             switch (g->type) {
@@ -424,7 +429,7 @@ static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, 
     ecs_entity_t found = 0;
 
     ecs_iter_t it = ecs_query_iter(w->world, q);
-    while (ecs_query_next(&it) && found == 0) {
+    while (ecs_query_next(&it)) {
         SelectableComp *selectables = ecs_field(&it, SelectableComp, 0);
 
         for (int i = 0; i < it.count; i++) {
@@ -433,7 +438,12 @@ static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, 
                 break;
             }
         }
+        if (found != 0) break;  // Found, exit outer loop
     }
+
+    // IMPORTANT: Always call ecs_iter_fini if we break out of iteration early
+    // This prevents "stack allocator leak" on ecs_fini
+    ecs_iter_fini(&it);
 
     ecs_query_fini(q);
     return found;
@@ -504,6 +514,10 @@ static inline ecs_entity_t ecs_scene_get_hovered_entity(ecs_scene_t *scene) {
     if (ecs_query_next(&it) && it.count > 0) {
         hovered = it.entities[0];  // Return first hovered (should be only one)
     }
+
+    // IMPORTANT: Always call ecs_iter_fini if we don't exhaust the iteration
+    // This prevents "stack allocator leak" on ecs_fini
+    ecs_iter_fini(&it);
 
     ecs_query_fini(q);
     return hovered;
