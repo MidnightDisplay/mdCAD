@@ -23,8 +23,8 @@
 //------------------------------------------------------------------------------
 // Configuration
 //------------------------------------------------------------------------------
-#define PICK_BUFFER_SIZE 20           // 20x20 pixels
-#define PICK_BUFFER_LINE_WIDTH 0.05f  // Slightly thicker for easier picking
+#define PICK_BUFFER_SIZE 20           // 20x20 pixels (temporarily reverted for debugging)
+#define PICK_BUFFER_LINE_WIDTH 0.03f  // Base line width (same as ECS lines)
 
 //------------------------------------------------------------------------------
 // Pick instance data types (similar to geometry_batch but with pick_color)
@@ -94,6 +94,7 @@ typedef struct {
     float center_y;
     float viewport_width;       // Source viewport dimensions
     float viewport_height;
+    float zoom_factor;          // Computed zoom factor for line width scaling
     uint32_t hovered_pick_id;   // Currently hovered entity's pick ID (0 = none)
 
     // Debug visualization
@@ -181,6 +182,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
 
     pb->debug_enabled = false;
     pb->hovered_pick_id = 0;
+    pb->zoom_factor = 1.0f;  // Default zoom factor
 
     // Create render target
     pb->color_img = sg_make_image(&(sg_image_desc){
@@ -485,24 +487,32 @@ static inline mat4_t pick_buffer_compute_mvp(pick_buffer_t *pb, mat4_t view, mat
     float ndc_x = pb->center_x * 2.0f - 1.0f;
     float ndc_y = (1.0f - pb->center_y) * 2.0f - 1.0f;  // Flip Y
 
-    // Calculate the zoom factor: viewport_size / pick_buffer_size
+    // Calculate the zoom factor: use uniform zoom to avoid distortion
+    // Use the smaller dimension to ensure we capture enough area
     float zoom_x = pb->viewport_width / (float)PICK_BUFFER_SIZE;
     float zoom_y = pb->viewport_height / (float)PICK_BUFFER_SIZE;
 
+    // Use uniform zoom (minimum of the two to capture a larger area and avoid distortion)
+    // Ensure minimum zoom of 1.0 to avoid issues with very small viewports
+    float zoom = (zoom_x < zoom_y) ? zoom_x : zoom_y;
+    if (zoom < 1.0f) zoom = 1.0f;
+    pb->zoom_factor = zoom;  // Store for line width scaling
+
     // Create a modified projection that:
-    // 1. Translates so the cursor is at the center
-    // 2. Scales to zoom into the region
+    // 1. Scales to zoom into the region (uniform)
+    // 2. Translates so the cursor is at the center
 
     // Start with identity
     mat4_t pick_proj = mat4_identity();
 
     // Scale (zoom in) - column-major: m[col*4 + row]
-    pick_proj.m[0] = zoom_x;   // m[0][0]
-    pick_proj.m[5] = zoom_y;   // m[1][1]
+    // Use uniform zoom to preserve aspect ratio
+    pick_proj.m[0] = zoom;    // m[0][0]
+    pick_proj.m[5] = zoom;    // m[1][1]
 
     // Translate to center on cursor (in NDC space)
-    pick_proj.m[12] = -ndc_x * zoom_x;  // m[3][0]
-    pick_proj.m[13] = -ndc_y * zoom_y;  // m[3][1]
+    pick_proj.m[12] = -ndc_x * zoom;   // m[3][0]
+    pick_proj.m[13] = -ndc_y * zoom;   // m[3][1]
 
     // Combine: pick_proj * proj * view
     mat4_t vp = mat4_mul(proj, view);
@@ -517,8 +527,12 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
     instance_buffer_upload(&pb->line_instances);
     instance_buffer_upload(&pb->point_instances);
 
-    // Compute modified MVP for pick region
+    // Compute modified MVP for pick region (also sets pb->zoom_factor)
     mat4_t mvp = pick_buffer_compute_mvp(pb, view, proj);
+
+    // Scale line width by zoom factor so lines appear the same screen-pixel size
+    // as in the main viewport. This is critical for accurate picking.
+    float scaled_line_width = PICK_BUFFER_LINE_WIDTH * pb->zoom_factor;
 
     // Begin pick pass
     sg_begin_pass(&(sg_pass){
@@ -533,10 +547,14 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
         .label = "pick-pass"
     });
 
+    // Compute aspect ratio for the pick view
+    // Since we use uniform zoom, the captured region maintains the original viewport's aspect ratio
+    float pick_aspect = pb->viewport_width / pb->viewport_height;
+
     pick_params_t params = {
         .mvp = mvp,
-        .line_width = PICK_BUFFER_LINE_WIDTH,
-        .aspect_ratio = 1.0f  // Pick buffer is square
+        .line_width = scaled_line_width,
+        .aspect_ratio = pick_aspect  // Use viewport aspect ratio for correct line rendering
     };
 
     // Draw lines
@@ -554,10 +572,10 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
         sg_draw(0, pb->line_template_index_count, line_count);
     }
 
-    // Draw points (with larger point size for easier picking)
+    // Draw points (use slightly larger size for easier picking)
     int point_count = instance_buffer_count(&pb->point_instances);
     if (point_count > 0) {
-        params.line_width = PICK_BUFFER_LINE_WIDTH * 1.5f;  // Points slightly larger
+        params.line_width = scaled_line_width * 1.5f;  // Points slightly larger than lines
 
         sg_apply_pipeline(pb->point_pip);
         sg_apply_bindings(&(sg_bindings){

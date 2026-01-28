@@ -40,12 +40,12 @@ static inline void ui_pick_debug_draw(ui_pick_debug_state_t *state) {
     if (igBegin("Pick Buffer Debug", &state->window_open, 0)) {
         pick_buffer_t *pb = state->pick_buffer;
 
-        // Display pick buffer texture scaled up (20x20 -> 200x200)
+        // Display pick buffer texture scaled 2x (100x100 -> 200x200)
         ImVec2_c size = { 200.0f, 200.0f };
         uint64_t tex_id = simgui_imtextureid_with_sampler(pb->tex_view, pb->sampler);
         ImTextureRef_c tex_ref = { ._TexID = tex_id };
 
-        igText("Pick Buffer (%dx%d):", PICK_BUFFER_SIZE, PICK_BUFFER_SIZE);
+        igText("Pick Buffer (%dx%d, 2x zoom):", PICK_BUFFER_SIZE, PICK_BUFFER_SIZE);
 
         // Get cursor position before drawing image (for crosshair)
         ImVec2_c cursor_pos = igGetCursorScreenPos();
@@ -99,6 +99,8 @@ static inline void ui_pick_debug_draw(ui_pick_debug_state_t *state) {
         // Show pick buffer parameters
         igText("Center: (%.3f, %.3f)", pb->center_x, pb->center_y);
         igText("Viewport: %.0f x %.0f", pb->viewport_width, pb->viewport_height);
+        igText("Zoom factor: %.1fx", pb->zoom_factor);
+        igText("Scaled line width: %.4f", PICK_BUFFER_LINE_WIDTH * pb->zoom_factor);
 
         // Instance counts
         int line_count = instance_buffer_count(&pb->line_instances);

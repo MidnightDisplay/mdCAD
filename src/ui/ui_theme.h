@@ -377,4 +377,24 @@ static inline void ui_theme_get_frame_bg(float* r, float* g, float* b) {
     *b = col.z;
 }
 
+// Get the current theme's hover color (for ECS entity highlighting)
+static inline void ui_theme_get_hover_color(float* r, float* g, float* b, float* a) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4 col = style->Colors[ImGuiCol_HeaderHovered];
+    *r = col.x;
+    *g = col.y;
+    *b = col.z;
+    *a = col.w > 0.0f ? 1.0f : col.w;  // Use full alpha for 3D entities
+}
+
+// Get the current theme's selection color (for selected ECS entities)
+static inline void ui_theme_get_selection_color(float* r, float* g, float* b, float* a) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4 col = style->Colors[ImGuiCol_HeaderActive];
+    *r = col.x;
+    *g = col.y;
+    *b = col.z;
+    *a = col.w > 0.0f ? 1.0f : col.w;  // Use full alpha for 3D entities
+}
+
 #endif // UI_THEME_H

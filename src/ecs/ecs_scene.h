@@ -15,6 +15,12 @@
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
 
+// For theme-aware hover colors (cimgui already defined in demo.c before this include)
+#ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#endif
+#include "cimgui.h"
+
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
@@ -239,6 +245,17 @@ static inline void scene_set_position(ecs_scene_t *scene, ecs_entity_t e, vec3_t
 static inline void ecs_scene_update(ecs_scene_t *scene) {
     ecs_world_state_t *w = scene->world;
 
+    // Get theme-aware hover color once per frame
+    // Use a bright yellow as default hover color
+    vec4_t hover_color = vec4_make(1.0f, 1.0f, 0.0f, 1.0f);
+
+    // Try to get theme color (may fail if ImGui not ready)
+    ImGuiStyle* style = igGetStyle();
+    if (style) {
+        ImVec4 col = style->Colors[ImGuiCol_HeaderHovered];
+        hover_color = vec4_make(col.x, col.y, col.z, 1.0f);
+    }
+
     // Query all entities with geometry and renderable
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
@@ -255,6 +272,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
         TransformComp *transforms = ecs_field(&it, TransformComp, 2);
 
         for (int i = 0; i < it.count; i++) {
+            ecs_entity_t e = it.entities[i];
             RenderableComp *r = &renderables[i];
             if (!r->instance_dirty) continue;
             if (r->instance_slot == 0xFFFFFFFF) continue;  // No slot allocated
@@ -271,19 +289,26 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                 t->dirty = false;
             }
 
+            // Determine render color: use hover color if entity is hovered
+            vec4_t render_color = g->color;
+            if (ecs_has_id(w->world, e, w->Hovered_tag)) {
+                render_color = hover_color;
+            }
+            // TODO: Also check for Selected tag when selection is implemented
+
             // Update instance data based on geometry type
             switch (g->type) {
                 case GEOM_LINE: {
                     vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.line.a);
                     vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.line.b);
                     geom_line_batch_set(&scene->batches.lines, (int)r->instance_slot,
-                                        world_a, world_b, g->color);
+                                        world_a, world_b, render_color);
                     break;
                 }
                 case GEOM_POINT: {
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point.point);
                     geom_point_batch_set(&scene->batches.points, (int)r->instance_slot,
-                                         world_pos, g->color);
+                                         world_pos, render_color);
                     break;
                 }
                 // TODO: Other geometry types (Phase 6)
@@ -414,7 +439,7 @@ static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, 
     return found;
 }
 
-// Clear hovered state from all entities
+// Clear hovered state from all entities and mark them dirty for re-render
 static inline void ecs_scene_clear_all_hovered(ecs_scene_t *scene) {
     ecs_world_state_t *w = scene->world;
 
@@ -428,7 +453,13 @@ static inline void ecs_scene_clear_all_hovered(ecs_scene_t *scene) {
     ecs_iter_t it = ecs_query_iter(w->world, q);
     while (ecs_query_next(&it)) {
         for (int i = 0; i < it.count; i++) {
-            ecs_world_clear_hovered(w, it.entities[i]);
+            ecs_entity_t e = it.entities[i];
+            ecs_world_clear_hovered(w, e);
+            // Mark as dirty so the color gets updated on next frame
+            RenderableComp *r = ecs_world_get_renderable(w, e);
+            if (r) {
+                r->instance_dirty = true;
+            }
         }
     }
 
@@ -437,7 +468,7 @@ static inline void ecs_scene_clear_all_hovered(ecs_scene_t *scene) {
 
 // Update hover state based on pick buffer result
 static inline void ecs_scene_update_hover(ecs_scene_t *scene, pick_buffer_t *pb) {
-    // Clear previous hover
+    // Clear previous hover (also marks those entities as dirty)
     ecs_scene_clear_all_hovered(scene);
 
     // Get newly hovered entity
@@ -446,6 +477,12 @@ static inline void ecs_scene_update_hover(ecs_scene_t *scene, pick_buffer_t *pb)
         ecs_entity_t e = ecs_scene_find_entity_by_pick_id(scene, pick_id);
         if (e != 0) {
             ecs_world_set_hovered(scene->world, e);
+
+            // Mark newly hovered entity as dirty so it gets the hover color
+            RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+            if (r) {
+                r->instance_dirty = true;
+            }
         }
     }
 }
