@@ -316,6 +316,104 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
             state->cache_dirty = true;
         }
 
+        igSeparator();
+
+        if (igMenuItem_Bool("Polyline (Zigzag)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t points[] = {
+                vec3_make(-1.5f, 0.0f, 0.0f),
+                vec3_make(-0.5f, 1.0f, 0.0f),
+                vec3_make(0.5f, -0.5f, 0.0f),
+                vec3_make(1.5f, 0.5f, 0.0f)
+            };
+            scene_add_polyline(state->scene, points, 4, color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Arc (Quarter Circle)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            scene_add_arc(state->scene,
+                vec3_make(0.0f, 0.0f, 0.0f),  // center
+                1.0f,                          // radius
+                0.0f,                          // start angle
+                1.5707963f,                    // end angle (PI/2)
+                vec3_make(0.0f, 0.0f, 1.0f),  // normal (XY plane)
+                color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Arc (Semicircle)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            scene_add_arc(state->scene,
+                vec3_make(0.0f, 0.0f, 0.0f),
+                1.0f,
+                0.0f,
+                3.1415926f,                    // PI
+                vec3_make(0.0f, 0.0f, 1.0f),
+                color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Polygon (Triangle)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t points[] = {
+                vec3_make(0.0f, 1.0f, 0.0f),
+                vec3_make(-0.866f, -0.5f, 0.0f),
+                vec3_make(0.866f, -0.5f, 0.0f)
+            };
+            scene_add_polygon(state->scene, points, 3, color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Polygon (Square)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t points[] = {
+                vec3_make(-0.7f, -0.7f, 0.0f),
+                vec3_make(0.7f, -0.7f, 0.0f),
+                vec3_make(0.7f, 0.7f, 0.0f),
+                vec3_make(-0.7f, 0.7f, 0.0f)
+            };
+            scene_add_polygon(state->scene, points, 4, color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Polygon (Pentagon)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t points[5];
+            for (int i = 0; i < 5; i++) {
+                float angle = (float)i * 1.2566370f - 1.5707963f;  // 2*PI/5, offset by -PI/2
+                points[i] = vec3_make(cosf(angle), sinf(angle), 0.0f);
+            }
+            scene_add_polygon(state->scene, points, 5, color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        igSeparator();
+
+        if (igMenuItem_Bool("Bezier Curve", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            scene_add_bezier(state->scene,
+                vec3_make(-1.5f, 0.0f, 0.0f),   // p0
+                vec3_make(-0.5f, 1.5f, 0.0f),   // p1 (control)
+                vec3_make(0.5f, -1.5f, 0.0f),   // p2 (control)
+                vec3_make(1.5f, 0.0f, 0.0f),    // p3
+                16,                              // segments
+                color, 0.03f);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Helix", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            scene_add_helix(state->scene,
+                vec3_make(0.0f, -1.0f, 0.0f),   // axis start
+                vec3_make(0.0f, 1.0f, 0.0f),    // axis end
+                0.5f,                            // radius
+                2.0f,                            // turns
+                32,                              // segments
+                color, 0.03f);
+            state->cache_dirty = true;
+        }
+
         igEndMenu();
     }
 }

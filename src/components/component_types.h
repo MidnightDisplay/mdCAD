@@ -14,10 +14,7 @@ static inline vec4_t vec4_make(float x, float y, float z, float w) {
     return (vec4_t){ x, y, z, w };
 }
 
-// Helper to create vec3 from components
-static inline vec3_t vec3_make(float x, float y, float z) {
-    return (vec3_t){ x, y, z };
-}
+// vec3_make is defined in math3d.h
 
 // Transform a point by a matrix
 static inline vec3_t mat4_transform_point(mat4_t m, vec3_t p) {
