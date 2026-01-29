@@ -203,6 +203,32 @@ static void init(void) {
             vec3_make(0.0f, 2.0f, 0.0f), vec4_make(0.4f, 1.0f, 0.4f, 1.0f), 0.08f);  // +Y
         scene_add_point(&state.ecs_scene,
             vec3_make(0.0f, 0.0f, 2.0f), vec4_make(0.4f, 0.4f, 1.0f, 1.0f), 0.08f);  // +Z
+
+        // Test hierarchy: Create a parent point with child lines
+        // Moving the parent's TransformComp.position should move all children with it
+        ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
+            vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.8f, 0.0f, 1.0f), 0.12f);  // Yellow parent (geometry at origin)
+
+        // Set parent's transform position (this is what children will inherit)
+        scene_set_position(&state.ecs_scene, parent_point, vec3_make(1.5f, 1.5f, 0.0f));
+
+        // Add child lines forming a small cross (defined relative to parent's origin)
+        ecs_entity_t child_x = scene_add_line(&state.ecs_scene,
+            vec3_make(-0.5f, 0.0f, 0.0f), vec3_make(0.5f, 0.0f, 0.0f),
+            vec4_make(1.0f, 0.6f, 0.0f, 1.0f), 0.025f);  // Orange horizontal
+
+        ecs_entity_t child_y = scene_add_line(&state.ecs_scene,
+            vec3_make(0.0f, -0.5f, 0.0f), vec3_make(0.0f, 0.5f, 0.0f),
+            vec4_make(0.8f, 0.4f, 0.0f, 1.0f), 0.025f);  // Dark orange vertical
+
+        // Set parent-child relationships
+        scene_set_parent(&state.ecs_scene, child_x, parent_point);
+        scene_set_parent(&state.ecs_scene, child_y, parent_point);
+
+        // Children's geometry is relative to parent.
+        // With parent at (1.5, 1.5, 0), child_x will render from (1.0, 1.5, 0) to (2.0, 1.5, 0)
+        // and child_y from (1.5, 1.0, 0) to (1.5, 2.0, 0)
+        // Edit the parent's position in Entity Inspector to see children move together!
     }
 
     // Main pass action (just clear to dark gray)

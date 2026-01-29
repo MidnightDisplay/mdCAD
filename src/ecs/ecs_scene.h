@@ -561,8 +561,8 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
 // Entity Deletion
 //------------------------------------------------------------------------------
 
-static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
-    // Get renderable to find which batch and slot
+// Internal helper to free instance slots for an entity (without deleting from ECS)
+static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
     RenderableComp *r = ecs_world_get_renderable(scene->world, e);
     if (r && r->instance_slot != 0xFFFFFFFF) {
         // Free the instance slot(s) based on batch type
@@ -593,9 +593,56 @@ static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
                 break;
         }
     }
+}
+
+// Recursively remove an entity and all its children
+static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
+    if (!ecs_is_alive(scene->world->world, e)) return;
+
+    // First, recursively delete all children
+    // We need to collect children first because deleting modifies the hierarchy
+    ecs_entity_t children[64];
+    int child_count = ecs_world_get_children(scene->world, e, children, 64);
+
+    for (int i = 0; i < child_count; i++) {
+        scene_remove_entity(scene, children[i]);
+    }
+
+    // Free this entity's instance buffer slots
+    scene_free_entity_slots(scene, e);
 
     // Delete entity (also frees pick ID and geometry allocations)
     ecs_world_delete_entity(scene->world, e);
+}
+
+//------------------------------------------------------------------------------
+// Parent-Child Relationship API
+//------------------------------------------------------------------------------
+
+// Set parent of an entity (pass 0 to unparent)
+static inline void scene_set_parent(ecs_scene_t *scene, ecs_entity_t child, ecs_entity_t parent) {
+    ecs_world_set_parent(scene->world, child, parent);
+}
+
+// Get parent of an entity (returns 0 if no parent)
+static inline ecs_entity_t scene_get_parent(ecs_scene_t *scene, ecs_entity_t child) {
+    return ecs_world_get_parent(scene->world, child);
+}
+
+// Check if entity has a parent
+static inline bool scene_has_parent(ecs_scene_t *scene, ecs_entity_t e) {
+    return ecs_world_has_parent(scene->world, e);
+}
+
+// Get children of an entity (returns count, fills out_children up to max_count)
+static inline int scene_get_children(ecs_scene_t *scene, ecs_entity_t parent,
+                                      ecs_entity_t *out_children, int max_count) {
+    return ecs_world_get_children(scene->world, parent, out_children, max_count);
+}
+
+// Check if entity has any children
+static inline bool scene_has_children(ecs_scene_t *scene, ecs_entity_t e) {
+    return ecs_world_has_children(scene->world, e);
 }
 
 //------------------------------------------------------------------------------
@@ -634,11 +681,104 @@ static inline void scene_set_position(ecs_scene_t *scene, ecs_entity_t e, vec3_t
 }
 
 //------------------------------------------------------------------------------
+// Hierarchical Transform Update (internal helper)
+//------------------------------------------------------------------------------
+
+// Recursively update transforms for an entity and all its children
+// Must be called on parents before children to ensure correct world matrices
+// When called recursively for children, forces update even if child's local transform isn't dirty
+// because the parent's world_matrix changed
+static inline void ecs_scene_update_transform_recursive(ecs_scene_t *scene, ecs_entity_t e,
+                                                         const mat4_t *parent_world) {
+    ecs_world_state_t *w = scene->world;
+
+    // Get this entity's transform
+    TransformComp *t = (TransformComp*)ecs_get_id(w->world, e, w->TransformComp_id);
+    if (!t) return;
+
+    // Force the transform to be dirty so it updates
+    // This is needed because even if local transform didn't change,
+    // the world_matrix needs recalculating if parent's world_matrix changed
+    t->dirty = true;
+
+    // Update this entity's transform
+    transform_comp_update_with_parent(t, parent_world);
+
+    // Mark renderable dirty so GPU data gets updated
+    RenderableComp *r = (RenderableComp*)ecs_get_id(w->world, e, w->RenderableComp_id);
+    if (r) {
+        r->instance_dirty = true;
+    }
+
+    // Recursively update children - they need updating since this entity's
+    // world_matrix may have changed
+    ecs_entity_t children[64];
+    int child_count = ecs_world_get_children(w, e, children, 64);
+
+    for (int i = 0; i < child_count; i++) {
+        ecs_scene_update_transform_recursive(scene, children[i], &t->world_matrix);
+    }
+}
+
+// Update all transforms in the scene respecting parent-child hierarchy
+static inline void ecs_scene_update_transforms(ecs_scene_t *scene) {
+    ecs_world_state_t *w = scene->world;
+
+    // Query all entities with TransformComp
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->TransformComp_id }
+        }
+    });
+
+    // Process all dirty transforms
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it)) {
+        TransformComp *transforms = ecs_field(&it, TransformComp, 0);
+
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t e = it.entities[i];
+            TransformComp *t = &transforms[i];
+
+            // Only process if dirty
+            if (!t->dirty) continue;
+
+            // Check if this entity has a parent
+            ecs_entity_t parent = ecs_get_parent(w->world, e);
+
+            if (parent == 0) {
+                // Root entity - update it and all descendants
+                ecs_scene_update_transform_recursive(scene, e, NULL);
+            } else {
+                // Entity has a parent - get parent's world matrix
+                TransformComp *parent_t = (TransformComp*)ecs_get_id(w->world, parent, w->TransformComp_id);
+                if (parent_t) {
+                    // If parent is also dirty, it will be processed by its own iteration
+                    // and will recursively update this entity. But if parent is NOT dirty,
+                    // we need to update this entity using parent's current world_matrix
+                    if (!parent_t->dirty) {
+                        ecs_scene_update_transform_recursive(scene, e, &parent_t->world_matrix);
+                    }
+                    // If parent IS dirty, this entity will be updated when parent is processed
+                } else {
+                    // Parent has no transform, treat as root
+                    ecs_scene_update_transform_recursive(scene, e, NULL);
+                }
+            }
+        }
+    }
+    ecs_query_fini(q);
+}
+
+//------------------------------------------------------------------------------
 // Scene Update (sync dirty entities to GPU)
 //------------------------------------------------------------------------------
 
 static inline void ecs_scene_update(ecs_scene_t *scene) {
     ecs_world_state_t *w = scene->world;
+
+    // First, update all transforms respecting hierarchy
+    ecs_scene_update_transforms(scene);
 
     // Get theme-aware hover and selection colors once per frame
     // Use defaults in case ImGui not ready
@@ -678,15 +818,6 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
 
             GeometryComp *g = &geoms[i];
             TransformComp *t = &transforms[i];
-
-            // Recalculate world matrix if transform dirty
-            if (t->dirty) {
-                // Create translation matrix and apply to identity
-                mat4_t trans = mat4_translate(t->position.x, t->position.y, t->position.z);
-                t->world_matrix = trans;
-                // TODO: rotation, scale
-                t->dirty = false;
-            }
 
             // Handle visibility: hidden entities get degenerate instance data
             if (!r->visible) {

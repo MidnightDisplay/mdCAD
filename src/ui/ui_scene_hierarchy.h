@@ -33,7 +33,9 @@
 
 typedef struct {
     ecs_entity_t entity;
+    ecs_entity_t parent;  // 0 if root entity
     geometry_type_t type;
+    int depth;            // Hierarchy depth (0 = root)
 } ui_hierarchy_entry_t;
 
 //------------------------------------------------------------------------------
@@ -170,6 +172,23 @@ static inline bool ui_hierarchy_entry_matches_filter(ui_hierarchy_entry_t *entry
 }
 
 //------------------------------------------------------------------------------
+// Internal: Compute hierarchy depth
+//------------------------------------------------------------------------------
+
+static inline int ui_hierarchy_compute_depth(ecs_world_state_t *w, ecs_entity_t e) {
+    int depth = 0;
+    ecs_entity_t current = e;
+    while (current != 0) {
+        ecs_entity_t parent = ecs_get_parent(w->world, current);
+        if (parent == 0) break;
+        depth++;
+        current = parent;
+        if (depth > 100) break;  // Safety limit
+    }
+    return depth;
+}
+
+//------------------------------------------------------------------------------
 // Internal: Rebuild cache from ECS world
 //------------------------------------------------------------------------------
 
@@ -201,7 +220,7 @@ static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *
         state->cache_capacity = new_capacity;
     }
 
-    // Second pass: collect entities
+    // Second pass: collect entities with parent info
     state->cache_count = 0;
     q = ecs_query(w->world, {
         .terms = {
@@ -214,8 +233,11 @@ static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *
         GeometryComp *geoms = ecs_field(&it, GeometryComp, 0);
 
         for (int i = 0; i < it.count; i++) {
-            state->cache[state->cache_count].entity = it.entities[i];
+            ecs_entity_t e = it.entities[i];
+            state->cache[state->cache_count].entity = e;
             state->cache[state->cache_count].type = geoms[i].type;
+            state->cache[state->cache_count].parent = ecs_get_parent(w->world, e);
+            state->cache[state->cache_count].depth = ui_hierarchy_compute_depth(w, e);
             state->cache_count++;
         }
     }
@@ -419,14 +441,28 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 }
 
 //------------------------------------------------------------------------------
-// Internal: Draw single entity item
+// Internal: Find cache entry for entity
 //------------------------------------------------------------------------------
 
-static inline bool ui_scene_hierarchy_draw_entity(ui_scene_hierarchy_state_t *state,
-                                                   ecs_entity_t e,
-                                                   geometry_type_t type,
-                                                   bool ctrl_held,
-                                                   bool shift_held) {
+static inline ui_hierarchy_entry_t* ui_hierarchy_find_entry(ui_scene_hierarchy_state_t *state,
+                                                             ecs_entity_t e) {
+    for (int i = 0; i < state->cache_count; i++) {
+        if (state->cache[i].entity == e) {
+            return &state->cache[i];
+        }
+    }
+    return NULL;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Draw single entity as leaf (no children)
+//------------------------------------------------------------------------------
+
+static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_t *state,
+                                                        ecs_entity_t e,
+                                                        geometry_type_t type,
+                                                        bool ctrl_held,
+                                                        bool shift_held) {
     selection_buffer_t *sel = state->selection;
     bool entity_deleted = false;
 
@@ -443,8 +479,16 @@ static inline bool ui_scene_hierarchy_draw_entity(ui_scene_hierarchy_state_t *st
              geometry_type_name(type),
              (unsigned long long)e);
 
-    // Selectable item
-    if (igSelectable_Bool(label, is_selected, ImGuiSelectableFlags_None, (ImVec2){0, 0})) {
+    // Leaf node flags
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    if (is_selected) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    igTreeNodeEx_Str(label, flags);
+
+    // Handle click on tree node
+    if (igIsItemClicked(ImGuiMouseButton_Left)) {
         if (ctrl_held) {
             selection_toggle(sel, e);
         } else if (shift_held) {
@@ -463,12 +507,115 @@ static inline bool ui_scene_hierarchy_draw_entity(ui_scene_hierarchy_state_t *st
             selection_add(sel, e);
         }
         igSeparator();
+        if (igMenuItem_Bool("Make Child of Selected", NULL, false, sel->count == 1 && sel->entities[0] != e)) {
+            ecs_entity_t parent = sel->entities[0];
+            scene_set_parent(state->scene, e, parent);
+            state->cache_dirty = true;
+        }
+        if (igMenuItem_Bool("Unparent", NULL, false, scene_has_parent(state->scene, e))) {
+            scene_set_parent(state->scene, e, 0);
+            state->cache_dirty = true;
+        }
+        igSeparator();
         if (igMenuItem_Bool("Delete", "Del", false, true)) {
             selection_remove(sel, e);
             scene_remove_entity(state->scene, e);
             entity_deleted = true;
         }
         igEndPopup();
+    }
+
+    return entity_deleted;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Draw entity as tree node (recursive)
+// Returns true if any entity was deleted
+//------------------------------------------------------------------------------
+
+static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_t *state,
+                                                        ecs_entity_t e,
+                                                        geometry_type_t type,
+                                                        bool ctrl_held,
+                                                        bool shift_held) {
+    selection_buffer_t *sel = state->selection;
+    bool entity_deleted = false;
+
+    // Skip if entity was deleted
+    if (!ecs_is_alive(state->scene->world->world, e)) {
+        return true;  // Mark for cache refresh
+    }
+
+    bool is_selected = selection_contains(sel, e);
+    bool has_children = scene_has_children(state->scene, e);
+
+    // Create label: Type #EntityID
+    char label[64];
+    snprintf(label, sizeof(label), "%s #%llu",
+             geometry_type_name(type),
+             (unsigned long long)e);
+
+    // Tree node flags
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    if (is_selected) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    if (!has_children) {
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    }
+
+    bool node_open = igTreeNodeEx_Str(label, flags);
+
+    // Handle click on tree node
+    if (igIsItemClicked(ImGuiMouseButton_Left)) {
+        if (ctrl_held) {
+            selection_toggle(sel, e);
+        } else if (shift_held) {
+            selection_add(sel, e);
+        } else {
+            selection_set_single(sel, e);
+        }
+    }
+
+    // Right-click context menu
+    if (igBeginPopupContextItem(NULL, ImGuiPopupFlags_MouseButtonRight)) {
+        if (igMenuItem_Bool("Select", NULL, false, true)) {
+            selection_set_single(sel, e);
+        }
+        if (igMenuItem_Bool("Add to Selection", NULL, false, true)) {
+            selection_add(sel, e);
+        }
+        igSeparator();
+        if (igMenuItem_Bool("Make Child of Selected", NULL, false, sel->count == 1 && sel->entities[0] != e)) {
+            ecs_entity_t parent = sel->entities[0];
+            scene_set_parent(state->scene, e, parent);
+            state->cache_dirty = true;
+        }
+        if (igMenuItem_Bool("Unparent", NULL, false, scene_has_parent(state->scene, e))) {
+            scene_set_parent(state->scene, e, 0);
+            state->cache_dirty = true;
+        }
+        igSeparator();
+        if (igMenuItem_Bool("Delete", "Del", false, true)) {
+            selection_remove(sel, e);
+            scene_remove_entity(state->scene, e);
+            entity_deleted = true;
+        }
+        igEndPopup();
+    }
+
+    // Draw children if node is open
+    if (has_children && node_open) {
+        // Find children in cache and draw them
+        for (int i = 0; i < state->cache_count; i++) {
+            if (state->cache[i].parent == e) {
+                if (ui_scene_hierarchy_draw_entity_tree(state, state->cache[i].entity,
+                                                         state->cache[i].type, ctrl_held, shift_held)) {
+                    entity_deleted = true;
+                }
+            }
+        }
+        igTreePop();
     }
 
     return entity_deleted;
@@ -586,40 +733,90 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     // Track if we need to mark dirty due to deletion
     bool entity_deleted = false;
 
-    // Display paginated and filtered entities
-    int start_index = state->current_page * state->items_per_page;
-    int displayed = 0;
-    int filtered_index = 0;
+    if (state->filter_active) {
+        // FLAT VIEW: When filter is active, show all matching entities in a flat list
+        // This makes search results easier to see regardless of hierarchy position
 
-    for (int i = 0; i < state->cache_count && displayed < state->items_per_page; i++) {
-        ui_hierarchy_entry_t *entry = &state->cache[i];
+        int start_index = state->current_page * state->items_per_page;
+        int displayed = 0;
+        int filtered_index = 0;
 
-        // Skip if doesn't match filter
-        if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text)) {
-            continue;
-        }
+        for (int i = 0; i < state->cache_count && displayed < state->items_per_page; i++) {
+            ui_hierarchy_entry_t *entry = &state->cache[i];
 
-        // Skip entries before current page
-        if (filtered_index < start_index) {
+            // Skip if doesn't match filter
+            if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text)) {
+                continue;
+            }
+
+            // Skip entries before current page
+            if (filtered_index < start_index) {
+                filtered_index++;
+                continue;
+            }
+
+            // Draw entity as leaf (flat list, no children shown)
+            if (ui_scene_hierarchy_draw_entity_leaf(state, entry->entity, entry->type,
+                                                     ctrl_held, shift_held)) {
+                entity_deleted = true;
+            }
+
+            displayed++;
             filtered_index++;
-            continue;
         }
 
-        // Draw entity
-        if (ui_scene_hierarchy_draw_entity(state, entry->entity, entry->type,
-                                            ctrl_held, shift_held)) {
-            entity_deleted = true;
+        // Show message if no entities match filter
+        if (filtered_count == 0) {
+            igTextDisabled("No entities match filter");
+        }
+    } else {
+        // TREE VIEW: When no filter, show hierarchical tree structure
+        // Only root entities (no parent) are shown at top level
+
+        // Count root entities for pagination
+        int root_count = 0;
+        for (int i = 0; i < state->cache_count; i++) {
+            if (state->cache[i].parent == 0) {
+                root_count++;
+            }
         }
 
-        displayed++;
-        filtered_index++;
-    }
+        // Recalculate pagination for root entities only
+        int root_pages = (root_count + state->items_per_page - 1) / state->items_per_page;
+        if (root_pages < 1) root_pages = 1;
 
-    // Show message if no entities match filter
-    if (filtered_count == 0 && state->filter_active) {
-        igTextDisabled("No entities match filter");
-    } else if (state->cache_count == 0) {
-        igTextDisabled("No entities in scene");
+        int start_index = state->current_page * state->items_per_page;
+        int displayed = 0;
+        int root_index = 0;
+
+        for (int i = 0; i < state->cache_count && displayed < state->items_per_page; i++) {
+            ui_hierarchy_entry_t *entry = &state->cache[i];
+
+            // Only draw root entities at top level (children drawn recursively)
+            if (entry->parent != 0) {
+                continue;
+            }
+
+            // Skip entries before current page
+            if (root_index < start_index) {
+                root_index++;
+                continue;
+            }
+
+            // Draw entity as tree node
+            if (ui_scene_hierarchy_draw_entity_tree(state, entry->entity, entry->type,
+                                                     ctrl_held, shift_held)) {
+                entity_deleted = true;
+            }
+
+            displayed++;
+            root_index++;
+        }
+
+        // Show message if no entities
+        if (state->cache_count == 0) {
+            igTextDisabled("No entities in scene");
+        }
     }
 
     // Mark cache dirty if any entity was deleted

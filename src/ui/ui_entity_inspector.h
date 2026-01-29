@@ -97,6 +97,9 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             t->dirty = true;
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
+
+            // Mark all descendants dirty so they update their world matrices
+            ecs_world_mark_descendants_dirty(w, e);
         }
     }
 

@@ -230,4 +230,109 @@ static inline SelectableComp* ecs_world_get_selectable(ecs_world_state_t *s, ecs
     return (SelectableComp*)ecs_get_id(s->world, e, s->SelectableComp_id);
 }
 
+//------------------------------------------------------------------------------
+// Parent-Child Relationship Helpers (using Flecs built-in EcsChildOf)
+//------------------------------------------------------------------------------
+
+// Get parent of an entity (returns 0 if no parent)
+static inline ecs_entity_t ecs_world_get_parent(ecs_world_state_t *s, ecs_entity_t e) {
+    if (!ecs_is_alive(s->world, e)) return 0;
+    return ecs_get_parent(s->world, e);
+}
+
+// Check if entity has a parent
+static inline bool ecs_world_has_parent(ecs_world_state_t *s, ecs_entity_t e) {
+    return ecs_world_get_parent(s, e) != 0;
+}
+
+// Get children of an entity (returns count, fills out_children up to max_count)
+static inline int ecs_world_get_children(ecs_world_state_t *s, ecs_entity_t parent,
+                                          ecs_entity_t *out_children, int max_count) {
+    if (!ecs_is_alive(s->world, parent) || !out_children || max_count <= 0) return 0;
+
+    int count = 0;
+
+    // Iterate over entities that are children of the parent
+    ecs_iter_t it = ecs_children(s->world, parent);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count && count < max_count; i++) {
+            out_children[count++] = it.entities[i];
+        }
+        if (count >= max_count) {
+            ecs_iter_fini(&it);
+            break;
+        }
+    }
+
+    return count;
+}
+
+// Check if entity has any children
+static inline bool ecs_world_has_children(ecs_world_state_t *s, ecs_entity_t parent) {
+    if (!ecs_is_alive(s->world, parent)) return false;
+
+    ecs_iter_t it = ecs_children(s->world, parent);
+    bool has_children = ecs_children_next(&it);
+    if (has_children) {
+        ecs_iter_fini(&it);
+    }
+    return has_children;
+}
+
+// Mark all descendants as dirty (recursive)
+static inline void ecs_world_mark_descendants_dirty(ecs_world_state_t *s, ecs_entity_t parent) {
+    ecs_entity_t children[64];  // Reasonable batch size
+    int count = ecs_world_get_children(s, parent, children, 64);
+
+    for (int i = 0; i < count; i++) {
+        ecs_entity_t child = children[i];
+
+        // Mark this child's transform dirty
+        TransformComp *t = (TransformComp*)ecs_get_id(s->world, child, s->TransformComp_id);
+        if (t) {
+            t->dirty = true;
+        }
+
+        RenderableComp *r = (RenderableComp*)ecs_get_id(s->world, child, s->RenderableComp_id);
+        if (r) {
+            r->instance_dirty = true;
+        }
+
+        // Recursively mark this child's descendants
+        ecs_world_mark_descendants_dirty(s, child);
+    }
+}
+
+// Set parent of an entity (use 0 to unparent)
+static inline void ecs_world_set_parent(ecs_world_state_t *s, ecs_entity_t child, ecs_entity_t parent) {
+    if (!ecs_is_alive(s->world, child)) return;
+
+    // Remove existing parent relationship if any
+    ecs_entity_t current_parent = ecs_get_parent(s->world, child);
+    if (current_parent != 0) {
+        ecs_remove_pair(s->world, child, EcsChildOf, current_parent);
+    }
+
+    // Add new parent relationship
+    if (parent != 0 && ecs_is_alive(s->world, parent)) {
+        ecs_add_pair(s->world, child, EcsChildOf, parent);
+
+        // Mark child's transform as dirty so it recalculates world matrix
+        TransformComp *t = (TransformComp*)ecs_get_id(s->world, child, s->TransformComp_id);
+        if (t) {
+            t->dirty = true;
+        }
+
+        // Mark renderable as dirty
+        RenderableComp *r = (RenderableComp*)ecs_get_id(s->world, child, s->RenderableComp_id);
+        if (r) {
+            r->instance_dirty = true;
+        }
+
+        // Also mark all descendants dirty - the entire subtree needs to update
+        // its world matrices since it now has a new ancestor
+        ecs_world_mark_descendants_dirty(s, child);
+    }
+}
+
 #endif // ECS_WORLD_H
