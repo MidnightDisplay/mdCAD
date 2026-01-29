@@ -26,6 +26,7 @@
 
 #define UI_HIERARCHY_ITEMS_PER_PAGE 100
 #define UI_HIERARCHY_FILTER_MAX_LEN 64
+#define UI_HIERARCHY_DRAG_DROP_TYPE "ENTITY_ID"
 
 //------------------------------------------------------------------------------
 // Entity cache entry
@@ -186,6 +187,30 @@ static inline int ui_hierarchy_compute_depth(ecs_world_state_t *w, ecs_entity_t 
         if (depth > 100) break;  // Safety limit
     }
     return depth;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Check if 'potential_descendant' is a descendant of 'ancestor'
+// Used to prevent creating cycles when reparenting
+//------------------------------------------------------------------------------
+
+static inline bool ui_hierarchy_is_descendant(ecs_world_state_t *w,
+                                               ecs_entity_t potential_descendant,
+                                               ecs_entity_t ancestor) {
+    if (potential_descendant == 0 || ancestor == 0) return false;
+    if (potential_descendant == ancestor) return true;  // Same entity
+
+    // Walk up the hierarchy from potential_descendant
+    ecs_entity_t current = potential_descendant;
+    int depth = 0;
+    while (current != 0 && depth < 100) {
+        ecs_entity_t parent = ecs_get_parent(w->world, current);
+        if (parent == 0) break;
+        if (parent == ancestor) return true;
+        current = parent;
+        depth++;
+    }
+    return false;
 }
 
 //------------------------------------------------------------------------------
@@ -498,6 +523,31 @@ static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_
         }
     }
 
+    // Drag source: allow dragging this entity
+    if (igBeginDragDropSource(ImGuiDragDropFlags_None)) {
+        igSetDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, &e, sizeof(ecs_entity_t), ImGuiCond_Once);
+        igText("Move %s #%llu", geometry_type_name(type), (unsigned long long)e);
+        igEndDragDropSource();
+    }
+
+    // Drop target: allow dropping other entities onto this one (making them children)
+    if (igBeginDragDropTarget()) {
+        const ImGuiPayload* payload = igAcceptDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, ImGuiDragDropFlags_None);
+        if (payload) {
+            ecs_entity_t dragged_entity = *(ecs_entity_t*)payload->Data;
+
+            // Validate drop:
+            // 1. Can't drop onto self
+            // 2. Can't drop parent onto its own descendant (would create cycle)
+            if (dragged_entity != e &&
+                !ui_hierarchy_is_descendant(state->scene->world, e, dragged_entity)) {
+                scene_set_parent(state->scene, dragged_entity, e);
+                state->cache_dirty = true;
+            }
+        }
+        igEndDragDropTarget();
+    }
+
     // Right-click context menu
     if (igBeginPopupContextItem(NULL, ImGuiPopupFlags_MouseButtonRight)) {
         if (igMenuItem_Bool("Select", NULL, false, true)) {
@@ -575,6 +625,31 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
         } else {
             selection_set_single(sel, e);
         }
+    }
+
+    // Drag source: allow dragging this entity
+    if (igBeginDragDropSource(ImGuiDragDropFlags_None)) {
+        igSetDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, &e, sizeof(ecs_entity_t), ImGuiCond_Once);
+        igText("Move %s #%llu", geometry_type_name(type), (unsigned long long)e);
+        igEndDragDropSource();
+    }
+
+    // Drop target: allow dropping other entities onto this one (making them children)
+    if (igBeginDragDropTarget()) {
+        const ImGuiPayload* payload = igAcceptDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, ImGuiDragDropFlags_None);
+        if (payload) {
+            ecs_entity_t dragged_entity = *(ecs_entity_t*)payload->Data;
+
+            // Validate drop:
+            // 1. Can't drop onto self
+            // 2. Can't drop parent onto its own descendant (would create cycle)
+            if (dragged_entity != e &&
+                !ui_hierarchy_is_descendant(state->scene->world, e, dragged_entity)) {
+                scene_set_parent(state->scene, dragged_entity, e);
+                state->cache_dirty = true;
+            }
+        }
+        igEndDragDropTarget();
     }
 
     // Right-click context menu
@@ -733,6 +808,24 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     // Track if we need to mark dirty due to deletion
     bool entity_deleted = false;
 
+    // Drop target for unparenting: invisible drop zone at start of list area
+    // Dropping here will unparent the entity (make it a root)
+    igBeginGroup();
+    igDummy((ImVec2){-1, 2});  // Small invisible area
+    if (igBeginDragDropTarget()) {
+        const ImGuiPayload* payload = igAcceptDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, ImGuiDragDropFlags_None);
+        if (payload) {
+            ecs_entity_t dragged_entity = *(ecs_entity_t*)payload->Data;
+            // Unparent: set parent to 0
+            if (scene_has_parent(state->scene, dragged_entity)) {
+                scene_set_parent(state->scene, dragged_entity, 0);
+                state->cache_dirty = true;
+            }
+        }
+        igEndDragDropTarget();
+    }
+    igEndGroup();
+
     if (state->filter_active) {
         // FLAT VIEW: When filter is active, show all matching entities in a flat list
         // This makes search results easier to see regardless of hierarchy position
@@ -822,6 +915,27 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     // Mark cache dirty if any entity was deleted
     if (entity_deleted) {
         state->cache_dirty = true;
+    }
+
+    // Drop target at bottom of list: larger area for easy unparenting
+    // This fills the remaining space in the window
+    ImVec2_c avail = igGetContentRegionAvail();
+    if (avail.y > 10.0f) {
+        igBeginGroup();
+        igDummy((ImVec2){avail.x, avail.y});
+        if (igBeginDragDropTarget()) {
+            const ImGuiPayload* payload = igAcceptDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, ImGuiDragDropFlags_None);
+            if (payload) {
+                ecs_entity_t dragged_entity = *(ecs_entity_t*)payload->Data;
+                // Unparent: set parent to 0
+                if (scene_has_parent(state->scene, dragged_entity)) {
+                    scene_set_parent(state->scene, dragged_entity, 0);
+                    state->cache_dirty = true;
+                }
+            }
+            igEndDragDropTarget();
+        }
+        igEndGroup();
     }
 
     igEnd();
