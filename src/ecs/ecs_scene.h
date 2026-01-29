@@ -223,40 +223,38 @@ static inline ecs_entity_t scene_add_polyline(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_polyline(points, point_count, color, width);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate segment slots (N-1 for N points)
+    // Allocate CONTIGUOUS segment slots (N-1 for N points)
     int num_segments = point_count - 1;
-    int first_segment_slot = -1;
+    int first_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, num_segments);
 
-    for (int i = 0; i < num_segments; i++) {
-        int slot = geom_line_batch_alloc(&scene->batches.lines);
-        if (slot < 0) break;  // Buffer full
-        if (i == 0) first_segment_slot = slot;
-
-        // Get geometry and transform for initial setup
+    if (first_segment_slot >= 0) {
         GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (geom && t) {
-            vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i]);
-            vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
-            geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
+            for (int i = 0; i < num_segments; i++) {
+                vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i]);
+                vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
+                geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+            }
         }
     }
 
-    // Allocate join slots (N-2 for N points, at interior vertices)
+    // Allocate CONTIGUOUS join slots (N-2 for N points, at interior vertices)
     int num_joins = (point_count > 2) ? (point_count - 2) : 0;
     int first_join_slot = -1;
 
-    for (int i = 0; i < num_joins; i++) {
-        int slot = geom_point_batch_alloc(&scene->batches.points);
-        if (slot < 0) break;
-        if (i == 0) first_join_slot = slot;
-
-        GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        if (geom && t) {
-            // Join is at interior vertex i+1 (vertices 1 to N-2)
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
-            geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+    if (num_joins > 0) {
+        first_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, num_joins);
+        if (first_join_slot >= 0) {
+            GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
+            TransformComp *t = ecs_world_get_transform(scene->world, e);
+            if (geom && t) {
+                for (int i = 0; i < num_joins; i++) {
+                    // Join is at interior vertex i+1 (vertices 1 to N-2)
+                    vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
+                    geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                }
+            }
         }
     }
 
@@ -286,39 +284,35 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_polygon(points, point_count, color, width);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate segment slots (N for N points - includes closing segment)
+    // Allocate CONTIGUOUS segment slots (N for N points - includes closing segment)
     int num_segments = point_count;
-    int first_segment_slot = -1;
+    int first_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, num_segments);
 
-    for (int i = 0; i < num_segments; i++) {
-        int slot = geom_line_batch_alloc(&scene->batches.lines);
-        if (slot < 0) break;
-        if (i == 0) first_segment_slot = slot;
-
+    if (first_segment_slot >= 0) {
         GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (geom && t) {
-            int next = (i + 1) % point_count;
-            vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
-            vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polygon.points[next]);
-            geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
+            for (int i = 0; i < num_segments; i++) {
+                int next = (i + 1) % point_count;
+                vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
+                vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polygon.points[next]);
+                geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+            }
         }
     }
 
-    // Allocate join slots (N for N points - all vertices get joins in closed polygon)
+    // Allocate CONTIGUOUS join slots (N for N points - all vertices get joins in closed polygon)
     int num_joins = point_count;
-    int first_join_slot = -1;
+    int first_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, num_joins);
 
-    for (int i = 0; i < num_joins; i++) {
-        int slot = geom_point_batch_alloc(&scene->batches.points);
-        if (slot < 0) break;
-        if (i == 0) first_join_slot = slot;
-
+    if (first_join_slot >= 0) {
         GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (geom && t) {
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
-            geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+            for (int i = 0; i < num_joins; i++) {
+                vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
+                geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+            }
         }
     }
 
@@ -382,36 +376,35 @@ static inline ecs_entity_t scene_add_arc(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_arc(center, radius, start_angle, end_angle, normal, color, width);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate segment slots (N-1 for N points)
+    // Allocate CONTIGUOUS segment slots (N-1 for N points)
     int num_segments = point_count - 1;
-    int first_segment_slot = -1;
+    int first_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, num_segments);
 
-    for (int i = 0; i < num_segments; i++) {
-        int slot = geom_line_batch_alloc(&scene->batches.lines);
-        if (slot < 0) break;
-        if (i == 0) first_segment_slot = slot;
-
+    if (first_segment_slot >= 0) {
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
-            vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-            vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
+            for (int i = 0; i < num_segments; i++) {
+                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
+                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+            }
         }
     }
 
-    // Allocate join slots (N-2 for N points)
+    // Allocate CONTIGUOUS join slots (N-2 for N points)
     int num_joins = (point_count > 2) ? (point_count - 2) : 0;
     int first_join_slot = -1;
 
-    for (int i = 0; i < num_joins; i++) {
-        int slot = geom_point_batch_alloc(&scene->batches.points);
-        if (slot < 0) break;
-        if (i == 0) first_join_slot = slot;
-
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        if (t) {
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+    if (num_joins > 0) {
+        first_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, num_joins);
+        if (first_join_slot >= 0) {
+            TransformComp *t = ecs_world_get_transform(scene->world, e);
+            if (t) {
+                for (int i = 0; i < num_joins; i++) {
+                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                }
+            }
         }
     }
 
@@ -450,36 +443,35 @@ static inline ecs_entity_t scene_add_bezier(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_bezier(p0, p1, p2, p3, segments, color, width);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate segment slots (N-1 for N points)
+    // Allocate CONTIGUOUS segment slots (N-1 for N points)
     int num_segments = point_count - 1;
-    int first_segment_slot = -1;
+    int first_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, num_segments);
 
-    for (int i = 0; i < num_segments; i++) {
-        int slot = geom_line_batch_alloc(&scene->batches.lines);
-        if (slot < 0) break;
-        if (i == 0) first_segment_slot = slot;
-
+    if (first_segment_slot >= 0) {
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
-            vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-            vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
+            for (int i = 0; i < num_segments; i++) {
+                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
+                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+            }
         }
     }
 
-    // Allocate join slots (N-2 for N points)
+    // Allocate CONTIGUOUS join slots (N-2 for N points)
     int num_joins = (point_count > 2) ? (point_count - 2) : 0;
     int first_join_slot = -1;
 
-    for (int i = 0; i < num_joins; i++) {
-        int slot = geom_point_batch_alloc(&scene->batches.points);
-        if (slot < 0) break;
-        if (i == 0) first_join_slot = slot;
-
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        if (t) {
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+    if (num_joins > 0) {
+        first_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, num_joins);
+        if (first_join_slot >= 0) {
+            TransformComp *t = ecs_world_get_transform(scene->world, e);
+            if (t) {
+                for (int i = 0; i < num_joins; i++) {
+                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                }
+            }
         }
     }
 
@@ -518,36 +510,35 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_helix(axis_start, axis_end, radius, turns, segments, color, width);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate segment slots (N-1 for N points)
+    // Allocate CONTIGUOUS segment slots (N-1 for N points)
     int num_segments = point_count - 1;
-    int first_segment_slot = -1;
+    int first_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, num_segments);
 
-    for (int i = 0; i < num_segments; i++) {
-        int slot = geom_line_batch_alloc(&scene->batches.lines);
-        if (slot < 0) break;
-        if (i == 0) first_segment_slot = slot;
-
+    if (first_segment_slot >= 0) {
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
-            vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-            vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
+            for (int i = 0; i < num_segments; i++) {
+                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
+                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+            }
         }
     }
 
-    // Allocate join slots (N-2 for N points)
+    // Allocate CONTIGUOUS join slots (N-2 for N points)
     int num_joins = (point_count > 2) ? (point_count - 2) : 0;
     int first_join_slot = -1;
 
-    for (int i = 0; i < num_joins; i++) {
-        int slot = geom_point_batch_alloc(&scene->batches.points);
-        if (slot < 0) break;
-        if (i == 0) first_join_slot = slot;
-
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        if (t) {
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
-            geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+    if (num_joins > 0) {
+        first_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, num_joins);
+        if (first_join_slot >= 0) {
+            TransformComp *t = ecs_world_get_transform(scene->world, e);
+            if (t) {
+                for (int i = 0; i < num_joins; i++) {
+                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                }
+            }
         }
     }
 

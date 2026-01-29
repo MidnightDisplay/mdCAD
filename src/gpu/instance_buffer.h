@@ -151,6 +151,54 @@ static inline int instance_buffer_alloc_slot(instance_buffer_t *ib) {
     return slot;
 }
 
+// Allocate n contiguous slots (for multi-slot entities like polylines)
+// Skips free list to guarantee contiguous allocation
+// Returns first slot index, or -1 if buffer full
+static inline int instance_buffer_alloc_contiguous(instance_buffer_t *ib, int n) {
+    if (n <= 0) return -1;
+
+    int first_slot = ib->count;
+
+    // Grow if needed
+    while (first_slot + n > ib->capacity) {
+        int new_capacity = ib->capacity * 2;
+        if (new_capacity > INSTANCE_BUFFER_MAX_CAPACITY) {
+            return -1;  // Buffer full
+        }
+
+        // Grow CPU staging buffer
+        void *new_staging = malloc(new_capacity * ib->instance_size);
+        memcpy(new_staging, ib->staging, ib->capacity * ib->instance_size);
+        memset((char*)new_staging + ib->capacity * ib->instance_size, 0,
+               (new_capacity - ib->capacity) * ib->instance_size);
+        free(ib->staging);
+        ib->staging = new_staging;
+
+        // Destroy old GPU buffer, create new
+        sg_destroy_buffer(ib->gpu_buffer);
+        ib->gpu_buffer = sg_make_buffer(&(sg_buffer_desc){
+            .usage.vertex_buffer = true,
+            .usage.stream_update = true,
+            .size = new_capacity * ib->instance_size,
+            .label = ib->label
+        });
+
+        // Grow free list capacity
+        ib->free_slots = (int*)realloc(ib->free_slots, new_capacity * sizeof(int));
+        ib->free_capacity = new_capacity;
+
+        ib->capacity = new_capacity;
+
+        // Mark entire buffer dirty after resize
+        ib->dirty_min = 0;
+        ib->dirty_max = ib->count > 0 ? ib->count - 1 : 0;
+        ib->needs_upload = true;
+    }
+
+    ib->count += n;
+    return first_slot;
+}
+
 // Free a slot for reuse
 static inline void instance_buffer_free_slot(instance_buffer_t *ib, int slot) {
     if (slot < 0 || slot >= ib->count) return;

@@ -303,6 +303,11 @@ static inline int geom_line_batch_alloc(geom_line_batch_t* batch) {
     return instance_buffer_alloc_slot(&batch->instances);
 }
 
+// Allocate n contiguous slots (for polylines, arcs, etc.)
+static inline int geom_line_batch_alloc_contiguous(geom_line_batch_t* batch, int n) {
+    return instance_buffer_alloc_contiguous(&batch->instances, n);
+}
+
 static inline void geom_line_batch_free(geom_line_batch_t* batch, int slot) {
     instance_buffer_free_slot(&batch->instances, slot);
 }
@@ -451,6 +456,11 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
 
 static inline int geom_point_batch_alloc(geom_point_batch_t* batch) {
     return instance_buffer_alloc_slot(&batch->instances);
+}
+
+// Allocate n contiguous slots (for polyline joins, polygon vertices, etc.)
+static inline int geom_point_batch_alloc_contiguous(geom_point_batch_t* batch, int n) {
+    return instance_buffer_alloc_contiguous(&batch->instances, n);
 }
 
 static inline void geom_point_batch_free(geom_point_batch_t* batch, int slot) {
