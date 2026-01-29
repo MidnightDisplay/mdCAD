@@ -210,8 +210,14 @@ static inline void instance_buffer_free_slot(instance_buffer_t *ib, int slot) {
     }
     ib->free_slots[ib->free_count++] = slot;
 
-    // Zero out the slot data (optional, helps with debugging)
-    memset((char*)ib->staging + slot * ib->instance_size, 0, ib->instance_size);
+    // Set slot data to far-away values so freed instances render off-screen
+    // (GPU frustum culling makes this essentially free)
+    // Using a large float value that won't cause precision issues
+    float *slot_data = (float*)((char*)ib->staging + slot * ib->instance_size);
+    size_t num_floats = ib->instance_size / sizeof(float);
+    for (size_t i = 0; i < num_floats; i++) {
+        slot_data[i] = 1e10f;
+    }
 
     // Mark slot dirty so the zeroed data gets uploaded
     if (slot < ib->dirty_min) ib->dirty_min = slot;
