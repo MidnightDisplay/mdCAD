@@ -177,7 +177,7 @@ static inline void ui_slot_buffer_debug_draw_buffer(
     // Page input
     igSetNextItemWidth(60);
     int display_page = *page + 1;
-    if (igInputInt("##page", &display_page, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue)) {
+    if (igInputInt("##page", &display_page, 0, 0, 0)) {
         *page = display_page - 1;
         if (*page < 0) *page = 0;
         if (*page >= total_pages) *page = total_pages - 1;
