@@ -1254,16 +1254,16 @@ static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, 
         for (int i = 0; i < it.count; i++) {
             if (selectables[i].pick_id == pick_id) {
                 found = it.entities[i];
-                break;
+                // Breaking early - must call ecs_iter_fini before exiting
+                ecs_iter_fini(&it);
+                goto found_exit;
             }
         }
-        if (found != 0) break;  // Found, exit outer loop
     }
+    // If we get here, ecs_query_next returned false which already finalized the iterator
+    // Do NOT call ecs_iter_fini again - that would be a double-finalization error
 
-    // IMPORTANT: Always call ecs_iter_fini if we break out of iteration early
-    // This prevents "stack allocator leak" on ecs_fini
-    ecs_iter_fini(&it);
-
+found_exit:
     ecs_query_fini(q);
     return found;
 }
@@ -1330,13 +1330,16 @@ static inline ecs_entity_t ecs_scene_get_hovered_entity(ecs_scene_t *scene) {
     ecs_entity_t hovered = 0;
 
     ecs_iter_t it = ecs_query_iter(w->world, q);
-    if (ecs_query_next(&it) && it.count > 0) {
-        hovered = it.entities[0];  // Return first hovered (should be only one)
+    while (ecs_query_next(&it)) {
+        if (it.count > 0) {
+            hovered = it.entities[0];  // Return first hovered (should be only one)
+            // Breaking early - must call ecs_iter_fini before exiting
+            ecs_iter_fini(&it);
+            break;
+        }
     }
-
-    // IMPORTANT: Always call ecs_iter_fini if we don't exhaust the iteration
-    // This prevents "stack allocator leak" on ecs_fini
-    ecs_iter_fini(&it);
+    // If we didn't break (hovered is still 0), ecs_query_next returned false
+    // which already finalized the iterator - do NOT call ecs_iter_fini again
 
     ecs_query_fini(q);
     return hovered;
