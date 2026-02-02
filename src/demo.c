@@ -43,6 +43,7 @@
 #include "ui/ui_pick_debug.h"
 #include "ui/ui_entity_inspector.h"
 #include "ui/ui_scene_hierarchy.h"
+#include "ui/ui_slot_buffer_debug.h"
 
 //------------------------------------------------------------------------------
 // Application state
@@ -92,6 +93,9 @@ static struct {
     // Entity management UI
     ui_entity_inspector_state_t entity_inspector;
     ui_scene_hierarchy_state_t scene_hierarchy;
+
+    // Debug UI
+    ui_slot_buffer_debug_state_t slot_buffer_debug;
 } state;
 
 //------------------------------------------------------------------------------
@@ -180,6 +184,12 @@ static void init(void) {
     // Initialize entity management UI
     ui_entity_inspector_init(&state.entity_inspector, &state.selection, &state.ecs_world);
     ui_scene_hierarchy_init(&state.scene_hierarchy, &state.selection, &state.ecs_scene);
+
+    // Initialize slot buffer debug viewer
+    ui_slot_buffer_debug_init(&state.slot_buffer_debug, &state.ecs_scene);
+
+    // Wire up slot buffer debug window toggle to visibility controls
+    ui_visibility_set_slot_buffer_debug_ptr(&state.visibility, &state.slot_buffer_debug.window_open);
 
     // Create test ECS entities using the scene API
     {
@@ -336,6 +346,7 @@ static void frame(void) {
         ui_pick_debug_draw(&state.pick_debug);
         ui_entity_inspector_draw(&state.entity_inspector);
         ui_scene_hierarchy_draw(&state.scene_hierarchy);
+        ui_slot_buffer_debug_draw(&state.slot_buffer_debug);
     }
 
     // Handle Delete key for entity deletion

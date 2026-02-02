@@ -43,6 +43,10 @@ typedef struct {
     int free_count;             // Number of free slots in stack
     int free_capacity;          // Capacity of free_slots array
 
+    // Slot-to-entity mapping (for debug viewer)
+    uint64_t *slot_to_entity;   // Entity ID per slot (0 = empty)
+    uint8_t *slot_geom_type;    // Geometry type per slot (for color coding)
+
     // Dirty tracking
     bool needs_upload;          // Buffer needs GPU upload this frame
     int dirty_min;              // Minimum dirty slot index
@@ -81,6 +85,12 @@ static inline void instance_buffer_init(instance_buffer_t *ib,
     ib->free_capacity = cap;
     ib->free_slots = (int*)malloc(cap * sizeof(int));
     ib->free_count = 0;  // No free slots yet (slots allocated sequentially)
+
+    // Initialize slot-to-entity mapping (for debug viewer)
+    ib->slot_to_entity = (uint64_t*)malloc(cap * sizeof(uint64_t));
+    ib->slot_geom_type = (uint8_t*)malloc(cap * sizeof(uint8_t));
+    memset(ib->slot_to_entity, 0, cap * sizeof(uint64_t));
+    memset(ib->slot_geom_type, 0, cap * sizeof(uint8_t));
 
     // Dirty tracking
     ib->needs_upload = false;
@@ -139,6 +149,12 @@ static inline int instance_buffer_alloc_slot(instance_buffer_t *ib) {
         ib->free_slots = (int*)realloc(ib->free_slots, new_capacity * sizeof(int));
         ib->free_capacity = new_capacity;
 
+        // Grow slot-to-entity mapping
+        ib->slot_to_entity = (uint64_t*)realloc(ib->slot_to_entity, new_capacity * sizeof(uint64_t));
+        ib->slot_geom_type = (uint8_t*)realloc(ib->slot_geom_type, new_capacity * sizeof(uint8_t));
+        memset(ib->slot_to_entity + ib->capacity, 0, (new_capacity - ib->capacity) * sizeof(uint64_t));
+        memset(ib->slot_geom_type + ib->capacity, 0, (new_capacity - ib->capacity) * sizeof(uint8_t));
+
         ib->capacity = new_capacity;
 
         // Mark entire buffer dirty after resize (need full upload)
@@ -187,6 +203,12 @@ static inline int instance_buffer_alloc_contiguous(instance_buffer_t *ib, int n)
         ib->free_slots = (int*)realloc(ib->free_slots, new_capacity * sizeof(int));
         ib->free_capacity = new_capacity;
 
+        // Grow slot-to-entity mapping
+        ib->slot_to_entity = (uint64_t*)realloc(ib->slot_to_entity, new_capacity * sizeof(uint64_t));
+        ib->slot_geom_type = (uint8_t*)realloc(ib->slot_geom_type, new_capacity * sizeof(uint8_t));
+        memset(ib->slot_to_entity + ib->capacity, 0, (new_capacity - ib->capacity) * sizeof(uint64_t));
+        memset(ib->slot_geom_type + ib->capacity, 0, (new_capacity - ib->capacity) * sizeof(uint8_t));
+
         ib->capacity = new_capacity;
 
         // Mark entire buffer dirty after resize
@@ -209,6 +231,10 @@ static inline void instance_buffer_free_slot(instance_buffer_t *ib, int slot) {
         ib->free_slots = (int*)realloc(ib->free_slots, ib->free_capacity * sizeof(int));
     }
     ib->free_slots[ib->free_count++] = slot;
+
+    // Clear entity mapping
+    ib->slot_to_entity[slot] = 0;
+    ib->slot_geom_type[slot] = 0;
 
     // Set slot data to far-away values so freed instances render off-screen
     // (GPU frustum culling makes this essentially free)
@@ -257,6 +283,36 @@ static inline void instance_buffer_mark_dirty(instance_buffer_t *ib, int slot) {
 }
 
 //------------------------------------------------------------------------------
+// Slot-to-Entity Mapping (for debug viewer)
+//------------------------------------------------------------------------------
+
+// Set entity ID and geometry type for a slot
+static inline void instance_buffer_set_entity(instance_buffer_t *ib, int slot,
+                                               uint64_t entity_id, uint8_t geom_type) {
+    if (slot < 0 || slot >= ib->count) return;
+    ib->slot_to_entity[slot] = entity_id;
+    ib->slot_geom_type[slot] = geom_type;
+}
+
+// Get entity ID for a slot (returns 0 if empty/invalid)
+static inline uint64_t instance_buffer_get_entity(instance_buffer_t *ib, int slot) {
+    if (slot < 0 || slot >= ib->count) return 0;
+    return ib->slot_to_entity[slot];
+}
+
+// Get geometry type for a slot
+static inline uint8_t instance_buffer_get_geom_type(instance_buffer_t *ib, int slot) {
+    if (slot < 0 || slot >= ib->count) return 0;
+    return ib->slot_geom_type[slot];
+}
+
+// Check if slot is occupied (has an entity)
+static inline bool instance_buffer_slot_occupied(instance_buffer_t *ib, int slot) {
+    if (slot < 0 || slot >= ib->count) return false;
+    return ib->slot_to_entity[slot] != 0;
+}
+
+//------------------------------------------------------------------------------
 // GPU Upload
 //------------------------------------------------------------------------------
 
@@ -292,6 +348,10 @@ static inline void instance_buffer_clear(instance_buffer_t *ib) {
 
     // Optionally zero out staging buffer (helps with debugging)
     memset(ib->staging, 0, ib->capacity * ib->instance_size);
+
+    // Clear slot-to-entity mapping
+    memset(ib->slot_to_entity, 0, ib->capacity * sizeof(uint64_t));
+    memset(ib->slot_geom_type, 0, ib->capacity * sizeof(uint8_t));
 }
 
 //------------------------------------------------------------------------------
@@ -327,6 +387,16 @@ static inline void instance_buffer_shutdown(instance_buffer_t *ib) {
     if (ib->free_slots) {
         free(ib->free_slots);
         ib->free_slots = NULL;
+    }
+
+    if (ib->slot_to_entity) {
+        free(ib->slot_to_entity);
+        ib->slot_to_entity = NULL;
+    }
+
+    if (ib->slot_geom_type) {
+        free(ib->slot_geom_type);
+        ib->slot_geom_type = NULL;
     }
 
     sg_destroy_buffer(ib->gpu_buffer);

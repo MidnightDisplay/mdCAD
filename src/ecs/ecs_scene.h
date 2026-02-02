@@ -199,6 +199,9 @@ static inline ecs_entity_t scene_add_line(ecs_scene_t *scene,
         // Set instance data
         geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
 
+        // Set entity mapping for debug viewer
+        geom_line_batch_set_entity(&scene->batches.lines, slot, (uint64_t)e, (uint8_t)GEOM_LINE);
+
         // Update renderable with slot info
         RenderableComp *r = ecs_world_get_renderable(scene->world, e);
         if (r) {
@@ -235,6 +238,8 @@ static inline ecs_entity_t scene_add_polyline(ecs_scene_t *scene,
                 vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i]);
                 vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+                // Set entity mapping for debug viewer
+                geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYLINE);
             }
         }
     }
@@ -253,6 +258,8 @@ static inline ecs_entity_t scene_add_polyline(ecs_scene_t *scene,
                     // Join is at interior vertex i+1 (vertices 1 to N-2)
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                    // Set entity mapping for debug viewer
+                    geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYLINE);
                 }
             }
         }
@@ -297,6 +304,8 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
                 vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
                 vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polygon.points[next]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+                // Set entity mapping for debug viewer
+                geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYGON);
             }
         }
     }
@@ -312,6 +321,8 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
             for (int i = 0; i < num_joins; i++) {
                 vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
                 geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                // Set entity mapping for debug viewer
+                geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYGON);
             }
         }
     }
@@ -345,6 +356,9 @@ static inline ecs_entity_t scene_add_point(ecs_scene_t *scene,
         vec3_t world_pos = mat4_transform_point(t->world_matrix, pos);
 
         geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+
+        // Set entity mapping for debug viewer
+        geom_point_batch_set_entity(&scene->batches.points, slot, (uint64_t)e, (uint8_t)GEOM_POINT);
 
         RenderableComp *r = ecs_world_get_renderable(scene->world, e);
         if (r) {
@@ -387,6 +401,8 @@ static inline ecs_entity_t scene_add_arc(ecs_scene_t *scene,
                 vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
                 vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+                // Set entity mapping for debug viewer
+                geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_ARC);
             }
         }
     }
@@ -403,6 +419,8 @@ static inline ecs_entity_t scene_add_arc(ecs_scene_t *scene,
                 for (int i = 0; i < num_joins; i++) {
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                    // Set entity mapping for debug viewer
+                    geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_ARC);
                 }
             }
         }
@@ -454,6 +472,8 @@ static inline ecs_entity_t scene_add_bezier(ecs_scene_t *scene,
                 vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
                 vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+                // Set entity mapping for debug viewer
+                geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_BEZIER);
             }
         }
     }
@@ -470,6 +490,8 @@ static inline ecs_entity_t scene_add_bezier(ecs_scene_t *scene,
                 for (int i = 0; i < num_joins; i++) {
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                    // Set entity mapping for debug viewer
+                    geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_BEZIER);
                 }
             }
         }
@@ -521,6 +543,8 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
                 vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
                 vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
+                // Set entity mapping for debug viewer
+                geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_HELIX);
             }
         }
     }
@@ -537,6 +561,8 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
                 for (int i = 0; i < num_joins; i++) {
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
+                    // Set entity mapping for debug viewer
+                    geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_HELIX);
                 }
             }
         }

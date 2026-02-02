@@ -322,6 +322,12 @@ static inline void geom_line_batch_set(geom_line_batch_t* batch, int slot,
     instance_buffer_set(&batch->instances, slot, &inst);
 }
 
+// Set entity mapping for a line slot (for debug viewer)
+static inline void geom_line_batch_set_entity(geom_line_batch_t* batch, int slot,
+                                               uint64_t entity_id, uint8_t geom_type) {
+    instance_buffer_set_entity(&batch->instances, slot, entity_id, geom_type);
+}
+
 static inline void geom_line_batch_upload(geom_line_batch_t* batch) {
     instance_buffer_upload(&batch->instances);
 }
@@ -474,6 +480,12 @@ static inline void geom_point_batch_set(geom_point_batch_t* batch, int slot,
         .r = color.x, .g = color.y, .b = color.z, .a = color.w
     };
     instance_buffer_set(&batch->instances, slot, &inst);
+}
+
+// Set entity mapping for a point slot (for debug viewer)
+static inline void geom_point_batch_set_entity(geom_point_batch_t* batch, int slot,
+                                                uint64_t entity_id, uint8_t geom_type) {
+    instance_buffer_set_entity(&batch->instances, slot, entity_id, geom_type);
 }
 
 static inline void geom_point_batch_upload(geom_point_batch_t* batch) {
