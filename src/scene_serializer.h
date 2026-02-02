@@ -829,8 +829,8 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
     // Set defaults
     ent->geom_type = GEOM_POINT;
     ent->color = vec4_make(1, 1, 1, 1);
-    ent->line_width = 0.02f;
-    ent->point_size = 0.05f;
+    ent->line_width = 0.005f;
+    ent->point_size = 0.01f;
 
     if (!json_next_token(p)) return false;
 
