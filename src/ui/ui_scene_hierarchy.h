@@ -16,6 +16,7 @@
 #include "../selection.h"
 #include "../ecs/ecs_scene.h"
 #include "../scene_serializer.h"
+#include "../undo_redo_exec.h"  // Includes undo_redo.h and provides undo/redo functions
 #include "ui_file_browser.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
@@ -48,6 +49,7 @@ typedef struct {
 typedef struct {
     selection_buffer_t *selection;
     ecs_scene_t *scene;
+    undo_redo_t *undo_redo;  // Optional, can be NULL if no undo/redo
 
     // Cached sorted entity list
     ui_hierarchy_entry_t *cache;
@@ -79,6 +81,7 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
                                             ecs_scene_t *scene) {
     state->selection = selection;
     state->scene = scene;
+    state->undo_redo = NULL;  // Set via ui_scene_hierarchy_set_undo_redo
 
     // Initialize cache
     state->cache = NULL;
@@ -99,6 +102,12 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->clear_on_load = true;
     state->last_status[0] = '\0';
     state->last_folder[0] = '\0';  // Will use cwd on first use
+}
+
+// Set undo/redo system (optional, can be NULL)
+static inline void ui_scene_hierarchy_set_undo_redo(ui_scene_hierarchy_state_t *state,
+                                                     undo_redo_t *undo_redo) {
+    state->undo_redo = undo_redo;
 }
 
 static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state) {
@@ -327,9 +336,11 @@ static inline vec4_t ui_scene_hierarchy_random_color(void) {
 
 static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *state) {
     if (igBeginMenu("Add Entity", true)) {
+        ecs_entity_t new_entity = 0;
+
         if (igMenuItem_Bool("Point", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_point(state->scene,
+            new_entity = scene_add_point(state->scene,
                 vec3_make(0.0f, 0.0f, 0.0f),
                 color, 0.06f);
             state->cache_dirty = true;
@@ -337,7 +348,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Line (X axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_line(state->scene,
+            new_entity = scene_add_line(state->scene,
                 vec3_make(-1.0f, 0.0f, 0.0f),
                 vec3_make(1.0f, 0.0f, 0.0f),
                 color, 0.03f);
@@ -346,7 +357,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Line (Y axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_line(state->scene,
+            new_entity = scene_add_line(state->scene,
                 vec3_make(0.0f, -1.0f, 0.0f),
                 vec3_make(0.0f, 1.0f, 0.0f),
                 color, 0.03f);
@@ -355,7 +366,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Line (Z axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_line(state->scene,
+            new_entity = scene_add_line(state->scene,
                 vec3_make(0.0f, 0.0f, -1.0f),
                 vec3_make(0.0f, 0.0f, 1.0f),
                 color, 0.03f);
@@ -374,7 +385,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 ((float)(rand() % 200) - 100.0f) / 50.0f,
                 ((float)(rand() % 200) - 100.0f) / 50.0f
             );
-            scene_add_line(state->scene, a, b, color, 0.03f);
+            new_entity = scene_add_line(state->scene, a, b, color, 0.03f);
             state->cache_dirty = true;
         }
 
@@ -388,13 +399,13 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 vec3_make(0.5f, -0.5f, 0.0f),
                 vec3_make(1.5f, 0.5f, 0.0f)
             };
-            scene_add_polyline(state->scene, points, 4, color, 0.03f);
+            new_entity = scene_add_polyline(state->scene, points, 4, color, 0.03f);
             state->cache_dirty = true;
         }
 
         if (igMenuItem_Bool("Arc (Quarter Circle)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_arc(state->scene,
+            new_entity = scene_add_arc(state->scene,
                 vec3_make(0.0f, 0.0f, 0.0f),  // center
                 1.0f,                          // radius
                 0.0f,                          // start angle
@@ -406,7 +417,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Arc (Semicircle)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_arc(state->scene,
+            new_entity = scene_add_arc(state->scene,
                 vec3_make(0.0f, 0.0f, 0.0f),
                 1.0f,
                 0.0f,
@@ -423,7 +434,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 vec3_make(-0.866f, -0.5f, 0.0f),
                 vec3_make(0.866f, -0.5f, 0.0f)
             };
-            scene_add_polygon(state->scene, points, 3, color, 0.03f);
+            new_entity = scene_add_polygon(state->scene, points, 3, color, 0.03f);
             state->cache_dirty = true;
         }
 
@@ -435,7 +446,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 vec3_make(0.7f, 0.7f, 0.0f),
                 vec3_make(-0.7f, 0.7f, 0.0f)
             };
-            scene_add_polygon(state->scene, points, 4, color, 0.03f);
+            new_entity = scene_add_polygon(state->scene, points, 4, color, 0.03f);
             state->cache_dirty = true;
         }
 
@@ -446,7 +457,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 float angle = (float)i * 1.2566370f - 1.5707963f;  // 2*PI/5, offset by -PI/2
                 points[i] = vec3_make(cosf(angle), sinf(angle), 0.0f);
             }
-            scene_add_polygon(state->scene, points, 5, color, 0.03f);
+            new_entity = scene_add_polygon(state->scene, points, 5, color, 0.03f);
             state->cache_dirty = true;
         }
 
@@ -454,7 +465,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Bezier Curve", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_bezier(state->scene,
+            new_entity = scene_add_bezier(state->scene,
                 vec3_make(-1.5f, 0.0f, 0.0f),   // p0
                 vec3_make(-0.5f, 1.5f, 0.0f),   // p1 (control)
                 vec3_make(0.5f, -1.5f, 0.0f),   // p2 (control)
@@ -466,7 +477,7 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Helix", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            scene_add_helix(state->scene,
+            new_entity = scene_add_helix(state->scene,
                 vec3_make(0.0f, -1.0f, 0.0f),   // axis start
                 vec3_make(0.0f, 1.0f, 0.0f),    // axis end
                 0.5f,                            // radius
@@ -474,6 +485,11 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 32,                              // segments
                 color, 0.03f);
             state->cache_dirty = true;
+        }
+
+        // Record undo command for entity creation
+        if (new_entity != 0 && state->undo_redo) {
+            undo_cmd_create_entity(state->undo_redo, new_entity);
         }
 
         igEndMenu();
@@ -721,7 +737,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         return;
     }
 
-    // Menu bar with File and Add Entity options
+    // Menu bar with File, Edit, and Add Entity options
     if (igBeginMenuBar()) {
         // File menu
         if (igBeginMenu("File", true)) {
@@ -744,6 +760,10 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             igCheckbox("Clear on Load", &state->clear_on_load);
             igSeparator();
             if (igMenuItem_Bool("Clear Scene", NULL, false, state->cache_count > 0)) {
+                // Clear undo history when clearing scene
+                if (state->undo_redo) {
+                    undo_redo_clear(state->undo_redo);
+                }
                 // Clear all entities
                 for (int i = state->cache_count - 1; i >= 0; i--) {
                     scene_remove_entity(state->scene, state->cache[i].entity);
@@ -754,6 +774,51 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             }
             igEndMenu();
         }
+
+        // Edit menu with Undo/Redo
+        if (igBeginMenu("Edit", true)) {
+            // Undo
+            bool can_undo = state->undo_redo && undo_redo_can_undo(state->undo_redo);
+            const char *undo_name = can_undo ? undo_redo_get_undo_name(state->undo_redo) : NULL;
+            char undo_label[64];
+            if (undo_name) {
+                snprintf(undo_label, sizeof(undo_label), "Undo %s", undo_name);
+            } else {
+                strcpy(undo_label, "Undo");
+            }
+            if (igMenuItem_Bool(undo_label, "Ctrl+Z", false, can_undo)) {
+                undo_redo_undo(state->undo_redo);
+                state->cache_dirty = true;
+            }
+
+            // Redo
+            bool can_redo = state->undo_redo && undo_redo_can_redo(state->undo_redo);
+            const char *redo_name = can_redo ? undo_redo_get_redo_name(state->undo_redo) : NULL;
+            char redo_label[64];
+            if (redo_name) {
+                snprintf(redo_label, sizeof(redo_label), "Redo %s", redo_name);
+            } else {
+                strcpy(redo_label, "Redo");
+            }
+            if (igMenuItem_Bool(redo_label, "Ctrl+Shift+Z", false, can_redo)) {
+                undo_redo_redo(state->undo_redo);
+                state->cache_dirty = true;
+            }
+
+            igSeparator();
+
+            // Show history count
+            if (state->undo_redo) {
+                igTextDisabled("Undo: %d, Redo: %d",
+                    undo_redo_get_undo_count(state->undo_redo),
+                    undo_redo_get_redo_count(state->undo_redo));
+            } else {
+                igTextDisabled("No undo/redo");
+            }
+
+            igEndMenu();
+        }
+
         ui_scene_hierarchy_draw_add_menu(state);
         igEndMenuBar();
     }
