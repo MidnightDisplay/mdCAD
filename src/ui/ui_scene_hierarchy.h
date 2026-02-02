@@ -15,6 +15,8 @@
 #include "cimgui.h"
 #include "../selection.h"
 #include "../ecs/ecs_scene.h"
+#include "../scene_serializer.h"
+#include "ui_file_browser.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -60,6 +62,12 @@ typedef struct {
     // Pagination state
     int current_page;
     int items_per_page;
+
+    // Save/Load state
+    file_browser_t file_browser;
+    bool clear_on_load;
+    char last_status[128];
+    char last_folder[512];  // Remember last used folder
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -85,6 +93,12 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     // Initialize pagination
     state->current_page = 0;
     state->items_per_page = UI_HIERARCHY_ITEMS_PER_PAGE;
+
+    // Initialize file browser
+    file_browser_init(&state->file_browser);
+    state->clear_on_load = true;
+    state->last_status[0] = '\0';
+    state->last_folder[0] = '\0';  // Will use cwd on first use
 }
 
 static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state) {
@@ -94,6 +108,7 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     }
     state->cache_count = 0;
     state->cache_capacity = 0;
+    file_browser_shutdown(&state->file_browser);
 }
 
 //------------------------------------------------------------------------------
@@ -706,10 +721,114 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         return;
     }
 
-    // Menu bar with Add Entity option
+    // Menu bar with File and Add Entity options
     if (igBeginMenuBar()) {
+        // File menu
+        if (igBeginMenu("File", true)) {
+            if (igMenuItem_Bool("Save Scene...", "Ctrl+S", false, true)) {
+                // Use last folder if available, otherwise will use cwd
+                char default_path[520];
+                if (state->last_folder[0]) {
+                    snprintf(default_path, sizeof(default_path), "%s/scene.json", state->last_folder);
+                } else {
+                    strcpy(default_path, "scene.json");
+                }
+                file_browser_save_file(&state->file_browser, "Save Scene", ".json", default_path);
+            }
+            if (igMenuItem_Bool("Load Scene...", "Ctrl+O", false, true)) {
+                // Use last folder if available
+                file_browser_open_file(&state->file_browser, "Load Scene", ".json",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
+            igSeparator();
+            igCheckbox("Clear on Load", &state->clear_on_load);
+            igSeparator();
+            if (igMenuItem_Bool("Clear Scene", NULL, false, state->cache_count > 0)) {
+                // Clear all entities
+                for (int i = state->cache_count - 1; i >= 0; i--) {
+                    scene_remove_entity(state->scene, state->cache[i].entity);
+                }
+                selection_clear(state->selection);
+                state->cache_dirty = true;
+                strcpy(state->last_status, "Scene cleared");
+            }
+            igEndMenu();
+        }
         ui_scene_hierarchy_draw_add_menu(state);
         igEndMenuBar();
+    }
+
+    // Handle keyboard shortcuts (only when Scene Hierarchy window is focused)
+    if (igIsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+        ImGuiIO* io_kb = igGetIO_Nil();
+        if (io_kb->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_S, false)) {
+            char default_path[520];
+            if (state->last_folder[0]) {
+                snprintf(default_path, sizeof(default_path), "%s/scene.json", state->last_folder);
+            } else {
+                strcpy(default_path, "scene.json");
+            }
+            file_browser_save_file(&state->file_browser, "Save Scene", ".json", default_path);
+        }
+        if (io_kb->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_O, false)) {
+            file_browser_open_file(&state->file_browser, "Load Scene", ".json",
+                                   state->last_folder[0] ? state->last_folder : NULL);
+        }
+    }
+
+    // Draw file browser (returns true when a file is selected)
+    if (file_browser_draw(&state->file_browser)) {
+        const char *path = file_browser_get_result(&state->file_browser);
+        bool success = false;
+
+        if (state->file_browser.mode == FILE_BROWSER_MODE_SAVE) {
+            // Save scene
+            if (scene_save_to_file(state->scene, path)) {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "Saved %d entities", state->cache_count);
+                success = true;
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "Failed to save");
+            }
+        } else {
+            // Load scene
+            selection_clear(state->selection);
+            int count = scene_load_from_file(state->scene, path, state->clear_on_load);
+            if (count >= 0) {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "Loaded %d entities", count);
+                state->cache_dirty = true;
+                success = true;
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "Failed to load");
+            }
+        }
+
+        // Remember the folder for next time on successful operation
+        if (success && path[0]) {
+            // Find last path separator to extract directory
+            const char *last_sep = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win = strrchr(path, '\\');
+            if (last_sep_win > last_sep) last_sep = last_sep_win;
+#endif
+            if (last_sep && last_sep > path) {
+                size_t dir_len = (size_t)(last_sep - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+
+        file_browser_clear_result(&state->file_browser);
+    }
+
+    // Show status message if any
+    if (state->last_status[0] != '\0') {
+        igTextColored((ImVec4){0.5f, 1.0f, 0.5f, 1.0f}, "%s", state->last_status);
     }
 
     // Rebuild cache if dirty
