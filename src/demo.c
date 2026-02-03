@@ -42,7 +42,7 @@
 #include "gpu/pick_buffer.h"
 #include "ui/ui_pick_debug.h"
 #include "ui/ui_entity_inspector.h"
-#include "ui/ui_scene_hierarchy.h"
+#include "ui/ui_scene_hierarchy.h"  // Includes undo_redo_exec.h
 #include "ui/ui_slot_buffer_debug.h"
 
 //------------------------------------------------------------------------------
@@ -96,6 +96,9 @@ static struct {
 
     // Debug UI
     ui_slot_buffer_debug_state_t slot_buffer_debug;
+
+    // Undo/Redo system
+    undo_redo_t undo_redo;
 } state;
 
 //------------------------------------------------------------------------------
@@ -190,6 +193,14 @@ static void init(void) {
 
     // Wire up slot buffer debug window toggle to visibility controls
     ui_visibility_set_slot_buffer_debug_ptr(&state.visibility, &state.slot_buffer_debug.window_open);
+
+    // Initialize undo/redo system
+    undo_redo_init(&state.undo_redo, &state.ecs_scene, 100);
+    undo_redo_set_selection(&state.undo_redo, &state.selection);
+
+    // Wire up undo/redo to scene hierarchy and entity inspector
+    ui_scene_hierarchy_set_undo_redo(&state.scene_hierarchy, &state.undo_redo);
+    ui_entity_inspector_set_undo_redo(&state.entity_inspector, &state.undo_redo);
 
     // Create test ECS entities using the scene API
     {
@@ -349,9 +360,24 @@ static void frame(void) {
         ui_slot_buffer_debug_draw(&state.slot_buffer_debug);
     }
 
-    // Handle Delete key for entity deletion
-    // Delete or Backspace (macOS) deletes selected entities
+    // Handle keyboard shortcuts when no text input has focus
     if (!io->WantCaptureKeyboard) {
+        // Undo: Ctrl+Z
+        if (io->KeyCtrl && !io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) {
+            if (undo_redo_undo(&state.undo_redo)) {
+                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+            }
+        }
+
+        // Redo: Ctrl+Shift+Z or Ctrl+Y
+        if ((io->KeyCtrl && io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) ||
+            (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_Y, false))) {
+            if (undo_redo_redo(&state.undo_redo)) {
+                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+            }
+        }
+
+        // Delete: Delete or Backspace (macOS) deletes selected entities
         if (igIsKeyPressed_Bool(ImGuiKey_Delete, false) ||
             igIsKeyPressed_Bool(ImGuiKey_Backspace, false)) {
             // Copy selection to temp array since we'll be modifying it
@@ -359,6 +385,11 @@ static void frame(void) {
             if (count > 0) {
                 ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
                 selection_copy_entities(&state.selection, to_delete, count);
+
+                // Record undo commands BEFORE deleting (in reverse order so undo restores in correct order)
+                for (int i = count - 1; i >= 0; i--) {
+                    undo_cmd_delete_entity(&state.undo_redo, to_delete[i]);
+                }
 
                 // Clear selection first (before deleting entities)
                 selection_clear(&state.selection);
@@ -530,6 +561,9 @@ static void frame(void) {
 //------------------------------------------------------------------------------
 static void cleanup(void) {
     imgui_storage_shutdown();
+
+    // Shutdown undo/redo system
+    undo_redo_shutdown(&state.undo_redo);
 
     // Shutdown GPU picking
     pick_buffer_shutdown(&state.pick_buffer);

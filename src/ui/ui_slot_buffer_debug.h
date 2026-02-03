@@ -129,7 +129,7 @@ static inline slot_type_t slot_debug_geom_to_slot_type_point(uint8_t geom_type) 
 //------------------------------------------------------------------------------
 
 static inline void ui_slot_buffer_debug_init(ui_slot_buffer_debug_state_t* state, ecs_scene_t* scene) {
-    state->window_open = false;
+    state->window_open = true;
     state->current_tab = 0;
     state->cell_size_preset = 1;  // Medium by default
     state->cell_size = SLOT_DEBUG_SIZE_MEDIUM;

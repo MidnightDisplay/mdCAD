@@ -205,7 +205,7 @@ static inline void geom_batch_generate_point_template(
 //------------------------------------------------------------------------------
 
 static inline void geom_line_batch_init(geom_line_batch_t* batch) {
-    batch->line_width = 0.03f;
+    batch->line_width = 0.005f;
 
     // Initialize instance buffer
     instance_buffer_init(&batch->instances,
@@ -367,7 +367,7 @@ static inline void geom_line_batch_shutdown(geom_line_batch_t* batch) {
 //------------------------------------------------------------------------------
 
 static inline void geom_point_batch_init(geom_point_batch_t* batch) {
-    batch->point_size = 0.05f;
+    batch->point_size = 0.01f;
 
     // Initialize instance buffer
     instance_buffer_init(&batch->instances,

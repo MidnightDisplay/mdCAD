@@ -299,7 +299,7 @@ static inline void ui_theme_apply_visual_studio(void) {
     colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.114f, 0.592f, 0.925f, 0.40f}; // #1D97EC with alpha
     colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.00f, 0.467f, 0.784f, 0.67f};  // #0077C8 with alpha
     colors[ImGuiCol_TitleBg]                = (ImVec4){0.145f, 0.145f, 0.149f, 1.00f};
-    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.00f, 0.467f, 0.784f, 1.00f};  // #0077C8
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.00f, 0.467f, 0.784f, 0.05f};  // #0077C8
     colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.145f, 0.145f, 0.149f, 1.00f};
     colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.20f, 0.20f, 0.216f, 1.00f};
     colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.145f, 0.145f, 0.149f, 1.00f};

@@ -24,7 +24,7 @@
 // Configuration
 //------------------------------------------------------------------------------
 #define PICK_BUFFER_SIZE 20           // 20x20 pixels (temporarily reverted for debugging)
-#define PICK_BUFFER_LINE_WIDTH 0.03f  // Base line width (same as ECS lines)
+#define PICK_BUFFER_LINE_WIDTH 0.005f  // Base line width (same as ECS lines)
 
 //------------------------------------------------------------------------------
 // Pick instance data types (similar to geometry_batch but with pick_color)
@@ -186,7 +186,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     pb->debug_enabled = false;
     pb->hovered_pick_id = 0;
     pb->zoom_factor = 1.0f;  // Default zoom factor
-    pb->thickness_multiplier = 1.0f;  // Default: same thickness as visual rendering
+    pb->thickness_multiplier = 4.0f;  // Default: same thickness as visual rendering
 
     // Create render target
     pb->color_img = sg_make_image(&(sg_image_desc){

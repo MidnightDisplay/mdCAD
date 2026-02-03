@@ -17,6 +17,7 @@
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include "../undo_redo_exec.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -25,6 +26,19 @@
 typedef struct {
     selection_buffer_t *selection;
     ecs_world_state_t *world;
+    undo_redo_t *undo_redo;  // Optional, can be NULL
+
+    // Cached values for drag operations (to capture old value at drag start)
+    ecs_entity_t editing_entity;
+    vec3_t drag_start_position;
+    vec3_t drag_start_rotation;
+    vec3_t drag_start_scale;
+    vec4_t drag_start_color;
+    float drag_start_line_width;
+    float drag_start_point_size;
+    vec3_t drag_start_point_pos;
+    vec3_t drag_start_line_a;
+    vec3_t drag_start_line_b;
 } ui_entity_inspector_state_t;
 
 //------------------------------------------------------------------------------
@@ -34,8 +48,15 @@ typedef struct {
 static inline void ui_entity_inspector_init(ui_entity_inspector_state_t *state,
                                              selection_buffer_t *selection,
                                              ecs_world_state_t *world) {
+    memset(state, 0, sizeof(ui_entity_inspector_state_t));
     state->selection = selection;
     state->world = world;
+    state->undo_redo = NULL;
+}
+
+static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t *state,
+                                                      undo_redo_t *undo_redo) {
+    state->undo_redo = undo_redo;
 }
 
 //------------------------------------------------------------------------------
@@ -70,6 +91,20 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             t->position.z = pos[2];
             changed = true;
         }
+        // Capture value at drag start
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_position = t->position;
+        }
+        // Record undo command at drag end
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_pos = t->position;
+            if (state->drag_start_position.x != new_pos.x ||
+                state->drag_start_position.y != new_pos.y ||
+                state->drag_start_position.z != new_pos.z) {
+                undo_cmd_set_position(state->undo_redo, e, state->drag_start_position, new_pos);
+            }
+        }
 
         // Rotation (in degrees for user friendliness)
         float rot_deg[3] = {
@@ -83,6 +118,18 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             t->rotation.z = rot_deg[2] * 0.01745329f;
             changed = true;
         }
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_rotation = t->rotation;
+        }
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_rot = t->rotation;
+            if (state->drag_start_rotation.x != new_rot.x ||
+                state->drag_start_rotation.y != new_rot.y ||
+                state->drag_start_rotation.z != new_rot.z) {
+                undo_cmd_set_rotation(state->undo_redo, e, state->drag_start_rotation, new_rot);
+            }
+        }
 
         // Scale
         float scale[3] = { t->scale.x, t->scale.y, t->scale.z };
@@ -91,6 +138,18 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             t->scale.y = scale[1];
             t->scale.z = scale[2];
             changed = true;
+        }
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_scale = t->scale;
+        }
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_scale = t->scale;
+            if (state->drag_start_scale.x != new_scale.x ||
+                state->drag_start_scale.y != new_scale.y ||
+                state->drag_start_scale.z != new_scale.z) {
+                undo_cmd_set_scale(state->undo_redo, e, state->drag_start_scale, new_scale);
+            }
         }
 
         if (changed) {
@@ -120,6 +179,19 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             g->color.w = color[3];
             changed = true;
         }
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_color = g->color;
+        }
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec4_t new_color = g->color;
+            if (state->drag_start_color.x != new_color.x ||
+                state->drag_start_color.y != new_color.y ||
+                state->drag_start_color.z != new_color.z ||
+                state->drag_start_color.w != new_color.w) {
+                undo_cmd_set_color(state->undo_redo, e, state->drag_start_color, new_color);
+            }
+        }
 
         // Type-specific properties
         switch (g->type) {
@@ -127,6 +199,16 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 if (igDragFloat("Point Size", &g->point_size, 0.005f, 0.01f, 0.5f, "%.3f", 0)) {
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_point_size = g->point_size;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_point_size != g->point_size) {
+                        undo_cmd_set_point_size(state->undo_redo, e, state->drag_start_point_size, g->point_size);
+                    }
+                }
+
                 // Point position
                 float pt[3] = { g->data.point.point.x, g->data.point.point.y, g->data.point.point.z };
                 if (igDragFloat3("Point", pt, 0.1f, -100.0f, 100.0f, "%.2f", 0)) {
@@ -135,12 +217,34 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     g->data.point.point.z = pt[2];
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_point_pos = g->data.point.point;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    vec3_t new_pt = g->data.point.point;
+                    if (state->drag_start_point_pos.x != new_pt.x ||
+                        state->drag_start_point_pos.y != new_pt.y ||
+                        state->drag_start_point_pos.z != new_pt.z) {
+                        undo_cmd_set_point_position(state->undo_redo, e, state->drag_start_point_pos, new_pt);
+                    }
+                }
                 break;
             }
             case GEOM_LINE: {
                 if (igDragFloat("Line Width", &g->line_width, 0.005f, 0.005f, 0.2f, "%.3f", 0)) {
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_width = g->line_width;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_line_width != g->line_width) {
+                        undo_cmd_set_line_width(state->undo_redo, e, state->drag_start_line_width, g->line_width);
+                    }
+                }
+
                 // Line endpoints
                 float a[3] = { g->data.line.a.x, g->data.line.a.y, g->data.line.a.z };
                 float b[3] = { g->data.line.b.x, g->data.line.b.y, g->data.line.b.z };
@@ -150,17 +254,57 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     g->data.line.a.z = a[2];
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_a = g->data.line.a;
+                    state->drag_start_line_b = g->data.line.b;  // Capture both at same time
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    vec3_t new_a = g->data.line.a;
+                    vec3_t new_b = g->data.line.b;
+                    if (state->drag_start_line_a.x != new_a.x ||
+                        state->drag_start_line_a.y != new_a.y ||
+                        state->drag_start_line_a.z != new_a.z) {
+                        undo_cmd_set_line_endpoints(state->undo_redo, e,
+                            state->drag_start_line_a, state->drag_start_line_b, new_a, new_b);
+                    }
+                }
+
                 if (igDragFloat3("Point B", b, 0.1f, -100.0f, 100.0f, "%.2f", 0)) {
                     g->data.line.b.x = b[0];
                     g->data.line.b.y = b[1];
                     g->data.line.b.z = b[2];
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_a = g->data.line.a;
+                    state->drag_start_line_b = g->data.line.b;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    vec3_t new_a = g->data.line.a;
+                    vec3_t new_b = g->data.line.b;
+                    if (state->drag_start_line_b.x != new_b.x ||
+                        state->drag_start_line_b.y != new_b.y ||
+                        state->drag_start_line_b.z != new_b.z) {
+                        undo_cmd_set_line_endpoints(state->undo_redo, e,
+                            state->drag_start_line_a, state->drag_start_line_b, new_a, new_b);
+                    }
+                }
                 break;
             }
             case GEOM_ARC: {
                 if (igDragFloat("Line Width", &g->line_width, 0.005f, 0.005f, 0.2f, "%.3f", 0)) {
                     changed = true;
+                }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_width = g->line_width;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_line_width != g->line_width) {
+                        undo_cmd_set_line_width(state->undo_redo, e, state->drag_start_line_width, g->line_width);
+                    }
                 }
                 // Arc parameters (read-only for now)
                 igTextDisabled("Radius: %.2f", g->data.arc.radius);
@@ -173,12 +317,30 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 if (igDragFloat("Line Width", &g->line_width, 0.005f, 0.005f, 0.2f, "%.3f", 0)) {
                     changed = true;
                 }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_width = g->line_width;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_line_width != g->line_width) {
+                        undo_cmd_set_line_width(state->undo_redo, e, state->drag_start_line_width, g->line_width);
+                    }
+                }
                 igTextDisabled("Segments: %d", g->data.bezier.segments);
                 break;
             }
             case GEOM_HELIX: {
                 if (igDragFloat("Line Width", &g->line_width, 0.005f, 0.005f, 0.2f, "%.3f", 0)) {
                     changed = true;
+                }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_width = g->line_width;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_line_width != g->line_width) {
+                        undo_cmd_set_line_width(state->undo_redo, e, state->drag_start_line_width, g->line_width);
+                    }
                 }
                 igTextDisabled("Radius: %.2f", g->data.helix.radius);
                 igTextDisabled("Turns: %.1f", g->data.helix.turns);
@@ -188,6 +350,15 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             case GEOM_POLYGON: {
                 if (igDragFloat("Line Width", &g->line_width, 0.005f, 0.005f, 0.2f, "%.3f", 0)) {
                     changed = true;
+                }
+                if (igIsItemActivated()) {
+                    state->editing_entity = e;
+                    state->drag_start_line_width = g->line_width;
+                }
+                if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+                    if (state->drag_start_line_width != g->line_width) {
+                        undo_cmd_set_line_width(state->undo_redo, e, state->drag_start_line_width, g->line_width);
+                    }
                 }
                 int count = (g->type == GEOM_POLYLINE) ? g->data.polyline.count : g->data.polygon.count;
                 igTextDisabled("Point count: %d", count);
@@ -206,8 +377,13 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     // Renderable section
     RenderableComp *r = ecs_world_get_renderable(w, e);
     if (r && igCollapsingHeader_TreeNodeFlags("Rendering", 0)) {
+        bool old_visible = r->visible;
         if (igCheckbox("Visible", &r->visible)) {
             r->instance_dirty = true;
+            // Record visibility change (checkbox is immediate, no drag tracking needed)
+            if (state->undo_redo && old_visible != r->visible) {
+                undo_cmd_set_visible(state->undo_redo, e, old_visible, r->visible);
+            }
         }
         igInputInt("Layer", &r->layer, 1, 10, 0);
     }
@@ -246,6 +422,9 @@ static inline void ui_entity_inspector_draw_multi(ui_entity_inspector_state_t *s
         igTextDisabled("Edit color for all selected:");
 
         static float common_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        static vec4_t *bulk_old_colors = NULL;
+        static uint64_t *bulk_entity_ids = NULL;
+        static int bulk_count = 0;
 
         if (igColorEdit4("Set Color", common_color, ImGuiColorEditFlags_AlphaBar)) {
             // Apply to all selected entities
@@ -264,9 +443,50 @@ static inline void ui_entity_inspector_draw_multi(ui_entity_inspector_state_t *s
                 if (r) r->instance_dirty = true;
             }
         }
+        // Capture old colors at edit start for bulk undo
+        if (igIsItemActivated() && state->undo_redo) {
+            // Allocate and store old colors
+            if (bulk_old_colors) free(bulk_old_colors);
+            if (bulk_entity_ids) free(bulk_entity_ids);
+            bulk_count = sel->count;
+            bulk_old_colors = (vec4_t*)malloc(bulk_count * sizeof(vec4_t));
+            bulk_entity_ids = (uint64_t*)malloc(bulk_count * sizeof(uint64_t));
+            for (int i = 0; i < bulk_count; i++) {
+                ecs_entity_t e = sel->entities[i];
+                bulk_entity_ids[i] = e;
+                GeometryComp *g = ecs_world_get_geometry(w, e);
+                if (g) {
+                    bulk_old_colors[i] = g->color;
+                } else {
+                    bulk_old_colors[i] = (vec4_t){1,1,1,1};
+                }
+            }
+        }
+        // Record bulk undo at edit end
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && bulk_count > 0) {
+            vec4_t new_color = { common_color[0], common_color[1], common_color[2], common_color[3] };
+            undo_cmd_bulk_set_color(state->undo_redo, bulk_entity_ids, bulk_old_colors, bulk_count, new_color);
+            // Transfer ownership to undo system
+            bulk_entity_ids = NULL;
+            bulk_old_colors = NULL;
+            bulk_count = 0;
+        }
 
         // Visibility toggle for all
         if (igButton("Show All", (ImVec2){0, 0})) {
+            // Record bulk visibility undo
+            if (state->undo_redo && sel->count > 0) {
+                uint64_t *ids = (uint64_t*)malloc(sel->count * sizeof(uint64_t));
+                bool *old_vis = (bool*)malloc(sel->count * sizeof(bool));
+                for (int i = 0; i < sel->count; i++) {
+                    ecs_entity_t e = sel->entities[i];
+                    ids[i] = e;
+                    RenderableComp *r = ecs_world_get_renderable(w, e);
+                    old_vis[i] = r ? r->visible : true;
+                }
+                undo_cmd_bulk_set_visible(state->undo_redo, ids, old_vis, sel->count, true);
+            }
+            // Apply visibility
             for (int i = 0; i < sel->count; i++) {
                 ecs_entity_t e = sel->entities[i];
                 if (!ecs_is_alive(w->world, e)) continue;
@@ -280,6 +500,19 @@ static inline void ui_entity_inspector_draw_multi(ui_entity_inspector_state_t *s
         }
         igSameLine(0, 5);
         if (igButton("Hide All", (ImVec2){0, 0})) {
+            // Record bulk visibility undo
+            if (state->undo_redo && sel->count > 0) {
+                uint64_t *ids = (uint64_t*)malloc(sel->count * sizeof(uint64_t));
+                bool *old_vis = (bool*)malloc(sel->count * sizeof(bool));
+                for (int i = 0; i < sel->count; i++) {
+                    ecs_entity_t e = sel->entities[i];
+                    ids[i] = e;
+                    RenderableComp *r = ecs_world_get_renderable(w, e);
+                    old_vis[i] = r ? r->visible : false;
+                }
+                undo_cmd_bulk_set_visible(state->undo_redo, ids, old_vis, sel->count, false);
+            }
+            // Apply visibility
             for (int i = 0; i < sel->count; i++) {
                 ecs_entity_t e = sel->entities[i];
                 if (!ecs_is_alive(w->world, e)) continue;
