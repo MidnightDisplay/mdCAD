@@ -15,7 +15,7 @@
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
 
-// For theme-aware hover colors (cimgui already defined in demo.c before this include)
+// For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #endif

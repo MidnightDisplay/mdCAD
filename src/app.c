@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// Sokol + cimgui demo with dockspace and 3D viewport rendering a cube
+// Sokol + cimgui app with dockspace and 3D viewport rendering a cube
 //------------------------------------------------------------------------------
 
 // Platform detection must be first (before Sokol includes)
@@ -19,21 +19,11 @@
 #include "imgui_storage.h"
 #include "render_target.h"
 #include "orbit_camera.h"
-#include "static_cube.h"
-#include "dynamic_lines.h"
-#include "instanced_lines.h"
-#include "instanced_polylines.h"
-#include "instanced_lines_alpha.h"
-#include "instanced_alpha_polylines.h"
-#include "gamepad_input.h"
 #include "ui/ui_theme.h"
 #include "ui/ui_controls.h"
 #include "ui/ui_viewport.h"
 #include "ui/ui_camera_debug.h"
-#include "ui/ui_lines_controls.h"
-#include "ui/ui_thick_lines_controls.h"
 #include "ui/ui_visibility.h"
-#include "ui/ui_gcode_controls.h"
 
 // ECS modules
 #include "ecs/ecs_world.h"
@@ -54,18 +44,8 @@ static struct {
     sg_pass_action offscreen_pass_action;
     sg_pass_action main_pass_action;
 
-    // Renderables
-    static_cube_t cube;
-    dynamic_lines_t lines;
-    instanced_lines_t instanced_lines;
-    instanced_polylines_t instanced_polylines;
-    instanced_lines_alpha_t alpha_lines;
-    instanced_alpha_polylines_t gcode_polyline;
-    bool gcode_loaded;
-
     // Scene state
     orbit_camera_t camera;
-    gamepad_state_t gamepad;
     uint64_t last_time;
     float elapsed_time;
     bool ui_visible;
@@ -74,10 +54,7 @@ static struct {
     ui_controls_state_t controls;
     ui_viewport_state_t viewport;
     ui_camera_debug_state_t camera_debug;
-    ui_lines_controls_state_t lines_controls;
-    ui_thick_lines_controls_state_t thick_lines_controls;
     ui_visibility_state_t visibility;
-    ui_gcode_controls_state_t gcode_controls;
 
     // ECS state
     ecs_world_state_t ecs_world;
@@ -134,32 +111,15 @@ static void init(void) {
     // Initialize render target
     render_target_init(&state.viewport_rt);
 
-    // Initialize camera and gamepad
+    // Initialize camera
     orbit_camera_init(&state.camera);
-    gamepad_init(&state.gamepad);
     state.ui_visible = true;
-
-    // Initialize renderables
-    static_cube_init(&state.cube);
-    dynamic_lines_init(&state.lines);
-    instanced_lines_init(&state.instanced_lines);
-    instanced_polylines_init(&state.instanced_polylines);
-    instanced_lines_alpha_init(&state.alpha_lines);
-
-    // Load G-code file
-    //state.gcode_loaded = instanced_alpha_polylines_init(&state.gcode_polyline, "models/gcode/3DBenchy.gcode");
-    state.gcode_loaded = instanced_alpha_polylines_init(&state.gcode_polyline, "models/gcode/Triceratops.gcode");
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
     ui_viewport_init(&state.viewport, &state.viewport_rt, &state.camera);
     ui_camera_debug_init(&state.camera_debug, &state.camera);
-    ui_lines_controls_init(&state.lines_controls, &state.lines);
-    ui_thick_lines_controls_init(&state.thick_lines_controls, &state.instanced_lines, &state.instanced_polylines);
     ui_visibility_init(&state.visibility);
-    ui_gcode_controls_init(&state.gcode_controls,
-        state.gcode_loaded ? &state.gcode_polyline : NULL,
-        &state.alpha_lines);
 
     // Initialize ECS world and scene
     ecs_world_init(&state.ecs_world);
@@ -278,64 +238,6 @@ static void frame(void) {
     bool any_mouse_down = io->MouseDown[0] || io->MouseDown[1] || io->MouseDown[2];
     orbit_camera_begin_frame(&state.camera, any_mouse_down);
 
-    // Update gamepad state
-    gamepad_begin_frame(&state.gamepad);
-    gamepad_update(&state.gamepad, dt);
-
-    // Apply gamepad input to camera
-    if (state.gamepad.connected) {
-        float orbit_x, orbit_y, pan_x, pan_y, zoom;
-        gamepad_get_orbit_input(&state.gamepad, &orbit_x, &orbit_y);
-        gamepad_get_pan_input(&state.gamepad, &pan_x, &pan_y);
-        zoom = gamepad_get_zoom_input(&state.gamepad);
-
-        orbit_camera_apply_gamepad(&state.camera, orbit_x, orbit_y, pan_x, pan_y, zoom, dt);
-
-        // Camera reset (L1 + R1 held)
-        if (gamepad_should_reset(&state.gamepad)) {
-            orbit_camera_reset(&state.camera);
-        }
-
-        // A button: Toggle UI visibility
-        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_A)) {
-            state.ui_visible = !state.ui_visible;
-        }
-
-        // Y button: Cycle themes
-        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_Y)) {
-            static int current_theme = 0;
-            current_theme = (current_theme + 1) % 3;
-            switch (current_theme) {
-                case 0: ui_theme_apply_catppuccin_frappe(); break;
-                case 1: ui_theme_apply_visual_studio(); break;
-                case 2: ui_theme_apply_ios_light(); break;
-            }
-            // Sync clear color with theme
-            float r, g, b;
-            ui_theme_get_frame_bg(&r, &g, &b);
-            state.offscreen_pass_action.colors[0].clear_value = (sg_color){r, g, b, 1.0f};
-        }
-
-        // Start button: Toggle all UI panels
-        if (gamepad_button_pressed(&state.gamepad, GAMEPAD_BUTTON_START)) {
-            state.ui_visible = !state.ui_visible;
-        }
-
-        // D-pad up/down: Timeline scrub (if G-code loaded)
-        if (state.gcode_loaded) {
-            if (gamepad_button_held(&state.gamepad, GAMEPAD_BUTTON_DPAD_UP)) {
-                state.gcode_polyline.timeline_position += dt * 0.2f;
-                if (state.gcode_polyline.timeline_position > 1.0f)
-                    state.gcode_polyline.timeline_position = 1.0f;
-            }
-            if (gamepad_button_held(&state.gamepad, GAMEPAD_BUTTON_DPAD_DOWN)) {
-                state.gcode_polyline.timeline_position -= dt * 0.2f;
-                if (state.gcode_polyline.timeline_position < 0.0f)
-                    state.gcode_polyline.timeline_position = 0.0f;
-            }
-        }
-    }
-
     simgui_new_frame(&(simgui_frame_desc_t){
         .width = width,
         .height = height,
@@ -350,10 +252,7 @@ static void frame(void) {
     if (state.ui_visible) {
         ui_controls_draw(&state.controls);
         ui_camera_debug_draw(&state.camera_debug);
-        ui_lines_controls_draw(&state.lines_controls);
-        ui_thick_lines_controls_draw(&state.thick_lines_controls);
         ui_visibility_draw(&state.visibility);
-        ui_gcode_controls_draw(&state.gcode_controls);
         ui_pick_debug_draw(&state.pick_debug);
         ui_entity_inspector_draw(&state.entity_inspector);
         ui_scene_hierarchy_draw(&state.scene_hierarchy);
@@ -430,15 +329,6 @@ static void frame(void) {
     mat4_t vp_mat = mat4_mul(proj, view);
     mat4_t mvp = mat4_mul(vp_mat, mat4_identity());
 
-    // Update dynamic lines vertex buffer (always update even if hidden, for smooth animation)
-    dynamic_lines_update(&state.lines, state.elapsed_time);
-    instanced_lines_update(&state.instanced_lines, state.elapsed_time);
-    instanced_polylines_update(&state.instanced_polylines, state.elapsed_time);
-    instanced_lines_alpha_update(&state.alpha_lines, state.elapsed_time);
-    if (state.gcode_loaded) {
-        instanced_alpha_polylines_update(&state.gcode_polyline);
-    }
-
     // Calculate aspect ratio for thick line rendering
     float aspect_ratio = (float)vp_width / (float)vp_height;
 
@@ -450,37 +340,6 @@ static void frame(void) {
             .depth_stencil = state.viewport_rt.depth_att_view,
         }
     });
-
-    // Draw cube if visible
-    if (state.visibility.show_cube) {
-        static_cube_draw(&state.cube, mvp);
-    }
-
-    // Draw dynamic lines if visible
-    if (state.visibility.show_lines) {
-        dynamic_lines_draw(&state.lines, mvp);
-    }
-
-    // Draw instanced thick lines if visible
-    if (state.visibility.show_instanced_lines) {
-        instanced_lines_draw(&state.instanced_lines, mvp, aspect_ratio);
-    }
-
-    // Draw instanced polylines if visible
-    if (state.visibility.show_instanced_polylines) {
-        instanced_polylines_draw(&state.instanced_polylines, mvp, aspect_ratio);
-    }
-
-    // Draw alpha-blended objects (after opaque objects)
-    // G-code path
-    if (state.visibility.show_gcode_path && state.gcode_loaded) {
-        instanced_alpha_polylines_draw(&state.gcode_polyline, mvp, aspect_ratio);
-    }
-
-    // Alpha-blended animated lines
-    if (state.visibility.show_alpha_lines) {
-        instanced_lines_alpha_draw(&state.alpha_lines, mvp, aspect_ratio);
-    }
 
     // Draw ECS scene entities (lines, points, etc.)
     if (state.visibility.show_ecs_entities) {
@@ -578,14 +437,6 @@ static void cleanup(void) {
     ecs_scene_shutdown(&state.ecs_scene);
     ecs_world_shutdown(&state.ecs_world);
 
-    static_cube_shutdown(&state.cube);
-    dynamic_lines_shutdown(&state.lines);
-    instanced_lines_shutdown(&state.instanced_lines);
-    instanced_polylines_shutdown(&state.instanced_polylines);
-    instanced_lines_alpha_shutdown(&state.alpha_lines);
-    if (state.gcode_loaded) {
-        instanced_alpha_polylines_shutdown(&state.gcode_polyline);
-    }
     render_target_shutdown(&state.viewport_rt);
     simgui_shutdown();
     sg_shutdown();
@@ -595,9 +446,6 @@ static void cleanup(void) {
 // Event handling
 //------------------------------------------------------------------------------
 static void event(const sapp_event* ev) {
-    // Handle gamepad input first
-    gamepad_handle_event(&state.gamepad, ev);
-
     // Handle app suspend (Android/iOS) - save ImGui settings
     if (ev->type == SAPP_EVENTTYPE_SUSPENDED) {
         imgui_storage_mark_should_save();

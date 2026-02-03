@@ -9,9 +9,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(libsokol)
 
-# Note: For full gamepad support on Android, apply patches/sokol_android_gamepad.patch
-# to the fetched sokol_app.h. The touchpad remote works without the patch.
-
 FetchContent_GetProperties(libcimgui)
 
 set(SOKOL_HEADERS
@@ -53,7 +50,16 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
         EGL
         android
         log)
+elseif(WIN32)
+    add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
+    target_link_libraries(libsokol PUBLIC
+        d3d11
+        dxgi
+        user32
+        shell32
+        gdi32)
 else()
+    # Linux
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     if (CMAKE_SYSTEM_NAME STREQUAL Linux)
         target_link_libraries(libsokol INTERFACE X11 Xi Xcursor GL dl m)

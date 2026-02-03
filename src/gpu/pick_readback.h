@@ -70,16 +70,9 @@ static inline bool pick_readback_pixels(sg_image img, int width, int height, uin
 
 #elif defined(SOKOL_D3D11)
 
-// D3D11 implementation - requires staging texture
-// Not yet implemented
-
-#include <string.h>
-
-static inline bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data) {
-    (void)img;
-    memset(pixel_data, 0, width * height * 4);
-    return false;  // Indicate readback not implemented
-}
+// D3D11 implementation is in pick_readback_d3d11.c
+// Declaration only here - implementation in .c file
+bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data);
 
 #else
 

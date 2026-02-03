@@ -408,7 +408,7 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant App as demo.c
+    participant App as app.c
     participant Scene as ecs_scene
     participant Batch as geometry_batch
     participant GPU

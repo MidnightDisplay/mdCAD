@@ -5,7 +5,7 @@
  * undo_redo_exec.h - Execution logic for undo/redo commands
  *
  * This file implements the actual undo/redo operations by interacting
- * with the ECS scene. Include this file in demo.c or wherever the
+ * with the ECS scene. Include this file in app.c or wherever the
  * undo/redo system is managed.
  *
  * Usage:

@@ -176,52 +176,6 @@ static inline void orbit_camera_handle_input(orbit_camera_t* cam,
     }
 }
 
-// Apply gamepad input to camera
-// orbit_x, orbit_y: rotation input from left stick/D-pad (in speed units)
-// pan_x, pan_y: pan input from right stick (in speed units)
-// zoom: zoom input from triggers (positive = zoom in, negative = zoom out)
-static inline void orbit_camera_apply_gamepad(orbit_camera_t* cam,
-                                               float orbit_x, float orbit_y,
-                                               float pan_x, float pan_y,
-                                               float zoom,
-                                               float dt) {
-    // Apply orbit (same as mouse rotation but frame-rate independent)
-    if (orbit_x != 0.0f || orbit_y != 0.0f) {
-        cam->azimuth -= orbit_x * dt;
-        cam->elevation += orbit_y * dt;
-
-        // Clamp elevation
-        if (cam->elevation > ORBIT_CAM_MAX_ELEVATION) cam->elevation = ORBIT_CAM_MAX_ELEVATION;
-        if (cam->elevation < ORBIT_CAM_MIN_ELEVATION) cam->elevation = ORBIT_CAM_MIN_ELEVATION;
-
-        // Set velocity for smooth stop (optional inertia)
-        cam->velocity_azimuth = -orbit_x * dt * 0.5f;
-        cam->velocity_elevation = orbit_y * dt * 0.5f;
-    }
-
-    // Apply pan
-    if (pan_x != 0.0f || pan_y != 0.0f) {
-        float ca = cosf(cam->azimuth);
-        float sa = sinf(cam->azimuth);
-
-        // Right vector
-        vec3_t right = { ca, 0.0f, -sa };
-
-        // Pan the target
-        float pan_scale = cam->distance * 0.5f * dt;
-        cam->target.x -= right.x * pan_x * pan_scale;
-        cam->target.z -= right.z * pan_x * pan_scale;
-        cam->target.y += pan_y * pan_scale;
-    }
-
-    // Apply zoom
-    if (zoom != 0.0f) {
-        cam->distance -= zoom * dt;
-        if (cam->distance < ORBIT_CAM_MIN_DISTANCE) cam->distance = ORBIT_CAM_MIN_DISTANCE;
-        if (cam->distance > ORBIT_CAM_MAX_DISTANCE) cam->distance = ORBIT_CAM_MAX_DISTANCE;
-    }
-}
-
 // Update camera state (apply inertia)
 static inline void orbit_camera_update(orbit_camera_t* cam, float dt) {
     // Apply inertia only when not actively dragging
