@@ -416,4 +416,246 @@ static inline ply_error_t ply_get_info(const char *filepath, int *vertex_count, 
     return err;
 }
 
+//------------------------------------------------------------------------------
+// Incremental parsing state (for chunked loading with progress)
+//------------------------------------------------------------------------------
+
+typedef struct {
+    FILE *file;                 // Open file handle
+    ply_header_t header;        // Parsed header
+
+    // Parsed data (grows during parsing)
+    vec3_t *points;
+    vec4_t *colors;
+    int parsed_count;           // Number of vertices parsed so far
+    int capacity;               // Allocated capacity
+
+    // Bounding box (computed during load)
+    vec3_t min_bounds;
+    vec3_t max_bounds;
+
+    // Error state
+    ply_error_t error;
+    bool has_colors;
+} ply_parse_state_t;
+
+//------------------------------------------------------------------------------
+// Open file and parse header only (first step of incremental parsing)
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *state) {
+    memset(state, 0, sizeof(ply_parse_state_t));
+
+    state->file = fopen(filepath, "r");
+    if (!state->file) {
+        state->error = PLY_ERROR_FILE_NOT_FOUND;
+        return PLY_ERROR_FILE_NOT_FOUND;
+    }
+
+    // Parse header
+    ply_error_t err = ply_parse_header(state->file, &state->header);
+    if (err != PLY_OK) {
+        fclose(state->file);
+        state->file = NULL;
+        state->error = err;
+        return err;
+    }
+
+    // Check for ASCII format (binary not yet supported)
+    if (!state->header.is_ascii) {
+        fclose(state->file);
+        state->file = NULL;
+        state->error = PLY_ERROR_UNSUPPORTED_FORMAT;
+        return PLY_ERROR_UNSUPPORTED_FORMAT;
+    }
+
+    // Determine if we have colors
+    state->has_colors = (state->header.prop_red >= 0 &&
+                         state->header.prop_green >= 0 &&
+                         state->header.prop_blue >= 0);
+
+    // Initialize bounds
+    state->min_bounds = vec3_make(1e30f, 1e30f, 1e30f);
+    state->max_bounds = vec3_make(-1e30f, -1e30f, -1e30f);
+
+    // Pre-allocate arrays for all vertices
+    int total = state->header.vertex_count;
+    state->points = (vec3_t*)malloc(total * sizeof(vec3_t));
+    if (state->has_colors) {
+        state->colors = (vec4_t*)malloc(total * sizeof(vec4_t));
+    }
+
+    if (!state->points || (state->has_colors && !state->colors)) {
+        if (state->points) free(state->points);
+        if (state->colors) free(state->colors);
+        state->points = NULL;
+        state->colors = NULL;
+        fclose(state->file);
+        state->file = NULL;
+        state->error = PLY_ERROR_MEMORY_ALLOCATION;
+        return PLY_ERROR_MEMORY_ALLOCATION;
+    }
+
+    state->capacity = total;
+    state->parsed_count = 0;
+    state->error = PLY_OK;
+
+    return PLY_OK;
+}
+
+//------------------------------------------------------------------------------
+// Parse up to max_vertices, returns number parsed (0 when done or error)
+//------------------------------------------------------------------------------
+
+static inline int ply_parse_vertices_chunk(ply_parse_state_t *state, int max_vertices) {
+    if (!state->file || state->error != PLY_OK) {
+        return 0;
+    }
+
+    int total = state->header.vertex_count;
+    int remaining = total - state->parsed_count;
+    if (remaining <= 0) {
+        return 0;  // Done parsing
+    }
+
+    int to_parse = (remaining < max_vertices) ? remaining : max_vertices;
+
+    char line[PLY_MAX_LINE_LENGTH];
+    float values[PLY_MAX_PROPERTIES];
+
+    int parsed = 0;
+    for (int i = 0; i < to_parse; i++) {
+        if (!fgets(line, sizeof(line), state->file)) {
+            state->error = PLY_ERROR_PARSE_ERROR;
+            return parsed;
+        }
+
+        // Parse all values from line
+        char *ptr = line;
+        for (int p = 0; p < state->header.property_count; p++) {
+            while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+            if (!*ptr) {
+                state->error = PLY_ERROR_PARSE_ERROR;
+                return parsed;
+            }
+
+            char *end;
+            values[p] = strtof(ptr, &end);
+            ptr = end;
+        }
+
+        int v = state->parsed_count + parsed;
+
+        // Extract position
+        float x = values[state->header.prop_x];
+        float y = values[state->header.prop_y];
+        float z = values[state->header.prop_z];
+        state->points[v] = vec3_make(x, y, z);
+
+        // Update bounds
+        if (x < state->min_bounds.x) state->min_bounds.x = x;
+        if (y < state->min_bounds.y) state->min_bounds.y = y;
+        if (z < state->min_bounds.z) state->min_bounds.z = z;
+        if (x > state->max_bounds.x) state->max_bounds.x = x;
+        if (y > state->max_bounds.y) state->max_bounds.y = y;
+        if (z > state->max_bounds.z) state->max_bounds.z = z;
+
+        // Extract color if available
+        if (state->has_colors) {
+            float r = values[state->header.prop_red];
+            float g = values[state->header.prop_green];
+            float b = values[state->header.prop_blue];
+            float a = (state->header.prop_alpha >= 0) ? values[state->header.prop_alpha] : 255.0f;
+
+            // Detect if colors are 0-255 (uchar) or 0-1 (float) by checking type
+            ply_property_type_t r_type = state->header.properties[state->header.prop_red].type;
+            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                // Integer colors: normalize to 0-1
+                r /= 255.0f;
+                g /= 255.0f;
+                b /= 255.0f;
+                a /= 255.0f;
+            }
+
+            state->colors[v] = vec4_make(r, g, b, a);
+        }
+
+        parsed++;
+    }
+
+    state->parsed_count += parsed;
+    return parsed;
+}
+
+//------------------------------------------------------------------------------
+// Get current parsing progress (0.0 - 1.0)
+//------------------------------------------------------------------------------
+
+static inline float ply_get_progress(const ply_parse_state_t *state) {
+    if (state->header.vertex_count <= 0) return 1.0f;
+    return (float)state->parsed_count / (float)state->header.vertex_count;
+}
+
+//------------------------------------------------------------------------------
+// Check if parsing is complete
+//------------------------------------------------------------------------------
+
+static inline bool ply_is_complete(const ply_parse_state_t *state) {
+    return state->parsed_count >= state->header.vertex_count;
+}
+
+//------------------------------------------------------------------------------
+// Close and cleanup parse state
+//------------------------------------------------------------------------------
+
+static inline void ply_close(ply_parse_state_t *state) {
+    if (state->file) {
+        fclose(state->file);
+        state->file = NULL;
+    }
+    // Note: points/colors arrays are not freed here - caller takes ownership
+}
+
+//------------------------------------------------------------------------------
+// Free parse state data (call when cancelling or on error)
+//------------------------------------------------------------------------------
+
+static inline void ply_parse_state_free(ply_parse_state_t *state) {
+    if (state->file) {
+        fclose(state->file);
+        state->file = NULL;
+    }
+    if (state->points) {
+        free(state->points);
+        state->points = NULL;
+    }
+    if (state->colors) {
+        free(state->colors);
+        state->colors = NULL;
+    }
+    state->parsed_count = 0;
+    state->capacity = 0;
+}
+
+//------------------------------------------------------------------------------
+// Transfer ownership of parsed data to ply_data_t (for final result)
+//------------------------------------------------------------------------------
+
+static inline void ply_parse_state_to_data(ply_parse_state_t *state, ply_data_t *data) {
+    data->points = state->points;
+    data->colors = state->colors;
+    data->count = state->parsed_count;
+    data->has_colors = state->has_colors;
+    data->min_bounds = state->min_bounds;
+    data->max_bounds = state->max_bounds;
+
+    // Clear state pointers (ownership transferred)
+    state->points = NULL;
+    state->colors = NULL;
+    state->parsed_count = 0;
+    state->capacity = 0;
+}
+
 #endif // PLY_LOADER_H

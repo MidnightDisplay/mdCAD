@@ -19,6 +19,7 @@
 #include "../undo_redo_exec.h"  // Includes undo_redo.h and provides undo/redo functions
 #include "ui_file_browser.h"
 #include "../ply_loader.h"
+#include "../ply_import_job.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -83,6 +84,10 @@ typedef struct {
     float ply_point_size;
     bool ply_use_colors;           // Use PLY colors or default color
     float ply_default_color[3];    // Default color when not using PLY colors
+
+    // PLY Import job (for progress bar)
+    ply_import_job_t import_job;
+    bool import_progress_popup_open;
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -129,6 +134,10 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->ply_default_color[0] = 1.0f;
     state->ply_default_color[1] = 1.0f;
     state->ply_default_color[2] = 1.0f;
+
+    // Initialize import job
+    ply_import_job_init(&state->import_job);
+    state->import_progress_popup_open = false;
 }
 
 // Set undo/redo system (optional, can be NULL)
@@ -146,6 +155,12 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     state->cache_capacity = 0;
     file_browser_shutdown(&state->file_browser);
     file_browser_shutdown(&state->ply_browser);
+
+    // Cleanup any running import job
+    if (ply_import_job_is_running(&state->import_job)) {
+        ply_import_job_cancel(&state->import_job, state->scene);
+    }
+    ply_import_job_reset(&state->import_job);
 }
 
 //------------------------------------------------------------------------------
@@ -1007,103 +1022,56 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
 
         // Import/Cancel buttons
         if (igButton("Import", (ImVec2){120, 0})) {
-            // Load PLY data
-            ply_data_t ply_data;
-            ply_error_t err = ply_load_file(state->ply_import_path, &ply_data);
+            // Calculate scale factor based on unit selection
+            float scale = 1.0f;
+            switch (state->ply_unit_index) {
+                case 1: scale = 0.001f; break;   // Millimeters
+                case 2: scale = 0.0254f; break;  // Inches
+                default: scale = 1.0f; break;    // Meters
+            }
 
-            if (err == PLY_OK) {
-                // Calculate scale factor based on unit selection
-                float scale = 1.0f;
-                switch (state->ply_unit_index) {
-                    case 1: scale = 0.001f; break;   // Millimeters
-                    case 2: scale = 0.0254f; break;  // Inches
-                    default: scale = 1.0f; break;    // Meters
-                }
+            vec4_t default_color = vec4_make(
+                state->ply_default_color[0],
+                state->ply_default_color[1],
+                state->ply_default_color[2],
+                1.0f
+            );
 
-                vec4_t default_color = vec4_make(
-                    state->ply_default_color[0],
-                    state->ply_default_color[1],
-                    state->ply_default_color[2],
-                    1.0f
-                );
+            // Start the import job
+            bool started = ply_import_job_start(
+                &state->import_job,
+                state->ply_import_path,
+                state->ply_import_mode,
+                scale,
+                state->ply_point_size,
+                default_color,
+                state->ply_use_colors
+            );
 
-                // Determine colors to use
-                vec4_t *colors_to_use = NULL;
-                if (state->ply_use_colors && ply_data.has_colors) {
-                    colors_to_use = ply_data.colors;
-                }
-
-                if (state->ply_import_mode == 0) {
-                    // Point Cloud Node mode - single entity
-                    ecs_entity_t cloud_entity = scene_add_point_cloud(
-                        state->scene,
-                        ply_data.points,
-                        colors_to_use,
-                        ply_data.count,
-                        default_color,
-                        state->ply_point_size
-                    );
-
-                    // Apply scale via transform
-                    if (cloud_entity != 0 && scale != 1.0f) {
-                        TransformComp *t = ecs_world_get_transform(state->scene->world, cloud_entity);
-                        if (t) {
-                            t->scale = vec3_make(scale, scale, scale);
-                            t->dirty = true;
-                        }
-                        RenderableComp *r = ecs_world_get_renderable(state->scene->world, cloud_entity);
-                        if (r) {
-                            r->instance_dirty = true;
-                        }
+            if (started) {
+                // Check if we should use synchronous import for small files
+                if (ply_import_job_should_sync(&state->import_job)) {
+                    // Small file - import synchronously
+                    while (!ply_import_job_tick(&state->import_job, state->scene)) {
+                        // Keep ticking until complete
                     }
 
-                    snprintf(state->last_status, sizeof(state->last_status),
-                             "Imported %d points as Point Cloud", ply_data.count);
+                    if (state->import_job.state == PLY_JOB_COMPLETE) {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "%s", state->import_job.status_message);
+                        state->cache_dirty = true;
+                    } else {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "PLY Error: %s", state->import_job.status_message);
+                    }
+                    ply_import_job_reset(&state->import_job);
                 } else {
-                    // Editable Subtree mode - individual point entities
-                    // Create a root point at origin
-                    ecs_entity_t root = scene_add_point(
-                        state->scene,
-                        vec3_make(0, 0, 0),
-                        default_color,
-                        state->ply_point_size
-                    );
-
-                    // Apply scale to root
-                    if (root != 0 && scale != 1.0f) {
-                        TransformComp *t = ecs_world_get_transform(state->scene->world, root);
-                        if (t) {
-                            t->scale = vec3_make(scale, scale, scale);
-                            t->dirty = true;
-                        }
-                    }
-
-                    // Create child points
-                    // Note: Large counts (50k+) may cause slow import and UI lag
-                    int import_count = ply_data.count;
-
-                    for (int i = 0; i < import_count; i++) {
-                        vec4_t pt_color = colors_to_use ? colors_to_use[i] : default_color;
-                        ecs_entity_t pt = scene_add_point(
-                            state->scene,
-                            ply_data.points[i],
-                            pt_color,
-                            state->ply_point_size
-                        );
-                        if (pt != 0) {
-                            scene_set_parent(state->scene, pt, root);
-                        }
-                    }
-
-                    snprintf(state->last_status, sizeof(state->last_status),
-                             "Imported %d points as Editable Subtree", import_count);
+                    // Large file - use progress bar
+                    state->import_progress_popup_open = true;
                 }
-
-                state->cache_dirty = true;
-                ply_data_free(&ply_data);
             } else {
                 snprintf(state->last_status, sizeof(state->last_status),
-                         "PLY Error: %s", ply_error_string(err));
+                         "PLY Error: %s", state->import_job.status_message);
             }
 
             state->ply_import_popup_open = false;
@@ -1114,6 +1082,72 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         if (igButton("Cancel", (ImVec2){120, 0})) {
             state->ply_import_popup_open = false;
             igCloseCurrentPopup();
+        }
+
+        igEndPopup();
+    }
+
+    // Progress popup for large file imports
+    if (state->import_progress_popup_open) {
+        igOpenPopup_Str("Importing PLY Point Cloud", ImGuiPopupFlags_None);
+    }
+
+    if (igBeginPopupModal("Importing PLY Point Cloud", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        // Extract filename from path for display
+        const char *filename = state->ply_import_path;
+        const char *last_sep = strrchr(state->ply_import_path, '/');
+#ifdef _WIN32
+        const char *last_sep_win = strrchr(state->ply_import_path, '\\');
+        if (last_sep_win > last_sep) last_sep = last_sep_win;
+#endif
+        if (last_sep) filename = last_sep + 1;
+
+        igText("File: %s", filename);
+        igSeparator();
+
+        // Progress bar
+        igProgressBar(state->import_job.progress, (ImVec2){300, 0}, NULL);
+
+        // Status message
+        igText("%s", state->import_job.status_message);
+
+        // Progress percentage
+        igText("%.0f%%", state->import_job.progress * 100.0f);
+
+        igSeparator();
+
+        // Cancel button centered
+        float button_width = 120.0f;
+        float avail_width = igGetContentRegionAvail().x;
+        igSetCursorPosX(igGetCursorPosX() + (avail_width - button_width) * 0.5f);
+
+        if (igButton("Cancel", (ImVec2){button_width, 0})) {
+            ply_import_job_cancel(&state->import_job, state->scene);
+            state->import_progress_popup_open = false;
+            state->cache_dirty = true;
+            snprintf(state->last_status, sizeof(state->last_status), "Import cancelled");
+            igCloseCurrentPopup();
+        }
+
+        // Process one chunk of work
+        if (ply_import_job_is_running(&state->import_job)) {
+            bool complete = ply_import_job_tick(&state->import_job, state->scene);
+
+            if (complete) {
+                state->import_progress_popup_open = false;
+                state->cache_dirty = true;
+
+                if (state->import_job.state == PLY_JOB_COMPLETE) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "%s", state->import_job.status_message);
+                } else if (state->import_job.state == PLY_JOB_ERROR) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "PLY Error: %s", state->import_job.status_message);
+                }
+
+                ply_import_job_reset(&state->import_job);
+                igCloseCurrentPopup();
+            }
         }
 
         igEndPopup();
