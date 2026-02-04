@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "skl_tmp"
+rootProject.name = "mdCAD"
 include(":app")

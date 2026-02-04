@@ -10,7 +10,7 @@ set(FETCHCONTENT_QUIET OFF)
 # Only Apple platforms need Objective-C
 if(APPLE)
     project(
-        skl_tmp
+        mdCAD
         VERSION 0.1.0
         LANGUAGES CXX C OBJC
     )
@@ -18,14 +18,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     # 16KB page alignment for Android 15+ compatibility
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
     project(
-        skl_tmp
+        mdCAD
         VERSION 0.1.0
         LANGUAGES CXX C
     )
 else()
     # Windows, Linux, etc.
     project(
-        skl_tmp
+        mdCAD
         VERSION 0.1.0
         LANGUAGES CXX C
     )

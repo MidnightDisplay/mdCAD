@@ -14,7 +14,7 @@ cmake -B build -G Ninja && ninja -C build
 
 Quick build & run:
 ``` bash
-ninja -C build -d stats && ./build/bin/skl_tmp
+ninja -C build -d stats && ./build/bin/mdCAD
 ```
 
 ## iOS build using Xcode
@@ -31,17 +31,17 @@ cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGE
 
 Open in Xcode:
 ``` bash
-open build-ios/skl_tmp.xcodeproj
+open build-ios/mdCAD.xcodeproj
 ```
 
 Build from command line for simulator:
 ``` bash
-xcodebuild -project build-ios/skl_tmp.xcodeproj -scheme skl_tmp -sdk iphonesimulator -configuration Release
+xcodebuild -project build-ios/mdCAD.xcodeproj -scheme mdCAD -sdk iphonesimulator -configuration Release
 ```
 
 Build from command line for device (requires code signing):
 ``` bash
-xcodebuild -project build-ios/skl_tmp.xcodeproj -scheme skl_tmp -sdk iphoneos -configuration Release
+xcodebuild -project build-ios/mdCAD.xcodeproj -scheme mdCAD -sdk iphoneos -configuration Release
 ```
 
 **Note:** For device builds, you'll need to configure code signing in Xcode (open the project, select your team in Signing & Capabilities).
@@ -68,19 +68,19 @@ cmake --build build-web
 Open directly in browser (works because `-sSINGLE_FILE` is set):
 ``` bash
 # macOS
-open build-web/bin/skl_tmp.html
+open build-web/bin/mdCAD.html
 
 # Linux
-xdg-open build-web/bin/skl_tmp.html
+xdg-open build-web/bin/mdCAD.html
 
 # Windows
-start build-web/bin/skl_tmp.html
+start build-web/bin/mdCAD.html
 ```
 
 Or serve with a local web server:
 ``` bash
 python3 -m http.server 8000 -d build-web/bin
-# Then open http://localhost:8000/skl_tmp.html
+# Then open http://localhost:8000/mdCAD.html
 ```
 
 ## Puppeteer testing
@@ -108,10 +108,10 @@ node scripts/debug-wasm.mjs --screenshot
 node scripts/debug-wasm.mjs --visible
 
 # Custom HTML path and runtime (ms)
-node scripts/debug-wasm.mjs build-web/bin/skl_tmp.html 10000
+node scripts/debug-wasm.mjs build-web/bin/mdCAD.html 10000
 
 # All options
-node scripts/debug-wasm.mjs build-web/bin/skl_tmp.html 5000 --visible --screenshot
+node scripts/debug-wasm.mjs build-web/bin/mdCAD.html 5000 --visible --screenshot
 ```
 
 ### ImGui interaction test
