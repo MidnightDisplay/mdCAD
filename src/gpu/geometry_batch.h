@@ -13,6 +13,7 @@
 #include "../shaders/instanced_line_shaders.h"
 #include "../shaders/join_shaders.h"
 #include "instance_buffer.h"
+#include "../components/geometry_comp.h"
 #include <math.h>
 
 //------------------------------------------------------------------------------
@@ -520,6 +521,47 @@ static inline void geom_point_batch_shutdown(geom_point_batch_t* batch) {
     sg_destroy_shader(batch->shd);
     sg_destroy_buffer(batch->template_vbuf);
     sg_destroy_buffer(batch->template_ibuf);
+}
+
+//------------------------------------------------------------------------------
+// Point Cloud Batch Helper Functions
+// Point clouds use the point batch with contiguous slot allocation
+//------------------------------------------------------------------------------
+
+// Allocate contiguous slots for a point cloud
+// Returns first slot index, or -1 if failed
+static inline int geom_point_cloud_batch_alloc(geom_point_batch_t* batch, int point_count) {
+    return geom_point_batch_alloc_contiguous(batch, point_count);
+}
+
+// Set point cloud data into contiguous slots
+// first_slot: first slot from geom_point_cloud_batch_alloc
+// points: array of positions
+// colors: array of colors (can be NULL for uniform color)
+// uniform_color: used when colors is NULL
+// count: number of points
+static inline void geom_point_cloud_batch_set(geom_point_batch_t* batch, int first_slot,
+                                               const vec3_t* points, const vec4_t* colors,
+                                               vec4_t uniform_color, int count) {
+    for (int i = 0; i < count; i++) {
+        vec4_t color = colors ? colors[i] : uniform_color;
+        geom_point_batch_set(batch, first_slot + i, points[i], color);
+    }
+}
+
+// Set entity mapping for all point cloud slots
+static inline void geom_point_cloud_batch_set_entity(geom_point_batch_t* batch, int first_slot,
+                                                      int count, uint64_t entity_id) {
+    for (int i = 0; i < count; i++) {
+        geom_point_batch_set_entity(batch, first_slot + i, entity_id, (uint8_t)GEOM_POINT_CLOUD);
+    }
+}
+
+// Free all slots used by a point cloud
+static inline void geom_point_cloud_batch_free(geom_point_batch_t* batch, int first_slot, int count) {
+    for (int i = 0; i < count; i++) {
+        geom_point_batch_free(batch, first_slot + i);
+    }
 }
 
 //------------------------------------------------------------------------------

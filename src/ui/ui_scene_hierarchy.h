@@ -18,6 +18,7 @@
 #include "../scene_serializer.h"
 #include "../undo_redo_exec.h"  // Includes undo_redo.h and provides undo/redo functions
 #include "ui_file_browser.h"
+#include "../ply_loader.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -70,6 +71,18 @@ typedef struct {
     bool clear_on_load;
     char last_status[128];
     char last_folder[512];  // Remember last used folder
+
+    // PLY Import state
+    file_browser_t ply_browser;
+    bool ply_import_popup_open;
+    char ply_import_path[512];
+    int ply_vertex_count;
+    bool ply_has_colors;
+    int ply_import_mode;           // 0 = Point Cloud Node, 1 = Editable Subtree (individual points)
+    int ply_unit_index;            // 0 = Meters, 1 = Millimeters, 2 = Inches
+    float ply_point_size;
+    bool ply_use_colors;           // Use PLY colors or default color
+    float ply_default_color[3];    // Default color when not using PLY colors
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -102,6 +115,20 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->clear_on_load = true;
     state->last_status[0] = '\0';
     state->last_folder[0] = '\0';  // Will use cwd on first use
+
+    // Initialize PLY import state
+    file_browser_init(&state->ply_browser);
+    state->ply_import_popup_open = false;
+    state->ply_import_path[0] = '\0';
+    state->ply_vertex_count = 0;
+    state->ply_has_colors = false;
+    state->ply_import_mode = 0;       // Point Cloud Node (default, more efficient)
+    state->ply_unit_index = 0;        // Meters (default)
+    state->ply_point_size = 0.01f;    // Default point size
+    state->ply_use_colors = true;     // Use PLY colors by default
+    state->ply_default_color[0] = 1.0f;
+    state->ply_default_color[1] = 1.0f;
+    state->ply_default_color[2] = 1.0f;
 }
 
 // Set undo/redo system (optional, can be NULL)
@@ -118,6 +145,7 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     state->cache_count = 0;
     state->cache_capacity = 0;
     file_browser_shutdown(&state->file_browser);
+    file_browser_shutdown(&state->ply_browser);
 }
 
 //------------------------------------------------------------------------------
@@ -757,6 +785,12 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
             igSeparator();
+            if (igMenuItem_Bool("Import PLY Point Cloud...", NULL, false, true)) {
+                // Open PLY file browser
+                file_browser_open_file(&state->ply_browser, "Import PLY", ".ply",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
+            igSeparator();
             igCheckbox("Clear on Load", &state->clear_on_load);
             igSeparator();
             if (igMenuItem_Bool("Clear Scene", NULL, false, state->cache_count > 0)) {
@@ -889,6 +923,200 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         }
 
         file_browser_clear_result(&state->file_browser);
+    }
+
+    // Handle PLY file browser (opens import options popup when file is selected)
+    if (file_browser_draw(&state->ply_browser)) {
+        const char *path = file_browser_get_result(&state->ply_browser);
+        if (path && path[0]) {
+            strncpy(state->ply_import_path, path, sizeof(state->ply_import_path) - 1);
+            state->ply_import_path[sizeof(state->ply_import_path) - 1] = '\0';
+
+            // Get PLY info
+            ply_error_t err = ply_get_info(path, &state->ply_vertex_count, &state->ply_has_colors);
+            if (err == PLY_OK) {
+                state->ply_import_popup_open = true;
+                igOpenPopup_Str("Import PLY Options", ImGuiPopupFlags_None);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Error: %s", ply_error_string(err));
+            }
+
+            // Remember folder
+            const char *last_sep = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win = strrchr(path, '\\');
+            if (last_sep_win > last_sep) last_sep = last_sep_win;
+#endif
+            if (last_sep && last_sep > path) {
+                size_t dir_len = (size_t)(last_sep - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->ply_browser);
+    }
+
+    // PLY Import Options Popup
+    if (igBeginPopupModal("Import PLY Options", &state->ply_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // File info
+        igText("File: %s", state->ply_import_path);
+        igText("Points: %d", state->ply_vertex_count);
+        igText("Has Colors: %s", state->ply_has_colors ? "Yes" : "No");
+        igSeparator();
+
+        // Import Mode
+        igText("Import Mode:");
+        igRadioButton_IntPtr("Point Cloud Node (efficient)", &state->ply_import_mode, 0);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Single entity with all points. Best for large clouds (10k+).");
+        }
+        igRadioButton_IntPtr("Editable Subtree (individual)", &state->ply_import_mode, 1);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Each point as a separate entity. Best for small clouds (<10k).");
+        }
+        igSeparator();
+
+        // Unit conversion
+        igText("Units:");
+        const char* unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##units", &state->ply_unit_index, unit_items, 3, -1);
+        igSeparator();
+
+        // Point size
+        igSliderFloat("Point Size", &state->ply_point_size, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_None);
+        igSeparator();
+
+        // Color options
+        if (state->ply_has_colors) {
+            igCheckbox("Use PLY Colors", &state->ply_use_colors);
+        } else {
+            state->ply_use_colors = false;
+            igTextDisabled("PLY has no colors, using default");
+        }
+        if (!state->ply_use_colors) {
+            igColorEdit3("Default Color", state->ply_default_color, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        // Import/Cancel buttons
+        if (igButton("Import", (ImVec2){120, 0})) {
+            // Load PLY data
+            ply_data_t ply_data;
+            ply_error_t err = ply_load_file(state->ply_import_path, &ply_data);
+
+            if (err == PLY_OK) {
+                // Calculate scale factor based on unit selection
+                float scale = 1.0f;
+                switch (state->ply_unit_index) {
+                    case 1: scale = 0.001f; break;   // Millimeters
+                    case 2: scale = 0.0254f; break;  // Inches
+                    default: scale = 1.0f; break;    // Meters
+                }
+
+                vec4_t default_color = vec4_make(
+                    state->ply_default_color[0],
+                    state->ply_default_color[1],
+                    state->ply_default_color[2],
+                    1.0f
+                );
+
+                // Determine colors to use
+                vec4_t *colors_to_use = NULL;
+                if (state->ply_use_colors && ply_data.has_colors) {
+                    colors_to_use = ply_data.colors;
+                }
+
+                if (state->ply_import_mode == 0) {
+                    // Point Cloud Node mode - single entity
+                    ecs_entity_t cloud_entity = scene_add_point_cloud(
+                        state->scene,
+                        ply_data.points,
+                        colors_to_use,
+                        ply_data.count,
+                        default_color,
+                        state->ply_point_size
+                    );
+
+                    // Apply scale via transform
+                    if (cloud_entity != 0 && scale != 1.0f) {
+                        TransformComp *t = ecs_world_get_transform(state->scene->world, cloud_entity);
+                        if (t) {
+                            t->scale = vec3_make(scale, scale, scale);
+                            t->dirty = true;
+                        }
+                        RenderableComp *r = ecs_world_get_renderable(state->scene->world, cloud_entity);
+                        if (r) {
+                            r->instance_dirty = true;
+                        }
+                    }
+
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "Imported %d points as Point Cloud", ply_data.count);
+                } else {
+                    // Editable Subtree mode - individual point entities
+                    // Create a root point at origin
+                    ecs_entity_t root = scene_add_point(
+                        state->scene,
+                        vec3_make(0, 0, 0),
+                        default_color,
+                        state->ply_point_size
+                    );
+
+                    // Apply scale to root
+                    if (root != 0 && scale != 1.0f) {
+                        TransformComp *t = ecs_world_get_transform(state->scene->world, root);
+                        if (t) {
+                            t->scale = vec3_make(scale, scale, scale);
+                            t->dirty = true;
+                        }
+                    }
+
+                    // Create child points
+                    // Note: Large counts (50k+) may cause slow import and UI lag
+                    int import_count = ply_data.count;
+
+                    for (int i = 0; i < import_count; i++) {
+                        vec4_t pt_color = colors_to_use ? colors_to_use[i] : default_color;
+                        ecs_entity_t pt = scene_add_point(
+                            state->scene,
+                            ply_data.points[i],
+                            pt_color,
+                            state->ply_point_size
+                        );
+                        if (pt != 0) {
+                            scene_set_parent(state->scene, pt, root);
+                        }
+                    }
+
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "Imported %d points as Editable Subtree", import_count);
+                }
+
+                state->cache_dirty = true;
+                ply_data_free(&ply_data);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Error: %s", ply_error_string(err));
+            }
+
+            state->ply_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igSameLine(0, -1);
+        if (igButton("Cancel", (ImVec2){120, 0})) {
+            state->ply_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igEndPopup();
     }
 
     // Show status message if any

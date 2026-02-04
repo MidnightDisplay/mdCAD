@@ -279,27 +279,40 @@ static inline bool ecs_world_has_children(ecs_world_state_t *s, ecs_entity_t par
     return has_children;
 }
 
+// Count total number of children (without limit)
+static inline int ecs_world_count_children(ecs_world_state_t *s, ecs_entity_t parent) {
+    if (!ecs_is_alive(s->world, parent)) return 0;
+
+    int count = 0;
+    ecs_iter_t it = ecs_children(s->world, parent);
+    while (ecs_children_next(&it)) {
+        count += it.count;
+    }
+    return count;
+}
+
 // Mark all descendants as dirty (recursive)
 static inline void ecs_world_mark_descendants_dirty(ecs_world_state_t *s, ecs_entity_t parent) {
-    ecs_entity_t children[64];  // Reasonable batch size
-    int count = ecs_world_get_children(s, parent, children, 64);
+    // Use ecs_children iterator directly to handle unlimited children
+    ecs_iter_t child_it = ecs_children(s->world, parent);
+    while (ecs_children_next(&child_it)) {
+        for (int i = 0; i < child_it.count; i++) {
+            ecs_entity_t child = child_it.entities[i];
 
-    for (int i = 0; i < count; i++) {
-        ecs_entity_t child = children[i];
+            // Mark this child's transform dirty
+            TransformComp *t = (TransformComp*)ecs_get_id(s->world, child, s->TransformComp_id);
+            if (t) {
+                t->dirty = true;
+            }
 
-        // Mark this child's transform dirty
-        TransformComp *t = (TransformComp*)ecs_get_id(s->world, child, s->TransformComp_id);
-        if (t) {
-            t->dirty = true;
+            RenderableComp *r = (RenderableComp*)ecs_get_id(s->world, child, s->RenderableComp_id);
+            if (r) {
+                r->instance_dirty = true;
+            }
+
+            // Recursively mark this child's descendants
+            ecs_world_mark_descendants_dirty(s, child);
         }
-
-        RenderableComp *r = (RenderableComp*)ecs_get_id(s->world, child, s->RenderableComp_id);
-        if (r) {
-            r->instance_dirty = true;
-        }
-
-        // Recursively mark this child's descendants
-        ecs_world_mark_descendants_dirty(s, child);
     }
 }
 

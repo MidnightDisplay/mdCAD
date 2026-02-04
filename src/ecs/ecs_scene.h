@@ -583,6 +583,50 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
     return e;
 }
 
+// Create a point cloud entity (single entity with many points)
+static inline ecs_entity_t scene_add_point_cloud(ecs_scene_t *scene,
+                                                  vec3_t *points, vec4_t *colors, int count,
+                                                  vec4_t uniform_color, float point_size) {
+    if (count < 1) return 0;  // Need at least 1 point
+
+    ecs_entity_t e = ecs_world_create_entity(scene->world);
+
+    // Create geometry component (copies points and colors)
+    GeometryComp g = geometry_comp_point_cloud(points, colors, count, uniform_color, point_size);
+    ecs_world_set_geometry(scene->world, e, &g);
+
+    // Allocate CONTIGUOUS point slots for all points in the cloud
+    int first_slot = geom_point_cloud_batch_alloc(&scene->batches.points, count);
+
+    if (first_slot >= 0) {
+        TransformComp *t = ecs_world_get_transform(scene->world, e);
+        GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
+        if (t && geom) {
+            // Set instance data for each point
+            for (int i = 0; i < count; i++) {
+                vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.point_cloud.points[i]);
+                vec4_t color = geom->data.point_cloud.colors ? geom->data.point_cloud.colors[i] : uniform_color;
+                geom_point_batch_set(&scene->batches.points, first_slot + i, world_pos, color);
+            }
+            // Set entity mapping for debug viewer
+            geom_point_cloud_batch_set_entity(&scene->batches.points, first_slot, count, (uint64_t)e);
+        }
+    }
+
+    // Update renderable with slot info
+    RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+    if (r) {
+        r->batch_id = GEOM_POINT_CLOUD;
+        r->instance_slot = (first_slot >= 0) ? (uint32_t)first_slot : 0xFFFFFFFF;
+        r->segment_count = (uint32_t)count;  // Reuse segment_count for point count
+        r->join_slot_start = 0xFFFFFFFF;     // Not used for point clouds
+        r->join_count = 0;
+        r->instance_dirty = false;
+    }
+
+    return e;
+}
+
 //------------------------------------------------------------------------------
 // Entity Deletion
 //------------------------------------------------------------------------------
@@ -598,6 +642,10 @@ static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
                 break;
             case GEOM_POINT:
                 geom_point_batch_free(&scene->batches.points, (int)r->instance_slot);
+                break;
+            case GEOM_POINT_CLOUD:
+                // Free all point slots (segment_count holds point count)
+                geom_point_cloud_batch_free(&scene->batches.points, (int)r->instance_slot, (int)r->segment_count);
                 break;
             case GEOM_POLYLINE:
             case GEOM_ARC:
@@ -627,11 +675,15 @@ static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
 
     // First, recursively delete all children
     // We need to collect children first because deleting modifies the hierarchy
+    // Process in batches to handle unlimited children
     ecs_entity_t children[64];
-    int child_count = ecs_world_get_children(scene->world, e, children, 64);
+    int child_count;
 
-    for (int i = 0; i < child_count; i++) {
-        scene_remove_entity(scene, children[i]);
+    // Keep deleting children until none remain
+    while ((child_count = ecs_world_get_children(scene->world, e, children, 64)) > 0) {
+        for (int i = 0; i < child_count; i++) {
+            scene_remove_entity(scene, children[i]);
+        }
     }
 
     // Free this entity's instance buffer slots
@@ -664,6 +716,11 @@ static inline bool scene_has_parent(ecs_scene_t *scene, ecs_entity_t e) {
 static inline int scene_get_children(ecs_scene_t *scene, ecs_entity_t parent,
                                       ecs_entity_t *out_children, int max_count) {
     return ecs_world_get_children(scene->world, parent, out_children, max_count);
+}
+
+// Count children of an entity (no limit)
+static inline int scene_count_children(ecs_scene_t *scene, ecs_entity_t parent) {
+    return ecs_world_count_children(scene->world, parent);
 }
 
 // Check if entity has any children
@@ -738,11 +795,12 @@ static inline void ecs_scene_update_transform_recursive(ecs_scene_t *scene, ecs_
 
     // Recursively update children - they need updating since this entity's
     // world_matrix may have changed
-    ecs_entity_t children[64];
-    int child_count = ecs_world_get_children(w, e, children, 64);
-
-    for (int i = 0; i < child_count; i++) {
-        ecs_scene_update_transform_recursive(scene, children[i], &t->world_matrix);
+    // Use ecs_children iterator directly to handle unlimited children
+    ecs_iter_t child_it = ecs_children(w->world, e);
+    while (ecs_children_next(&child_it)) {
+        for (int i = 0; i < child_it.count; i++) {
+            ecs_scene_update_transform_recursive(scene, child_it.entities[i], &t->world_matrix);
+        }
     }
 }
 
@@ -860,6 +918,14 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     case GEOM_POINT:
                         geom_point_batch_set(&scene->batches.points, (int)r->instance_slot,
                                              far_away, invisible);
+                        break;
+                    case GEOM_POINT_CLOUD:
+                        // Hide all point cloud slots (segment_count holds point count)
+                        for (uint32_t p = 0; p < r->segment_count; p++) {
+                            geom_point_batch_set(&scene->batches.points,
+                                                 (int)(r->instance_slot + p),
+                                                 far_away, invisible);
+                        }
                         break;
                     case GEOM_POLYLINE:
                     case GEOM_ARC:
@@ -1037,6 +1103,29 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                             }
                         }
                         free(helix_points);
+                    }
+                    break;
+                }
+                case GEOM_POINT_CLOUD: {
+                    // Update all point cloud slots (segment_count holds point count)
+                    int pc_count = g->data.point_cloud.count;
+                    for (int p = 0; p < pc_count && p < (int)r->segment_count; p++) {
+                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[p]);
+                        // Use per-point color if available, otherwise use render_color (which may be hover/selection color)
+                        vec4_t pc_color;
+                        if (g->data.point_cloud.colors) {
+                            // For point clouds with per-point colors, still show hover/selection
+                            if (ecs_has_id(w->world, e, w->Selected_tag) || ecs_has_id(w->world, e, w->Hovered_tag)) {
+                                pc_color = render_color;
+                            } else {
+                                pc_color = g->data.point_cloud.colors[p];
+                            }
+                        } else {
+                            pc_color = render_color;
+                        }
+                        geom_point_batch_set(&scene->batches.points,
+                                             (int)(r->instance_slot + (uint32_t)p),
+                                             world_pos, pc_color);
                     }
                     break;
                 }
@@ -1220,6 +1309,19 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                             pick_buffer_add_point(pb, world_pos, s->pick_id);
                         }
                         free(helix_points);
+                    }
+                    break;
+                }
+                case GEOM_POINT_CLOUD: {
+                    // Add point cloud points to pick buffer
+                    // For large clouds, we sample points to avoid overwhelming the pick buffer
+                    int pc_count = g->data.point_cloud.count;
+                    int max_pick_points = 1000;  // Limit to avoid overwhelming pick buffer
+                    int step = (pc_count > max_pick_points) ? (pc_count / max_pick_points) : 1;
+
+                    for (int p = 0; p < pc_count; p += step) {
+                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[p]);
+                        pick_buffer_add_point(pb, world_pos, s->pick_id);
                     }
                     break;
                 }
