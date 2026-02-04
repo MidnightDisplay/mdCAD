@@ -55,6 +55,10 @@ static inline vec3_t vec3_normalize(vec3_t v) {
     return (vec3_t){ 0.0f, 0.0f, 0.0f };
 }
 
+static inline vec3_t vec3_neg(vec3_t v) {
+    return (vec3_t){ -v.x, -v.y, -v.z };
+}
+
 //------------------------------------------------------------------------------
 // Matrix functions
 //------------------------------------------------------------------------------
@@ -167,6 +171,15 @@ static inline mat4_t mat4_translate(float tx, float ty, float tz) {
     m.m[13] = ty;
     m.m[14] = tz;
     return m;
+}
+
+// Transform a point by a matrix (assumes w=1, returns xyz)
+static inline vec3_t mat4_mul_point(mat4_t m, vec3_t p) {
+    return (vec3_t){
+        m.m[0] * p.x + m.m[4] * p.y + m.m[8]  * p.z + m.m[12],
+        m.m[1] * p.x + m.m[5] * p.y + m.m[9]  * p.z + m.m[13],
+        m.m[2] * p.x + m.m[6] * p.y + m.m[10] * p.z + m.m[14]
+    };
 }
 
 #endif // MATH3D_H

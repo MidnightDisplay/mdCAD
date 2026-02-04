@@ -86,6 +86,10 @@ typedef struct {
     bool ply_use_colors;           // Use PLY colors or default color
     float ply_default_color[3];    // Default color when not using PLY colors
 
+    // PLY Import transformation options
+    bool ply_shift_to_com;         // Shift to centre of mass
+    float ply_rotation[3];         // Rotation angles (degrees) around X, Y, Z
+
     // PLY Import job (for progress bar)
     ply_import_job_t import_job;
     bool import_progress_popup_open;
@@ -135,6 +139,10 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->ply_default_color[0] = 1.0f;
     state->ply_default_color[1] = 1.0f;
     state->ply_default_color[2] = 1.0f;
+    state->ply_shift_to_com = false;  // Don't shift by default
+    state->ply_rotation[0] = 0.0f;    // No rotation by default
+    state->ply_rotation[1] = 0.0f;
+    state->ply_rotation[2] = 0.0f;
 
     // Initialize import job
     ply_import_job_init(&state->import_job);
@@ -1021,6 +1029,31 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         }
         igSeparator();
 
+        // Transformation options
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass", &state->ply_shift_to_com);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Shifts all points so the centre of mass is at the origin.");
+        }
+
+        // Rotation controls
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##rot", &state->ply_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##rot", &state->ply_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##rot", &state->ply_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).\nUseful for coordinate system conversion.");
+        }
+        igSeparator();
+
         // Import/Cancel buttons
         if (igButton("Import", (ImVec2){120, 0})) {
             // Calculate scale factor based on unit selection
@@ -1039,6 +1072,12 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             );
 
             // Start the import job
+            // Convert rotation from degrees to radians
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->ply_rotation[0] * deg_to_rad;
+            float rot_y = state->ply_rotation[1] * deg_to_rad;
+            float rot_z = state->ply_rotation[2] * deg_to_rad;
+
             bool started = ply_import_job_start(
                 &state->import_job,
                 state->ply_import_path,
@@ -1046,7 +1085,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 scale,
                 state->ply_point_size,
                 default_color,
-                state->ply_use_colors
+                state->ply_use_colors,
+                state->ply_shift_to_com,
+                rot_x,
+                rot_y,
+                rot_z
             );
 
             if (started) {
@@ -1114,19 +1157,16 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igText("%s", state->import_job.status_message);
 
         // Progress percentage and timing info
-        bool show_timing = (state->import_job.state == PLY_JOB_CREATING_ENTITIES ||
-                           state->import_job.state == PLY_JOB_PARENTING_ENTITIES) &&
+        bool show_timing = (state->import_job.state == PLY_JOB_CREATING_ENTITIES) &&
                           state->import_job.last_iteration_time_ms > 0;
 
         if (show_timing) {
-            // Show time per iteration (s/it) for entity creation/parenting phases
+            // Show time per iteration (s/it) for entity creation phase
             // Each iteration is PLY_ENTITY_CHUNK_SIZE points (500)
             float seconds_per_iteration = (float)state->import_job.last_iteration_time_ms / 1000.0f;
-            const char *phase_name = (state->import_job.state == PLY_JOB_CREATING_ENTITIES) ? "creating" : "parenting";
-            igText("%.0f%%  |  %.3f s/it (%s, %d/it)",
+            igText("%.0f%%  |  %.3f s/it (creating, %d/it)",
                    state->import_job.progress * 100.0f,
                    seconds_per_iteration,
-                   phase_name,
                    PLY_ENTITY_CHUNK_SIZE);
         } else if (state->import_job.state == PLY_JOB_COMPLETE) {
             igText("100%% - Complete");
@@ -1136,7 +1176,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             igText("%.0f%%", state->import_job.progress * 100.0f);
         }
 
-        // Show iteration speed plot during entity creation or parenting phases, or after completion
+        // Show iteration speed plot during entity creation phase, or after completion
         bool show_plot = state->import_job.timing_sample_count > 1;
         if (show_plot) {
             igSeparator();

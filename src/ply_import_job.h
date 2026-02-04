@@ -6,6 +6,7 @@
 // - Creates entities in chunks for Editable Subtree mode
 // - Progress callback for UI updates
 // - Cancellation support
+// - Import transformations: CoM shift, rotation, scale
 //------------------------------------------------------------------------------
 #ifndef PLY_IMPORT_JOB_H
 #define PLY_IMPORT_JOB_H
@@ -34,7 +35,6 @@ typedef enum {
     PLY_JOB_IDLE = 0,           // No job running
     PLY_JOB_PARSING_VERTICES,   // Parsing PLY vertex data
     PLY_JOB_CREATING_ENTITIES,  // Creating ECS entities (Editable mode only)
-    PLY_JOB_PARENTING_ENTITIES, // Parenting entities to root (Editable mode only)
     PLY_JOB_COMPLETE,           // Job finished successfully
     PLY_JOB_CANCELLED,          // Job was cancelled
     PLY_JOB_ERROR               // Job failed with error
@@ -61,11 +61,19 @@ typedef struct {
     vec4_t default_color;       // Color when not using PLY colors
     bool use_ply_colors;        // Whether to use colors from PLY file
 
+    // Import transformation options (applied to coordinates)
+    bool shift_to_com;          // Shift points so centre of mass is at origin
+    float rotation_x;           // Rotation around X axis (radians)
+    float rotation_y;           // Rotation around Y axis (radians)
+    float rotation_z;           // Rotation around Z axis (radians)
+
+    // Computed transformation data (computed after parsing, before entity creation)
+    vec3_t com;                 // Centre of mass (computed if shift_to_com is true)
+    mat4_t transform_matrix;    // Combined rotation matrix (computed once)
+    bool transforms_applied;    // Whether transforms have been applied to parsed data
+
     // Entity creation state (for Editable Subtree mode)
     int created_count;          // Number of entities created so far
-    ecs_entity_t root_entity;   // Root entity for Editable Subtree
-    ecs_entity_t *created_entities;  // Array of created entity IDs for parenting phase
-    int parented_count;         // Number of entities parented so far
 
     // Progress (0.0 - 1.0)
     float progress;
@@ -95,11 +103,14 @@ static inline void ply_import_job_init(ply_import_job_t *job) {
     job->point_size = 0.01f;
     job->default_color = vec4_make(1.0f, 1.0f, 1.0f, 1.0f);
     job->use_ply_colors = true;
+    job->shift_to_com = false;
+    job->rotation_x = 0.0f;
+    job->rotation_y = 0.0f;
+    job->rotation_z = 0.0f;
+    job->transforms_applied = false;
     job->last_iteration_time_ms = 0.0;
     job->timing_sample_count = 0;
     job->iteration_start_time = 0;
-    job->created_entities = NULL;
-    job->parented_count = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -112,7 +123,11 @@ static inline bool ply_import_job_start(ply_import_job_t *job,
                                          float scale,
                                          float point_size,
                                          vec4_t default_color,
-                                         bool use_ply_colors) {
+                                         bool use_ply_colors,
+                                         bool shift_to_com,
+                                         float rotation_x,
+                                         float rotation_y,
+                                         float rotation_z) {
     // Cancel any running job first
     if (job->state != PLY_JOB_IDLE &&
         job->state != PLY_JOB_COMPLETE &&
@@ -129,20 +144,19 @@ static inline bool ply_import_job_start(ply_import_job_t *job,
     job->point_size = point_size;
     job->default_color = default_color;
     job->use_ply_colors = use_ply_colors;
+    job->shift_to_com = shift_to_com;
+    job->rotation_x = rotation_x;
+    job->rotation_y = rotation_y;
+    job->rotation_z = rotation_z;
 
     // Reset state
     job->created_count = 0;
-    job->root_entity = 0;
     job->progress = 0.0f;
     job->error = PLY_OK;
     job->total_points = 0;
-    job->parented_count = 0;
-
-    // Free any existing entity array
-    if (job->created_entities) {
-        free(job->created_entities);
-        job->created_entities = NULL;
-    }
+    job->transforms_applied = false;
+    job->com = vec3_make(0, 0, 0);
+    job->transform_matrix = mat4_identity();
 
     // Reset timing data
     job->last_iteration_time_ms = 0.0;
@@ -176,6 +190,61 @@ static inline bool ply_import_job_should_sync(const ply_import_job_t *job) {
 }
 
 //------------------------------------------------------------------------------
+// Internal: Apply transformations to parsed point data
+// Order: 1) CoM shift, 2) Rotation (X->Y->Z), 3) Scale
+//------------------------------------------------------------------------------
+
+static inline void ply_import_job_apply_transforms(ply_import_job_t *job) {
+    if (job->transforms_applied) return;
+
+    int count = job->parse_state.parsed_count;
+    vec3_t *points = job->parse_state.points;
+
+    // Step 1: Calculate and apply Centre of Mass shift
+    if (job->shift_to_com && count > 0) {
+        // Calculate CoM
+        vec3_t sum = vec3_make(0, 0, 0);
+        for (int i = 0; i < count; i++) {
+            sum = vec3_add(sum, points[i]);
+        }
+        job->com = vec3_scale(sum, 1.0f / (float)count);
+
+        // Shift all points by -CoM
+        for (int i = 0; i < count; i++) {
+            points[i] = vec3_sub(points[i], job->com);
+        }
+    }
+
+    // Step 2: Build rotation matrix (X -> Y -> Z order)
+    bool has_rotation = (job->rotation_x != 0.0f ||
+                         job->rotation_y != 0.0f ||
+                         job->rotation_z != 0.0f);
+
+    if (has_rotation) {
+        mat4_t rot_x = mat4_rotate_x(job->rotation_x);
+        mat4_t rot_y = mat4_rotate_y(job->rotation_y);
+        mat4_t rot_z = mat4_rotate_z(job->rotation_z);
+        // Combined: Z * Y * X (applied right to left)
+        mat4_t rot_xy = mat4_mul(rot_y, rot_x);
+        job->transform_matrix = mat4_mul(rot_z, rot_xy);
+
+        // Apply rotation to all points
+        for (int i = 0; i < count; i++) {
+            points[i] = mat4_mul_point(job->transform_matrix, points[i]);
+        }
+    }
+
+    // Step 3: Apply scale to all points
+    if (job->scale != 1.0f) {
+        for (int i = 0; i < count; i++) {
+            points[i] = vec3_scale(points[i], job->scale);
+        }
+    }
+
+    job->transforms_applied = true;
+}
+
+//------------------------------------------------------------------------------
 // Process one chunk of work - returns true when job is complete
 //------------------------------------------------------------------------------
 
@@ -192,6 +261,7 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
     //--------------------------------------------------------------------------
     if (job->state == PLY_JOB_PARSING_VERTICES) {
         int parsed = ply_parse_vertices_chunk(&job->parse_state, PLY_PARSE_CHUNK_SIZE);
+        (void)parsed;  // Suppress unused warning
 
         if (job->parse_state.error != PLY_OK) {
             job->state = PLY_JOB_ERROR;
@@ -214,8 +284,12 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
         if (ply_is_complete(&job->parse_state)) {
             ply_close(&job->parse_state);  // Close file, keep data
 
+            // Apply all transformations to parsed data (CoM shift, rotation, scale)
+            ply_import_job_apply_transforms(job);
+
             if (job->import_mode == 0) {
                 // Point Cloud Node mode - create single entity
+                // Transformations already applied to coordinates, so use identity transform
                 vec4_t *colors = NULL;
                 if (job->use_ply_colors && job->parse_state.has_colors) {
                     colors = job->parse_state.colors;
@@ -229,19 +303,7 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                     job->default_color,
                     job->point_size
                 );
-
-                // Apply scale via transform
-                if (cloud != 0 && job->scale != 1.0f) {
-                    TransformComp *t = ecs_world_get_transform(scene->world, cloud);
-                    if (t) {
-                        t->scale = vec3_make(job->scale, job->scale, job->scale);
-                        t->dirty = true;
-                    }
-                    RenderableComp *r = ecs_world_get_renderable(scene->world, cloud);
-                    if (r) {
-                        r->instance_dirty = true;
-                    }
-                }
+                (void)cloud;  // Entity created, no further setup needed
 
                 // Free parsed data
                 ply_parse_state_free(&job->parse_state);
@@ -252,35 +314,9 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                          "Imported %d points as Point Cloud", job->total_points);
                 return true;
             } else {
-                // Editable Subtree mode - create root entity first
-                job->root_entity = scene_add_point(
-                    scene,
-                    vec3_make(0, 0, 0),
-                    job->default_color,
-                    job->point_size
-                );
-
-                // Apply scale to root
-                if (job->root_entity != 0 && job->scale != 1.0f) {
-                    TransformComp *t = ecs_world_get_transform(scene->world, job->root_entity);
-                    if (t) {
-                        t->scale = vec3_make(job->scale, job->scale, job->scale);
-                        t->dirty = true;
-                    }
-                }
-
-                // Allocate array to store created entity IDs for parenting phase
-                job->created_entities = (ecs_entity_t*)malloc(job->total_points * sizeof(ecs_entity_t));
-                if (!job->created_entities) {
-                    job->state = PLY_JOB_ERROR;
-                    job->error = PLY_ERROR_MEMORY_ALLOCATION;
-                    snprintf(job->status_message, sizeof(job->status_message),
-                             "Failed to allocate memory for entity array");
-                    return true;
-                }
-
+                // Editable Subtree mode - create individual point entities (no parent)
+                // Transformations already applied to coordinates
                 job->created_count = 0;
-                job->parented_count = 0;
                 job->state = PLY_JOB_CREATING_ENTITIES;
                 snprintf(job->status_message, sizeof(job->status_message),
                          "Creating: 0 / %d entities", job->total_points);
@@ -291,8 +327,8 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
     }
 
     //--------------------------------------------------------------------------
-    // State: CREATING_ENTITIES (Editable Subtree mode)
-    // Creates entities unparented using deferred operations for performance
+    // State: CREATING_ENTITIES (Editable mode)
+    // Creates entities as top-level (no parent) with pre-transformed coordinates
     //--------------------------------------------------------------------------
     if (job->state == PLY_JOB_CREATING_ENTITIES) {
         // Start timing this iteration
@@ -306,20 +342,17 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
             colors = job->parse_state.colors;
         }
 
-        // Create entities without parenting - parenting is done in a separate phase
-        // Note: We can't use ecs_defer here because scene_add_point reads components
-        // immediately after setting them for GPU buffer setup
+        // Create entities as top-level (no parenting)
+        // Coordinates already have CoM shift, rotation, and scale applied
         for (int i = 0; i < to_create; i++) {
             int idx = job->created_count + i;
             vec4_t pt_color = colors ? colors[idx] : job->default_color;
-            ecs_entity_t pt = scene_add_point(
+            scene_add_point(
                 scene,
                 job->parse_state.points[idx],
                 pt_color,
                 job->point_size
             );
-            // Store entity ID for parenting phase (don't parent here)
-            job->created_entities[idx] = pt;
         }
 
         job->created_count += to_create;
@@ -331,85 +364,27 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
         // Store timing sample for the plot (if we have room)
         if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
             job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-            job->iteration_progress[job->timing_sample_count] = (float)job->created_count / (float)job->total_points * 100.0f;
+            job->iteration_progress[job->timing_sample_count] = 30.0f + (float)job->created_count / (float)job->total_points * 70.0f;
             job->timing_sample_count++;
         }
 
-        // Update progress - entity creation is 25-75% (50% of total)
+        // Update progress - entity creation is 30-100% (70% of total)
         float entity_progress = (float)job->created_count / (float)job->total_points;
-        job->progress = 0.25f + 0.50f * entity_progress;
+        job->progress = 0.30f + 0.70f * entity_progress;
 
         snprintf(job->status_message, sizeof(job->status_message),
                  "Creating: %d / %d entities",
                  job->created_count, job->total_points);
 
-        // Check if creation is complete - move to parenting phase
+        // Check if creation is complete
         if (job->created_count >= job->total_points) {
             // Free parsed data (no longer needed)
             ply_parse_state_free(&job->parse_state);
 
-            job->parented_count = 0;
-            job->state = PLY_JOB_PARENTING_ENTITIES;
-            snprintf(job->status_message, sizeof(job->status_message),
-                     "Parenting: 0 / %d entities", job->total_points);
-        }
-
-        return false;  // Not complete yet
-    }
-
-    //--------------------------------------------------------------------------
-    // State: PARENTING_ENTITIES (Editable Subtree mode)
-    // Parents all created entities to the root entity
-    //--------------------------------------------------------------------------
-    if (job->state == PLY_JOB_PARENTING_ENTITIES) {
-        // Start timing this iteration
-        uint64_t iter_start = stm_now();
-
-        int remaining = job->total_points - job->parented_count;
-        int to_parent = (remaining < PLY_ENTITY_CHUNK_SIZE) ? remaining : PLY_ENTITY_CHUNK_SIZE;
-
-        // Parent entities to root
-        // Note: Can't use ecs_defer because scene_set_parent reads components to mark dirty
-        for (int i = 0; i < to_parent; i++) {
-            int idx = job->parented_count + i;
-            ecs_entity_t pt = job->created_entities[idx];
-            if (pt != 0) {
-                scene_set_parent(scene, pt, job->root_entity);
-            }
-        }
-
-        job->parented_count += to_parent;
-
-        // Record iteration timing
-        uint64_t iter_end = stm_now();
-        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
-
-        // Store timing sample for the plot (if we have room)
-        if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
-            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-            // Progress for parenting phase is 75-100%
-            job->iteration_progress[job->timing_sample_count] = 75.0f + (float)job->parented_count / (float)job->total_points * 25.0f;
-            job->timing_sample_count++;
-        }
-
-        // Update progress - parenting is 75-100% (25% of total)
-        float parent_progress = (float)job->parented_count / (float)job->total_points;
-        job->progress = 0.75f + 0.25f * parent_progress;
-
-        snprintf(job->status_message, sizeof(job->status_message),
-                 "Parenting: %d / %d entities",
-                 job->parented_count, job->total_points);
-
-        // Check if complete
-        if (job->parented_count >= job->total_points) {
-            // Free the entity array
-            free(job->created_entities);
-            job->created_entities = NULL;
-
             job->progress = 1.0f;
             job->state = PLY_JOB_COMPLETE;
             snprintf(job->status_message, sizeof(job->status_message),
-                     "Imported %d points as Editable Subtree", job->total_points);
+                     "Imported %d points as Editable Points", job->total_points);
             return true;
         }
 
@@ -424,6 +399,8 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
 //------------------------------------------------------------------------------
 
 static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *scene) {
+    (void)scene;  // No longer need to delete entities - they're top-level and stay
+
     if (job->state == PLY_JOB_IDLE ||
         job->state == PLY_JOB_COMPLETE ||
         job->state == PLY_JOB_CANCELLED ||
@@ -434,29 +411,10 @@ static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *sce
     // Free parsed data
     ply_parse_state_free(&job->parse_state);
 
-    // If we were creating or parenting entities, clean up
-    if ((job->state == PLY_JOB_CREATING_ENTITIES || job->state == PLY_JOB_PARENTING_ENTITIES)) {
-        // Delete the root entity (this also deletes any parented children)
-        if (job->root_entity != 0) {
-            scene_remove_entity(scene, job->root_entity);
-            job->root_entity = 0;
-        }
-
-        // Delete any unparented entities that were created
-        if (job->created_entities) {
-            for (int i = 0; i < job->created_count; i++) {
-                ecs_entity_t e = job->created_entities[i];
-                // Only delete if not already parented (and thus deleted with root)
-                if (e != 0 && i >= job->parented_count) {
-                    if (ecs_is_alive(scene->world->world, e)) {
-                        scene_remove_entity(scene, e);
-                    }
-                }
-            }
-            free(job->created_entities);
-            job->created_entities = NULL;
-        }
-    }
+    // Note: For Editable mode, created entities are top-level (no parent).
+    // On cancel, we leave them in the scene rather than trying to delete them,
+    // as tracking which ones were created adds complexity.
+    // Users can clear the scene if needed.
 
     job->state = PLY_JOB_CANCELLED;
     job->progress = 0.0f;
@@ -469,8 +427,7 @@ static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *sce
 
 static inline bool ply_import_job_is_running(const ply_import_job_t *job) {
     return job->state == PLY_JOB_PARSING_VERTICES ||
-           job->state == PLY_JOB_CREATING_ENTITIES ||
-           job->state == PLY_JOB_PARENTING_ENTITIES;
+           job->state == PLY_JOB_CREATING_ENTITIES;
 }
 
 //------------------------------------------------------------------------------
@@ -481,14 +438,10 @@ static inline void ply_import_job_reset(ply_import_job_t *job) {
     if (ply_import_job_is_running(job)) {
         ply_parse_state_free(&job->parse_state);
     }
-    // Free entity array if allocated
-    if (job->created_entities) {
-        free(job->created_entities);
-        job->created_entities = NULL;
-    }
     job->state = PLY_JOB_IDLE;
     job->progress = 0.0f;
     job->status_message[0] = '\0';
+    job->transforms_applied = false;
 }
 
 #endif // PLY_IMPORT_JOB_H
