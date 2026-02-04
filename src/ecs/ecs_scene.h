@@ -342,30 +342,35 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
 }
 
 // Create a point entity
+// Returns 0 if allocation fails (slot buffer at capacity)
 static inline ecs_entity_t scene_add_point(ecs_scene_t *scene,
                                             vec3_t pos,
                                             vec4_t color, float size) {
+    // Allocate slot BEFORE creating entity so we can fail cleanly
+    int slot = geom_point_batch_alloc(&scene->batches.points);
+    if (slot < 0) {
+        // Slot buffer at capacity - cannot create point
+        return 0;
+    }
+
     ecs_entity_t e = ecs_world_create_entity(scene->world);
 
     GeometryComp g = geometry_comp_point(pos, color, size);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    int slot = geom_point_batch_alloc(&scene->batches.points);
-    if (slot >= 0) {
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        vec3_t world_pos = mat4_transform_point(t->world_matrix, pos);
+    TransformComp *t = ecs_world_get_transform(scene->world, e);
+    vec3_t world_pos = mat4_transform_point(t->world_matrix, pos);
 
-        geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
+    geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
 
-        // Set entity mapping for debug viewer
-        geom_point_batch_set_entity(&scene->batches.points, slot, (uint64_t)e, (uint8_t)GEOM_POINT);
+    // Set entity mapping for debug viewer
+    geom_point_batch_set_entity(&scene->batches.points, slot, (uint64_t)e, (uint8_t)GEOM_POINT);
 
-        RenderableComp *r = ecs_world_get_renderable(scene->world, e);
-        if (r) {
-            r->batch_id = GEOM_POINT;
-            r->instance_slot = (uint32_t)slot;
-            r->instance_dirty = false;
-        }
+    RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+    if (r) {
+        r->batch_id = GEOM_POINT;
+        r->instance_slot = (uint32_t)slot;
+        r->instance_dirty = false;
     }
 
     return e;
@@ -584,10 +589,19 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
 }
 
 // Create a point cloud entity (single entity with many points)
+// Returns 0 if allocation fails (slot buffer at capacity)
 static inline ecs_entity_t scene_add_point_cloud(ecs_scene_t *scene,
                                                   vec3_t *points, vec4_t *colors, int count,
                                                   vec4_t uniform_color, float point_size) {
     if (count < 1) return 0;  // Need at least 1 point
+
+    // Allocate CONTIGUOUS point slots for all points in the cloud
+    // Do this BEFORE creating entity so we can fail cleanly
+    int first_slot = geom_point_cloud_batch_alloc(&scene->batches.points, count);
+    if (first_slot < 0) {
+        // Slot buffer at capacity - cannot create point cloud
+        return 0;
+    }
 
     ecs_entity_t e = ecs_world_create_entity(scene->world);
 
@@ -595,29 +609,24 @@ static inline ecs_entity_t scene_add_point_cloud(ecs_scene_t *scene,
     GeometryComp g = geometry_comp_point_cloud(points, colors, count, uniform_color, point_size);
     ecs_world_set_geometry(scene->world, e, &g);
 
-    // Allocate CONTIGUOUS point slots for all points in the cloud
-    int first_slot = geom_point_cloud_batch_alloc(&scene->batches.points, count);
-
-    if (first_slot >= 0) {
-        TransformComp *t = ecs_world_get_transform(scene->world, e);
-        GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
-        if (t && geom) {
-            // Set instance data for each point
-            for (int i = 0; i < count; i++) {
-                vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.point_cloud.points[i]);
-                vec4_t color = geom->data.point_cloud.colors ? geom->data.point_cloud.colors[i] : uniform_color;
-                geom_point_batch_set(&scene->batches.points, first_slot + i, world_pos, color);
-            }
-            // Set entity mapping for debug viewer
-            geom_point_cloud_batch_set_entity(&scene->batches.points, first_slot, count, (uint64_t)e);
+    TransformComp *t = ecs_world_get_transform(scene->world, e);
+    GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
+    if (t && geom) {
+        // Set instance data for each point
+        for (int i = 0; i < count; i++) {
+            vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.point_cloud.points[i]);
+            vec4_t color = geom->data.point_cloud.colors ? geom->data.point_cloud.colors[i] : uniform_color;
+            geom_point_batch_set(&scene->batches.points, first_slot + i, world_pos, color);
         }
+        // Set entity mapping for debug viewer
+        geom_point_cloud_batch_set_entity(&scene->batches.points, first_slot, count, (uint64_t)e);
     }
 
     // Update renderable with slot info
     RenderableComp *r = ecs_world_get_renderable(scene->world, e);
     if (r) {
         r->batch_id = GEOM_POINT_CLOUD;
-        r->instance_slot = (first_slot >= 0) ? (uint32_t)first_slot : 0xFFFFFFFF;
+        r->instance_slot = (uint32_t)first_slot;
         r->segment_count = (uint32_t)count;  // Reuse segment_count for point count
         r->join_slot_start = 0xFFFFFFFF;     // Not used for point clouds
         r->join_count = 0;

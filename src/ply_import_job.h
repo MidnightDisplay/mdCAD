@@ -328,10 +328,19 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                     job->default_color,
                     job->point_size
                 );
-                (void)cloud;  // Entity created, no further setup needed
 
                 // Free parsed data
                 ply_parse_state_free(&job->parse_state);
+
+                // Check if allocation failed (slot buffer at capacity)
+                if (cloud == 0) {
+                    job->state = PLY_JOB_ERROR;
+                    job->error = PLY_ERROR_MEMORY_ALLOCATION;
+                    snprintf(job->status_message, sizeof(job->status_message),
+                             "Slot buffer limit reached (max %dM). Clear scene and try again.",
+                             INSTANCE_BUFFER_MAX_CAPACITY / (1024 * 1024));
+                    return true;
+                }
 
                 job->progress = 1.0f;
                 job->state = PLY_JOB_COMPLETE;
@@ -377,18 +386,31 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
 
         // Create entities as top-level (no parenting)
         // Coordinates already have CoM shift, rotation, and scale applied
+        int actually_created = 0;
         for (int i = 0; i < to_create; i++) {
             int idx = job->created_count + i;
             vec4_t pt_color = colors ? colors[idx] : job->default_color;
-            scene_add_point(
+            ecs_entity_t pt = scene_add_point(
                 scene,
                 job->parse_state.points[idx],
                 pt_color,
                 job->point_size
             );
+            if (pt == 0) {
+                // Slot buffer at capacity - stop creating and report error
+                ply_parse_state_free(&job->parse_state);
+                job->state = PLY_JOB_ERROR;
+                job->error = PLY_ERROR_MEMORY_ALLOCATION;
+                snprintf(job->status_message, sizeof(job->status_message),
+                         "Slot buffer limit reached at %d/%d points (max %dM). Clear scene and try again.",
+                         job->created_count + actually_created, job->total_points,
+                         INSTANCE_BUFFER_MAX_CAPACITY / (1024 * 1024));
+                return true;
+            }
+            actually_created++;
         }
 
-        job->created_count += to_create;
+        job->created_count += actually_created;
 
         // Record iteration timing
         uint64_t iter_end = stm_now();
