@@ -62,3 +62,5 @@ endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
 endif()
+
+#set(CMAKE_CXX_FLAGS "-O3")

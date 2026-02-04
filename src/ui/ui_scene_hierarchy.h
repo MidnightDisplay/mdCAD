@@ -24,6 +24,7 @@
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
 #include <ctype.h>   // for tolower()
+#include <float.h>   // for FLT_MIN
 
 //------------------------------------------------------------------------------
 // Configuration
@@ -1105,38 +1106,106 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igText("File: %s", filename);
         igSeparator();
 
-        // Progress bar
-        igProgressBar(state->import_job.progress, (ImVec2){300, 0}, NULL);
+        // Progress bar - stretch to full window width using -FLT_MIN
+        // This makes the progress bar fill available width regardless of filename length
+        igProgressBar(state->import_job.progress, (ImVec2){-FLT_MIN, 0}, NULL);
 
         // Status message
         igText("%s", state->import_job.status_message);
 
-        // Progress percentage
-        igText("%.0f%%", state->import_job.progress * 100.0f);
+        // Progress percentage and timing info
+        bool show_timing = (state->import_job.state == PLY_JOB_CREATING_ENTITIES ||
+                           state->import_job.state == PLY_JOB_PARENTING_ENTITIES) &&
+                          state->import_job.last_iteration_time_ms > 0;
+
+        if (show_timing) {
+            // Show time per iteration (s/it) for entity creation/parenting phases
+            // Each iteration is PLY_ENTITY_CHUNK_SIZE points (500)
+            float seconds_per_iteration = (float)state->import_job.last_iteration_time_ms / 1000.0f;
+            const char *phase_name = (state->import_job.state == PLY_JOB_CREATING_ENTITIES) ? "creating" : "parenting";
+            igText("%.0f%%  |  %.3f s/it (%s, %d/it)",
+                   state->import_job.progress * 100.0f,
+                   seconds_per_iteration,
+                   phase_name,
+                   PLY_ENTITY_CHUNK_SIZE);
+        } else if (state->import_job.state == PLY_JOB_COMPLETE) {
+            igText("100%% - Complete");
+        } else if (state->import_job.state == PLY_JOB_ERROR) {
+            igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "Error!");
+        } else {
+            igText("%.0f%%", state->import_job.progress * 100.0f);
+        }
+
+        // Show iteration speed plot during entity creation or parenting phases, or after completion
+        bool show_plot = state->import_job.timing_sample_count > 1;
+        if (show_plot) {
+            igSeparator();
+            igText("Iteration Time (ms) vs Progress");
+
+            // Find min/max for scaling
+            float max_time = 0.0f;
+            for (int i = 0; i < state->import_job.timing_sample_count; i++) {
+                if (state->import_job.iteration_times[i] > max_time) {
+                    max_time = state->import_job.iteration_times[i];
+                }
+            }
+            // Add some padding to the max
+            max_time *= 1.1f;
+            if (max_time < 1.0f) max_time = 1.0f;
+
+            // Use PlotLines to show the iteration time history
+            // overlay_text shows the current value
+            char overlay[32];
+            snprintf(overlay, sizeof(overlay), "%.1f ms", state->import_job.last_iteration_time_ms);
+
+            igPlotLines_FloatPtr(
+                "##speed_plot",
+                state->import_job.iteration_times,
+                state->import_job.timing_sample_count,
+                0,                          // values_offset
+                overlay,                    // overlay_text
+                0.0f,                       // scale_min
+                max_time,                   // scale_max
+                (ImVec2){-FLT_MIN, 80},     // graph_size (full width, 80px height)
+                sizeof(float)               // stride
+            );
+        }
 
         igSeparator();
 
-        // Cancel button centered
+        // Button: "Cancel" while running, "Close" when complete/error
         float button_width = 120.0f;
         float avail_width = igGetContentRegionAvail().x;
         igSetCursorPosX(igGetCursorPosX() + (avail_width - button_width) * 0.5f);
 
-        if (igButton("Cancel", (ImVec2){button_width, 0})) {
-            ply_import_job_cancel(&state->import_job, state->scene);
+        bool is_finished = (state->import_job.state == PLY_JOB_COMPLETE ||
+                           state->import_job.state == PLY_JOB_ERROR ||
+                           state->import_job.state == PLY_JOB_CANCELLED);
+        const char *button_label = is_finished ? "Close" : "Cancel";
+
+        if (igButton(button_label, (ImVec2){button_width, 0})) {
+            if (!is_finished) {
+                ply_import_job_cancel(&state->import_job, state->scene);
+                snprintf(state->last_status, sizeof(state->last_status), "Import cancelled");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "%s", state->import_job.status_message);
+            }
             state->import_progress_popup_open = false;
             state->cache_dirty = true;
-            snprintf(state->last_status, sizeof(state->last_status), "Import cancelled");
+            ply_import_job_reset(&state->import_job);
             igCloseCurrentPopup();
         }
 
-        // Process one chunk of work
+        // Process one chunk of work (only if still running)
         if (ply_import_job_is_running(&state->import_job)) {
             bool complete = ply_import_job_tick(&state->import_job, state->scene);
 
             if (complete) {
-                state->import_progress_popup_open = false;
+                // Mark cache dirty but DON'T close the popup - keep it open as report
                 state->cache_dirty = true;
 
+                // Update status for the status bar (will be shown when popup closes)
                 if (state->import_job.state == PLY_JOB_COMPLETE) {
                     snprintf(state->last_status, sizeof(state->last_status),
                              "%s", state->import_job.status_message);
@@ -1144,9 +1213,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                     snprintf(state->last_status, sizeof(state->last_status),
                              "PLY Error: %s", state->import_job.status_message);
                 }
-
-                ply_import_job_reset(&state->import_job);
-                igCloseCurrentPopup();
+                // Popup stays open - user must click "Close" to dismiss
             }
         }
 
