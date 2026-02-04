@@ -85,6 +85,7 @@ typedef struct {
     float iteration_progress[PLY_JOB_MAX_TIMING_SAMPLES]; // Progress % at each sample
     int timing_sample_count;            // Number of samples collected
     uint64_t iteration_start_time;      // Start time of current iteration (stm_now())
+    float last_sampled_progress;        // Last progress value that was sampled (for even distribution)
 
     // Result
     ply_error_t error;
@@ -111,6 +112,7 @@ static inline void ply_import_job_init(ply_import_job_t *job) {
     job->last_iteration_time_ms = 0.0;
     job->timing_sample_count = 0;
     job->iteration_start_time = 0;
+    job->last_sampled_progress = -1.0f;  // Force first sample
 }
 
 //------------------------------------------------------------------------------
@@ -162,6 +164,7 @@ static inline bool ply_import_job_start(ply_import_job_t *job,
     job->last_iteration_time_ms = 0.0;
     job->timing_sample_count = 0;
     job->iteration_start_time = 0;
+    job->last_sampled_progress = -1.0f;  // Force first sample
 
     // Open file and parse header
     ply_error_t err = ply_open(filepath, &job->parse_state);
@@ -177,6 +180,11 @@ static inline bool ply_import_job_start(ply_import_job_t *job,
     job->state = PLY_JOB_PARSING_VERTICES;
     snprintf(job->status_message, sizeof(job->status_message),
              "Parsing: 0 / %d vertices", job->total_points);
+
+    // Record initial 0% sample for the plot
+    job->iteration_times[0] = 0.0f;
+    job->iteration_progress[0] = 0.0f;
+    job->timing_sample_count = 1;
 
     return true;
 }
@@ -260,8 +268,15 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
     // State: PARSING_VERTICES
     //--------------------------------------------------------------------------
     if (job->state == PLY_JOB_PARSING_VERTICES) {
+        // Start timing this iteration
+        uint64_t iter_start = stm_now();
+
         int parsed = ply_parse_vertices_chunk(&job->parse_state, PLY_PARSE_CHUNK_SIZE);
         (void)parsed;  // Suppress unused warning
+
+        // Record iteration timing
+        uint64_t iter_end = stm_now();
+        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
 
         if (job->parse_state.error != PLY_OK) {
             job->state = PLY_JOB_ERROR;
@@ -275,6 +290,16 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
         // Update progress - parsing is 30% for Editable mode, 95% for Point Cloud mode
         float parse_weight = (job->import_mode == 0) ? 0.95f : 0.30f;
         job->progress = parse_weight * ply_get_progress(&job->parse_state);
+
+        // Store timing sample for the plot (sample every ~1% progress to ensure even distribution)
+        float progress_pct = job->progress * 100.0f;
+        if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES &&
+            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->timing_sample_count++;
+            job->last_sampled_progress = progress_pct;
+        }
 
         snprintf(job->status_message, sizeof(job->status_message),
                  "Parsing: %d / %d vertices",
@@ -310,6 +335,14 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
 
                 job->progress = 1.0f;
                 job->state = PLY_JOB_COMPLETE;
+
+                // Record final 100% sample for the plot
+                if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
+                    job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+                    job->iteration_progress[job->timing_sample_count] = 100.0f;
+                    job->timing_sample_count++;
+                }
+
                 snprintf(job->status_message, sizeof(job->status_message),
                          "Imported %d points as Point Cloud", job->total_points);
                 return true;
@@ -361,16 +394,19 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
         uint64_t iter_end = stm_now();
         job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
 
-        // Store timing sample for the plot (if we have room)
-        if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
-            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-            job->iteration_progress[job->timing_sample_count] = 30.0f + (float)job->created_count / (float)job->total_points * 70.0f;
-            job->timing_sample_count++;
-        }
-
         // Update progress - entity creation is 30-100% (70% of total)
         float entity_progress = (float)job->created_count / (float)job->total_points;
         job->progress = 0.30f + 0.70f * entity_progress;
+
+        // Store timing sample for the plot (sample every ~1% progress to ensure even distribution)
+        float progress_pct = job->progress * 100.0f;
+        if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES &&
+            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->timing_sample_count++;
+            job->last_sampled_progress = progress_pct;
+        }
 
         snprintf(job->status_message, sizeof(job->status_message),
                  "Creating: %d / %d entities",
@@ -383,6 +419,14 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
 
             job->progress = 1.0f;
             job->state = PLY_JOB_COMPLETE;
+
+            // Record final 100% sample for the plot
+            if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
+                job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+                job->iteration_progress[job->timing_sample_count] = 100.0f;
+                job->timing_sample_count++;
+            }
+
             snprintf(job->status_message, sizeof(job->status_message),
                      "Imported %d points as Editable Points", job->total_points);
             return true;
