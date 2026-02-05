@@ -12,7 +12,7 @@ fs.mkdirSync(outputDir, { recursive: true });
 // Configuration
 const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const flags = process.argv.slice(2).filter(a => a.startsWith('--'));
-const HTML_PATH = args[0] || 'build-web/bin/skl_tmp.html';
+const HTML_PATH = args[0] || 'build-web/bin/mdCAD.html';
 const RUN_TIME = parseInt(args[1]) || 5000; // ms
 const SCREENSHOT = flags.includes('--screenshot');
 const HEADLESS = !flags.includes('--visible');

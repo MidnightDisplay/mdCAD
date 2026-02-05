@@ -1,7 +1,7 @@
 // sokol implementation library on non-Apple platforms
 #define SOKOL_IMPL
 
-// Platform detection (shared with src/demo.c)
+// Platform detection (shared with src/app.c)
 #include "../../src/platform.h"
 
 #include "sokol_app.h"

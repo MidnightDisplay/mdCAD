@@ -34,7 +34,7 @@ Summary of fixes required to build the project on macOS.
 
 1. **Line 18**: Removed duplicate `#include "sokol_log.h"` which caused redefinition errors.
 
-### src/demo.c
+### src/app.c
 
 2. **Line 13**: Removed `#define SOKOL_IMGUI_IMPL` - the implementation is already compiled in `sokol.c`.
 

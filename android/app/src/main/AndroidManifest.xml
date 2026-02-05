@@ -29,7 +29,7 @@
 
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="skl_tmp"/>
+                android:value="mdCAD"/>
 
             <!-- Mobile launcher -->
             <intent-filter>

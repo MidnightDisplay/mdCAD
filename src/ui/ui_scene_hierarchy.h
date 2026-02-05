@@ -18,10 +18,13 @@
 #include "../scene_serializer.h"
 #include "../undo_redo_exec.h"  // Includes undo_redo.h and provides undo/redo functions
 #include "ui_file_browser.h"
+#include "../ply_loader.h"
+#include "../ply_import_job.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
 #include <ctype.h>   // for tolower()
+#include <float.h>   // for FLT_MIN
 
 //------------------------------------------------------------------------------
 // Configuration
@@ -70,6 +73,26 @@ typedef struct {
     bool clear_on_load;
     char last_status[128];
     char last_folder[512];  // Remember last used folder
+
+    // PLY Import state
+    file_browser_t ply_browser;
+    bool ply_import_popup_open;
+    char ply_import_path[512];
+    int ply_vertex_count;
+    bool ply_has_colors;
+    int ply_import_mode;           // 0 = Point Cloud Node, 1 = Editable Subtree (individual points)
+    int ply_unit_index;            // 0 = Meters, 1 = Millimeters, 2 = Inches
+    float ply_point_size;
+    bool ply_use_colors;           // Use PLY colors or default color
+    float ply_default_color[3];    // Default color when not using PLY colors
+
+    // PLY Import transformation options
+    bool ply_shift_to_com;         // Shift to centre of mass
+    float ply_rotation[3];         // Rotation angles (degrees) around X, Y, Z
+
+    // PLY Import job (for progress bar)
+    ply_import_job_t import_job;
+    bool import_progress_popup_open;
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -102,6 +125,28 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->clear_on_load = true;
     state->last_status[0] = '\0';
     state->last_folder[0] = '\0';  // Will use cwd on first use
+
+    // Initialize PLY import state
+    file_browser_init(&state->ply_browser);
+    state->ply_import_popup_open = false;
+    state->ply_import_path[0] = '\0';
+    state->ply_vertex_count = 0;
+    state->ply_has_colors = false;
+    state->ply_import_mode = 0;       // Point Cloud Node (default, more efficient)
+    state->ply_unit_index = 0;        // Meters (default)
+    state->ply_point_size = 0.01f;    // Default point size
+    state->ply_use_colors = true;     // Use PLY colors by default
+    state->ply_default_color[0] = 1.0f;
+    state->ply_default_color[1] = 1.0f;
+    state->ply_default_color[2] = 1.0f;
+    state->ply_shift_to_com = false;  // Don't shift by default
+    state->ply_rotation[0] = 0.0f;    // No rotation by default
+    state->ply_rotation[1] = 0.0f;
+    state->ply_rotation[2] = 0.0f;
+
+    // Initialize import job
+    ply_import_job_init(&state->import_job);
+    state->import_progress_popup_open = false;
 }
 
 // Set undo/redo system (optional, can be NULL)
@@ -118,6 +163,13 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     state->cache_count = 0;
     state->cache_capacity = 0;
     file_browser_shutdown(&state->file_browser);
+    file_browser_shutdown(&state->ply_browser);
+
+    // Cleanup any running import job
+    if (ply_import_job_is_running(&state->import_job)) {
+        ply_import_job_cancel(&state->import_job, state->scene);
+    }
+    ply_import_job_reset(&state->import_job);
 }
 
 //------------------------------------------------------------------------------
@@ -757,6 +809,12 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
             igSeparator();
+            if (igMenuItem_Bool("Import PLY Point Cloud...", NULL, false, true)) {
+                // Open PLY file browser
+                file_browser_open_file(&state->ply_browser, "Import PLY", ".ply",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
+            igSeparator();
             igCheckbox("Clear on Load", &state->clear_on_load);
             igSeparator();
             if (igMenuItem_Bool("Clear Scene", NULL, false, state->cache_count > 0)) {
@@ -889,6 +947,317 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         }
 
         file_browser_clear_result(&state->file_browser);
+    }
+
+    // Handle PLY file browser (opens import options popup when file is selected)
+    if (file_browser_draw(&state->ply_browser)) {
+        const char *path = file_browser_get_result(&state->ply_browser);
+        if (path && path[0]) {
+            strncpy(state->ply_import_path, path, sizeof(state->ply_import_path) - 1);
+            state->ply_import_path[sizeof(state->ply_import_path) - 1] = '\0';
+
+            // Get PLY info
+            ply_error_t err = ply_get_info(path, &state->ply_vertex_count, &state->ply_has_colors);
+            if (err == PLY_OK) {
+                state->ply_import_popup_open = true;
+                igOpenPopup_Str("Import PLY Options", ImGuiPopupFlags_None);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Error: %s", ply_error_string(err));
+            }
+
+            // Remember folder
+            const char *last_sep = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win = strrchr(path, '\\');
+            if (last_sep_win > last_sep) last_sep = last_sep_win;
+#endif
+            if (last_sep && last_sep > path) {
+                size_t dir_len = (size_t)(last_sep - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->ply_browser);
+    }
+
+    // PLY Import Options Popup
+    if (igBeginPopupModal("Import PLY Options", &state->ply_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // File info
+        igText("File: %s", state->ply_import_path);
+        igText("Points: %d", state->ply_vertex_count);
+        igText("Has Colors: %s", state->ply_has_colors ? "Yes" : "No");
+        igSeparator();
+
+        // Import Mode
+        igText("Import Mode:");
+        igRadioButton_IntPtr("Point Cloud Node (efficient)", &state->ply_import_mode, 0);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Single entity with all points. Best for large clouds (10k+).");
+        }
+        igRadioButton_IntPtr("Editable Subtree (individual)", &state->ply_import_mode, 1);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Each point as a separate entity. Best for small clouds (<10k).");
+        }
+        igSeparator();
+
+        // Unit conversion
+        igText("Units:");
+        const char* unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##units", &state->ply_unit_index, unit_items, 3, -1);
+        igSeparator();
+
+        // Point size
+        igSliderFloat("Point Size", &state->ply_point_size, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_None);
+        igSeparator();
+
+        // Color options
+        if (state->ply_has_colors) {
+            igCheckbox("Use PLY Colors", &state->ply_use_colors);
+        } else {
+            state->ply_use_colors = false;
+            igTextDisabled("PLY has no colors, using default");
+        }
+        if (!state->ply_use_colors) {
+            igColorEdit3("Default Color", state->ply_default_color, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        // Transformation options
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass", &state->ply_shift_to_com);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Shifts all points so the centre of mass is at the origin.");
+        }
+
+        // Rotation controls
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##rot", &state->ply_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##rot", &state->ply_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##rot", &state->ply_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).\nUseful for coordinate system conversion.");
+        }
+        igSeparator();
+
+        // Import/Cancel buttons
+        if (igButton("Import", (ImVec2){120, 0})) {
+            // Calculate scale factor based on unit selection
+            float scale = 1.0f;
+            switch (state->ply_unit_index) {
+                case 1: scale = 0.001f; break;   // Millimeters
+                case 2: scale = 0.0254f; break;  // Inches
+                default: scale = 1.0f; break;    // Meters
+            }
+
+            vec4_t default_color = vec4_make(
+                state->ply_default_color[0],
+                state->ply_default_color[1],
+                state->ply_default_color[2],
+                1.0f
+            );
+
+            // Start the import job
+            // Convert rotation from degrees to radians
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->ply_rotation[0] * deg_to_rad;
+            float rot_y = state->ply_rotation[1] * deg_to_rad;
+            float rot_z = state->ply_rotation[2] * deg_to_rad;
+
+            bool started = ply_import_job_start(
+                &state->import_job,
+                state->ply_import_path,
+                state->ply_import_mode,
+                scale,
+                state->ply_point_size,
+                default_color,
+                state->ply_use_colors,
+                state->ply_shift_to_com,
+                rot_x,
+                rot_y,
+                rot_z
+            );
+
+            if (started) {
+                // Check if we should use synchronous import for small files
+                if (ply_import_job_should_sync(&state->import_job)) {
+                    // Small file - import synchronously
+                    while (!ply_import_job_tick(&state->import_job, state->scene)) {
+                        // Keep ticking until complete
+                    }
+
+                    if (state->import_job.state == PLY_JOB_COMPLETE) {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "%s", state->import_job.status_message);
+                        state->cache_dirty = true;
+                    } else {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "PLY Error: %s", state->import_job.status_message);
+                    }
+                    ply_import_job_reset(&state->import_job);
+                } else {
+                    // Large file - use progress bar
+                    state->import_progress_popup_open = true;
+                }
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Error: %s", state->import_job.status_message);
+            }
+
+            state->ply_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igSameLine(0, -1);
+        if (igButton("Cancel", (ImVec2){120, 0})) {
+            state->ply_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igEndPopup();
+    }
+
+    // Progress popup for large file imports
+    if (state->import_progress_popup_open) {
+        igOpenPopup_Str("Importing PLY Point Cloud", ImGuiPopupFlags_None);
+    }
+
+    if (igBeginPopupModal("Importing PLY Point Cloud", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        // Extract filename from path for display
+        const char *filename = state->ply_import_path;
+        const char *last_sep = strrchr(state->ply_import_path, '/');
+#ifdef _WIN32
+        const char *last_sep_win = strrchr(state->ply_import_path, '\\');
+        if (last_sep_win > last_sep) last_sep = last_sep_win;
+#endif
+        if (last_sep) filename = last_sep + 1;
+
+        igText("File: %s", filename);
+        igSeparator();
+
+        // Progress bar - stretch to full window width using -FLT_MIN
+        // This makes the progress bar fill available width regardless of filename length
+        igProgressBar(state->import_job.progress, (ImVec2){-FLT_MIN, 0}, NULL);
+
+        // Status message
+        igText("%s", state->import_job.status_message);
+
+        // Progress percentage and timing info
+        bool show_timing = (state->import_job.state == PLY_JOB_CREATING_ENTITIES) &&
+                          state->import_job.last_iteration_time_ms > 0;
+
+        if (show_timing) {
+            // Show time per iteration (s/it) for entity creation phase
+            // Each iteration is PLY_ENTITY_CHUNK_SIZE points (500)
+            float seconds_per_iteration = (float)state->import_job.last_iteration_time_ms / 1000.0f;
+            igText("%.0f%%  |  %.3f s/it (creating, %d/it)",
+                   state->import_job.progress * 100.0f,
+                   seconds_per_iteration,
+                   PLY_ENTITY_CHUNK_SIZE);
+        } else if (state->import_job.state == PLY_JOB_COMPLETE) {
+            igText("100%% - Complete");
+        } else if (state->import_job.state == PLY_JOB_ERROR) {
+            igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "Error!");
+        } else {
+            igText("%.0f%%", state->import_job.progress * 100.0f);
+        }
+
+        // Show iteration speed plot during entity creation phase, or after completion
+        bool show_plot = state->import_job.timing_sample_count > 1;
+        if (show_plot) {
+            igSeparator();
+            igText("Iteration Time (ms) vs Progress");
+
+            // Find min/max for scaling
+            float max_time = 0.0f;
+            for (int i = 0; i < state->import_job.timing_sample_count; i++) {
+                if (state->import_job.iteration_times[i] > max_time) {
+                    max_time = state->import_job.iteration_times[i];
+                }
+            }
+            // Add some padding to the max
+            max_time *= 1.1f;
+            if (max_time < 1.0f) max_time = 1.0f;
+
+            // Use PlotLines to show the iteration time history
+            // overlay_text shows the current value
+            char overlay[32];
+            snprintf(overlay, sizeof(overlay), "%.1f ms", state->import_job.last_iteration_time_ms);
+
+            igPlotLines_FloatPtr(
+                "##speed_plot",
+                state->import_job.iteration_times,
+                state->import_job.timing_sample_count,
+                0,                          // values_offset
+                overlay,                    // overlay_text
+                0.0f,                       // scale_min
+                max_time,                   // scale_max
+                (ImVec2){-FLT_MIN, 80},     // graph_size (full width, 80px height)
+                sizeof(float)               // stride
+            );
+        }
+
+        igSeparator();
+
+        // Button: "Cancel" while running, "Close" when complete/error
+        float button_width = 120.0f;
+        float avail_width = igGetContentRegionAvail().x;
+        igSetCursorPosX(igGetCursorPosX() + (avail_width - button_width) * 0.5f);
+
+        bool is_finished = (state->import_job.state == PLY_JOB_COMPLETE ||
+                           state->import_job.state == PLY_JOB_ERROR ||
+                           state->import_job.state == PLY_JOB_CANCELLED);
+        const char *button_label = is_finished ? "Close" : "Cancel";
+
+        if (igButton(button_label, (ImVec2){button_width, 0})) {
+            if (!is_finished) {
+                ply_import_job_cancel(&state->import_job, state->scene);
+                snprintf(state->last_status, sizeof(state->last_status), "Import cancelled");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "%s", state->import_job.status_message);
+            }
+            state->import_progress_popup_open = false;
+            state->cache_dirty = true;
+            ply_import_job_reset(&state->import_job);
+            igCloseCurrentPopup();
+        }
+
+        // Process one chunk of work (only if still running)
+        if (ply_import_job_is_running(&state->import_job)) {
+            bool complete = ply_import_job_tick(&state->import_job, state->scene);
+
+            if (complete) {
+                // Mark cache dirty but DON'T close the popup - keep it open as report
+                state->cache_dirty = true;
+
+                // Update status for the status bar (will be shown when popup closes)
+                if (state->import_job.state == PLY_JOB_COMPLETE) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "%s", state->import_job.status_message);
+                } else if (state->import_job.state == PLY_JOB_ERROR) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "PLY Error: %s", state->import_job.status_message);
+                }
+                // Popup stays open - user must click "Close" to dismiss
+            }
+        }
+
+        igEndPopup();
     }
 
     // Show status message if any

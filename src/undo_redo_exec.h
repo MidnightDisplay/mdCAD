@@ -5,7 +5,7 @@
  * undo_redo_exec.h - Execution logic for undo/redo commands
  *
  * This file implements the actual undo/redo operations by interacting
- * with the ECS scene. Include this file in demo.c or wherever the
+ * with the ECS scene. Include this file in app.c or wherever the
  * undo/redo system is managed.
  *
  * Usage:
@@ -206,19 +206,24 @@ static inline void undo_cmd_delete_entity(undo_redo_t *ur, ecs_entity_t e) {
     cmd.data.delete_.entity_id = (uint64_t)e;
     cmd.data.delete_.snapshot = undo_snapshot_entity(scene, e);
 
-    // Collect children
-    ecs_entity_t children[64];
-    int child_count = scene_get_children(scene, e, children, 64);
+    // Collect children - count first, then allocate dynamically
+    int child_count = scene_count_children(scene, e);
 
     if (child_count > 0) {
-        cmd.data.delete_.child_ids = (uint64_t*)malloc(sizeof(uint64_t) * child_count);
-        cmd.data.delete_.child_snapshots = (undo_entity_snapshot_t*)malloc(sizeof(undo_entity_snapshot_t) * child_count);
-        cmd.data.delete_.child_count = child_count;
+        // Allocate array for children
+        ecs_entity_t *children = (ecs_entity_t*)malloc(sizeof(ecs_entity_t) * child_count);
+        int actual_count = scene_get_children(scene, e, children, child_count);
 
-        for (int i = 0; i < child_count; i++) {
+        cmd.data.delete_.child_ids = (uint64_t*)malloc(sizeof(uint64_t) * actual_count);
+        cmd.data.delete_.child_snapshots = (undo_entity_snapshot_t*)malloc(sizeof(undo_entity_snapshot_t) * actual_count);
+        cmd.data.delete_.child_count = actual_count;
+
+        for (int i = 0; i < actual_count; i++) {
             cmd.data.delete_.child_ids[i] = (uint64_t)children[i];
             cmd.data.delete_.child_snapshots[i] = undo_snapshot_entity(scene, children[i]);
         }
+
+        free(children);
     }
 
     undo_redo_push(ur, &cmd);

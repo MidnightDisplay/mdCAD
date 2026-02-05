@@ -1,12 +1,14 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(SOURCES
-    demo.c
+    app.c
 )
 
-# Add Metal-specific Objective-C source on Apple platforms
+# Add platform-specific pick buffer readback implementations
 if(APPLE)
     list(APPEND SOURCES gpu/pick_readback_metal.m)
+elseif(WIN32)
+    list(APPEND SOURCES gpu/pick_readback_d3d11.c)
 endif()
 
 # iOS requires MACOSX_BUNDLE for app packaging
@@ -60,3 +62,5 @@ endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
 endif()
+
+#set(CMAKE_CXX_FLAGS "-O3")

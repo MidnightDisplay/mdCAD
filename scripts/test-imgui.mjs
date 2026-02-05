@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.resolve(__dirname, 'test-output');
 fs.mkdirSync(outputDir, { recursive: true });
-const htmlFile = path.resolve(projectRoot, 'build-web/bin/skl_tmp.html');
+const htmlFile = path.resolve(projectRoot, 'build-web/bin/mdCAD.html');
 
 const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const flags = process.argv.slice(2).filter(a => a.startsWith('--'));

@@ -20,7 +20,7 @@
 // Configuration
 //------------------------------------------------------------------------------
 #define INSTANCE_BUFFER_INITIAL_CAPACITY  64
-#define INSTANCE_BUFFER_MAX_CAPACITY      (1 << 20)  // 1M instances max
+#define INSTANCE_BUFFER_MAX_CAPACITY      (1 << 21)  // 2M instances max (~56MB per buffer type)
 
 //------------------------------------------------------------------------------
 // Types
@@ -112,6 +112,13 @@ static inline void instance_buffer_init(instance_buffer_t *ib,
 
 // Allocate a slot, returns slot index (grows buffer if needed)
 static inline int instance_buffer_alloc_slot(instance_buffer_t *ib) {
+    // If all allocated slots have been freed, reset to start fresh
+    // This allows efficient reuse after clearing the scene
+    if (ib->free_count > 0 && ib->free_count == ib->count) {
+        ib->count = 0;
+        ib->free_count = 0;
+    }
+
     // First try free list
     if (ib->free_count > 0) {
         return ib->free_slots[--ib->free_count];
@@ -172,6 +179,13 @@ static inline int instance_buffer_alloc_slot(instance_buffer_t *ib) {
 // Returns first slot index, or -1 if buffer full
 static inline int instance_buffer_alloc_contiguous(instance_buffer_t *ib, int n) {
     if (n <= 0) return -1;
+
+    // If all allocated slots have been freed, reset to start fresh
+    // This allows efficient reuse after clearing the scene
+    if (ib->free_count > 0 && ib->free_count == ib->count) {
+        ib->count = 0;
+        ib->free_count = 0;
+    }
 
     int first_slot = ib->count;
 
@@ -364,6 +378,22 @@ static inline int instance_buffer_count(instance_buffer_t *ib) {
 
 static inline int instance_buffer_capacity(instance_buffer_t *ib) {
     return ib->capacity;
+}
+
+static inline int instance_buffer_max_capacity(void) {
+    return INSTANCE_BUFFER_MAX_CAPACITY;
+}
+
+// Check if buffer is at maximum capacity (cannot grow further)
+static inline bool instance_buffer_is_at_max(instance_buffer_t *ib) {
+    return ib->capacity >= INSTANCE_BUFFER_MAX_CAPACITY;
+}
+
+// Check if allocating n more slots would exceed max capacity
+static inline bool instance_buffer_would_exceed_max(instance_buffer_t *ib, int n) {
+    // Account for free slots that can be reused
+    int effective_count = ib->count - ib->free_count;
+    return (effective_count + n) > INSTANCE_BUFFER_MAX_CAPACITY;
 }
 
 static inline sg_buffer instance_buffer_gpu_buffer(instance_buffer_t *ib) {
