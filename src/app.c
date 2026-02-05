@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// Sokol + cimgui app with dockspace and 3D viewport rendering a cube
+// Sokol + cimgui + flecs app with dockspace and 3D viewport
 //------------------------------------------------------------------------------
 
 // Platform detection must be first (before Sokol includes)
@@ -164,47 +164,54 @@ static void init(void) {
 
     // Create test ECS entities using the scene API
     {
+        ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
+        vec3_make(0.0f, 0.0f, 0.0f), vec4_make(0.0f, 0.0f, 0.0f, 1.0f), 0.03f);  // White parent (geometry at origin)
+
         // RGB axis lines (visible in 3D viewport)
-        scene_add_line(&state.ecs_scene,
-            vec3_make(-2.0f, 0.0f, 0.0f), vec3_make(2.0f, 0.0f, 0.0f),
+        ecs_entity_t xAxis = scene_add_line(&state.ecs_scene,
+            vec3_make(-1.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
             vec4_make(1.0f, 0.2f, 0.2f, 1.0f), 0.03f);  // Red X axis
 
-        scene_add_line(&state.ecs_scene,
-            vec3_make(0.0f, -2.0f, 0.0f), vec3_make(0.0f, 2.0f, 0.0f),
+        ecs_entity_t yAxis = scene_add_line(&state.ecs_scene,
+            vec3_make(0.0f, -1.0f, 0.0f), vec3_make(0.0f, 1.0f, 0.0f),
             vec4_make(0.2f, 1.0f, 0.2f, 1.0f), 0.03f);  // Green Y axis
 
-        scene_add_line(&state.ecs_scene,
-            vec3_make(0.0f, 0.0f, -2.0f), vec3_make(0.0f, 0.0f, 2.0f),
+        ecs_entity_t zAxis = scene_add_line(&state.ecs_scene,
+            vec3_make(0.0f, 0.0f, -1.0f), vec3_make(0.0f, 0.0f, 1.0f),
             vec4_make(0.2f, 0.2f, 1.0f, 1.0f), 0.03f);  // Blue Z axis
 
-        // Test points at axis endpoints
-        scene_add_point(&state.ecs_scene,
-            vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X
-        scene_add_point(&state.ecs_scene,
-            vec3_make(0.0f, 2.0f, 0.0f), vec4_make(0.4f, 1.0f, 0.4f, 1.0f), 0.08f);  // +Y
-        scene_add_point(&state.ecs_scene,
-            vec3_make(0.0f, 0.0f, 2.0f), vec4_make(0.4f, 0.4f, 1.0f, 1.0f), 0.08f);  // +Z
+        scene_set_parent(&state.ecs_scene, xAxis, parent_point);
+        scene_set_parent(&state.ecs_scene, yAxis, parent_point);
+        scene_set_parent(&state.ecs_scene, zAxis, parent_point);
 
-        // Test hierarchy: Create a parent point with child lines
-        // Moving the parent's TransformComp.position should move all children with it
-        ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
-            vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.8f, 0.0f, 1.0f), 0.12f);  // Yellow parent (geometry at origin)
+        // // Test points at axis endpoints
+        // scene_add_point(&state.ecs_scene,
+        //     vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X
+        // scene_add_point(&state.ecs_scene,
+        //     vec3_make(0.0f, 2.0f, 0.0f), vec4_make(0.4f, 1.0f, 0.4f, 1.0f), 0.08f);  // +Y
+        // scene_add_point(&state.ecs_scene,
+        //     vec3_make(0.0f, 0.0f, 2.0f), vec4_make(0.4f, 0.4f, 1.0f, 1.0f), 0.08f);  // +Z
 
-        // Set parent's transform position (this is what children will inherit)
-        scene_set_position(&state.ecs_scene, parent_point, vec3_make(1.5f, 1.5f, 0.0f));
+        // // Test hierarchy: Create a parent point with child lines
+        // // Moving the parent's TransformComp.position should move all children with it
+        // ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
+        //     vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.8f, 0.0f, 1.0f), 0.12f);  // Yellow parent (geometry at origin)
 
-        // Add child lines forming a small cross (defined relative to parent's origin)
-        ecs_entity_t child_x = scene_add_line(&state.ecs_scene,
-            vec3_make(-0.5f, 0.0f, 0.0f), vec3_make(0.5f, 0.0f, 0.0f),
-            vec4_make(1.0f, 0.6f, 0.0f, 1.0f), 0.025f);  // Orange horizontal
+        // // Set parent's transform position (this is what children will inherit)
+        // scene_set_position(&state.ecs_scene, parent_point, vec3_make(1.5f, 1.5f, 0.0f));
 
-        ecs_entity_t child_y = scene_add_line(&state.ecs_scene,
-            vec3_make(0.0f, -0.5f, 0.0f), vec3_make(0.0f, 0.5f, 0.0f),
-            vec4_make(0.8f, 0.4f, 0.0f, 1.0f), 0.025f);  // Dark orange vertical
+        // // Add child lines forming a small cross (defined relative to parent's origin)
+        // ecs_entity_t child_x = scene_add_line(&state.ecs_scene,
+        //     vec3_make(-0.5f, 0.0f, 0.0f), vec3_make(0.5f, 0.0f, 0.0f),
+        //     vec4_make(1.0f, 0.6f, 0.0f, 1.0f), 0.025f);  // Orange horizontal
 
-        // Set parent-child relationships
-        scene_set_parent(&state.ecs_scene, child_x, parent_point);
-        scene_set_parent(&state.ecs_scene, child_y, parent_point);
+        // ecs_entity_t child_y = scene_add_line(&state.ecs_scene,
+        //     vec3_make(0.0f, -0.5f, 0.0f), vec3_make(0.0f, 0.5f, 0.0f),
+        //     vec4_make(0.8f, 0.4f, 0.0f, 1.0f), 0.025f);  // Dark orange vertical
+
+        // // Set parent-child relationships
+        // scene_set_parent(&state.ecs_scene, child_x, parent_point);
+        // scene_set_parent(&state.ecs_scene, child_y, parent_point);
 
         // Children's geometry is relative to parent.
         // With parent at (1.5, 1.5, 0), child_x will render from (1.0, 1.5, 0) to (2.0, 1.5, 0)
@@ -354,8 +361,8 @@ static void frame(void) {
     if (state.viewport.clicked && !state.visibility.show_ecs_entities) {
         // Clicked on viewport with ECS hidden - clear selection unless modifiers held
         selection_handle_click(&state.selection, 0,
-                               state.viewport.shift_held,
-                               state.viewport.ctrl_held);
+                                state.viewport.shift_held,
+                                state.viewport.ctrl_held);
     }
 
     // Update pick buffer center from mouse position (relative to viewport)
@@ -398,8 +405,8 @@ static void frame(void) {
                 uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
                 ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
                 selection_handle_click(&state.selection, clicked_entity,
-                                       state.viewport.shift_held,
-                                       state.viewport.ctrl_held);
+                                        state.viewport.shift_held,
+                                        state.viewport.ctrl_held);
             }
         }
     }
@@ -466,7 +473,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .frame_cb = frame,
         .cleanup_cb = cleanup,
         .event_cb = event,
-        .window_title = "Sokol Cube Viewport",
+        .window_title = "mdCAD",
         .width = 1280,
         .height = 720,
         .high_dpi = true,
