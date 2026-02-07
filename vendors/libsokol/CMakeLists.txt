@@ -52,12 +52,22 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
         log)
 elseif(WIN32)
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
-    target_link_libraries(libsokol PUBLIC
-        d3d11
-        dxgi
-        user32
-        shell32
-        gdi32)
+    if(MINGW)
+        # MinGW: use OpenGL
+        target_link_libraries(libsokol PUBLIC
+            opengl32
+            user32
+            shell32
+            gdi32)
+    else()
+        # MSVC: use D3D11
+        target_link_libraries(libsokol PUBLIC
+            d3d11
+            dxgi
+            user32
+            shell32
+            gdi32)
+    endif()
 else()
     # Linux
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})

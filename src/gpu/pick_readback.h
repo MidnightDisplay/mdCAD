@@ -38,22 +38,9 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
 
 #elif defined(SOKOL_GLCORE) || defined(SOKOL_GLES3)
 
-// OpenGL implementation - inline
-// Note: This requires the image to be bound as the current read framebuffer
-// For pick buffer, we need to read after the pick pass while FBO is still bound
-
-#include <string.h>
-
-static inline bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data) {
-    (void)img;  // Not used directly - we read from current FBO
-
-    // Note: This is a placeholder. Proper implementation requires:
-    // 1. Binding the image's FBO
-    // 2. Calling glReadPixels
-    // For now, clear to zero (no hover)
-    memset(pixel_data, 0, width * height * 4);
-    return false;  // Indicate readback not implemented
-}
+// OpenGL implementation is in pick_readback_opengl.c
+// Declaration only here - implementation in .c file
+bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data);
 
 #elif defined(SOKOL_WGPU)
 

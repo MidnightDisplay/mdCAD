@@ -7,6 +7,7 @@
 #ifndef UI_PICK_DEBUG_H
 #define UI_PICK_DEBUG_H
 
+#include "../platform.h"
 #include "../gpu/pick_buffer.h"
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
@@ -50,8 +51,12 @@ static inline void ui_pick_debug_draw(ui_pick_debug_state_t *state) {
         // Get cursor position before drawing image (for crosshair)
         ImVec2_c cursor_pos = igGetCursorScreenPos();
 
-        // Display the pick buffer (no tint/border in this API version)
+        // Display the pick buffer (Y-flip for OpenGL)
+#if defined(SOKOL_GLCORE) || defined(SOKOL_GLES3)
+        igImage(tex_ref, size, (ImVec2_c){0, 1}, (ImVec2_c){1, 0});
+#else
         igImage(tex_ref, size, (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
+#endif
 
         // Draw crosshair overlay at center
         ImDrawList* draw_list = igGetWindowDrawList();

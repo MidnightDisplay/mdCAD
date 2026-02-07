@@ -7,8 +7,12 @@ set(SOURCES
 # Add platform-specific pick buffer readback implementations
 if(APPLE)
     list(APPEND SOURCES gpu/pick_readback_metal.m)
-elseif(WIN32)
+elseif(WIN32 AND NOT MINGW)
+    # D3D11 readback for MSVC builds
     list(APPEND SOURCES gpu/pick_readback_d3d11.c)
+elseif(MINGW)
+    # OpenGL readback for MinGW builds
+    list(APPEND SOURCES gpu/pick_readback_opengl.c)
 endif()
 
 # iOS requires MACOSX_BUNDLE for app packaging
@@ -36,6 +40,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     target_link_options(${PROJECT_NAME} PRIVATE -u ANativeActivity_onCreate)
     # 16KB page alignment for Android 15+ compatibility
     target_link_options(${PROJECT_NAME} PRIVATE -Wl,-z,max-page-size=16384)
+elseif(WIN32)
+    # WIN32 flag tells VS to use WinMain entry point (provided by Sokol)
+    add_executable(${PROJECT_NAME} WIN32 ${SOURCES})
 else()
     add_executable(${PROJECT_NAME} ${SOURCES})
 endif()
