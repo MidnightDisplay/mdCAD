@@ -88,6 +88,8 @@ static void init(void) {
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
         .logger.func = slog_func,
+        // Note: Sokol validation is enabled by default in debug builds
+        // Errors will be logged via slog_func
     });
 
     // Setup ImGui with docking enabled

@@ -5,6 +5,7 @@
 #define RENDER_TARGET_H
 
 #include "sokol_gfx.h"
+#include <stdio.h>  // For debug printf
 
 //------------------------------------------------------------------------------
 // Constants
@@ -77,6 +78,15 @@ static inline void render_target_create(render_target_t* rt, int width, int heig
 
     rt->width = width;
     rt->height = height;
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[D3D11 DEBUG] Render target created: %dx%d\n", width, height);
+    printf("[D3D11 DEBUG]   Color image state: %d (2=valid, 4=failed)\n", sg_query_image_state(rt->color_img));
+    printf("[D3D11 DEBUG]   Depth image state: %d (2=valid, 4=failed)\n", sg_query_image_state(rt->depth_img));
+    printf("[D3D11 DEBUG]   Color view state: %d (2=valid, 4=failed)\n", sg_query_view_state(rt->color_att_view));
+    printf("[D3D11 DEBUG]   Depth view state: %d (2=valid, 4=failed)\n", sg_query_view_state(rt->depth_att_view));
+    printf("[D3D11 DEBUG]   Tex view state: %d (2=valid, 4=failed)\n", sg_query_view_state(rt->tex_view));
+#endif
 }
 
 // Destroy render target resources
