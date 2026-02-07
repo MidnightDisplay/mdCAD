@@ -180,7 +180,7 @@ static const char* join_vs_source =
     "    float4 color : COLOR;\n"
     "    float4 pos : SV_Position;\n"
     "};\n"
-    "vs_out main(vs_in inp) {\n"
+    "vs_out vs_main(vs_in inp) {\n"
     "    vs_out outp;\n"
     "    float4 clip_p = mul(mvp, float4(inp.point, 1.0));\n"
     "    float2 offset = float2(inp.template_pos.x / aspect_ratio, inp.template_pos.y) * line_width;\n"
@@ -194,7 +194,7 @@ static const char* join_fs_source =
     "struct fs_in {\n"
     "    float4 color : COLOR;\n"
     "};\n"
-    "float4 main(fs_in inp) : SV_Target0 {\n"
+    "float4 fs_main(fs_in inp) : SV_Target0 {\n"
     "    return inp.color;\n"
     "}\n";
 

@@ -64,6 +64,7 @@ elseif(WIN32)
         target_link_libraries(libsokol PUBLIC
             d3d11
             dxgi
+            d3dcompiler
             user32
             shell32
             gdi32)

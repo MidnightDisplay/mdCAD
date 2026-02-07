@@ -374,7 +374,7 @@ static const char* pick_line_vs_source =
     "    float3 pick_color : COLOR;\n"
     "    float4 pos : SV_Position;\n"
     "};\n"
-    "vs_out main(vs_in inp) {\n"
+    "vs_out vs_main(vs_in inp) {\n"
     "    vs_out outp;\n"
     "    float4 clip_a = mul(mvp, float4(inp.point_a, 1.0));\n"
     "    float4 clip_b = mul(mvp, float4(inp.point_b, 1.0));\n"
@@ -400,7 +400,7 @@ static const char* pick_line_fs_source =
     "struct fs_in {\n"
     "    float3 pick_color : COLOR;\n"
     "};\n"
-    "float4 main(fs_in inp) : SV_Target0 {\n"
+    "float4 fs_main(fs_in inp) : SV_Target0 {\n"
     "    return float4(inp.pick_color, 1.0);\n"
     "}\n";
 
@@ -420,7 +420,7 @@ static const char* pick_point_vs_source =
     "    float3 pick_color : COLOR;\n"
     "    float4 pos : SV_Position;\n"
     "};\n"
-    "vs_out main(vs_in inp) {\n"
+    "vs_out vs_main(vs_in inp) {\n"
     "    vs_out outp;\n"
     "    float4 clip_p = mul(mvp, float4(inp.point, 1.0));\n"
     "    float2 offset = float2(inp.template_pos.x / aspect_ratio, inp.template_pos.y) * line_width;\n"
@@ -434,7 +434,7 @@ static const char* pick_point_fs_source =
     "struct fs_in {\n"
     "    float3 pick_color : COLOR;\n"
     "};\n"
-    "float4 main(fs_in inp) : SV_Target0 {\n"
+    "float4 fs_main(fs_in inp) : SV_Target0 {\n"
     "    return float4(inp.pick_color, 1.0);\n"
     "}\n";
 
