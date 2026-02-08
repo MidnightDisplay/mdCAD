@@ -8,6 +8,7 @@
 #include "cimgui.h"
 #include "sokol_imgui.h"
 #include "sokol_app.h"
+#include "../platform.h"
 #include "../render_target.h"
 #include "../orbit_camera.h"
 
@@ -90,8 +91,17 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
         vp->render_target->sampler
     );
     ImTextureRef_c tex_ref = { ._TexID = tex_id };
-    igImage(tex_ref, (ImVec2_c){(float)logical_width, (float)logical_height},
-            (ImVec2_c){0, 0}, (ImVec2_c){1, 1});
+
+    // OpenGL framebuffers are Y-flipped relative to screen coordinates
+    // Metal/D3D: (0,0) is top-left, OpenGL: (0,0) is bottom-left
+#if defined(SOKOL_GLCORE) || defined(SOKOL_GLES3)
+    ImVec2_c uv0 = {0, 1};  // Flip V coordinates for OpenGL
+    ImVec2_c uv1 = {1, 0};
+#else
+    ImVec2_c uv0 = {0, 0};
+    ImVec2_c uv1 = {1, 1};
+#endif
+    igImage(tex_ref, (ImVec2_c){(float)logical_width, (float)logical_height}, uv0, uv1);
 
     // Handle camera input when mouse is over the viewport image
     vp->hovered = igIsItemHovered(ImGuiHoveredFlags_None);

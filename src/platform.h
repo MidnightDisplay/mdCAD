@@ -8,7 +8,13 @@
 // Backend detection for Sokol
 //------------------------------------------------------------------------------
 #if defined(_WIN32)
-    #define SOKOL_D3D11
+    #if defined(__MINGW32__) || defined(__MINGW64__)
+        // MinGW: use OpenGL for better compatibility
+        #define SOKOL_GLCORE
+    #else
+        // MSVC: use D3D11
+        #define SOKOL_D3D11
+    #endif
     #define PLATFORM_WINDOWS
 #elif defined(__EMSCRIPTEN__)
     #define SOKOL_WGPU

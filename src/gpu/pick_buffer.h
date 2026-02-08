@@ -241,6 +241,12 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
             .source = pick_line_fs_source,
             .entry = "fs_main",
         },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // point_b
+            [3] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
+        },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,
             .size = sizeof(pick_params_t),
@@ -290,6 +296,11 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
         .fragment_func = {
             .source = pick_point_fs_source,
             .entry = "fs_main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point
+            [2] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
         },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,

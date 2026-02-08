@@ -15,6 +15,7 @@
 #include "instance_buffer.h"
 #include "../components/geometry_comp.h"
 #include <math.h>
+#include <stdio.h>  // For debug printf
 
 //------------------------------------------------------------------------------
 // Configuration
@@ -259,6 +260,12 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
             .source = instanced_line_fs_source,
             .entry = "fs_main",
         },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // point_b
+            [3] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // color
+        },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,
             .size = sizeof(geom_batch_params_t),
@@ -271,6 +278,10 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
         },
         .label = "ecs-line-shader"
     });
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[DEBUG] Line shader state: %d (2=valid, 4=failed)\n", sg_query_shader_state(batch->shd));
+#endif
 
     // Create pipeline with instancing
     batch->pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -298,6 +309,10 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
         .cull_mode = SG_CULLMODE_NONE,
         .label = "ecs-line-pipeline"
     });
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[D3D11 DEBUG] Line pipeline state: %d (2=valid, 4=failed)\n", sg_query_pipeline_state(batch->pip));
+#endif
 }
 
 static inline int geom_line_batch_alloc(geom_line_batch_t* batch) {
@@ -421,6 +436,11 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
             .source = join_fs_source,
             .entry = "fs_main",
         },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // center
+            [2] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // color
+        },
         .uniform_blocks[0] = {
             .stage = SG_SHADERSTAGE_VERTEX,
             .size = sizeof(geom_batch_params_t),
@@ -433,6 +453,10 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
         },
         .label = "ecs-point-shader"
     });
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[D3D11 DEBUG] Point shader state: %d (2=valid, 4=failed)\n", sg_query_shader_state(batch->shd));
+#endif
 
     // Create pipeline with instancing
     batch->pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -459,6 +483,10 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
         .cull_mode = SG_CULLMODE_NONE,
         .label = "ecs-point-pipeline"
     });
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[D3D11 DEBUG] Point pipeline state: %d (2=valid, 4=failed)\n", sg_query_pipeline_state(batch->pip));
+#endif
 }
 
 static inline int geom_point_batch_alloc(geom_point_batch_t* batch) {

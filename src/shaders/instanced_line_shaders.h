@@ -265,7 +265,7 @@ static const char* instanced_line_vs_source =
     "    float4 color : COLOR;\n"
     "    float4 pos : SV_Position;\n"
     "};\n"
-    "vs_out main(vs_in inp) {\n"
+    "vs_out vs_main(vs_in inp) {\n"
     "    vs_out outp;\n"
     "    // Transform endpoints to clip space\n"
     "    float4 clip_a = mul(mvp, float4(inp.point_a, 1.0));\n"
@@ -298,7 +298,7 @@ static const char* instanced_line_fs_source =
     "struct fs_in {\n"
     "    float4 color : COLOR;\n"
     "};\n"
-    "float4 main(fs_in inp) : SV_Target0 {\n"
+    "float4 fs_main(fs_in inp) : SV_Target0 {\n"
     "    return inp.color;\n"
     "}\n";
 

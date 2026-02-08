@@ -14,6 +14,11 @@
 #include <string.h>
 #include <stdbool.h>
 
+// Case-insensitive string comparison (cross-platform) - must be before first use
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
+
 // Platform-specific includes
 #ifdef _WIN32
     #include <windows.h>
@@ -139,11 +144,6 @@ static inline bool file_browser_matches_filter(const char *filename, const char 
 
     return strcasecmp(ext, filter) == 0;
 }
-
-// Case-insensitive string comparison (cross-platform)
-#ifdef _WIN32
-#define strcasecmp _stricmp
-#endif
 
 //------------------------------------------------------------------------------
 // Internal: Directory listing

@@ -28,3 +28,8 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     target_link_libraries(flecs_static PUBLIC log)
 endif()
+
+# Windows requires ws2_32 (sockets for REST API) and dbghelp (debug symbols)
+if(WIN32)
+    target_link_libraries(flecs_static PUBLIC ws2_32 dbghelp)
+endif()
