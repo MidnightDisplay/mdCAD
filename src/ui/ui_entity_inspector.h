@@ -376,7 +376,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
     // Renderable section
     RenderableComp *r = ecs_world_get_renderable(w, e);
-    if (r && igCollapsingHeader_TreeNodeFlags("Rendering", 0)) {
+    if (r && igCollapsingHeader_TreeNodeFlags("Rendering", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool old_visible = r->visible;
         if (igCheckbox("Visible", &r->visible)) {
             r->instance_dirty = true;
@@ -386,6 +386,18 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             }
         }
         igInputInt("Layer", &r->layer, 1, 10, 0);
+
+        // Show/Hide all children buttons (only if entity has children)
+        int child_count = ecs_world_count_children(w, e);
+        if (child_count > 0) {
+            if (igButton("Show Children", (ImVec2){0, 0})) {
+                ecs_world_set_descendants_visible(w, e, true);
+            }
+            igSameLine(0, 4);
+            if (igButton("Hide Children", (ImVec2){0, 0})) {
+                ecs_world_set_descendants_visible(w, e, false);
+            }
+        }
     }
 }
 

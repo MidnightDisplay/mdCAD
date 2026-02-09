@@ -47,7 +47,7 @@ else()
     add_executable(${PROJECT_NAME} ${SOURCES})
 endif()
 
-target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static)
+target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static cjson)
 
 # Emscripten-specific linker options
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)

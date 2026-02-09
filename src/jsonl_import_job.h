@@ -1,0 +1,712 @@
+//------------------------------------------------------------------------------
+// jsonl_import_job.h - JSONL import job state machine (header-only)
+//
+// Provides chunked JSONL import with progress tracking:
+// - Parses JSONL file in chunks across frames
+// - Creates ECS geometry entities in chunks
+// - Sets parent-child relationships in chunks
+// - Progress callback for UI updates
+// - Cancellation support
+// - Import transformations: CoM shift, rotation, scale
+//------------------------------------------------------------------------------
+#ifndef JSONL_IMPORT_JOB_H
+#define JSONL_IMPORT_JOB_H
+
+#include "jsonl_loader.h"
+#include "ecs/ecs_scene.h"
+#include "sokol_time.h"
+#include <string.h>
+
+//------------------------------------------------------------------------------
+// Configuration
+//------------------------------------------------------------------------------
+
+#define JSONL_PARSE_CHUNK_SIZE      50      // Lines per frame during parsing
+#define JSONL_ENTITY_CHUNK_SIZE     200     // Entities per frame during creation
+#define JSONL_PARENT_CHUNK_SIZE     500     // Parenting ops per frame
+#define JSONL_SYNC_THRESHOLD        100     // Total elements below this import synchronously
+#define JSONL_DEFAULT_LINE_WIDTH    0.03f   // Default line width for imported geometry
+
+//------------------------------------------------------------------------------
+// Job states
+//------------------------------------------------------------------------------
+
+typedef enum {
+    JSONL_JOB_IDLE = 0,
+    JSONL_JOB_PARSING_FILE,         // Reading and parsing JSONL
+    JSONL_JOB_CREATING_ENTITIES,    // Creating ECS geometry entities
+    JSONL_JOB_PARENTING_ENTITIES,   // Setting parent-child relationships
+    JSONL_JOB_COMPLETE,
+    JSONL_JOB_CANCELLED,
+    JSONL_JOB_ERROR
+} jsonl_job_state_t;
+
+//------------------------------------------------------------------------------
+// Import job structure
+//------------------------------------------------------------------------------
+
+#define JSONL_JOB_MAX_TIMING_SAMPLES 100
+
+typedef struct {
+    jsonl_job_state_t state;
+    char filepath[512];
+
+    // Import options
+    float scale;
+    bool use_jsonl_colours;
+    vec4_t default_colour;
+    bool shift_to_com;
+    float rotation_x, rotation_y, rotation_z;  // radians
+
+    // Parse state
+    jsonl_parse_state_t parse_state;
+
+    // Entity creation state
+    int current_entry_idx;      // which log entry we're processing
+    int current_element_idx;    // which element within that entry
+    int total_entities_created;
+    ecs_entity_t root_entity;
+    ecs_entity_t *entry_entities;  // one per log entry (sub-anchors)
+
+    // Parenting state
+    int parented_count;
+    int total_to_parent;
+    ecs_entity_t *all_created_entities;   // flat array of all geometry entities
+    int *entity_to_entry_map;             // maps each entity index to its entry index
+    int all_created_count;
+
+    // Computed transforms
+    vec3_t com;
+    mat4_t transform_matrix;
+    bool transforms_applied;
+
+    // Progress & timing
+    float progress;
+    char status_message[128];
+    double last_iteration_time_ms;
+    float iteration_times[JSONL_JOB_MAX_TIMING_SAMPLES];
+    float iteration_progress[JSONL_JOB_MAX_TIMING_SAMPLES];
+    int timing_sample_count;
+    float last_sampled_progress;
+
+    // Result
+    jsonl_error_t error;
+    int total_elements;
+} jsonl_import_job_t;
+
+//------------------------------------------------------------------------------
+// Initialize job structure
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_init(jsonl_import_job_t *job) {
+    memset(job, 0, sizeof(jsonl_import_job_t));
+    job->state = JSONL_JOB_IDLE;
+    job->scale = 1.0f;
+    job->use_jsonl_colours = true;
+    job->default_colour = vec4_make(1.0f, 1.0f, 1.0f, 1.0f);
+    job->shift_to_com = false;
+    job->rotation_x = 0.0f;
+    job->rotation_y = 0.0f;
+    job->rotation_z = 0.0f;
+    job->transforms_applied = false;
+    job->last_iteration_time_ms = 0.0;
+    job->timing_sample_count = 0;
+    job->last_sampled_progress = -1.0f;
+}
+
+//------------------------------------------------------------------------------
+// Start a new import job
+//------------------------------------------------------------------------------
+
+static inline bool jsonl_import_job_start(jsonl_import_job_t *job,
+                                           const char *filepath,
+                                           float scale,
+                                           bool use_jsonl_colours,
+                                           vec4_t default_colour,
+                                           bool shift_to_com,
+                                           float rotation_x,
+                                           float rotation_y,
+                                           float rotation_z) {
+    // Cancel any running job first
+    if (job->state != JSONL_JOB_IDLE &&
+        job->state != JSONL_JOB_COMPLETE &&
+        job->state != JSONL_JOB_CANCELLED &&
+        job->state != JSONL_JOB_ERROR) {
+        jsonl_parse_state_free(&job->parse_state);
+    }
+
+    // Store options
+    strncpy(job->filepath, filepath, sizeof(job->filepath) - 1);
+    job->filepath[sizeof(job->filepath) - 1] = '\0';
+    job->scale = scale;
+    job->use_jsonl_colours = use_jsonl_colours;
+    job->default_colour = default_colour;
+    job->shift_to_com = shift_to_com;
+    job->rotation_x = rotation_x;
+    job->rotation_y = rotation_y;
+    job->rotation_z = rotation_z;
+
+    // Reset state
+    job->current_entry_idx = 0;
+    job->current_element_idx = 0;
+    job->total_entities_created = 0;
+    job->root_entity = 0;
+    job->entry_entities = NULL;
+    job->parented_count = 0;
+    job->total_to_parent = 0;
+    job->all_created_entities = NULL;
+    job->entity_to_entry_map = NULL;
+    job->all_created_count = 0;
+    job->progress = 0.0f;
+    job->error = JSONL_OK;
+    job->total_elements = 0;
+    job->transforms_applied = false;
+    job->com = vec3_make(0, 0, 0);
+    job->transform_matrix = mat4_identity();
+
+    // Reset timing data
+    job->last_iteration_time_ms = 0.0;
+    job->timing_sample_count = 0;
+    job->last_sampled_progress = -1.0f;
+
+    // Open file and count lines
+    jsonl_error_t err = jsonl_open(filepath, &job->parse_state);
+    if (err != JSONL_OK) {
+        job->state = JSONL_JOB_ERROR;
+        job->error = err;
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Error: %s", jsonl_error_string(err));
+        return false;
+    }
+
+    job->state = JSONL_JOB_PARSING_FILE;
+    snprintf(job->status_message, sizeof(job->status_message),
+             "Parsing: 0 / %d lines", job->parse_state.total_lines);
+
+    // Record initial 0% sample for the plot
+    job->iteration_times[0] = 0.0f;
+    job->iteration_progress[0] = 0.0f;
+    job->timing_sample_count = 1;
+
+    return true;
+}
+
+//------------------------------------------------------------------------------
+// Check if job should use synchronous import (small file)
+//------------------------------------------------------------------------------
+
+static inline bool jsonl_import_job_should_sync(const jsonl_import_job_t *job) {
+    // Use total_lines as a proxy before we know total_elements
+    return job->parse_state.total_lines < 5;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Apply transforms to all parsed geometry coordinates
+// Order: 1) CoM shift, 2) Rotation (X->Y->Z), 3) Scale
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
+    if (job->transforms_applied) return;
+
+    jsonl_data_t *data = &job->parse_state.data;
+
+    // Step 1: Collect all characteristic points for CoM calculation
+    if (job->shift_to_com) {
+        vec3_t sum = vec3_make(0, 0, 0);
+        int point_count = 0;
+
+        for (int e = 0; e < data->entry_count; e++) {
+            jsonl_log_entry_t *entry = &data->entries[e];
+            for (int i = 0; i < entry->element_count; i++) {
+                jsonl_element_t *elem = &entry->elements[i];
+                switch (elem->type) {
+                    case JSONL_GEOM_POINT:
+                        sum = vec3_add(sum, elem->data.point.point);
+                        point_count++;
+                        break;
+                    case JSONL_GEOM_LINE:
+                        sum = vec3_add(sum, elem->data.line.start);
+                        sum = vec3_add(sum, elem->data.line.end);
+                        point_count += 2;
+                        break;
+                    case JSONL_GEOM_ARC:
+                        sum = vec3_add(sum, elem->data.arc.center);
+                        point_count++;
+                        break;
+                    case JSONL_GEOM_POLYLINE:
+                    case JSONL_GEOM_POLYGON:
+                        for (int p = 0; p < elem->data.polyline.count; p++) {
+                            sum = vec3_add(sum, elem->data.polyline.points[p]);
+                            point_count++;
+                        }
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        if (point_count > 0) {
+            job->com = vec3_scale(sum, 1.0f / (float)point_count);
+        }
+    }
+
+    // Step 2: Build rotation matrix
+    bool has_rotation = (job->rotation_x != 0.0f ||
+                         job->rotation_y != 0.0f ||
+                         job->rotation_z != 0.0f);
+
+    mat4_t rot_matrix = mat4_identity();
+    if (has_rotation) {
+        mat4_t rot_x = mat4_rotate_x(job->rotation_x);
+        mat4_t rot_y = mat4_rotate_y(job->rotation_y);
+        mat4_t rot_z = mat4_rotate_z(job->rotation_z);
+        mat4_t rot_xy = mat4_mul(rot_y, rot_x);
+        rot_matrix = mat4_mul(rot_z, rot_xy);
+        job->transform_matrix = rot_matrix;
+    }
+
+    // Apply transforms to all geometry coordinates
+    for (int e = 0; e < data->entry_count; e++) {
+        jsonl_log_entry_t *entry = &data->entries[e];
+        for (int i = 0; i < entry->element_count; i++) {
+            jsonl_element_t *elem = &entry->elements[i];
+
+            // Helper lambda-like: transform a single point
+            #define JSONL_TRANSFORM_POINT(pt) do { \
+                if (job->shift_to_com) pt = vec3_sub(pt, job->com); \
+                if (has_rotation) pt = mat4_mul_point(rot_matrix, pt); \
+                if (job->scale != 1.0f) pt = vec3_scale(pt, job->scale); \
+            } while(0)
+
+            switch (elem->type) {
+                case JSONL_GEOM_POINT:
+                    JSONL_TRANSFORM_POINT(elem->data.point.point);
+                    break;
+                case JSONL_GEOM_LINE:
+                    JSONL_TRANSFORM_POINT(elem->data.line.start);
+                    JSONL_TRANSFORM_POINT(elem->data.line.end);
+                    break;
+                case JSONL_GEOM_ARC: {
+                    JSONL_TRANSFORM_POINT(elem->data.arc.center);
+                    if (job->scale != 1.0f) {
+                        elem->data.arc.radius *= job->scale;
+                    }
+                    if (has_rotation) {
+                        elem->data.arc.normal = mat4_mul_point(rot_matrix, elem->data.arc.normal);
+                        elem->data.arc.normal = vec3_normalize(elem->data.arc.normal);
+                    }
+                    // Note: angles stay the same - they're relative to the local coordinate
+                    // system which rotates with the normal
+                    break;
+                }
+                case JSONL_GEOM_POLYLINE:
+                case JSONL_GEOM_POLYGON:
+                    for (int p = 0; p < elem->data.polyline.count; p++) {
+                        JSONL_TRANSFORM_POINT(elem->data.polyline.points[p]);
+                    }
+                    break;
+                default: break;
+            }
+
+            #undef JSONL_TRANSFORM_POINT
+        }
+    }
+
+    job->transforms_applied = true;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Create one geometry entity from a parsed element
+//------------------------------------------------------------------------------
+
+static inline ecs_entity_t jsonl_import_job_create_entity(
+    jsonl_import_job_t *job,
+    ecs_scene_t *scene,
+    jsonl_element_t *elem)
+{
+    vec4_t colour = job->use_jsonl_colours ? elem->colour : job->default_colour;
+    float width = JSONL_DEFAULT_LINE_WIDTH;
+
+    switch (elem->type) {
+        case JSONL_GEOM_POINT:
+            return scene_add_point(scene, elem->data.point.point, colour, 0.06f);
+
+        case JSONL_GEOM_LINE:
+            return scene_add_line(scene, elem->data.line.start, elem->data.line.end,
+                                  colour, width);
+
+        case JSONL_GEOM_ARC:
+            return scene_add_arc(scene,
+                elem->data.arc.center,
+                elem->data.arc.radius,
+                elem->data.arc.start_angle,
+                elem->data.arc.end_angle,
+                elem->data.arc.normal,
+                colour, width);
+
+        case JSONL_GEOM_POLYLINE:
+            return scene_add_polyline(scene, elem->data.polyline.points,
+                                      elem->data.polyline.count, colour, width);
+
+        case JSONL_GEOM_POLYGON:
+            return scene_add_polygon(scene, elem->data.polyline.points,
+                                     elem->data.polyline.count, colour, width);
+
+        default:
+            return 0;
+    }
+}
+
+//------------------------------------------------------------------------------
+// Process one chunk of work - returns true when job is complete
+//------------------------------------------------------------------------------
+
+static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *scene) {
+    if (job->state == JSONL_JOB_IDLE ||
+        job->state == JSONL_JOB_COMPLETE ||
+        job->state == JSONL_JOB_CANCELLED ||
+        job->state == JSONL_JOB_ERROR) {
+        return true;
+    }
+
+    //--------------------------------------------------------------------------
+    // State: PARSING_FILE (0-20% progress)
+    //--------------------------------------------------------------------------
+    if (job->state == JSONL_JOB_PARSING_FILE) {
+        uint64_t iter_start = stm_now();
+
+        int parsed = jsonl_parse_lines_chunk(&job->parse_state, JSONL_PARSE_CHUNK_SIZE);
+        (void)parsed;
+
+        uint64_t iter_end = stm_now();
+        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
+
+        if (job->parse_state.error != JSONL_OK) {
+            job->state = JSONL_JOB_ERROR;
+            job->error = job->parse_state.error;
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Parse error: %s", jsonl_error_string(job->error));
+            jsonl_parse_state_free(&job->parse_state);
+            return true;
+        }
+
+        // Parsing is 0-20% of total progress
+        job->progress = 0.20f * jsonl_get_progress(&job->parse_state);
+
+        // Store timing sample
+        float progress_pct = job->progress * 100.0f;
+        if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES &&
+            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->timing_sample_count++;
+            job->last_sampled_progress = progress_pct;
+        }
+
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Parsing: %d / %d lines",
+                 job->parse_state.lines_parsed, job->parse_state.total_lines);
+
+        // Check if parsing is complete
+        if (jsonl_is_complete(&job->parse_state)) {
+            jsonl_close(&job->parse_state);  // Close file, keep data
+
+            job->total_elements = job->parse_state.data.total_elements;
+
+            // Apply all transformations to parsed data
+            jsonl_import_job_apply_transforms(job);
+
+            // Allocate tracking arrays
+            int num_entries = job->parse_state.data.entry_count;
+            job->entry_entities = (ecs_entity_t*)calloc(num_entries, sizeof(ecs_entity_t));
+            job->all_created_entities = (ecs_entity_t*)malloc(
+                sizeof(ecs_entity_t) * (job->total_elements + num_entries + 1));
+            job->entity_to_entry_map = (int*)malloc(
+                sizeof(int) * (job->total_elements + num_entries + 1));
+
+            if (!job->entry_entities || !job->all_created_entities || !job->entity_to_entry_map) {
+                job->state = JSONL_JOB_ERROR;
+                job->error = JSONL_ERROR_MEMORY_ALLOCATION;
+                snprintf(job->status_message, sizeof(job->status_message),
+                         "Memory allocation failed");
+                return true;
+            }
+
+            // Create root anchor entity (invisible point at origin)
+            job->root_entity = scene_add_point(scene, vec3_make(0, 0, 0),
+                                                vec4_make(0, 0, 0, 0), 0.0f);
+            if (job->root_entity) {
+                scene_set_visible(scene, job->root_entity, false);
+            }
+
+            // Create entry anchor entities (one per log entry)
+            for (int i = 0; i < num_entries; i++) {
+                ecs_entity_t entry_e = scene_add_point(scene, vec3_make(0, 0, 0),
+                                                        vec4_make(0, 0, 0, 0), 0.0f);
+                if (entry_e) {
+                    scene_set_visible(scene, entry_e, false);
+                }
+                job->entry_entities[i] = entry_e;
+            }
+
+            job->current_entry_idx = 0;
+            job->current_element_idx = 0;
+            job->all_created_count = 0;
+            job->state = JSONL_JOB_CREATING_ENTITIES;
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Creating: 0 / %d entities", job->total_elements);
+        }
+
+        return false;
+    }
+
+    //--------------------------------------------------------------------------
+    // State: CREATING_ENTITIES (20-80% progress)
+    //--------------------------------------------------------------------------
+    if (job->state == JSONL_JOB_CREATING_ENTITIES) {
+        uint64_t iter_start = stm_now();
+
+        jsonl_data_t *data = &job->parse_state.data;
+        int created_this_frame = 0;
+
+        while (created_this_frame < JSONL_ENTITY_CHUNK_SIZE &&
+               job->current_entry_idx < data->entry_count) {
+
+            jsonl_log_entry_t *entry = &data->entries[job->current_entry_idx];
+
+            while (job->current_element_idx < entry->element_count &&
+                   created_this_frame < JSONL_ENTITY_CHUNK_SIZE) {
+
+                jsonl_element_t *elem = &entry->elements[job->current_element_idx];
+                ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
+
+                if (e != 0) {
+                    // Track for parenting
+                    job->all_created_entities[job->all_created_count] = e;
+                    job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
+                    job->all_created_count++;
+                    job->total_entities_created++;
+                }
+
+                job->current_element_idx++;
+                created_this_frame++;
+            }
+
+            // Move to next entry if current one is done
+            if (job->current_element_idx >= entry->element_count) {
+                job->current_entry_idx++;
+                job->current_element_idx = 0;
+            }
+        }
+
+        uint64_t iter_end = stm_now();
+        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
+
+        // Update progress (20-80%)
+        float entity_progress = (job->total_elements > 0) ?
+            (float)job->total_entities_created / (float)job->total_elements : 1.0f;
+        job->progress = 0.20f + 0.60f * entity_progress;
+
+        // Store timing sample
+        float progress_pct = job->progress * 100.0f;
+        if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES &&
+            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->timing_sample_count++;
+            job->last_sampled_progress = progress_pct;
+        }
+
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Creating: %d / %d entities",
+                 job->total_entities_created, job->total_elements);
+
+        // Check if entity creation is complete
+        if (job->current_entry_idx >= data->entry_count) {
+            // Set up parenting phase
+            // Total to parent: all_created_count (geometry -> entry) + entry_count (entry -> root)
+            job->total_to_parent = job->all_created_count + data->entry_count;
+            job->parented_count = 0;
+            job->state = JSONL_JOB_PARENTING_ENTITIES;
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Parenting: 0 / %d", job->total_to_parent);
+        }
+
+        return false;
+    }
+
+    //--------------------------------------------------------------------------
+    // State: PARENTING_ENTITIES (80-100% progress)
+    //--------------------------------------------------------------------------
+    if (job->state == JSONL_JOB_PARENTING_ENTITIES) {
+        uint64_t iter_start = stm_now();
+
+        jsonl_data_t *data = &job->parse_state.data;
+        int parented_this_frame = 0;
+
+        while (parented_this_frame < JSONL_PARENT_CHUNK_SIZE &&
+               job->parented_count < job->total_to_parent) {
+
+            if (job->parented_count < job->all_created_count) {
+                // Parent geometry entity to its entry anchor
+                int idx = job->parented_count;
+                ecs_entity_t child = job->all_created_entities[idx];
+                int entry_idx = job->entity_to_entry_map[idx];
+                ecs_entity_t parent = job->entry_entities[entry_idx];
+                if (child && parent) {
+                    scene_set_parent(scene, child, parent);
+                }
+            } else {
+                // Parent entry anchor to root
+                int entry_idx = job->parented_count - job->all_created_count;
+                if (entry_idx < data->entry_count) {
+                    ecs_entity_t entry_e = job->entry_entities[entry_idx];
+                    if (entry_e && job->root_entity) {
+                        scene_set_parent(scene, entry_e, job->root_entity);
+                    }
+                }
+            }
+
+            job->parented_count++;
+            parented_this_frame++;
+        }
+
+        uint64_t iter_end = stm_now();
+        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
+
+        // Update progress (80-100%)
+        float parent_progress = (job->total_to_parent > 0) ?
+            (float)job->parented_count / (float)job->total_to_parent : 1.0f;
+        job->progress = 0.80f + 0.20f * parent_progress;
+
+        // Store timing sample
+        float progress_pct = job->progress * 100.0f;
+        if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES &&
+            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->timing_sample_count++;
+            job->last_sampled_progress = progress_pct;
+        }
+
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Parenting: %d / %d",
+                 job->parented_count, job->total_to_parent);
+
+        // Check if parenting is complete
+        if (job->parented_count >= job->total_to_parent) {
+            // Store entry count before freeing
+            int num_entries = data->entry_count;
+
+            // Free tracking arrays
+            if (job->all_created_entities) {
+                free(job->all_created_entities);
+                job->all_created_entities = NULL;
+            }
+            if (job->entity_to_entry_map) {
+                free(job->entity_to_entry_map);
+                job->entity_to_entry_map = NULL;
+            }
+            if (job->entry_entities) {
+                free(job->entry_entities);
+                job->entry_entities = NULL;
+            }
+
+            // Free parsed data
+            jsonl_parse_state_free(&job->parse_state);
+
+            job->progress = 1.0f;
+            job->state = JSONL_JOB_COMPLETE;
+
+            // Record final 100% sample
+            if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES) {
+                job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+                job->iteration_progress[job->timing_sample_count] = 100.0f;
+                job->timing_sample_count++;
+            }
+
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Imported %d elements in %d entries",
+                     job->total_elements, num_entries);
+            return true;
+        }
+
+        return false;
+    }
+
+    return true;  // Unknown state
+}
+
+//------------------------------------------------------------------------------
+// Cancel an in-progress job
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_cancel(jsonl_import_job_t *job, ecs_scene_t *scene) {
+    (void)scene;
+
+    if (job->state == JSONL_JOB_IDLE ||
+        job->state == JSONL_JOB_COMPLETE ||
+        job->state == JSONL_JOB_CANCELLED ||
+        job->state == JSONL_JOB_ERROR) {
+        return;
+    }
+
+    // Free parsed data
+    jsonl_parse_state_free(&job->parse_state);
+
+    // Free tracking arrays
+    if (job->all_created_entities) {
+        free(job->all_created_entities);
+        job->all_created_entities = NULL;
+    }
+    if (job->entity_to_entry_map) {
+        free(job->entity_to_entry_map);
+        job->entity_to_entry_map = NULL;
+    }
+    if (job->entry_entities) {
+        free(job->entry_entities);
+        job->entry_entities = NULL;
+    }
+
+    job->state = JSONL_JOB_CANCELLED;
+    job->progress = 0.0f;
+    snprintf(job->status_message, sizeof(job->status_message), "Import cancelled");
+}
+
+//------------------------------------------------------------------------------
+// Check if job is currently running
+//------------------------------------------------------------------------------
+
+static inline bool jsonl_import_job_is_running(const jsonl_import_job_t *job) {
+    return job->state == JSONL_JOB_PARSING_FILE ||
+           job->state == JSONL_JOB_CREATING_ENTITIES ||
+           job->state == JSONL_JOB_PARENTING_ENTITIES;
+}
+
+//------------------------------------------------------------------------------
+// Reset job to idle state
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_reset(jsonl_import_job_t *job) {
+    if (jsonl_import_job_is_running(job)) {
+        jsonl_parse_state_free(&job->parse_state);
+        if (job->all_created_entities) {
+            free(job->all_created_entities);
+            job->all_created_entities = NULL;
+        }
+        if (job->entity_to_entry_map) {
+            free(job->entity_to_entry_map);
+            job->entity_to_entry_map = NULL;
+        }
+        if (job->entry_entities) {
+            free(job->entry_entities);
+            job->entry_entities = NULL;
+        }
+    }
+    job->state = JSONL_JOB_IDLE;
+    job->progress = 0.0f;
+    job->status_message[0] = '\0';
+    job->transforms_applied = false;
+}
+
+#endif // JSONL_IMPORT_JOB_H

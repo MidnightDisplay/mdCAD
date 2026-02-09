@@ -316,6 +316,22 @@ static inline void ecs_world_mark_descendants_dirty(ecs_world_state_t *s, ecs_en
     }
 }
 
+// Set visibility on all descendants (recursive)
+static inline void ecs_world_set_descendants_visible(ecs_world_state_t *s, ecs_entity_t parent, bool visible) {
+    ecs_iter_t child_it = ecs_children(s->world, parent);
+    while (ecs_children_next(&child_it)) {
+        for (int i = 0; i < child_it.count; i++) {
+            ecs_entity_t child = child_it.entities[i];
+            RenderableComp *r = (RenderableComp*)ecs_get_id(s->world, child, s->RenderableComp_id);
+            if (r) {
+                r->visible = visible;
+                r->instance_dirty = true;
+            }
+            ecs_world_set_descendants_visible(s, child, visible);
+        }
+    }
+}
+
 // Set parent of an entity (use 0 to unparent)
 static inline void ecs_world_set_parent(ecs_world_state_t *s, ecs_entity_t child, ecs_entity_t parent) {
     if (!ecs_is_alive(s->world, child)) return;
