@@ -232,6 +232,30 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     pb->pixel_data = (uint8_t*)malloc(PICK_BUFFER_SIZE * PICK_BUFFER_SIZE * 4);
 
     // Create line pick shader
+#if defined(SOKOL_VULKAN)
+    pb->line_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(pick_line_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(pick_line_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // point_b
+            [3] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(pick_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "pick-line-shader"
+    });
+#else
     pb->line_shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = {
             .source = pick_line_vs_source,
@@ -259,6 +283,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
         },
         .label = "pick-line-shader"
     });
+#endif
 
     // Create line pick pipeline
     pb->line_pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -288,6 +313,29 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     });
 
     // Create point pick shader
+#if defined(SOKOL_VULKAN)
+    pb->point_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(pick_point_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(pick_point_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point
+            [2] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(pick_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "pick-point-shader"
+    });
+#else
     pb->point_shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = {
             .source = pick_point_vs_source,
@@ -314,6 +362,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
         },
         .label = "pick-point-shader"
     });
+#endif
 
     // Create point pick pipeline
     pb->point_pip = sg_make_pipeline(&(sg_pipeline_desc){

@@ -161,6 +161,15 @@ static const char* join_fs_source =
     "}\n";
 
 //------------------------------------------------------------------------------
+// Vulkan SPIR-V bytecode
+//------------------------------------------------------------------------------
+#elif defined(SOKOL_VULKAN)
+
+#include "spirv/spirv_bytecode.h"
+
+// Bytecode pointers for Vulkan (uses join_vs_spirv and join_fs_spirv from spirv_bytecode.h)
+
+//------------------------------------------------------------------------------
 // DirectX 11 HLSL
 //------------------------------------------------------------------------------
 #elif defined(SOKOL_D3D11)
@@ -199,7 +208,7 @@ static const char* join_fs_source =
     "}\n";
 
 #else
-#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
+#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, SOKOL_VULKAN, or SOKOL_D3D11"
 #endif
 
 #endif // JOIN_SHADERS_H

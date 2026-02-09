@@ -11,8 +11,8 @@ elseif(WIN32 AND NOT MINGW)
     # D3D11 readback for MSVC builds
     list(APPEND SOURCES gpu/pick_readback_d3d11.c)
 elseif(MINGW)
-    # OpenGL readback for MinGW builds
-    list(APPEND SOURCES gpu/pick_readback_opengl.c)
+    # Vulkan readback for MinGW builds
+    list(APPEND SOURCES gpu/pick_readback_vulkan.c)
 endif()
 
 # iOS requires MACOSX_BUNDLE for app packaging

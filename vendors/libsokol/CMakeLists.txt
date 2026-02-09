@@ -53,12 +53,17 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
 elseif(WIN32)
     add_library(libsokol STATIC sokol.c ${SOKOL_HEADERS})
     if(MINGW)
-        # MinGW: use OpenGL
-        target_link_libraries(libsokol PUBLIC
-            opengl32
-            user32
-            shell32
-            gdi32)
+        # MinGW: use Vulkan backend
+        # Find Vulkan SDK via environment variable
+        if(DEFINED ENV{VULKAN_SDK})
+            set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
+            message(STATUS "Found Vulkan SDK: ${VULKAN_SDK_PATH}")
+            target_include_directories(libsokol PUBLIC "${VULKAN_SDK_PATH}/Include")
+            target_link_directories(libsokol PUBLIC "${VULKAN_SDK_PATH}/Lib")
+            target_link_libraries(libsokol PUBLIC vulkan-1 user32 shell32 gdi32)
+        else()
+            message(FATAL_ERROR "VULKAN_SDK environment variable not set. Install Vulkan SDK from https://vulkan.lunarg.com/")
+        endif()
     else()
         # MSVC: use D3D11
         target_link_libraries(libsokol PUBLIC

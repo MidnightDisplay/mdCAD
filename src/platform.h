@@ -9,8 +9,8 @@
 //------------------------------------------------------------------------------
 #if defined(_WIN32)
     #if defined(__MINGW32__) || defined(__MINGW64__)
-        // MinGW: use OpenGL for better compatibility
-        #define SOKOL_GLCORE
+        // MinGW: use Vulkan for better performance
+        #define SOKOL_VULKAN
     #else
         // MSVC: use D3D11
         #define SOKOL_D3D11
