@@ -60,6 +60,7 @@ typedef enum {
 typedef struct {
     jsonl_geom_type_t type;
     char name[128];
+    char description[256];
     vec4_t colour;          // RGBA, alpha always 1.0
 
     union {
@@ -85,6 +86,7 @@ typedef struct {
 
 typedef struct {
     char name[128];
+    char description[256];
     jsonl_element_t *elements;
     int element_count;
     int element_capacity;
@@ -286,6 +288,13 @@ static inline bool jsonl_parse_element(const cJSON *elem_json, jsonl_element_t *
         element->name[sizeof(element->name) - 1] = '\0';
     }
 
+    // Get description
+    cJSON *desc = cJSON_GetObjectItemCaseSensitive(elem_json, "Description");
+    if (desc && cJSON_IsString(desc)) {
+        strncpy(element->description, desc->valuestring, sizeof(element->description) - 1);
+        element->description[sizeof(element->description) - 1] = '\0';
+    }
+
     // Get colour
     cJSON *colour = cJSON_GetObjectItemCaseSensitive(elem_json, "Colour");
     if (colour && cJSON_IsString(colour)) {
@@ -382,6 +391,13 @@ static inline bool jsonl_parse_entry(const char *json_str, jsonl_log_entry_t *en
     if (name && cJSON_IsString(name)) {
         strncpy(entry->name, name->valuestring, sizeof(entry->name) - 1);
         entry->name[sizeof(entry->name) - 1] = '\0';
+    }
+
+    // Get entry description
+    cJSON *desc = cJSON_GetObjectItemCaseSensitive(root, "Description");
+    if (desc && cJSON_IsString(desc)) {
+        strncpy(entry->description, desc->valuestring, sizeof(entry->description) - 1);
+        entry->description[sizeof(entry->description) - 1] = '\0';
     }
 
     // Get elements array

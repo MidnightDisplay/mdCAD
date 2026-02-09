@@ -9,6 +9,7 @@
 #include "../components/geometry_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include "../components/label_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -23,6 +24,7 @@ typedef struct {
     ecs_entity_t GeometryComp_id;
     ecs_entity_t RenderableComp_id;
     ecs_entity_t SelectableComp_id;
+    ecs_entity_t LabelComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -91,6 +93,12 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "SelectableComp" }),
         .type.size = sizeof(SelectableComp),
         .type.alignment = ECS_ALIGNOF(SelectableComp)
+    });
+
+    s->LabelComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "LabelComp" }),
+        .type.size = sizeof(LabelComp),
+        .type.alignment = ECS_ALIGNOF(LabelComp)
     });
 
     // Register tag components (zero-size)
@@ -228,6 +236,14 @@ static inline RenderableComp* ecs_world_get_renderable(ecs_world_state_t *s, ecs
 
 static inline SelectableComp* ecs_world_get_selectable(ecs_world_state_t *s, ecs_entity_t e) {
     return (SelectableComp*)ecs_get_id(s->world, e, s->SelectableComp_id);
+}
+
+static inline LabelComp* ecs_world_get_label(ecs_world_state_t *s, ecs_entity_t e) {
+    return (LabelComp*)ecs_get_id(s->world, e, s->LabelComp_id);
+}
+
+static inline void ecs_world_set_label(ecs_world_state_t *s, ecs_entity_t e, const LabelComp *label) {
+    ecs_set_id(s->world, e, s->LabelComp_id, sizeof(LabelComp), label);
 }
 
 //------------------------------------------------------------------------------

@@ -18,6 +18,7 @@
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
 #include "../undo_redo_exec.h"
+#include <float.h>
 
 //------------------------------------------------------------------------------
 // Types
@@ -77,6 +78,14 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     }
 
     igSeparator();
+
+    // Label section (optional component - only shown if entity has one)
+    LabelComp *label = ecs_world_get_label(w, e);
+    if (label && igCollapsingHeader_TreeNodeFlags("Label", ImGuiTreeNodeFlags_DefaultOpen)) {
+        igInputText("Name", label->name, LABEL_NAME_MAX, 0, NULL, NULL);
+        igInputTextMultiline("Description", label->description, LABEL_DESC_MAX,
+                             (ImVec2){-FLT_MIN, igGetTextLineHeight() * 3}, 0, NULL, NULL);
+    }
 
     // Transform section
     TransformComp *t = ecs_world_get_transform(w, e);

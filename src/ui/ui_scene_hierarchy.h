@@ -267,13 +267,22 @@ static inline bool ui_hierarchy_str_contains_ci(const char *haystack, const char
 //------------------------------------------------------------------------------
 
 static inline bool ui_hierarchy_entry_matches_filter(ui_hierarchy_entry_t *entry,
-                                                      const char *filter) {
+                                                      const char *filter,
+                                                      ecs_world_state_t *w) {
     if (!filter[0]) return true;  // Empty filter matches all
 
     // Check if filter matches type name
     const char *type_name = geometry_type_name(entry->type);
     if (ui_hierarchy_str_contains_ci(type_name, filter)) {
         return true;
+    }
+
+    // Check if filter matches label name
+    if (w) {
+        LabelComp *lbl = ecs_world_get_label(w, entry->entity);
+        if (lbl && lbl->name[0] && ui_hierarchy_str_contains_ci(lbl->name, filter)) {
+            return true;
+        }
     }
 
     // Check if filter matches entity ID (with or without # prefix)
@@ -626,11 +635,18 @@ static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_
 
     bool is_selected = selection_contains(sel, e);
 
-    // Create label: Type #EntityID
-    char label[64];
-    snprintf(label, sizeof(label), "%s #%llu",
-             geometry_type_name(type),
-             (unsigned long long)e);
+    // Create label: "Type - Name #ID" or "Type #ID" if no label
+    char label[256];
+    LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
+    if (lbl && lbl->name[0]) {
+        snprintf(label, sizeof(label), "%s - %s #%llu",
+                 geometry_type_name(type), lbl->name,
+                 (unsigned long long)e);
+    } else {
+        snprintf(label, sizeof(label), "%s #%llu",
+                 geometry_type_name(type),
+                 (unsigned long long)e);
+    }
 
     // Leaf node flags
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -727,11 +743,18 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
     bool is_selected = selection_contains(sel, e);
     bool has_children = scene_has_children(state->scene, e);
 
-    // Create label: Type #EntityID
-    char label[64];
-    snprintf(label, sizeof(label), "%s #%llu",
-             geometry_type_name(type),
-             (unsigned long long)e);
+    // Create label: "Type - Name #ID" or "Type #ID" if no label
+    char label[256];
+    LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
+    if (lbl && lbl->name[0]) {
+        snprintf(label, sizeof(label), "%s - %s #%llu",
+                 geometry_type_name(type), lbl->name,
+                 (unsigned long long)e);
+    } else {
+        snprintf(label, sizeof(label), "%s #%llu",
+                 geometry_type_name(type),
+                 (unsigned long long)e);
+    }
 
     // Tree node flags
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
@@ -1603,7 +1626,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     // Count filtered entities and build display list
     int filtered_count = 0;
     for (int i = 0; i < state->cache_count; i++) {
-        if (ui_hierarchy_entry_matches_filter(&state->cache[i], state->filter_text)) {
+        if (ui_hierarchy_entry_matches_filter(&state->cache[i], state->filter_text, state->scene->world)) {
             filtered_count++;
         }
     }
@@ -1695,7 +1718,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             ui_hierarchy_entry_t *entry = &state->cache[i];
 
             // Skip if doesn't match filter
-            if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text)) {
+            if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text, state->scene->world)) {
                 continue;
             }
 

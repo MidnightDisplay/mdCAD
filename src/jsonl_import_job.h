@@ -437,6 +437,16 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                                                 vec4_make(0, 0, 0, 0), 0.0f);
             if (job->root_entity) {
                 scene_set_visible(scene, job->root_entity, false);
+                // Extract filename from path for root label
+                const char *fname = job->filepath;
+                const char *sep = strrchr(job->filepath, '/');
+#ifdef _WIN32
+                const char *sep_win = strrchr(job->filepath, '\\');
+                if (sep_win > sep) sep = sep_win;
+#endif
+                if (sep) fname = sep + 1;
+                LabelComp root_label = label_comp_make(fname, "JSONL import root");
+                ecs_world_set_label(scene->world, job->root_entity, &root_label);
             }
 
             // Create entry anchor entities (one per log entry)
@@ -445,6 +455,10 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                                                         vec4_make(0, 0, 0, 0), 0.0f);
                 if (entry_e) {
                     scene_set_visible(scene, entry_e, false);
+                    LabelComp entry_label = label_comp_make(
+                        job->parse_state.data.entries[i].name,
+                        job->parse_state.data.entries[i].description);
+                    ecs_world_set_label(scene->world, entry_e, &entry_label);
                 }
                 job->entry_entities[i] = entry_e;
             }
@@ -481,6 +495,12 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                 ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
 
                 if (e != 0) {
+                    // Set label if element has a name
+                    if (elem->name[0] || elem->description[0]) {
+                        LabelComp lbl = label_comp_make(elem->name, elem->description);
+                        ecs_world_set_label(scene->world, e, &lbl);
+                    }
+
                     // Track for parenting
                     job->all_created_entities[job->all_created_count] = e;
                     job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
