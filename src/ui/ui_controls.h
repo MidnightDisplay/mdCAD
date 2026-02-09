@@ -36,7 +36,7 @@ static inline void ui_controls_sync_clear_color(ui_controls_state_t* ctrl) {
 static inline void ui_controls_init(ui_controls_state_t* ctrl, orbit_camera_t* camera, sg_pass_action* pass_action) {
     ctrl->camera = camera;
     ctrl->offscreen_pass_action = pass_action;
-    ctrl->current_theme = UI_THEME_VISUAL_STUDIO;  // Default theme
+    ctrl->current_theme = UI_THEME_CATPPUCCIN_FRAPPE;  // Default theme
 
     // Initialize pass action
     pass_action->colors[0].load_action = SG_LOADACTION_CLEAR;
