@@ -34,6 +34,7 @@
 #include "ui/ui_entity_inspector.h"
 #include "ui/ui_scene_hierarchy.h"  // Includes undo_redo_exec.h
 #include "ui/ui_slot_buffer_debug.h"
+#include "ui/ui_fps_debug.h"
 
 //------------------------------------------------------------------------------
 // Application state
@@ -73,6 +74,7 @@ static struct {
 
     // Debug UI
     ui_slot_buffer_debug_state_t slot_buffer_debug;
+    ui_fps_debug_state_t fps_debug;
 
     // Undo/Redo system
     undo_redo_t undo_redo;
@@ -88,6 +90,11 @@ static void init(void) {
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
         .logger.func = slog_func,
+#if defined(SOKOL_VULKAN)
+        // Vulkan needs larger staging buffer for large point clouds (default 16MB)
+        // 1M points * 28 bytes = 28MB, so use 64MB for headroom
+        .vulkan.stream_staging_buffer_size = 64 * 1024 * 1024,
+#endif
         // Note: Sokol validation is enabled by default in debug builds
         // Errors will be logged via slog_func
     });
@@ -155,6 +162,12 @@ static void init(void) {
 
     // Wire up slot buffer debug window toggle to visibility controls
     ui_visibility_set_slot_buffer_debug_ptr(&state.visibility, &state.slot_buffer_debug.window_open);
+
+    // Initialize FPS debug viewer
+    ui_fps_debug_init(&state.fps_debug);
+
+    // Wire up FPS debug window toggle to visibility controls
+    ui_visibility_set_fps_debug_ptr(&state.visibility, &state.fps_debug.window_open);
 
     // Initialize undo/redo system
     undo_redo_init(&state.undo_redo, &state.ecs_scene, 100);
@@ -266,6 +279,10 @@ static void frame(void) {
         ui_entity_inspector_draw(&state.entity_inspector);
         ui_scene_hierarchy_draw(&state.scene_hierarchy);
         ui_slot_buffer_debug_draw(&state.slot_buffer_debug);
+
+        // Update and draw FPS debug (updates every frame, draws if visible)
+        ui_fps_debug_update(&state.fps_debug);
+        ui_fps_debug_draw(&state.fps_debug);
     }
 
     // Handle keyboard shortcuts when no text input has focus
