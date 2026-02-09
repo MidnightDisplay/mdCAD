@@ -6,4 +6,5 @@
 add_subdirectory(libcimgui)
 add_subdirectory(libsokol)
 add_subdirectory(flecs)
+add_subdirectory(cjson)
 

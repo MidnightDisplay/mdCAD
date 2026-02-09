@@ -20,6 +20,8 @@
 #include "ui_file_browser.h"
 #include "../ply_loader.h"
 #include "../ply_import_job.h"
+#include "../jsonl_loader.h"
+#include "../jsonl_import_job.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -93,6 +95,22 @@ typedef struct {
     // PLY Import job (for progress bar)
     ply_import_job_t import_job;
     bool import_progress_popup_open;
+
+    // JSONL Import state
+    file_browser_t jsonl_browser;
+    bool jsonl_import_popup_open;
+    char jsonl_import_path[512];
+    int jsonl_entry_count;
+    int jsonl_element_count;
+    int jsonl_unit_index;
+    bool jsonl_use_colours;
+    float jsonl_default_colour[3];
+    bool jsonl_shift_to_com;
+    float jsonl_rotation[3];
+
+    // JSONL Import job
+    jsonl_import_job_t jsonl_import_job;
+    bool jsonl_import_progress_popup_open;
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -147,6 +165,26 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     // Initialize import job
     ply_import_job_init(&state->import_job);
     state->import_progress_popup_open = false;
+
+    // Initialize JSONL import state
+    file_browser_init(&state->jsonl_browser);
+    state->jsonl_import_popup_open = false;
+    state->jsonl_import_path[0] = '\0';
+    state->jsonl_entry_count = 0;
+    state->jsonl_element_count = 0;
+    state->jsonl_unit_index = 0;        // Meters (default)
+    state->jsonl_use_colours = true;     // Use JSONL colours by default
+    state->jsonl_default_colour[0] = 1.0f;
+    state->jsonl_default_colour[1] = 1.0f;
+    state->jsonl_default_colour[2] = 1.0f;
+    state->jsonl_shift_to_com = false;
+    state->jsonl_rotation[0] = 0.0f;
+    state->jsonl_rotation[1] = 0.0f;
+    state->jsonl_rotation[2] = 0.0f;
+
+    // Initialize JSONL import job
+    jsonl_import_job_init(&state->jsonl_import_job);
+    state->jsonl_import_progress_popup_open = false;
 }
 
 // Set undo/redo system (optional, can be NULL)
@@ -164,12 +202,19 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     state->cache_capacity = 0;
     file_browser_shutdown(&state->file_browser);
     file_browser_shutdown(&state->ply_browser);
+    file_browser_shutdown(&state->jsonl_browser);
 
     // Cleanup any running import job
     if (ply_import_job_is_running(&state->import_job)) {
         ply_import_job_cancel(&state->import_job, state->scene);
     }
     ply_import_job_reset(&state->import_job);
+
+    // Cleanup any running JSONL import job
+    if (jsonl_import_job_is_running(&state->jsonl_import_job)) {
+        jsonl_import_job_cancel(&state->jsonl_import_job, state->scene);
+    }
+    jsonl_import_job_reset(&state->jsonl_import_job);
 }
 
 //------------------------------------------------------------------------------
@@ -222,13 +267,22 @@ static inline bool ui_hierarchy_str_contains_ci(const char *haystack, const char
 //------------------------------------------------------------------------------
 
 static inline bool ui_hierarchy_entry_matches_filter(ui_hierarchy_entry_t *entry,
-                                                      const char *filter) {
+                                                      const char *filter,
+                                                      ecs_world_state_t *w) {
     if (!filter[0]) return true;  // Empty filter matches all
 
     // Check if filter matches type name
     const char *type_name = geometry_type_name(entry->type);
     if (ui_hierarchy_str_contains_ci(type_name, filter)) {
         return true;
+    }
+
+    // Check if filter matches label name
+    if (w) {
+        LabelComp *lbl = ecs_world_get_label(w, entry->entity);
+        if (lbl && lbl->name[0] && ui_hierarchy_str_contains_ci(lbl->name, filter)) {
+            return true;
+        }
     }
 
     // Check if filter matches entity ID (with or without # prefix)
@@ -581,11 +635,18 @@ static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_
 
     bool is_selected = selection_contains(sel, e);
 
-    // Create label: Type #EntityID
-    char label[64];
-    snprintf(label, sizeof(label), "%s #%llu",
-             geometry_type_name(type),
-             (unsigned long long)e);
+    // Create label: "Type - Name #ID" or "Type #ID" if no label
+    char label[256];
+    LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
+    if (lbl && lbl->name[0]) {
+        snprintf(label, sizeof(label), "[%s] - %s #%llu",
+                 lbl->name, geometry_type_name(type),
+                 (unsigned long long)e);
+    } else {
+        snprintf(label, sizeof(label), "- %s #%llu",
+                 geometry_type_name(type),
+                 (unsigned long long)e);
+    }
 
     // Leaf node flags
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -682,11 +743,18 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
     bool is_selected = selection_contains(sel, e);
     bool has_children = scene_has_children(state->scene, e);
 
-    // Create label: Type #EntityID
-    char label[64];
-    snprintf(label, sizeof(label), "%s #%llu",
-             geometry_type_name(type),
-             (unsigned long long)e);
+    // Create label: "Type - Name #ID" or "Type #ID" if no label
+    char label[256];
+    LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
+    if (lbl && lbl->name[0]) {
+        snprintf(label, sizeof(label), "[%s] - %s #%llu",
+                 lbl->name, geometry_type_name(type),
+                 (unsigned long long)e);
+    } else {
+        snprintf(label, sizeof(label), "- %s #%llu",
+                 geometry_type_name(type),
+                 (unsigned long long)e);
+    }
 
     // Tree node flags
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
@@ -812,6 +880,10 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             if (igMenuItem_Bool("Import PLY Point Cloud...", NULL, false, true)) {
                 // Open PLY file browser
                 file_browser_open_file(&state->ply_browser, "Import PLY", ".ply",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
+            if (igMenuItem_Bool("Import JSONL Geometry Log...", NULL, false, true)) {
+                file_browser_open_file(&state->jsonl_browser, "Import JSONL", ".jsonl",
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
             igSeparator();
@@ -1260,6 +1332,261 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igEndPopup();
     }
 
+    // Handle JSONL file browser (opens import options popup when file is selected)
+    if (file_browser_draw(&state->jsonl_browser)) {
+        const char *path = file_browser_get_result(&state->jsonl_browser);
+        if (path && path[0]) {
+            strncpy(state->jsonl_import_path, path, sizeof(state->jsonl_import_path) - 1);
+            state->jsonl_import_path[sizeof(state->jsonl_import_path) - 1] = '\0';
+
+            // Quick scan the file
+            int entry_count = 0, element_count = 0;
+            jsonl_error_t err = jsonl_quick_scan(path, &entry_count, &element_count);
+            if (err == JSONL_OK) {
+                state->jsonl_entry_count = entry_count;
+                state->jsonl_element_count = element_count;
+                state->jsonl_import_popup_open = true;
+                igOpenPopup_Str("Import JSONL Options", ImGuiPopupFlags_None);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Error: %s", jsonl_error_string(err));
+            }
+
+            // Remember folder
+            const char *last_sep_j = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win_j = strrchr(path, '\\');
+            if (last_sep_win_j > last_sep_j) last_sep_j = last_sep_win_j;
+#endif
+            if (last_sep_j && last_sep_j > path) {
+                size_t dir_len = (size_t)(last_sep_j - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->jsonl_browser);
+    }
+
+    // JSONL Import Options Popup
+    if (igBeginPopupModal("Import JSONL Options", &state->jsonl_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // File info
+        igText("File: %s", state->jsonl_import_path);
+        igText("Entries: %d", state->jsonl_entry_count);
+        igText("Elements: %d", state->jsonl_element_count);
+        igSeparator();
+
+        // Unit conversion
+        igText("Units:");
+        const char* jsonl_unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##jsonl_units", &state->jsonl_unit_index, jsonl_unit_items, 3, -1);
+        igSeparator();
+
+        // Colour options
+        igCheckbox("Import Colours", &state->jsonl_use_colours);
+        if (!state->jsonl_use_colours) {
+            igColorEdit3("Default Colour", state->jsonl_default_colour, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        // Transformation options
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass##jsonl", &state->jsonl_shift_to_com);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Shifts all geometry so the centre of mass is at the origin.");
+        }
+
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##jsonl_rot", &state->jsonl_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##jsonl_rot", &state->jsonl_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##jsonl_rot", &state->jsonl_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).");
+        }
+        igSeparator();
+
+        // Import/Cancel buttons
+        if (igButton("Import##jsonl", (ImVec2){120, 0})) {
+            float scale = 1.0f;
+            switch (state->jsonl_unit_index) {
+                case 1: scale = 0.001f; break;
+                case 2: scale = 0.0254f; break;
+                default: scale = 1.0f; break;
+            }
+
+            vec4_t default_colour = vec4_make(
+                state->jsonl_default_colour[0],
+                state->jsonl_default_colour[1],
+                state->jsonl_default_colour[2],
+                1.0f
+            );
+
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->jsonl_rotation[0] * deg_to_rad;
+            float rot_y = state->jsonl_rotation[1] * deg_to_rad;
+            float rot_z = state->jsonl_rotation[2] * deg_to_rad;
+
+            bool started = jsonl_import_job_start(
+                &state->jsonl_import_job,
+                state->jsonl_import_path,
+                scale,
+                state->jsonl_use_colours,
+                default_colour,
+                state->jsonl_shift_to_com,
+                rot_x, rot_y, rot_z
+            );
+
+            if (started) {
+                if (jsonl_import_job_should_sync(&state->jsonl_import_job)) {
+                    while (!jsonl_import_job_tick(&state->jsonl_import_job, state->scene)) {
+                    }
+
+                    if (state->jsonl_import_job.state == JSONL_JOB_COMPLETE) {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "%s", state->jsonl_import_job.status_message);
+                        state->cache_dirty = true;
+                    } else {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "JSONL Error: %s", state->jsonl_import_job.status_message);
+                    }
+                    jsonl_import_job_reset(&state->jsonl_import_job);
+                } else {
+                    state->jsonl_import_progress_popup_open = true;
+                }
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Error: %s", state->jsonl_import_job.status_message);
+            }
+
+            state->jsonl_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igSameLine(0, -1);
+        if (igButton("Cancel##jsonl", (ImVec2){120, 0})) {
+            state->jsonl_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igEndPopup();
+    }
+
+    // JSONL Progress popup
+    if (state->jsonl_import_progress_popup_open) {
+        igOpenPopup_Str("Importing JSONL Geometry Log", ImGuiPopupFlags_None);
+    }
+
+    if (igBeginPopupModal("Importing JSONL Geometry Log", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        const char *jsonl_filename = state->jsonl_import_path;
+        const char *last_sep_jf = strrchr(state->jsonl_import_path, '/');
+#ifdef _WIN32
+        const char *last_sep_win_jf = strrchr(state->jsonl_import_path, '\\');
+        if (last_sep_win_jf > last_sep_jf) last_sep_jf = last_sep_win_jf;
+#endif
+        if (last_sep_jf) jsonl_filename = last_sep_jf + 1;
+
+        igText("File: %s", jsonl_filename);
+        igSeparator();
+
+        igProgressBar(state->jsonl_import_job.progress, (ImVec2){-FLT_MIN, 0}, NULL);
+
+        igText("%s", state->jsonl_import_job.status_message);
+
+        bool show_jsonl_timing = jsonl_import_job_is_running(&state->jsonl_import_job) &&
+                                  state->jsonl_import_job.last_iteration_time_ms > 0;
+
+        if (show_jsonl_timing) {
+            float seconds_per_it = (float)state->jsonl_import_job.last_iteration_time_ms / 1000.0f;
+            igText("%.0f%%  |  %.3f s/it",
+                   state->jsonl_import_job.progress * 100.0f,
+                   seconds_per_it);
+        } else if (state->jsonl_import_job.state == JSONL_JOB_COMPLETE) {
+            igText("100%% - Complete");
+        } else if (state->jsonl_import_job.state == JSONL_JOB_ERROR) {
+            igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "Error!");
+        } else {
+            igText("%.0f%%", state->jsonl_import_job.progress * 100.0f);
+        }
+
+        bool show_jsonl_plot = state->jsonl_import_job.timing_sample_count > 1;
+        if (show_jsonl_plot) {
+            igSeparator();
+            igText("Iteration Time (ms) vs Progress");
+
+            float max_time_j = 0.0f;
+            for (int i = 0; i < state->jsonl_import_job.timing_sample_count; i++) {
+                if (state->jsonl_import_job.iteration_times[i] > max_time_j) {
+                    max_time_j = state->jsonl_import_job.iteration_times[i];
+                }
+            }
+            max_time_j *= 1.1f;
+            if (max_time_j < 1.0f) max_time_j = 1.0f;
+
+            char overlay_j[32];
+            snprintf(overlay_j, sizeof(overlay_j), "%.1f ms", state->jsonl_import_job.last_iteration_time_ms);
+
+            igPlotLines_FloatPtr(
+                "##jsonl_speed_plot",
+                state->jsonl_import_job.iteration_times,
+                state->jsonl_import_job.timing_sample_count,
+                0, overlay_j, 0.0f, max_time_j,
+                (ImVec2){-FLT_MIN, 80}, sizeof(float)
+            );
+        }
+
+        igSeparator();
+
+        float jsonl_btn_width = 120.0f;
+        float jsonl_avail_width = igGetContentRegionAvail().x;
+        igSetCursorPosX(igGetCursorPosX() + (jsonl_avail_width - jsonl_btn_width) * 0.5f);
+
+        bool jsonl_is_finished = (state->jsonl_import_job.state == JSONL_JOB_COMPLETE ||
+                                   state->jsonl_import_job.state == JSONL_JOB_ERROR ||
+                                   state->jsonl_import_job.state == JSONL_JOB_CANCELLED);
+        const char *jsonl_btn_label = jsonl_is_finished ? "Close" : "Cancel";
+
+        if (igButton(jsonl_btn_label, (ImVec2){jsonl_btn_width, 0})) {
+            if (!jsonl_is_finished) {
+                jsonl_import_job_cancel(&state->jsonl_import_job, state->scene);
+                snprintf(state->last_status, sizeof(state->last_status), "JSONL import cancelled");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "%s", state->jsonl_import_job.status_message);
+            }
+            state->jsonl_import_progress_popup_open = false;
+            state->cache_dirty = true;
+            jsonl_import_job_reset(&state->jsonl_import_job);
+            igCloseCurrentPopup();
+        }
+
+        if (jsonl_import_job_is_running(&state->jsonl_import_job)) {
+            bool jsonl_complete = jsonl_import_job_tick(&state->jsonl_import_job, state->scene);
+
+            if (jsonl_complete) {
+                state->cache_dirty = true;
+
+                if (state->jsonl_import_job.state == JSONL_JOB_COMPLETE) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "%s", state->jsonl_import_job.status_message);
+                } else if (state->jsonl_import_job.state == JSONL_JOB_ERROR) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "JSONL Error: %s", state->jsonl_import_job.status_message);
+                }
+            }
+        }
+
+        igEndPopup();
+    }
+
     // Show status message if any
     if (state->last_status[0] != '\0') {
         igTextColored((ImVec4){0.5f, 1.0f, 0.5f, 1.0f}, "%s", state->last_status);
@@ -1299,7 +1626,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     // Count filtered entities and build display list
     int filtered_count = 0;
     for (int i = 0; i < state->cache_count; i++) {
-        if (ui_hierarchy_entry_matches_filter(&state->cache[i], state->filter_text)) {
+        if (ui_hierarchy_entry_matches_filter(&state->cache[i], state->filter_text, state->scene->world)) {
             filtered_count++;
         }
     }
@@ -1391,7 +1718,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             ui_hierarchy_entry_t *entry = &state->cache[i];
 
             // Skip if doesn't match filter
-            if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text)) {
+            if (!ui_hierarchy_entry_matches_filter(entry, state->filter_text, state->scene->world)) {
                 continue;
             }
 

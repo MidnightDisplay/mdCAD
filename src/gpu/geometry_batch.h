@@ -408,7 +408,7 @@ static inline void geom_line_batch_shutdown(geom_line_batch_t* batch) {
 //------------------------------------------------------------------------------
 
 static inline void geom_point_batch_init(geom_point_batch_t* batch) {
-    batch->point_size = 0.01f;
+    batch->point_size = 0.006f;
 
     // Initialize instance buffer
     instance_buffer_init(&batch->instances,
