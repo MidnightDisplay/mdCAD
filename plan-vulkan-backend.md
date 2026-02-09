@@ -314,47 +314,47 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
 ## Phase 1 Implementation Checklist
 
 ### Environment Setup
-- [ ] Install Vulkan SDK on development machine
-- [ ] Verify `VULKAN_SDK` environment variable
-- [ ] Test `vulkaninfo.exe` shows GPU support
-- [ ] Verify MinGW can compile/link Vulkan test program
+- [x] Install Vulkan SDK on development machine
+- [x] Verify `VULKAN_SDK` environment variable
+- [x] Test `vulkaninfo.exe` shows GPU support
+- [x] Verify MinGW can compile/link Vulkan test program
 
 ### Build System
-- [ ] Update `vendors/libsokol/CMakeLists.txt` with Vulkan linking
-- [ ] Update `src/CMakeLists.txt` for Vulkan readback source
-- [ ] Test CMake configuration with MinGW
+- [x] Update `vendors/libsokol/CMakeLists.txt` with Vulkan linking
+- [x] Update `src/CMakeLists.txt` for Vulkan readback source
+- [x] Test CMake configuration with MinGW
 
 ### Platform Detection
-- [ ] Update `src/platform.h` to use `SOKOL_VULKAN` for MinGW
+- [x] Update `src/platform.h` to use `SOKOL_VULKAN` for MinGW
 
 ### Shaders
-- [ ] Add Vulkan GLSL to `instanced_line_shaders.h`
-- [ ] Add Vulkan GLSL to `pick_shaders.h`
-- [ ] Add Vulkan GLSL to `join_shaders.h`
-- [ ] Verify shader syntax with `glslangValidator --target-env vulkan1.0`
+- [x] Add Vulkan GLSL to `instanced_line_shaders.h`
+- [x] Add Vulkan GLSL to `pick_shaders.h`
+- [x] Add Vulkan GLSL to `join_shaders.h`
+- [x] Verify shader syntax with `glslangValidator --target-env vulkan1.0`
 
 ### Pick Readback
-- [ ] Investigate Sokol Vulkan API exposure
-- [ ] Implement `pick_readback_vulkan.c`
-- [ ] Update `pick_readback.h` header
+- [x] Investigate Sokol Vulkan API exposure
+- [x] Implement `pick_readback_vulkan.c`
+- [x] Update `pick_readback.h` header
 
 ### Testing
-- [ ] Build MinGW Vulkan version
-- [ ] Verify basic rendering works
-- [ ] Verify line rendering works
-- [ ] Verify join rendering works
-- [ ] Test pick buffer (may be placeholder initially)
-- [ ] Performance comparison vs OpenGL build
+- [x] Build MinGW Vulkan version
+- [x] Verify basic rendering works
+- [x] Verify line rendering works
+- [x] Verify join rendering works
+- [x] Test pick buffer (fully implemented)
+- [ ] Performance comparison vs OpenGL build (deferred)
 
 ---
 
-## Phase 2: Visual Studio 2026 Vulkan Option (Future)
+## Phase 2: Visual Studio 2026 Vulkan Option (COMPLETED)
 
-Once Phase 1 is stable on MinGW, add Vulkan as an optional backend for MSVC builds.
+Phase 2 has been implemented, adding Vulkan as an optional backend for MSVC builds.
 
-### 2.1 Build Option
+### 2.1 Build Option (IMPLEMENTED)
 
-Add CMake option for MSVC builds:
+CMake option `USE_VULKAN` added for MSVC builds:
 
 ```cmake
 # In vendors/libsokol/CMakeLists.txt
@@ -384,7 +384,9 @@ elseif(WIN32)
 endif()
 ```
 
-### 2.2 Platform Header Update
+### 2.2 Platform Header Update (IMPLEMENTED)
+
+Platform detection updated to handle `USE_VULKAN` compile definition:
 
 ```c
 // src/platform.h
@@ -399,7 +401,9 @@ endif()
     #define PLATFORM_WINDOWS
 ```
 
-### 2.3 Build Commands
+### 2.3 Build Commands (VERIFIED)
+
+All build configurations tested and working:
 
 ```powershell
 # MinGW build (Vulkan - Phase 1)

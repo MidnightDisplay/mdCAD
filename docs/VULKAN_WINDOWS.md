@@ -1,6 +1,6 @@
-# Vulkan Backend for Windows (MinGW)
+# Vulkan Backend for Windows
 
-This document explains the Vulkan backend implementation for mdCAD on Windows using MinGW, focusing on the key differences from other backends and how to work with Vulkan shaders.
+This document explains the Vulkan backend implementation for mdCAD on Windows, covering both MinGW (default Vulkan) and Visual Studio 2026 (optional Vulkan) builds.
 
 ## Overview
 
@@ -9,18 +9,18 @@ mdCAD uses [Sokol](https://github.com/floooh/sokol) as its cross-platform graphi
 | Backend | Platforms | Shader Format |
 |---------|-----------|---------------|
 | Metal | macOS, iOS | MSL source strings |
-| D3D11 | Windows (MSVC) | HLSL source strings |
+| D3D11 | Windows (MSVC default) | HLSL source strings |
 | OpenGL | Linux, Web (fallback) | GLSL source strings |
 | WebGPU | Web | WGSL source strings |
-| **Vulkan** | Windows (MinGW), Linux | **SPIR-V bytecode** |
+| **Vulkan** | **Windows (MinGW, MSVC optional)**, Linux | **SPIR-V bytecode** |
 
 The critical difference is that **Vulkan requires precompiled SPIR-V bytecode**, while all other backends accept shader source code as strings that are compiled at runtime.
 
 ## Why Vulkan for MinGW?
 
 On Windows, we have two toolchain options:
-- **MSVC (Visual Studio)**: Uses D3D11 backend (excellent Windows integration)
-- **MinGW (GCC)**: Previously used OpenGL, now uses Vulkan
+- **MSVC (Visual Studio)**: Uses D3D11 backend by default, Vulkan optional via `-DUSE_VULKAN=ON`
+- **MinGW (GCC)**: Uses Vulkan backend (default)
 
 Vulkan provides better performance than OpenGL due to:
 - Lower driver overhead
@@ -303,6 +303,37 @@ $env:VULKAN_SDK = "C:\VulkanSDK\1.4.341.1"
 # Then rebuild the project
 cmake --build build-mingw
 ```
+
+## Build Commands
+
+### MinGW Vulkan Build (Default)
+
+```powershell
+# MinGW always uses Vulkan backend
+cmake -B build-mingw -G "MinGW Makefiles"
+cmake --build build-mingw
+.\build-mingw\bin\mdCAD.exe
+```
+
+### Visual Studio 2026 with D3D11 (Default)
+
+```powershell
+# MSVC default is D3D11
+cmake -B build -G "Visual Studio 18"
+cmake --build build --config Release
+.\build\bin\Release\mdCAD.exe
+```
+
+### Visual Studio 2026 with Vulkan (Optional)
+
+```powershell
+# MSVC with Vulkan backend - requires Vulkan SDK installed
+cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
+cmake --build build-vulkan --config Release
+.\build-vulkan\bin\Release\mdCAD.exe
+```
+
+**Note:** The `USE_VULKAN=ON` option requires the Vulkan SDK to be installed and the `VULKAN_SDK` environment variable to be set. The CMake configuration will fail with an error message if the SDK is not found.
 
 ## Vulkan-Specific Configuration
 

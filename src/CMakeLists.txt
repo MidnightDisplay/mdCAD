@@ -7,12 +7,14 @@ set(SOURCES
 # Add platform-specific pick buffer readback implementations
 if(APPLE)
     list(APPEND SOURCES gpu/pick_readback_metal.m)
-elseif(WIN32 AND NOT MINGW)
-    # D3D11 readback for MSVC builds
-    list(APPEND SOURCES gpu/pick_readback_d3d11.c)
-elseif(MINGW)
-    # Vulkan readback for MinGW builds
-    list(APPEND SOURCES gpu/pick_readback_vulkan.c)
+elseif(WIN32)
+    if(MINGW OR USE_VULKAN)
+        # Vulkan readback for MinGW or MSVC with USE_VULKAN=ON
+        list(APPEND SOURCES gpu/pick_readback_vulkan.c)
+    else()
+        # D3D11 readback for MSVC builds (default)
+        list(APPEND SOURCES gpu/pick_readback_d3d11.c)
+    endif()
 endif()
 
 # iOS requires MACOSX_BUNDLE for app packaging

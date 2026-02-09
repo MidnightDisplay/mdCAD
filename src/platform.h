@@ -11,8 +11,11 @@
     #if defined(__MINGW32__) || defined(__MINGW64__)
         // MinGW: use Vulkan for better performance
         #define SOKOL_VULKAN
+    #elif defined(USE_VULKAN)
+        // MSVC with Vulkan option enabled via CMake -DUSE_VULKAN=ON
+        #define SOKOL_VULKAN
     #else
-        // MSVC: use D3D11
+        // MSVC default: use D3D11
         #define SOKOL_D3D11
     #endif
     #define PLATFORM_WINDOWS
