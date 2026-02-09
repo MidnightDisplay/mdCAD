@@ -245,6 +245,19 @@ static const char* instanced_line_fs_source =
     "}\n";
 
 //------------------------------------------------------------------------------
+// Vulkan SPIR-V bytecode
+//------------------------------------------------------------------------------
+#elif defined(SOKOL_VULKAN)
+
+#include "spirv/spirv_bytecode.h"
+
+// Bytecode pointers and sizes for Vulkan
+static const uint8_t* instanced_line_vs_bytecode = instanced_line_vs_spirv;
+static const size_t instanced_line_vs_bytecode_size = sizeof(instanced_line_vs_spirv);
+static const uint8_t* instanced_line_fs_bytecode = instanced_line_fs_spirv;
+static const size_t instanced_line_fs_bytecode_size = sizeof(instanced_line_fs_spirv);
+
+//------------------------------------------------------------------------------
 // DirectX 11 HLSL
 //------------------------------------------------------------------------------
 #elif defined(SOKOL_D3D11)
@@ -303,7 +316,7 @@ static const char* instanced_line_fs_source =
     "}\n";
 
 #else
-#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, or SOKOL_D3D11"
+#error "Unknown graphics backend - define SOKOL_GLCORE, SOKOL_GLES3, SOKOL_METAL, SOKOL_WGPU, SOKOL_VULKAN, or SOKOL_D3D11"
 #endif
 
 #endif // INSTANCED_LINE_SHADERS_H

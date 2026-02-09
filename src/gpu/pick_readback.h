@@ -61,6 +61,12 @@ static inline bool pick_readback_pixels(sg_image img, int width, int height, uin
 // Declaration only here - implementation in .c file
 bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data);
 
+#elif defined(SOKOL_VULKAN)
+
+// Vulkan implementation is in pick_readback_vulkan.c
+// Note: Currently a placeholder - Sokol doesn't expose VkImage handles
+bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data);
+
 #else
 
 // Fallback - no readback support

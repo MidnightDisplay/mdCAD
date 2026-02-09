@@ -19,6 +19,7 @@ typedef struct {
     bool show_ecs_entities;
     bool *show_pick_debug;       // Pointer to external pick debug window state
     bool *show_slot_buffer_debug; // Pointer to external slot buffer debug window state
+    bool *show_fps_debug;        // Pointer to external FPS debug window state
 
     // ECS thickness controls (pointers to external state)
     float *ecs_line_width;
@@ -37,6 +38,7 @@ static inline void ui_visibility_init(ui_visibility_state_t* vis) {
     vis->show_ecs_entities = true;      // ECS entities visible by default
     vis->show_pick_debug = NULL;        // Set via setter
     vis->show_slot_buffer_debug = NULL; // Set via setter
+    vis->show_fps_debug = NULL;         // Set via setter
     vis->ecs_line_width = NULL;
     vis->ecs_point_size = NULL;
     vis->pick_thickness_multiplier = NULL;
@@ -49,6 +51,10 @@ static inline void ui_visibility_set_pick_debug_ptr(ui_visibility_state_t* vis, 
 
 static inline void ui_visibility_set_slot_buffer_debug_ptr(ui_visibility_state_t* vis, bool *slot_debug_open) {
     vis->show_slot_buffer_debug = slot_debug_open;
+}
+
+static inline void ui_visibility_set_fps_debug_ptr(ui_visibility_state_t* vis, bool *fps_debug_open) {
+    vis->show_fps_debug = fps_debug_open;
 }
 
 static inline void ui_visibility_set_ecs_thickness_ptrs(ui_visibility_state_t* vis,
@@ -104,6 +110,9 @@ static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
     }
     if (vis->show_slot_buffer_debug) {
         igCheckbox("Slot Buffer Debug", vis->show_slot_buffer_debug);
+    }
+    if (vis->show_fps_debug) {
+        igCheckbox("FPS Debug", vis->show_fps_debug);
     }
 
     igEnd();

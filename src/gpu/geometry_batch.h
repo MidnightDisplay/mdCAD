@@ -251,6 +251,30 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
     free(template_indices);
 
     // Create shader
+#if defined(SOKOL_VULKAN)
+    batch->shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(instanced_line_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(instanced_line_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // point_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // point_b
+            [3] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(geom_batch_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "ecs-line-shader"
+    });
+#else
     batch->shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = {
             .source = instanced_line_vs_source,
@@ -278,6 +302,7 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
         },
         .label = "ecs-line-shader"
     });
+#endif
 
 #if defined(_DEBUG) || defined(DEBUG)
     printf("[DEBUG] Line shader state: %d (2=valid, 4=failed)\n", sg_query_shader_state(batch->shd));
@@ -427,6 +452,29 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
     free(template_indices);
 
     // Create shader (uses join shader which works for circles)
+#if defined(SOKOL_VULKAN)
+    batch->shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(join_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(join_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // center
+            [2] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(geom_batch_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "ecs-point-shader"
+    });
+#else
     batch->shd = sg_make_shader(&(sg_shader_desc){
         .vertex_func = {
             .source = join_vs_source,
@@ -453,6 +501,7 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
         },
         .label = "ecs-point-shader"
     });
+#endif
 
 #if defined(_DEBUG) || defined(DEBUG)
     printf("[D3D11 DEBUG] Point shader state: %d (2=valid, 4=failed)\n", sg_query_shader_state(batch->shd));
