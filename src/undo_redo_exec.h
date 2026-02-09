@@ -401,6 +401,38 @@ static inline void undo_cmd_bulk_set_visible(undo_redo_t *ur, ecs_entity_t *enti
     undo_redo_push(ur, &cmd);
 }
 
+// Record geometry vertex position changes
+static inline void undo_cmd_set_geometry_vertices(undo_redo_t *ur, ecs_entity_t e,
+                                                    int *vertex_indices, vec3_t *old_positions,
+                                                    vec3_t *new_positions, int count) {
+    if (!ur || count <= 0) return;
+
+    undo_command_t cmd = {0};
+    cmd.type = CMD_SET_GEOMETRY_VERTICES;
+    cmd.data.set_vertices.entity_id = (uint64_t)e;
+    cmd.data.set_vertices.count = count;
+    cmd.data.set_vertices.vertex_indices = (int*)malloc(sizeof(int) * count);
+    cmd.data.set_vertices.old_positions = (vec3_t*)malloc(sizeof(vec3_t) * count);
+    cmd.data.set_vertices.new_positions = (vec3_t*)malloc(sizeof(vec3_t) * count);
+
+    memcpy(cmd.data.set_vertices.vertex_indices, vertex_indices, sizeof(int) * count);
+    memcpy(cmd.data.set_vertices.old_positions, old_positions, sizeof(vec3_t) * count);
+    memcpy(cmd.data.set_vertices.new_positions, new_positions, sizeof(vec3_t) * count);
+
+    undo_redo_push(ur, &cmd);
+}
+
+// Helper: set vertex position in GeometryComp by index
+static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
+    switch (g->type) {
+        case GEOM_POINT:    g->data.point.point = pos; break;
+        case GEOM_LINE:     if (idx == 0) g->data.line.a = pos; else g->data.line.b = pos; break;
+        case GEOM_POLYLINE: if (idx < g->data.polyline.count) g->data.polyline.points[idx] = pos; break;
+        case GEOM_POLYGON:  if (idx < g->data.polygon.count) g->data.polygon.points[idx] = pos; break;
+        default: break;
+    }
+}
+
 // ============================================================================
 // Apply Command (for redo)
 // ============================================================================
@@ -563,6 +595,20 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
                     r->instance_dirty = true;
                 }
             }
+            break;
+        }
+
+        case CMD_SET_GEOMETRY_VERTICES: {
+            ecs_entity_t e = (ecs_entity_t)cmd->data.set_vertices.entity_id;
+            GeometryComp *g = ecs_world_get_geometry(w, e);
+            if (g) {
+                for (int i = 0; i < cmd->data.set_vertices.count; i++) {
+                    undo_set_vertex_pos(g, cmd->data.set_vertices.vertex_indices[i],
+                                        cmd->data.set_vertices.new_positions[i]);
+                }
+            }
+            RenderableComp *r = ecs_world_get_renderable(w, e);
+            if (r) r->instance_dirty = true;
             break;
         }
 
@@ -741,6 +787,20 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
                     r->instance_dirty = true;
                 }
             }
+            break;
+        }
+
+        case CMD_SET_GEOMETRY_VERTICES: {
+            ecs_entity_t e = (ecs_entity_t)cmd->data.set_vertices.entity_id;
+            GeometryComp *g = ecs_world_get_geometry(w, e);
+            if (g) {
+                for (int i = 0; i < cmd->data.set_vertices.count; i++) {
+                    undo_set_vertex_pos(g, cmd->data.set_vertices.vertex_indices[i],
+                                        cmd->data.set_vertices.old_positions[i]);
+                }
+            }
+            RenderableComp *r = ecs_world_get_renderable(w, e);
+            if (r) r->instance_dirty = true;
             break;
         }
 

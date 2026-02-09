@@ -68,6 +68,9 @@ typedef enum {
     CMD_BULK_SET_COLOR,
     CMD_BULK_SET_VISIBLE,
 
+    // Geometry vertex editing (gizmo geometry mode)
+    CMD_SET_GEOMETRY_VERTICES,
+
     CMD_TYPE_COUNT
 } undo_cmd_type_t;
 
@@ -209,6 +212,14 @@ typedef struct {
     bool new_visible;
 } cmd_bulk_set_visible_t;
 
+typedef struct {
+    uint64_t entity_id;
+    int *vertex_indices;      // Which vertices changed
+    vec3_t *old_positions;    // Original positions (local space)
+    vec3_t *new_positions;    // New positions (local space)
+    int count;
+} cmd_set_geometry_vertices_t;
+
 // ============================================================================
 // Command Union
 // ============================================================================
@@ -227,6 +238,7 @@ typedef struct {
         cmd_set_parent_t set_parent;
         cmd_bulk_set_color_t bulk_color;
         cmd_bulk_set_visible_t bulk_visible;
+        cmd_set_geometry_vertices_t set_vertices;
     } data;
 } undo_command_t;
 
@@ -302,6 +314,12 @@ static inline void undo_command_free(undo_command_t *cmd) {
         case CMD_BULK_SET_VISIBLE:
             if (cmd->data.bulk_visible.entity_ids) free(cmd->data.bulk_visible.entity_ids);
             if (cmd->data.bulk_visible.old_visible) free(cmd->data.bulk_visible.old_visible);
+            break;
+
+        case CMD_SET_GEOMETRY_VERTICES:
+            if (cmd->data.set_vertices.vertex_indices) free(cmd->data.set_vertices.vertex_indices);
+            if (cmd->data.set_vertices.old_positions) free(cmd->data.set_vertices.old_positions);
+            if (cmd->data.set_vertices.new_positions) free(cmd->data.set_vertices.new_positions);
             break;
 
         default:
@@ -411,6 +429,7 @@ static inline const char* undo_cmd_name(undo_cmd_type_t type) {
         case CMD_SET_PARENT: return "Reparent";
         case CMD_BULK_SET_COLOR: return "Bulk Color";
         case CMD_BULK_SET_VISIBLE: return "Bulk Visibility";
+        case CMD_SET_GEOMETRY_VERTICES: return "Edit Vertices";
         default: return "Unknown";
     }
 }

@@ -36,6 +36,9 @@
 #include "ui/ui_slot_buffer_debug.h"
 #include "ui/ui_fps_debug.h"
 
+// Gizmo system
+#include "gizmo/gizmo.h"
+
 //------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
@@ -78,6 +81,18 @@ static struct {
 
     // Undo/Redo system
     undo_redo_t undo_redo;
+
+    // Gizmo system
+    gizmo_t gizmo;
+    bool gizmo_drag_active;
+    // Transform mode drag snapshots
+    vec3_t *gizmo_drag_start_positions;
+    ecs_entity_t *gizmo_drag_entities;
+    int gizmo_drag_entity_count;
+    // Geometry mode drag snapshots
+    vec3_t *gizmo_drag_start_vertices;
+    int *gizmo_drag_vertex_indices;
+    int gizmo_drag_vertex_count;
 } state;
 
 //------------------------------------------------------------------------------
@@ -176,6 +191,9 @@ static void init(void) {
     // Wire up undo/redo to scene hierarchy and entity inspector
     ui_scene_hierarchy_set_undo_redo(&state.scene_hierarchy, &state.undo_redo);
     ui_entity_inspector_set_undo_redo(&state.entity_inspector, &state.undo_redo);
+
+    // Initialize gizmo system
+    gizmo_init(&state.gizmo);
 
     // Create test ECS entities using the scene API
     {
@@ -302,6 +320,13 @@ static void frame(void) {
             }
         }
 
+        // Tab: toggle gizmo edit mode (Transform <-> Geometry)
+        if (igIsKeyPressed_Bool(ImGuiKey_Tab, false)) {
+            gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
+                ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
+            gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
+        }
+
         // Delete: Delete or Backspace (macOS) deletes selected entities
         if (igIsKeyPressed_Bool(ImGuiKey_Delete, false) ||
             igIsKeyPressed_Bool(ImGuiKey_Backspace, false)) {
@@ -331,6 +356,12 @@ static void frame(void) {
         }
     }
 
+    // Suppress camera input when gizmo is active (uses previous-frame hover state)
+    state.viewport.suppress_camera_input =
+        state.gizmo.hovered_handle != GIZMO_HANDLE_NONE ||
+        state.gizmo.hovered_vertex >= 0 ||
+        state.gizmo.mode == GIZMO_MODE_DRAGGING;
+
     // Viewport is always drawn (contains the 3D content)
     ui_viewport_draw(&state.viewport);
 
@@ -340,6 +371,14 @@ static void frame(void) {
     // Update ECS world and scene
     ecs_world_progress(&state.ecs_world, dt);
     ecs_scene_update(&state.ecs_scene);
+
+    // Update gizmo (must be after ecs_scene_update for correct world matrices)
+    {
+        vec3_t cam_eye = orbit_camera_get_eye_position(&state.camera);
+        float fov = 0.785398f;  // Must match perspective call below
+        float ecs_point_size = state.ecs_scene.batches.points.point_size;
+        gizmo_update(&state.gizmo, &state.selection, &state.ecs_scene, cam_eye, fov, ecs_point_size);
+    }
 
     // Update elapsed time for animation
     state.elapsed_time += dt;
@@ -370,6 +409,14 @@ static void frame(void) {
     // Draw ECS scene entities (lines, points, etc.)
     if (state.visibility.show_ecs_entities) {
         ecs_scene_draw(&state.ecs_scene, mvp, aspect_ratio);
+    }
+
+    // Draw gizmo overlay (always on top via depth-always pipeline)
+    if (state.gizmo.mode != GIZMO_MODE_HIDDEN) {
+        float gizmo_line_width = state.ecs_scene.batches.lines.line_width * 1.5f;
+        float gizmo_point_size = state.ecs_scene.batches.points.point_size * 2.0f;
+        gizmo_rendering_upload(&state.gizmo.rendering);
+        gizmo_rendering_draw(&state.gizmo.rendering, mvp, aspect_ratio, gizmo_line_width, gizmo_point_size);
     }
 
     sg_end_pass();
@@ -408,24 +455,179 @@ static void frame(void) {
             if (state.visibility.show_ecs_entities) {
                 ecs_scene_populate_pick_buffer(&state.ecs_scene, &state.pick_buffer);
             }
+            // Add gizmo handles + vertex handles to pick buffer
+            gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
 
             // Render pick pass
             pick_buffer_render(&state.pick_buffer, view, proj);
 
-            // Readback and update hover state (Note: readback not yet implemented)
+            // Readback and update hover state
             pick_buffer_readback(&state.pick_buffer);
             pick_buffer_update_hover(&state.pick_buffer);
 
-            // Update ECS hover state based on pick result
-            ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+            uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
 
-            // Handle click selection
-            if (state.viewport.clicked) {
-                uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
-                ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
-                selection_handle_click(&state.selection, clicked_entity,
-                                        state.viewport.shift_held,
-                                        state.viewport.ctrl_held);
+            // Route hover: gizmo handles first, then vertices, then entities
+            if (pick_id >= GIZMO_PICK_RESERVED_START) {
+                // Gizmo handle or vertex handle
+                gizmo_handle_hover(&state.gizmo, pick_id);
+                // Clear ECS hover
+                ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+            } else {
+                // Normal entity hover
+                gizmo_handle_hover(&state.gizmo, 0);  // Clear gizmo hover
+                ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+            }
+
+            // Handle mouse interactions
+            if (!state.gizmo_drag_active) {
+                // Check if we should start a gizmo drag
+                if (state.viewport.hovered && io->MouseDown[0] && igIsMouseClicked_Bool(0, false)) {
+                    if (state.gizmo.hovered_handle != GIZMO_HANDLE_NONE) {
+                        // Start gizmo drag — compute mouse ray
+                        float ndc_x = vp_x * 2.0f - 1.0f;
+                        float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
+                        mat4_t inv_vp = mat4_inverse(vp_mat);
+                        ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
+
+                        if (gizmo_begin_drag(&state.gizmo, mouse_ray)) {
+                            state.gizmo_drag_active = true;
+
+                            if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
+                                // Snapshot entity positions
+                                int count = state.selection.count;
+                                state.gizmo_drag_entity_count = count;
+                                state.gizmo_drag_entities = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
+                                state.gizmo_drag_start_positions = (vec3_t*)malloc(count * sizeof(vec3_t));
+                                for (int i = 0; i < count; i++) {
+                                    ecs_entity_t e = state.selection.entities[i];
+                                    state.gizmo_drag_entities[i] = e;
+                                    const TransformComp *t = ecs_world_get_transform(state.ecs_scene.world, e);
+                                    state.gizmo_drag_start_positions[i] = t ? t->position : vec3_make(0, 0, 0);
+                                }
+                            } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                                       state.gizmo.vertex_mode.active) {
+                                // Snapshot vertex positions
+                                gizmo_vertex_mode_t *vm = &state.gizmo.vertex_mode;
+                                ecs_entity_t entity = (ecs_entity_t)vm->target_entity;
+                                const GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+                                if (geom) {
+                                    int count = vm->selected_count;
+                                    state.gizmo_drag_vertex_count = count;
+                                    state.gizmo_drag_vertex_indices = (int*)malloc(count * sizeof(int));
+                                    state.gizmo_drag_start_vertices = (vec3_t*)malloc(count * sizeof(vec3_t));
+                                    for (int i = 0; i < count; i++) {
+                                        int idx = vm->selected_vertices[i];
+                                        state.gizmo_drag_vertex_indices[i] = idx;
+                                        state.gizmo_drag_start_vertices[i] = gizmo_vertex_mode_get_local_pos(geom, idx);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (state.gizmo.hovered_vertex >= 0 &&
+                               state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE) {
+                        // Clicked on a vertex handle — select it
+                        gizmo_vertex_mode_select(&state.gizmo.vertex_mode,
+                                                  state.gizmo.hovered_vertex,
+                                                  state.viewport.shift_held,
+                                                  state.viewport.ctrl_held);
+                    } else if (state.viewport.clicked) {
+                        // Normal entity click
+                        ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
+                        selection_handle_click(&state.selection, clicked_entity,
+                                                state.viewport.shift_held,
+                                                state.viewport.ctrl_held);
+                        // If selection changed while in geometry mode, update vertex mode
+                        if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE) {
+                            gizmo_set_edit_mode(&state.gizmo, GIZMO_GEOMETRY_MODE,
+                                                 &state.ecs_scene, &state.selection);
+                        }
+                    }
+                }
+            }
+
+            // Update active drag
+            if (state.gizmo_drag_active) {
+                float ndc_x = vp_x * 2.0f - 1.0f;
+                float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
+                mat4_t inv_vp = mat4_inverse(vp_mat);
+                ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
+
+                vec3_t delta = gizmo_update_drag(&state.gizmo, mouse_ray);
+                float delta_len = vec3_length(delta);
+
+                if (delta_len > 1e-7f) {
+                    if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
+                        // Apply delta to all selected entities
+                        for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                            ecs_entity_t e = state.gizmo_drag_entities[i];
+                            TransformComp *t = (TransformComp*)ecs_world_get_transform(state.ecs_scene.world, e);
+                            if (t) {
+                                t->position = vec3_add(t->position, delta);
+                                t->dirty = true;
+                                ecs_world_mark_descendants_dirty(state.ecs_scene.world, e);
+                            }
+                            RenderableComp *r = (RenderableComp*)ecs_world_get_renderable(state.ecs_scene.world, e);
+                            if (r) r->instance_dirty = true;
+                        }
+                    } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                               state.gizmo.vertex_mode.active) {
+                        // Apply delta to selected vertices
+                        ecs_entity_t entity = (ecs_entity_t)state.gizmo.vertex_mode.target_entity;
+                        GeometryComp *geom = (GeometryComp*)ecs_world_get_geometry(state.ecs_scene.world, entity);
+                        const TransformComp *xform = ecs_world_get_transform(state.ecs_scene.world, entity);
+                        if (geom && xform) {
+                            gizmo_vertex_mode_apply_delta(&state.gizmo.vertex_mode, geom, xform->world_matrix, delta);
+                        }
+                        RenderableComp *r = (RenderableComp*)ecs_world_get_renderable(state.ecs_scene.world, entity);
+                        if (r) r->instance_dirty = true;
+                    }
+                }
+
+                // End drag on mouse release
+                if (!io->MouseDown[0]) {
+                    vec3_t total_delta = gizmo_end_drag(&state.gizmo);
+                    state.gizmo_drag_active = false;
+
+                    // Record undo
+                    if (vec3_length(total_delta) > 1e-7f) {
+                        if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
+                            for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                                ecs_entity_t e = state.gizmo_drag_entities[i];
+                                const TransformComp *t = ecs_world_get_transform(state.ecs_scene.world, e);
+                                vec3_t new_pos = t ? t->position : vec3_make(0, 0, 0);
+                                undo_cmd_set_position(&state.undo_redo, e,
+                                    state.gizmo_drag_start_positions[i], new_pos);
+                            }
+                        } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                                   state.gizmo.vertex_mode.active) {
+                            ecs_entity_t entity = (ecs_entity_t)state.gizmo.vertex_mode.target_entity;
+                            const GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+                            if (geom && state.gizmo_drag_vertex_count > 0) {
+                                int count = state.gizmo_drag_vertex_count;
+                                vec3_t *new_positions = (vec3_t*)malloc(count * sizeof(vec3_t));
+                                for (int i = 0; i < count; i++) {
+                                    new_positions[i] = gizmo_vertex_mode_get_local_pos(geom,
+                                        state.gizmo_drag_vertex_indices[i]);
+                                }
+                                undo_cmd_set_geometry_vertices(&state.undo_redo, entity,
+                                    state.gizmo_drag_vertex_indices,
+                                    state.gizmo_drag_start_vertices,
+                                    new_positions, count);
+                                free(new_positions);
+                            }
+                        }
+                        ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                    }
+
+                    // Free drag arrays
+                    free(state.gizmo_drag_entities); state.gizmo_drag_entities = NULL;
+                    free(state.gizmo_drag_start_positions); state.gizmo_drag_start_positions = NULL;
+                    state.gizmo_drag_entity_count = 0;
+                    free(state.gizmo_drag_vertex_indices); state.gizmo_drag_vertex_indices = NULL;
+                    free(state.gizmo_drag_start_vertices); state.gizmo_drag_start_vertices = NULL;
+                    state.gizmo_drag_vertex_count = 0;
+                }
             }
         }
     }
@@ -446,6 +648,13 @@ static void frame(void) {
 //------------------------------------------------------------------------------
 static void cleanup(void) {
     imgui_storage_shutdown();
+
+    // Shutdown gizmo system
+    gizmo_shutdown(&state.gizmo);
+    free(state.gizmo_drag_entities);
+    free(state.gizmo_drag_start_positions);
+    free(state.gizmo_drag_vertex_indices);
+    free(state.gizmo_drag_start_vertices);
 
     // Shutdown undo/redo system
     undo_redo_shutdown(&state.undo_redo);

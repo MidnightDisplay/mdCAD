@@ -30,6 +30,7 @@ typedef struct {
     bool clicked;                    // Was viewport clicked this frame (left button)
     bool shift_held;                 // Is shift key held during click
     bool ctrl_held;                  // Is ctrl/cmd key held during click
+    bool suppress_camera_input;      // Suppress camera when gizmo is active
 } ui_viewport_state_t;
 
 //------------------------------------------------------------------------------
@@ -126,7 +127,7 @@ static inline bool ui_viewport_draw(ui_viewport_state_t* vp) {
         vp->ctrl_held = ctrl;
     }
 
-    if (vp->camera) {
+    if (vp->camera && !vp->suppress_camera_input) {
         bool hovered = vp->hovered;
 
         float dx = io->MouseDelta.x;

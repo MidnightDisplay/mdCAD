@@ -182,4 +182,96 @@ static inline vec3_t mat4_mul_point(mat4_t m, vec3_t p) {
     };
 }
 
+//------------------------------------------------------------------------------
+// Ray type and intersection functions
+//------------------------------------------------------------------------------
+typedef struct { vec3_t origin, direction; } ray_t;
+
+// General 4x4 matrix inverse (cofactor method)
+static inline mat4_t mat4_inverse(mat4_t m) {
+    float *a = m.m;
+    mat4_t inv;
+    float *o = inv.m;
+
+    float s0 = a[0]*a[5] - a[4]*a[1];
+    float s1 = a[0]*a[6] - a[4]*a[2];
+    float s2 = a[0]*a[7] - a[4]*a[3];
+    float s3 = a[1]*a[6] - a[5]*a[2];
+    float s4 = a[1]*a[7] - a[5]*a[3];
+    float s5 = a[2]*a[7] - a[6]*a[3];
+
+    float c5 = a[10]*a[15] - a[14]*a[11];
+    float c4 = a[9]*a[15]  - a[13]*a[11];
+    float c3 = a[9]*a[14]  - a[13]*a[10];
+    float c2 = a[8]*a[15]  - a[12]*a[11];
+    float c1 = a[8]*a[14]  - a[12]*a[10];
+    float c0 = a[8]*a[13]  - a[12]*a[9];
+
+    float det = s0*c5 - s1*c4 + s2*c3 + s3*c2 - s4*c1 + s5*c0;
+    if (fabsf(det) < 1e-12f) return mat4_identity();
+    float invdet = 1.0f / det;
+
+    o[0]  = ( a[5]*c5 - a[6]*c4 + a[7]*c3) * invdet;
+    o[1]  = (-a[1]*c5 + a[2]*c4 - a[3]*c3) * invdet;
+    o[2]  = ( a[13]*s5 - a[14]*s4 + a[15]*s3) * invdet;
+    o[3]  = (-a[9]*s5  + a[10]*s4 - a[11]*s3) * invdet;
+    o[4]  = (-a[4]*c5 + a[6]*c2 - a[7]*c1) * invdet;
+    o[5]  = ( a[0]*c5 - a[2]*c2 + a[3]*c1) * invdet;
+    o[6]  = (-a[12]*s5 + a[14]*s2 - a[15]*s1) * invdet;
+    o[7]  = ( a[8]*s5  - a[10]*s2 + a[11]*s1) * invdet;
+    o[8]  = ( a[4]*c4 - a[5]*c2 + a[7]*c0) * invdet;
+    o[9]  = (-a[0]*c4 + a[1]*c2 - a[3]*c0) * invdet;
+    o[10] = ( a[12]*s4 - a[13]*s2 + a[15]*s0) * invdet;
+    o[11] = (-a[8]*s4  + a[9]*s2  - a[11]*s0) * invdet;
+    o[12] = (-a[4]*c3 + a[5]*c1 - a[6]*c0) * invdet;
+    o[13] = ( a[0]*c3 - a[1]*c1 + a[2]*c0) * invdet;
+    o[14] = (-a[12]*s3 + a[13]*s1 - a[14]*s0) * invdet;
+    o[15] = ( a[8]*s3  - a[9]*s1  + a[10]*s0) * invdet;
+
+    return inv;
+}
+
+// Unproject screen NDC (-1..+1) to world-space ray
+static inline ray_t ray_from_screen(float ndc_x, float ndc_y, mat4_t inv_vp) {
+    vec3_t near_pt = mat4_mul_point(inv_vp, vec3_make(ndc_x, ndc_y, -1.0f));
+    vec3_t far_pt  = mat4_mul_point(inv_vp, vec3_make(ndc_x, ndc_y,  1.0f));
+    // For perspective projection, we need proper w-divide
+    // mat4_mul_point doesn't do w-divide, so do it manually
+    float *m = inv_vp.m;
+    {
+        float w_near = m[3]*ndc_x + m[7]*ndc_y + m[11]*(-1.0f) + m[15];
+        float w_far  = m[3]*ndc_x + m[7]*ndc_y + m[11]*( 1.0f) + m[15];
+        if (fabsf(w_near) > 1e-6f) near_pt = vec3_scale(near_pt, 1.0f / w_near);
+        if (fabsf(w_far)  > 1e-6f) far_pt  = vec3_scale(far_pt,  1.0f / w_far);
+    }
+    ray_t r;
+    r.origin = near_pt;
+    r.direction = vec3_normalize(vec3_sub(far_pt, near_pt));
+    return r;
+}
+
+// Closest parameter t on an axis line to a ray (for axis-constrained dragging)
+// Returns t such that axis_origin + t * axis_dir is closest to ray
+static inline float ray_axis_closest_t(ray_t ray, vec3_t axis_origin, vec3_t axis_dir) {
+    vec3_t w = vec3_sub(ray.origin, axis_origin);
+    float a = vec3_dot(axis_dir, axis_dir);
+    float b = vec3_dot(axis_dir, ray.direction);
+    float c = vec3_dot(ray.direction, ray.direction);
+    float d = vec3_dot(axis_dir, w);
+    float e = vec3_dot(ray.direction, w);
+    float denom = a * c - b * b;
+    if (fabsf(denom) < 1e-6f) return 0.0f;  // Degenerate: ray parallel to axis
+    return (b * e - c * d) / denom;
+}
+
+// Ray-plane intersection. Returns distance t, writes hit point.
+// Returns -1.0 if no intersection (ray parallel to plane).
+static inline float ray_plane_intersect(ray_t ray, vec3_t plane_pt, vec3_t plane_n, vec3_t *hit) {
+    float denom = vec3_dot(plane_n, ray.direction);
+    if (fabsf(denom) < 1e-6f) return -1.0f;
+    float t = vec3_dot(vec3_sub(plane_pt, ray.origin), plane_n) / denom;
+    if (hit) *hit = vec3_add(ray.origin, vec3_scale(ray.direction, t));
+    return t;
+}
+
 #endif // MATH3D_H
