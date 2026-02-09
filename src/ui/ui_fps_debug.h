@@ -123,6 +123,11 @@ static inline void ui_fps_debug_draw(ui_fps_debug_state_t *state) {
         
         // Get cursor position before drawing plot (for overlay positioning)
         ImVec2_c plot_pos = igGetCursorScreenPos();
+
+        // Draw FPS counter overlaid at top-middle of plot
+        // Format FPS string
+        char fps_str[32];
+        snprintf(fps_str, sizeof(fps_str), "%.1f FPS", state->current_fps);
         
         // Draw the plot filling the window
         ImVec2_c plot_size = { plot_width, plot_height };
@@ -131,37 +136,12 @@ static inline void ui_fps_debug_draw(ui_fps_debug_state_t *state) {
             display_samples,
             display_count,
             0,                  // values_offset
-            NULL,               // overlay_text (we'll draw our own)
+            fps_str,               // overlay_text (we'll draw our own)
             0.0f,               // scale_min
             state->max_fps,     // scale_max (autoscaled)
             plot_size,
             sizeof(float)
         );
-        
-        // Draw FPS counter overlaid at top-middle of plot
-        // Format FPS string
-        char fps_str[32];
-        snprintf(fps_str, sizeof(fps_str), "%.1f FPS", state->current_fps);
-        
-        // Calculate text size for centering
-        ImVec2_c text_size = igCalcTextSize(fps_str, NULL, false, 0.0f);
-        
-        ImVec2_c text_pos = {
-            plot_pos.x + plot_width * 0.5f - text_size.x * 0.5f,
-            plot_pos.y + 5.0f
-        };
-        
-        // Draw background for readability
-        ImDrawList* draw_list = igGetWindowDrawList();
-        ImVec2_c bg_min = { text_pos.x - 4, text_pos.y - 2 };
-        ImVec2_c bg_max = { text_pos.x + text_size.x + 4, text_pos.y + text_size.y + 2 };
-        ImDrawList_AddRectFilled(draw_list, bg_min, bg_max, 
-            igColorConvertFloat4ToU32((ImVec4_c){0.1f, 0.1f, 0.1f, 0.8f}), 4.0f, 0);
-        
-        // Draw FPS text
-        ImDrawList_AddText_Vec2(draw_list, text_pos, 
-            igColorConvertFloat4ToU32((ImVec4_c){0.0f, 1.0f, 0.3f, 1.0f}), 
-            fps_str, NULL);
     }
     igEnd();
 }
