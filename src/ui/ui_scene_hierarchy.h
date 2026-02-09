@@ -639,11 +639,11 @@ static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_
     char label[256];
     LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
     if (lbl && lbl->name[0]) {
-        snprintf(label, sizeof(label), "%s - %s #%llu",
-                 geometry_type_name(type), lbl->name,
+        snprintf(label, sizeof(label), "[%s] - %s #%llu",
+                 lbl->name, geometry_type_name(type),
                  (unsigned long long)e);
     } else {
-        snprintf(label, sizeof(label), "%s #%llu",
+        snprintf(label, sizeof(label), "- %s #%llu",
                  geometry_type_name(type),
                  (unsigned long long)e);
     }
@@ -747,11 +747,11 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
     char label[256];
     LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
     if (lbl && lbl->name[0]) {
-        snprintf(label, sizeof(label), "%s - %s #%llu",
-                 geometry_type_name(type), lbl->name,
+        snprintf(label, sizeof(label), "[%s] - %s #%llu",
+                 lbl->name, geometry_type_name(type),
                  (unsigned long long)e);
     } else {
-        snprintf(label, sizeof(label), "%s #%llu",
+        snprintf(label, sizeof(label), "- %s #%llu",
                  geometry_type_name(type),
                  (unsigned long long)e);
     }
