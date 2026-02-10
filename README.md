@@ -2,7 +2,7 @@
 
 A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering.
 
-<!-- screenshot -->
+![image](mdCAD.png)
 
 ## Features
 

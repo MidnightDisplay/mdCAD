@@ -4,6 +4,8 @@
 
 **On fresh sessions:** Always read `CHECKPOINT.md` first to understand the current project state and pick up where the previous session left off.
 
+**Project blurb** README.md is the introduction to our project - must be kept up to date with ongoing development.
+
 ## New feature planning and implementation
 
 **After running plan mode** Always save the plan file as `PLAN_*.md` to `.plans/` folder. 
