@@ -705,7 +705,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .width = 1280,
         .height = 720,
         .high_dpi = true,
-        .icon.sokol_default = true,
+        .icon.sokol_default = false,
         .logger.func = slog_func,
     };
 }
