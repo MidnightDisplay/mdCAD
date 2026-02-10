@@ -35,7 +35,7 @@ emcmake cmake -B build-web && cmake --build build-web
 open build-web/bin/mdCAD.html
 ```
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for full build instructions including iOS, Android, Visual Studio, and Vulkan configurations.
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for full build instructions including iOS, Android, and MinGW configurations.
 
 ## Platform Support
 
