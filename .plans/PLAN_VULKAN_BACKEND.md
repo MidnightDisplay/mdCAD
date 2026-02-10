@@ -344,7 +344,7 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
 - [x] Verify line rendering works
 - [x] Verify join rendering works
 - [x] Test pick buffer (fully implemented)
-- [ ] Performance comparison vs OpenGL build (deferred)
+- [x] Performance comparison vs OpenGL build (result: significant visible difference ~20 FPS)
 
 ---
 

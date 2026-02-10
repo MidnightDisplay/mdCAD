@@ -23,11 +23,7 @@ scripts/test-output/
 .claude/
 CLAUDE.md
 
-# Other Agents
-AGENTS.md
-CHECKPOINT.md
-
-# Plans
+# Plan files
 *.prompt.md
 
 # Imgui
