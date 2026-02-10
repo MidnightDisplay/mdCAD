@@ -18,6 +18,7 @@
 #include "../scene_serializer.h"
 #include "../undo_redo_exec.h"  // Includes undo_redo.h and provides undo/redo functions
 #include "ui_file_browser.h"
+#include "ui_about.h"
 #include "../ply_loader.h"
 #include "../ply_import_job.h"
 #include "../jsonl_loader.h"
@@ -111,6 +112,9 @@ typedef struct {
     // JSONL Import job
     jsonl_import_job_t jsonl_import_job;
     bool jsonl_import_progress_popup_open;
+
+    // About window
+    ui_about_state_t about;
 } ui_scene_hierarchy_state_t;
 
 //------------------------------------------------------------------------------
@@ -185,6 +189,9 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     // Initialize JSONL import job
     jsonl_import_job_init(&state->jsonl_import_job);
     state->jsonl_import_progress_popup_open = false;
+
+    // Initialize about window
+    ui_about_init(&state->about);
 }
 
 // Set undo/redo system (optional, can be NULL)
@@ -950,6 +957,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         }
 
         ui_scene_hierarchy_draw_add_menu(state);
+        ui_about_draw_menu(&state->about);
         igEndMenuBar();
     }
 
@@ -1819,6 +1827,9 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     }
 
     igEnd();
+
+    // Draw the About window (independent of Scene Hierarchy window)
+    ui_about_draw(&state->about);
 }
 
 #endif // UI_SCENE_HIERARCHY_H

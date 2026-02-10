@@ -1,4 +1,4 @@
-# Session Checkpoint - 2026-02-09
+# Session Checkpoint - 2026-02-10
 
 ## Project Overview
 
@@ -64,6 +64,7 @@ src/
 │   ├── ui_pick_debug.h     # Pick buffer debug visualization
 │   ├── ui_entity_inspector.h   # Entity property inspector
 │   ├── ui_scene_hierarchy.h    # Scene hierarchy with entity list
+│   ├── ui_about.h              # Help -> About window with license info
 │   ├── ui_slot_buffer_debug.h  # Slot buffer debug viewer
 │   ├── ui_fps_debug.h          # FPS counter with rolling plot
 │   └── ui_file_browser.h       # Cross-platform file browser
@@ -81,6 +82,7 @@ src/
         └── spirv_bytecode.h     # Generated C byte arrays
 
 scripts/
+├── gather_licenses.py   # Regenerate THIRD_PARTY_LICENSES.md from vendor LICENSE files
 └── vulkan-win/          # Vulkan shader build scripts (Windows)
     ├── compile-spirv.ps1
     ├── generate-bytecode-header.ps1
@@ -99,7 +101,7 @@ vendors/
 ```bash
 # Native build (macOS - Metal backend)
 cmake -B build -G Ninja && ninja -C build
-./build/bin/skl_tmp
+./build/bin/mdCAD
 
 # Windows build (D3D11 backend - Visual Studio, default)
 cmake -B build-msvc -G "Visual Studio 18"
@@ -118,7 +120,7 @@ cmake --build build-mingw
 
 # iOS build (Metal backend)
 cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
-open build-ios/skl_tmp.xcodeproj
+open build-ios/mdCAD.xcodeproj
 
 # Android build (GLES3 backend)
 cd android && ./gradlew assembleDebug
@@ -126,7 +128,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Web build (WebGPU backend)
 emcmake cmake -B build-web && cmake --build build-web
-open build-web/bin/skl_tmp.html
+open build-web/bin/mdCAD.html
 ```
 
 ## ECS Architecture
@@ -203,6 +205,43 @@ Use `instance_buffer_alloc_contiguous(n)` to avoid free-list fragmentation issue
 When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
+
+## Recent Changes (2026-02-10)
+
+### Licensing, Attribution & Help -> About Window (IMPLEMENTED)
+
+Added MIT license, third-party attributions, in-app About window, and project README.
+
+**New Files:**
+- `LICENSE` - MIT license (Copyright (c) 2026 Rodion Radchenko and mdCAD contributors)
+- `THIRD_PARTY_LICENSES.md` - Full license texts for all third-party libraries
+- `scripts/gather_licenses.py` - Script to regenerate `THIRD_PARTY_LICENSES.md` from vendor/build LICENSE files (with hardcoded fallbacks for vendored amalgamations)
+- `src/ui/ui_about.h` - Help -> About window (header-only, follows project conventions)
+- `README.md` - Project front page with features, quick start, platform table, architecture overview
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Integrated About window: added include, state field, init call, Help menu after Edit menu, draw call
+
+**About Window Contents:**
+- App name "mdCAD" + version (v0.1.0)
+- MIT license notice + copyright line
+- Collapsing headers for each third-party library (Sokol, Dear ImGui, cimgui, Flecs, cJSON) showing copyright, license type, and URL
+- Reference to `THIRD_PARTY_LICENSES.md` for full texts
+- Close button
+
+**Third-Party Libraries Covered:**
+
+| Library | License | Copyright |
+|---------|---------|-----------|
+| Sokol | zlib/libpng | (c) 2018 Andre Weissflog |
+| Dear ImGui | MIT | (c) 2014-2024 Omar Cornut |
+| cimgui | MIT | (c) 2015 Stephan Dilly |
+| Flecs | MIT | (c) 2019 Sander Mertens |
+| cJSON | MIT | (c) 2009-2017 Dave Gamble and cJSON contributors |
+
+### Documentation Tidy-Up
+- Fixed stale binary name references in CHECKPOINT.md build commands (`skl_tmp` -> `mdCAD`)
+- Removed obsolete `docs/CMAKE_FIX.md`
 
 ## Recent Changes (2026-02-09)
 
