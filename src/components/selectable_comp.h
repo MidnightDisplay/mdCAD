@@ -7,6 +7,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+//------------------------------------------------------------------------------
+// Reserved pick ID ranges (top of 24-bit range for gizmo system)
+//------------------------------------------------------------------------------
+#define GIZMO_PICK_RESERVED_START  16767200u   // Everything >= this is gizmo territory
+#define GIZMO_HANDLE_BASE          16767200u   // 16 IDs: transform gizmo handles (16767200-16767215)
+#define GIZMO_HANDLE_COUNT         16
+#define VERTEX_HANDLE_BASE         16767216u   // 10000 IDs: vertex handles (16767216-16777215)
+#define VERTEX_HANDLE_MAX          10000
+
 typedef struct {
     uint32_t pick_id;           // Unique ID for GPU picking (1-16777215)
     bool pickable;              // Can be picked

@@ -86,6 +86,12 @@ typedef struct {
     instance_buffer_t line_instances;
     instance_buffer_t point_instances;
 
+    // Overlay pick (depth-always, renders on top — for gizmo handles)
+    sg_pipeline overlay_line_pip;
+    sg_pipeline overlay_point_pip;
+    instance_buffer_t overlay_line_instances;
+    instance_buffer_t overlay_point_instances;
+
     // CPU readback buffer
     uint8_t *pixel_data;
 
@@ -451,6 +457,62 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     // Initialize instance buffers
     instance_buffer_init(&pb->line_instances, sizeof(pick_line_instance_t), 64, "pick-line-instances");
     instance_buffer_init(&pb->point_instances, sizeof(pick_point_instance_t), 64, "pick-point-instances");
+
+    // Create overlay pipelines (depth-always, no depth write — for gizmo picks on top)
+    pb->overlay_line_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = pb->line_shd,  // Reuse same shaders
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },
+            }
+        },
+        .index_type = SG_INDEXTYPE_UINT16,
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = {
+            .compare = SG_COMPAREFUNC_ALWAYS,
+            .write_enabled = false,
+            .pixel_format = SG_PIXELFORMAT_DEPTH
+        },
+        .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "pick-overlay-line-pipeline"
+    });
+
+    pb->overlay_point_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = pb->point_shd,  // Reuse same shaders
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },
+            }
+        },
+        .index_type = SG_INDEXTYPE_UINT16,
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = {
+            .compare = SG_COMPAREFUNC_ALWAYS,
+            .write_enabled = false,
+            .pixel_format = SG_PIXELFORMAT_DEPTH
+        },
+        .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "pick-overlay-point-pipeline"
+    });
+
+    // Initialize overlay instance buffers
+    instance_buffer_init(&pb->overlay_line_instances, sizeof(pick_line_instance_t), 32, "pick-overlay-line-instances");
+    instance_buffer_init(&pb->overlay_point_instances, sizeof(pick_point_instance_t), 32, "pick-overlay-point-instances");
 }
 
 //------------------------------------------------------------------------------
@@ -459,11 +521,15 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
 static inline void pick_buffer_shutdown(pick_buffer_t *pb) {
     instance_buffer_shutdown(&pb->line_instances);
     instance_buffer_shutdown(&pb->point_instances);
+    instance_buffer_shutdown(&pb->overlay_line_instances);
+    instance_buffer_shutdown(&pb->overlay_point_instances);
 
     sg_destroy_pipeline(pb->line_pip);
     sg_destroy_shader(pb->line_shd);
     sg_destroy_pipeline(pb->point_pip);
     sg_destroy_shader(pb->point_shd);
+    sg_destroy_pipeline(pb->overlay_line_pip);
+    sg_destroy_pipeline(pb->overlay_point_pip);
 
     sg_destroy_buffer(pb->line_template_vbuf);
     sg_destroy_buffer(pb->line_template_ibuf);
@@ -498,6 +564,8 @@ static inline void pick_buffer_begin_frame(pick_buffer_t *pb) {
     // Reset instance buffers (free all slots)
     instance_buffer_clear(&pb->line_instances);
     instance_buffer_clear(&pb->point_instances);
+    instance_buffer_clear(&pb->overlay_line_instances);
+    instance_buffer_clear(&pb->overlay_point_instances);
 }
 
 //------------------------------------------------------------------------------
@@ -536,6 +604,45 @@ static inline void pick_buffer_add_point(pick_buffer_t *pb,
             .r = r, .g = g, .b = b
         };
         instance_buffer_set(&pb->point_instances, slot, &inst);
+    }
+}
+
+//------------------------------------------------------------------------------
+// Add an overlay line for pick rendering (depth-always, renders on top)
+//------------------------------------------------------------------------------
+static inline void pick_buffer_add_overlay_line(pick_buffer_t *pb,
+                                                 vec3_t a, vec3_t b,
+                                                 uint32_t pick_id) {
+    int slot = instance_buffer_alloc_slot(&pb->overlay_line_instances);
+    if (slot >= 0) {
+        float r, g, b_color;
+        pick_id_to_rgb_float(pick_id, &r, &g, &b_color);
+
+        pick_line_instance_t inst = {
+            .ax = a.x, .ay = a.y, .az = a.z,
+            .bx = b.x, .by = b.y, .bz = b.z,
+            .r = r, .g = g, .b = b_color
+        };
+        instance_buffer_set(&pb->overlay_line_instances, slot, &inst);
+    }
+}
+
+//------------------------------------------------------------------------------
+// Add an overlay point for pick rendering (depth-always, renders on top)
+//------------------------------------------------------------------------------
+static inline void pick_buffer_add_overlay_point(pick_buffer_t *pb,
+                                                  vec3_t center,
+                                                  uint32_t pick_id) {
+    int slot = instance_buffer_alloc_slot(&pb->overlay_point_instances);
+    if (slot >= 0) {
+        float r, g, b;
+        pick_id_to_rgb_float(pick_id, &r, &g, &b);
+
+        pick_point_instance_t inst = {
+            .x = center.x, .y = center.y, .z = center.z,
+            .r = r, .g = g, .b = b
+        };
+        instance_buffer_set(&pb->overlay_point_instances, slot, &inst);
     }
 }
 
@@ -651,6 +758,40 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
         });
         sg_apply_uniforms(0, &SG_RANGE(params));
         sg_draw(0, pb->point_template_index_count, point_count);
+    }
+
+    // Draw overlay picks (depth-always, on top of everything)
+    instance_buffer_upload(&pb->overlay_line_instances);
+    instance_buffer_upload(&pb->overlay_point_instances);
+
+    int overlay_line_count = instance_buffer_count(&pb->overlay_line_instances);
+    if (overlay_line_count > 0) {
+        params.line_width = scaled_line_width;
+        sg_apply_pipeline(pb->overlay_line_pip);
+        sg_apply_bindings(&(sg_bindings){
+            .vertex_buffers = {
+                [0] = pb->line_template_vbuf,
+                [1] = instance_buffer_gpu_buffer(&pb->overlay_line_instances)
+            },
+            .index_buffer = pb->line_template_ibuf
+        });
+        sg_apply_uniforms(0, &SG_RANGE(params));
+        sg_draw(0, pb->line_template_index_count, overlay_line_count);
+    }
+
+    int overlay_point_count = instance_buffer_count(&pb->overlay_point_instances);
+    if (overlay_point_count > 0) {
+        params.line_width = scaled_line_width * 1.5f;
+        sg_apply_pipeline(pb->overlay_point_pip);
+        sg_apply_bindings(&(sg_bindings){
+            .vertex_buffers = {
+                [0] = pb->point_template_vbuf,
+                [1] = instance_buffer_gpu_buffer(&pb->overlay_point_instances)
+            },
+            .index_buffer = pb->point_template_ibuf
+        });
+        sg_apply_uniforms(0, &SG_RANGE(params));
+        sg_draw(0, pb->point_template_index_count, overlay_point_count);
     }
 
     sg_end_pass();

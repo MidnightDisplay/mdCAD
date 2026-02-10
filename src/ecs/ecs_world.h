@@ -46,6 +46,8 @@ static inline uint32_t ecs_world_alloc_pick_id(ecs_world_state_t *s) {
     if (s->free_pick_count > 0) {
         return s->free_pick_ids[--s->free_pick_count];
     }
+    // Cap below reserved gizmo range
+    if (s->next_pick_id >= GIZMO_PICK_RESERVED_START) return 0;
     // Allocate new ID
     return s->next_pick_id++;
 }

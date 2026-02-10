@@ -300,7 +300,7 @@ $env:VULKAN_SDK = "C:\VulkanSDK\1.4.341.1"
 # Run full shader build
 .\scripts\vulkan-win\build-all.ps1
 
-# Then rebuild the project
+# Then rebuild the project (MinGW config)
 cmake --build build-mingw
 ```
 
@@ -315,22 +315,22 @@ cmake --build build-mingw
 .\build-mingw\bin\mdCAD.exe
 ```
 
-### Visual Studio 2026 with D3D11 (Default)
-
-```powershell
-# MSVC default is D3D11
-cmake -B build -G "Visual Studio 18"
-cmake --build build --config Release
-.\build\bin\Release\mdCAD.exe
-```
-
-### Visual Studio 2026 with Vulkan (Optional)
+### Visual Studio 2026 with Vulkan (Default)
 
 ```powershell
 # MSVC with Vulkan backend - requires Vulkan SDK installed
 cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
 cmake --build build-vulkan --config Release
 .\build-vulkan\bin\Release\mdCAD.exe
+```
+
+### Visual Studio 2026 with D3D11 (Optional)
+
+```powershell
+# MSVC default is D3D11
+cmake -B build-msvc -G "Visual Studio 18"
+cmake --build build-msvc --config Release
+.\build-msvc\bin\Release\mdCAD.exe
 ```
 
 **Note:** The `USE_VULKAN=ON` option requires the Vulkan SDK to be installed and the `VULKAN_SDK` environment variable to be set. The CMake configuration will fail with an error message if the SDK is not found.
