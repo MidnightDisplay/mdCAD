@@ -255,7 +255,7 @@ static inline void gizmo_vertex_mode_populate_pick(const gizmo_vertex_mode_t *vm
         vec3_t local = gizmo_vertex_mode_get_local_pos(geom, i);
         vec3_t world = mat4_mul_point(world_matrix, local);
         uint32_t pick_id = VERTEX_HANDLE_BASE + (uint32_t)i;
-        pick_buffer_add_point(pb, world, pick_id);
+        pick_buffer_add_overlay_point(pb, world, pick_id);
     }
 }
 

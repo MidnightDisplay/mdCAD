@@ -253,7 +253,8 @@ static inline ray_t ray_from_screen(float ndc_x, float ndc_y, mat4_t inv_vp) {
 // Closest parameter t on an axis line to a ray (for axis-constrained dragging)
 // Returns t such that axis_origin + t * axis_dir is closest to ray
 static inline float ray_axis_closest_t(ray_t ray, vec3_t axis_origin, vec3_t axis_dir) {
-    vec3_t w = vec3_sub(ray.origin, axis_origin);
+    // w = axis_origin - ray.origin (standard convention: w0 = P1 - P2)
+    vec3_t w = vec3_sub(axis_origin, ray.origin);
     float a = vec3_dot(axis_dir, axis_dir);
     float b = vec3_dot(axis_dir, ray.direction);
     float c = vec3_dot(ray.direction, ray.direction);

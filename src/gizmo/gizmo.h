@@ -59,6 +59,7 @@ typedef struct {
     float scale;                        // Current world-space scale for constant screen size
 
     // Drag state
+    vec3_t drag_origin;                 // Gizmo center at drag start (fixed reference)
     float drag_start_t;                 // Axis: parameter at drag start
     vec3_t drag_start_hit;              // Plane: hit point at drag start
     vec3_t drag_accumulated;            // Total delta applied so far
@@ -301,6 +302,8 @@ static inline void gizmo_set_edit_mode(gizmo_t *g,
             const GeometryComp *geom = ecs_world_get_geometry(world, entity);
             if (geom && gizmo_vertex_mode_enter(&g->vertex_mode, (uint64_t)entity, geom)) {
                 g->edit_mode = GIZMO_GEOMETRY_MODE;
+                // Auto-select first vertex
+                gizmo_vertex_mode_select(&g->vertex_mode, 0, false, false);
             }
             // If geometry type not supported, stay in transform mode
         }
@@ -325,15 +328,15 @@ static inline void gizmo_populate_pick_buffer(gizmo_t *g,
     float s = g->scale;
     vec3_t c = g->center;
 
-    // Add axis lines to pick buffer
+    // Add axis lines to pick buffer (overlay — depth-always, on top)
     for (int i = 0; i < 3; i++) {
         vec3_t dir = gizmo_axis_dir(i);
         vec3_t tip = vec3_add(c, vec3_scale(dir, s));
         uint32_t pick_id = GIZMO_HANDLE_BASE + (uint32_t)i;
-        pick_buffer_add_line(pb, c, tip, pick_id);
+        pick_buffer_add_overlay_line(pb, c, tip, pick_id);
     }
 
-    // Add plane handle lines to pick buffer
+    // Add plane handle lines to pick buffer (overlay)
     float plane_offset = s * 0.25f;
     float plane_size = s * 0.15f;
     for (int p = 0; p < 3; p++) {
@@ -349,18 +352,18 @@ static inline void gizmo_populate_pick_buffer(gizmo_t *g,
         vec3_t p3 = vec3_add(base, vec3_scale(d2, plane_size));
 
         uint32_t pick_id = GIZMO_HANDLE_BASE + (uint32_t)(GIZMO_HANDLE_XY + p);
-        pick_buffer_add_line(pb, p0, p1, pick_id);
-        pick_buffer_add_line(pb, p1, p2, pick_id);
-        pick_buffer_add_line(pb, p2, p3, pick_id);
-        pick_buffer_add_line(pb, p3, p0, pick_id);
+        pick_buffer_add_overlay_line(pb, p0, p1, pick_id);
+        pick_buffer_add_overlay_line(pb, p1, p2, pick_id);
+        pick_buffer_add_overlay_line(pb, p2, p3, pick_id);
+        pick_buffer_add_overlay_line(pb, p3, p0, pick_id);
     }
 
-    // Add tip points to pick buffer
+    // Add tip points to pick buffer (overlay)
     for (int i = 0; i < 3; i++) {
         vec3_t dir = gizmo_axis_dir(i);
         vec3_t tip = vec3_add(c, vec3_scale(dir, s));
         uint32_t pick_id = GIZMO_HANDLE_BASE + (uint32_t)i;
-        pick_buffer_add_point(pb, tip, pick_id);
+        pick_buffer_add_overlay_point(pb, tip, pick_id);
     }
 
     // In geometry mode, add vertex handles to pick buffer
@@ -404,17 +407,18 @@ static inline bool gizmo_begin_drag(gizmo_t *g, ray_t mouse_ray) {
     g->active_handle = g->hovered_handle;
     g->mode = GIZMO_MODE_DRAGGING;
     g->drag_accumulated = vec3_make(0, 0, 0);
+    g->drag_origin = g->center;  // Fixed reference point for entire drag
 
     if (g->active_handle <= GIZMO_HANDLE_Z) {
         // Axis constrained: record initial parameter t
         vec3_t axis = gizmo_axis_dir(g->active_handle);
-        g->drag_start_t = ray_axis_closest_t(mouse_ray, g->center, axis);
+        g->drag_start_t = ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
     } else {
         // Plane constrained: record initial hit point
         int plane_idx = g->active_handle - GIZMO_HANDLE_XY;
         vec3_t normal = gizmo_plane_normal(plane_idx);
         vec3_t hit;
-        float t = ray_plane_intersect(mouse_ray, g->center, normal, &hit);
+        float t = ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit);
         if (t < 0.0f) return false;
         g->drag_start_hit = hit;
     }
@@ -429,19 +433,19 @@ static inline vec3_t gizmo_update_drag(gizmo_t *g, ray_t mouse_ray) {
     vec3_t delta = vec3_make(0, 0, 0);
 
     if (g->active_handle <= GIZMO_HANDLE_Z) {
-        // Axis constrained
+        // Axis constrained — always use fixed drag_origin as axis reference
         vec3_t axis = gizmo_axis_dir(g->active_handle);
-        float t = ray_axis_closest_t(mouse_ray, g->center, axis);
+        float t = ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
         float dt = t - g->drag_start_t;
         vec3_t total = vec3_scale(axis, dt);
         delta = vec3_sub(total, g->drag_accumulated);
         g->drag_accumulated = total;
     } else {
-        // Plane constrained
+        // Plane constrained — always use fixed drag_origin as plane reference
         int plane_idx = g->active_handle - GIZMO_HANDLE_XY;
         vec3_t normal = gizmo_plane_normal(plane_idx);
         vec3_t hit;
-        float t = ray_plane_intersect(mouse_ray, g->center, normal, &hit);
+        float t = ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit);
         if (t >= 0.0f) {
             vec3_t total = vec3_sub(hit, g->drag_start_hit);
             delta = vec3_sub(total, g->drag_accumulated);
@@ -449,8 +453,8 @@ static inline vec3_t gizmo_update_drag(gizmo_t *g, ray_t mouse_ray) {
         }
     }
 
-    // Move gizmo center by delta
-    g->center = vec3_add(g->center, delta);
+    // Move gizmo center by delta (visual only — entities are moved by caller)
+    g->center = vec3_add(g->drag_origin, g->drag_accumulated);
 
     return delta;
 }
