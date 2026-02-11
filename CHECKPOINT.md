@@ -1,4 +1,4 @@
-# Session Checkpoint - 2026-02-10
+# Session Checkpoint - 2026-02-11
 
 ## Project Overview
 
@@ -73,13 +73,14 @@ src/
 │   ├── gizmo_rendering.h    # Own GPU pipelines + stream instance buffers
 │   └── gizmo_vertex_mode.h  # Geometry mode vertex editing
 └── shaders/
-    ├── instanced_line_shaders.h # Thick line shaders (all backends)
-    ├── join_shaders.h           # Circle join shaders
-    ├── pick_shaders.h           # GPU picking shaders
-    └── spirv/                   # Vulkan SPIR-V shaders
-        ├── *.vert, *.frag       # GLSL 450 source files
-        ├── *.spv                # Compiled SPIR-V bytecode
-        └── spirv_bytecode.h     # Generated C byte arrays
+    ├── instanced_line_shaders.h     # Thick line shaders (all backends)
+    ├── instanced_triangle_shaders.h # Triangle shaders (all backends)
+    ├── join_shaders.h               # Circle join shaders
+    ├── pick_shaders.h               # GPU picking shaders
+    └── spirv/                       # Vulkan SPIR-V shaders
+        ├── *.vert, *.frag           # GLSL 450 source files
+        ├── *.spv                    # Compiled SPIR-V bytecode
+        └── spirv_bytecode.h         # Generated C byte arrays
 
 scripts/
 ├── gather_licenses.py   # Regenerate THIRD_PARTY_LICENSES.md from vendor LICENSE files
@@ -205,6 +206,42 @@ Use `instance_buffer_alloc_contiguous(n)` to avoid free-list fragmentation issue
 When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
+
+## Recent Changes (2026-02-11)
+
+### Mesh Triangles - Sprint 1: Core Triangle Rendering (IMPLEMENTED)
+
+Added instanced triangle rendering as a new geometry primitive alongside existing points and lines. Triangles are full ECS entities rendered via GPU instancing using the same architectural pattern as lines and points. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**New Files:**
+- `src/shaders/instanced_triangle_shaders.h` - Multi-backend triangle shaders (GLCORE, GLES3, Metal, WGPU, D3D11, Vulkan)
+- `src/shaders/spirv/instanced_triangle.vert` - GLSL 450 triangle vertex shader
+- `src/shaders/spirv/instanced_triangle.frag` - GLSL 450 triangle fragment shader
+- `src/shaders/spirv/instanced_triangle_vs.spv` - Compiled SPIR-V vertex bytecode
+- `src/shaders/spirv/instanced_triangle_fs.spv` - Compiled SPIR-V fragment bytecode
+
+**Modified Files:**
+- `src/components/geometry_comp.h` - Added `GEOM_TRIANGLE` enum, `geom_triangle_data_t` struct, `geometry_comp_triangle()` factory, updated type name table
+- `src/gpu/geometry_batch.h` - Added `geom_triangle_instance_t` (96 bytes), `geom_triangle_batch_t`, full batch API (init/alloc/set/free/upload/draw/shutdown), `geom_triangle_compute_normal()`, wired into batch manager
+- `src/ecs/ecs_scene.h` - Added `scene_add_triangle()`, GEOM_TRIANGLE cases in `ecs_scene_update()` (visibility hiding + dirty transform), `scene_free_entity_slots()`, `ecs_scene_triangle_count()`
+- `src/app.c` - 3 sample triangles at startup (red, green, blue)
+- `src/shaders/spirv/spirv_bytecode.h` - Regenerated with triangle shader bytecode
+
+**Key Design Decisions:**
+- **Barycentric selector template**: 3 vertices at (1,0,0), (0,1,0), (0,0,1) — vertex shader mixes instance vertex positions: `world_pos = sel.x * A + sel.y * B + sel.z * C`
+- **96-byte instances**: 3 vertex positions (9 floats) + face normal (3 floats) + 3 per-vertex colors (12 floats). All 3 colors set identical for uniform-color mode — avoids shader branching
+- **8 vertex attributes**: template_pos + vertex_a/b/c + normal + color_a/b/c (within SG_MAX_VERTEX_ATTRIBUTES = 16)
+- **Draw order**: Triangles drawn first, then lines, then points — correct depth layering
+- **MVP-only uniform block** (`geom_triangle_params_t`): No line_width/aspect_ratio needed — triangles are solid geometry, not screen-space shapes
+- **Double-sided**: Cull mode NONE, consistent with lines/points
+- **Normal stored per instance**: Computed as `normalize(cross(B-A, C-A))` — ready for future lighting (Sprint 5)
+
+**Remaining Sprints (see plan):**
+- Sprint 2: Picking, selection, undo/redo, serialization
+- Sprint 3: Gizmo vertex editing
+- Sprint 4: Per-vertex color & shader variants
+- Sprint 5: Lighting system (3-point studio)
+- Sprint 6: Mesh entities (multi-triangle indexed)
 
 ## Recent Changes (2026-02-10)
 
