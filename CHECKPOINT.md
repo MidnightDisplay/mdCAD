@@ -104,14 +104,14 @@ vendors/
 cmake -B build -G Ninja && ninja -C build
 ./build/bin/mdCAD
 
-# Windows build (D3D11 backend - Visual Studio, default)
-cmake -B build-msvc -G "Visual Studio 18"
-cmake --build build-msvc --config Release
-
-# Windows build (Vulkan backend - Visual Studio, optional)
+# Windows build (Vulkan backend - Visual Studio, default)
 $env:VULKAN_SDK = "C:\VulkanSDK\1.4.341.1"  # Set if not in environment, change path to exact installed.
 cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
 cmake --build build-vulkan --config Release
+
+# Windows build (D3D11 backend - Visual Studio, optional)
+cmake -B build-msvc -G "Visual Studio 18"
+cmake --build build-msvc --config Release
 
 # Windows build (Vulkan backend - MinGW)
 $env:VULKAN_SDK = "C:\VulkanSDK\1.4.341.1"  # Set if not in environment, change path to exact installed.
