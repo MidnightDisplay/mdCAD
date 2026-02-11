@@ -44,7 +44,7 @@ Both already have scene API functions: `scene_add_triangle()` (line ~640 in ecs_
 
 ---
 
-## Sprint 2: Light Entities in Hierarchy & Inspector
+## Sprint 2: Light Entities in Hierarchy & Inspector ✅ DONE
 
 **Goal:** Make light entities selectable from the scene hierarchy and editable in the Entity Inspector.
 
@@ -472,7 +472,7 @@ Options:
 | Sprint | Deliverable | Key Files | Testable Outcome |
 |--------|-------------|-----------|------------------|
 | S1 ✅ | Add Entity menu items | `ui_scene_hierarchy.h` | Triangle & Box from menu |
-| S2 | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
+| S2 ✅ | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
 | S3 | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
 | S4 | PLY binary support | `ply_loader.h` | Parse binary PLY files |
 | S5 | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
@@ -480,4 +480,4 @@ Options:
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 ✅ -> S2 -> S3 -> S4 -> S5 -> S6
+**Recommended order:** S1 ✅ -> S2 ✅ -> S3 -> S4 -> S5 -> S6

@@ -209,6 +209,14 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 2: Light Entities in Hierarchy & Inspector (IMPLEMENTED)
+
+Made light entities visible and editable from the UI. Scene hierarchy now has a collapsible "Lights" section (collapsed by default) that lists all light entities by type and ID. Clicking a light selects it; Ctrl+click toggles multi-select. The Entity Inspector shows a "Light" section for light entities with read-only type display, editable color picker, editable intensity drag, and direction/position info derived from the transform. Light property changes take effect immediately since `scene_collect_lights()` reads live component data each frame. No undo/redo for light properties in this sprint. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `ui_scene_hierarchy_draw_lights_section()` function that queries `LightComp` entities and renders them as selectable tree leaves; called from `ui_scene_hierarchy_draw()` after the entity list
+- `src/ui/ui_entity_inspector.h` - Added Light section in `ui_entity_inspector_draw_single()` after the Renderable section, with type display, `igColorEdit3` for color, `igDragFloat` for intensity, and direction/position readout from transform
+
 ### Mesh Features - Sprint 1: Add Entity Menu Items (IMPLEMENTED)
 
 Added "Triangle (Mesh)" and "Test Mesh (Box)" menu items to the Add Entity menu. Both appear after the Helix item, separated by a visual divider. Triangle creates an equilateral mesh triangle in the XY plane using `scene_add_triangle()`. Box creates a unit-sized mesh box at origin using `scene_add_mesh_box()`. Both use random colors and are covered by existing undo/redo infrastructure. Plan file: `.plans/PLAN_MESH_FEATURES.md`
