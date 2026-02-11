@@ -108,6 +108,9 @@ typedef struct {
 
     // Debug visualization
     bool debug_enabled;
+
+    // Tracks whether the pick pass has run at least once (image is valid for sampling)
+    bool has_rendered;
 } pick_buffer_t;
 
 //------------------------------------------------------------------------------
@@ -795,6 +798,7 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
     }
 
     sg_end_pass();
+    pb->has_rendered = true;
 }
 
 //------------------------------------------------------------------------------
