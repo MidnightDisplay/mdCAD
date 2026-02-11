@@ -147,7 +147,7 @@ All changes backward-compatible: existing point cloud import (`ply_load_file`, `
 
 ---
 
-## Sprint 4: PLY Binary Support
+## Sprint 4: PLY Binary Support ✅ DONE
 
 **Goal:** Add binary_little_endian and binary_big_endian parsing for both vertices and faces.
 
@@ -373,10 +373,10 @@ Options:
 | S1 ✅ | Add Entity menu items | `ui_scene_hierarchy.h` | Triangle & Box from menu |
 | S2 ✅ | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
 | S3 ✅ | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
-| S4 | PLY binary support | `ply_loader.h` | Parse binary PLY files |
+| S4 ✅ | PLY binary support | `ply_loader.h` | Parse binary PLY files |
 | S5 | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
 | S6 | OBJ→PLY script | `scripts/obj_to_colored_ply.py` (new) | Convert & import test assets |
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 -> S5 -> S6
+**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 ✅ -> S5 -> S6

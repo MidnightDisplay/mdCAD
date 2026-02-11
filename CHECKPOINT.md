@@ -209,6 +209,13 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 4: PLY Mesh Parser - ASCII (IMPLEMENTED)
+
+Extended `ply_loader.h` to parse triangle mesh data from binary PLY files.
+
+**Modified Files:**
+- `src/ply_loader.h` extended `ply_parse_vertices_chunk()` and `ply_parse_faces_chunk()` to handle binary mode: read `chunk_size * vertex_byte_stride` bytes at once; parse from memory buffer rather than line-by-lines
+
 ### Mesh Features - Sprint 3: PLY Mesh Parser - ASCII (IMPLEMENTED)
 
 Extended `ply_loader.h` to parse triangle mesh data from ASCII PLY files. The existing parser only handled vertex positions and colors (point clouds), skipping face elements entirely. Now parses `element face` headers (vertex_indices list + optional face colors), ASCII face data lines with fan triangulation for quads/polygons, and provides both one-shot (`ply_load_mesh_file`) and incremental/chunked (`ply_parse_faces_chunk`) APIs for mesh loading. Output is compatible with `scene_add_mesh()` / `scene_add_mesh_colored()`. All changes are backward-compatible - existing point cloud import works unchanged. Plan file: `.plans/PLAN_MESH_FEATURES.md`
