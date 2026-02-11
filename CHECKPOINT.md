@@ -209,6 +209,13 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 6: OBJ to PLY Conversion Script (IMPLEMENTED)
+
+Added Python utility `scripts/obj_to_colored_ply.py` for converting OBJ mesh files to colored PLY files. Parses OBJ vertices and faces (handles all face formats: `f v`, `f v/vt`, `f v/vt/vn`, `f v//vn`), fan-triangulates quads and n-gons, and generates random colors using four palettes (rainbow, pastel, earth, grayscale). Outputs both ASCII and binary_little_endian PLY format. Supports per-vertex and per-face color modes, configurable alpha, and reproducible colors via seed. Compatible with mdCAD's PLY mesh import (Sprint 5). Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**New File:**
+- `scripts/obj_to_colored_ply.py` - Standalone Python script with argparse CLI; OBJ parser with negative index support; HSV-based color palettes; ASCII and binary PLY writers with proper header format
+
 ### Mesh Features - Sprint 5: PLY Mesh Import Job & UI (IMPLEMENTED)
 
 Added full user-facing PLY mesh import workflow with file browser, import options dialog, and progress bar. Two import modes: "Single Mesh Entity" (efficient, one indexed mesh entity via `scene_add_mesh_colored()`/`scene_add_mesh()`) and "Individual Triangles" (each face as a separate selectable entity via chunked `scene_add_triangle()`). Supports per-vertex colors, per-face colors (auto-converted to per-vertex by averaging at shared vertices), and uniform default color. Import options include unit conversion (m/mm/in), CoM shift, and X/Y/Z rotation. Progress popup with timing plot for large meshes. Works with both ASCII and binary PLY files. Plan file: `.plans/PLAN_MESH_FEATURES.md`

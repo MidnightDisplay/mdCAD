@@ -225,7 +225,7 @@ Header-only mesh import job state machine modeled after `ply_import_job.h`. 3-ph
 
 ---
 
-## Sprint 6: OBJ to PLY Conversion Script
+## Sprint 6: OBJ to PLY Conversion Script ✅ DONE
 
 **Goal:** Python utility to convert OBJ meshes to colored PLY files.
 
@@ -279,8 +279,8 @@ Options:
 | S3 ✅ | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
 | S4 ✅ | PLY binary support | `ply_loader.h` | Parse binary PLY files |
 | S5 ✅ | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
-| S6 | OBJ→PLY script | `scripts/obj_to_colored_ply.py` (new) | Convert & import test assets |
+| S6 ✅ | OBJ→PLY script | `scripts/obj_to_colored_ply.py` (new) | Convert & import test assets |
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 ✅ -> S5 ✅ -> S6
+**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 ✅ -> S5 ✅ -> S6 ✅
