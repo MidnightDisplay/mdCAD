@@ -406,6 +406,15 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 }
                 break;
             }
+            case GEOM_MESH: {
+                igTextDisabled("Vertices: %d", g->data.mesh.vertex_count);
+                igTextDisabled("Faces: %d", geom_mesh_face_count(&g->data.mesh));
+                igTextDisabled("Indices: %d", g->data.mesh.index_count);
+                if (g->data.mesh.vertex_colors) {
+                    igTextDisabled("Per-vertex colors: Yes");
+                }
+                break;
+            }
             default:
                 break;
         }

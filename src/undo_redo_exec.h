@@ -102,6 +102,28 @@ static inline undo_entity_snapshot_t undo_snapshot_entity(ecs_scene_t *scene, ec
                     snap.data.triangle.color_c = g->data.triangle.color_c;
                 }
                 break;
+            case GEOM_MESH: {
+                geom_mesh_data_t *mesh = &g->data.mesh;
+                snap.data.mesh.vertex_count = mesh->vertex_count;
+                snap.data.mesh.index_count = mesh->index_count;
+                snap.data.mesh.vertices = (vec3_t*)malloc(sizeof(vec3_t) * mesh->vertex_count);
+                memcpy(snap.data.mesh.vertices, mesh->vertices, sizeof(vec3_t) * mesh->vertex_count);
+                snap.data.mesh.indices = (uint32_t*)malloc(sizeof(uint32_t) * mesh->index_count);
+                memcpy(snap.data.mesh.indices, mesh->indices, sizeof(uint32_t) * mesh->index_count);
+                if (mesh->normals) {
+                    snap.data.mesh.normals = (vec3_t*)malloc(sizeof(vec3_t) * mesh->vertex_count);
+                    memcpy(snap.data.mesh.normals, mesh->normals, sizeof(vec3_t) * mesh->vertex_count);
+                } else {
+                    snap.data.mesh.normals = NULL;
+                }
+                if (mesh->vertex_colors) {
+                    snap.data.mesh.vertex_colors = (vec4_t*)malloc(sizeof(vec4_t) * mesh->vertex_count);
+                    memcpy(snap.data.mesh.vertex_colors, mesh->vertex_colors, sizeof(vec4_t) * mesh->vertex_count);
+                } else {
+                    snap.data.mesh.vertex_colors = NULL;
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -173,6 +195,22 @@ static inline ecs_entity_t undo_create_from_snapshot(ecs_scene_t *scene, undo_en
             } else {
                 e = scene_add_triangle(scene, snap->data.triangle.a, snap->data.triangle.b,
                                        snap->data.triangle.c, snap->color);
+            }
+            break;
+        case UNDO_GEOM_MESH:
+            if (snap->data.mesh.vertices && snap->data.mesh.indices &&
+                snap->data.mesh.vertex_count >= 3 && snap->data.mesh.index_count >= 3) {
+                if (snap->data.mesh.vertex_colors) {
+                    e = scene_add_mesh_colored(scene,
+                        snap->data.mesh.vertices, snap->data.mesh.vertex_count,
+                        snap->data.mesh.indices, snap->data.mesh.index_count,
+                        snap->data.mesh.vertex_colors);
+                } else {
+                    e = scene_add_mesh(scene,
+                        snap->data.mesh.vertices, snap->data.mesh.vertex_count,
+                        snap->data.mesh.indices, snap->data.mesh.index_count,
+                        snap->color);
+                }
             }
             break;
         default:
@@ -455,6 +493,10 @@ static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
             if (idx == 0) g->data.triangle.a = pos;
             else if (idx == 1) g->data.triangle.b = pos;
             else g->data.triangle.c = pos;
+            break;
+        case GEOM_MESH:
+            if (idx >= 0 && idx < g->data.mesh.vertex_count)
+                g->data.mesh.vertices[idx] = pos;
             break;
         default: break;
     }

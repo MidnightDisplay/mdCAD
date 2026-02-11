@@ -705,6 +705,156 @@ static inline ecs_entity_t scene_add_triangle_colored(ecs_scene_t *scene,
     return e;
 }
 
+// Create an indexed mesh entity (multiple triangles sharing vertices)
+static inline ecs_entity_t scene_add_mesh(ecs_scene_t *scene,
+                                            vec3_t *vertices, int vertex_count,
+                                            uint32_t *indices, int index_count,
+                                            vec4_t color) {
+    if (vertex_count < 3 || index_count < 3) return 0;
+    int face_count = index_count / 3;
+
+    // Allocate contiguous triangle batch slots BEFORE creating entity
+    int first_slot = geom_triangle_batch_alloc_contiguous(&scene->batches.triangles, face_count);
+    if (first_slot < 0) return 0;
+
+    ecs_entity_t e = ecs_world_create_entity(scene->world);
+
+    // Create geometry component (copies data, computes normals)
+    GeometryComp g = geometry_comp_mesh(vertices, vertex_count, indices, index_count, NULL, color);
+    ecs_world_set_geometry(scene->world, e, &g);
+
+    // Fill triangle batch slots from indexed mesh
+    TransformComp *t = ecs_world_get_transform(scene->world, e);
+    GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
+    if (t && geom) {
+        for (int f = 0; f < face_count; f++) {
+            uint32_t i0 = geom->data.mesh.indices[f * 3 + 0];
+            uint32_t i1 = geom->data.mesh.indices[f * 3 + 1];
+            uint32_t i2 = geom->data.mesh.indices[f * 3 + 2];
+
+            vec3_t wa = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i0]);
+            vec3_t wb = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i1]);
+            vec3_t wc = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i2]);
+            vec3_t normal = geom_triangle_compute_normal(wa, wb, wc);
+
+            geom_triangle_batch_set(&scene->batches.triangles, first_slot + f,
+                                    wa, wb, wc, normal, color);
+            geom_triangle_batch_set_entity(&scene->batches.triangles, first_slot + f,
+                                           (uint64_t)e, (uint8_t)GEOM_MESH);
+        }
+    }
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+    if (r) {
+        r->batch_id = GEOM_MESH;
+        r->instance_slot = (uint32_t)first_slot;
+        r->segment_count = (uint32_t)face_count;
+        r->join_slot_start = 0xFFFFFFFF;
+        r->join_count = 0;
+        r->instance_dirty = false;
+    }
+
+    return e;
+}
+
+// Create an indexed mesh entity with per-vertex colors
+static inline ecs_entity_t scene_add_mesh_colored(ecs_scene_t *scene,
+                                                     vec3_t *vertices, int vertex_count,
+                                                     uint32_t *indices, int index_count,
+                                                     vec4_t *vertex_colors) {
+    if (vertex_count < 3 || index_count < 3) return 0;
+    int face_count = index_count / 3;
+
+    int first_slot = geom_triangle_batch_alloc_contiguous(&scene->batches.triangles, face_count);
+    if (first_slot < 0) return 0;
+
+    ecs_entity_t e = ecs_world_create_entity(scene->world);
+
+    GeometryComp g = geometry_comp_mesh(vertices, vertex_count, indices, index_count,
+                                        vertex_colors, vertex_colors[0]);
+    ecs_world_set_geometry(scene->world, e, &g);
+
+    TransformComp *t = ecs_world_get_transform(scene->world, e);
+    GeometryComp *geom = ecs_world_get_geometry(scene->world, e);
+    if (t && geom) {
+        for (int f = 0; f < face_count; f++) {
+            uint32_t i0 = geom->data.mesh.indices[f * 3 + 0];
+            uint32_t i1 = geom->data.mesh.indices[f * 3 + 1];
+            uint32_t i2 = geom->data.mesh.indices[f * 3 + 2];
+
+            vec3_t wa = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i0]);
+            vec3_t wb = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i1]);
+            vec3_t wc = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i2]);
+            vec3_t normal = geom_triangle_compute_normal(wa, wb, wc);
+
+            geom_triangle_batch_set_colored(&scene->batches.triangles, first_slot + f,
+                                            wa, wb, wc, normal,
+                                            geom->data.mesh.vertex_colors[i0],
+                                            geom->data.mesh.vertex_colors[i1],
+                                            geom->data.mesh.vertex_colors[i2]);
+            geom_triangle_batch_set_entity(&scene->batches.triangles, first_slot + f,
+                                           (uint64_t)e, (uint8_t)GEOM_MESH);
+        }
+    }
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+    if (r) {
+        r->batch_id = GEOM_MESH;
+        r->instance_slot = (uint32_t)first_slot;
+        r->segment_count = (uint32_t)face_count;
+        r->join_slot_start = 0xFFFFFFFF;
+        r->join_count = 0;
+        r->instance_dirty = false;
+    }
+
+    return e;
+}
+
+// Create a quad mesh (2 triangles) from 4 corners
+static inline ecs_entity_t scene_add_mesh_quad(ecs_scene_t *scene,
+                                                 vec3_t a, vec3_t b, vec3_t c, vec3_t d,
+                                                 vec4_t color) {
+    vec3_t verts[4] = { a, b, c, d };
+    uint32_t indices[6] = { 0, 1, 2,  0, 2, 3 };
+    return scene_add_mesh(scene, verts, 4, indices, 6, color);
+}
+
+// Create a box mesh (12 triangles, 8 vertices) centered at `center` with half-extents `size`
+static inline ecs_entity_t scene_add_mesh_box(ecs_scene_t *scene,
+                                                vec3_t center, vec3_t size,
+                                                vec4_t color) {
+    float hx = size.x * 0.5f, hy = size.y * 0.5f, hz = size.z * 0.5f;
+    float cx = center.x, cy = center.y, cz = center.z;
+
+    vec3_t verts[8] = {
+        { cx - hx, cy - hy, cz - hz },  // 0: left  bottom back
+        { cx + hx, cy - hy, cz - hz },  // 1: right bottom back
+        { cx + hx, cy + hy, cz - hz },  // 2: right top    back
+        { cx - hx, cy + hy, cz - hz },  // 3: left  top    back
+        { cx - hx, cy - hy, cz + hz },  // 4: left  bottom front
+        { cx + hx, cy - hy, cz + hz },  // 5: right bottom front
+        { cx + hx, cy + hy, cz + hz },  // 6: right top    front
+        { cx - hx, cy + hy, cz + hz },  // 7: left  top    front
+    };
+
+    uint32_t indices[36] = {
+        // Front face
+        4, 5, 6,  4, 6, 7,
+        // Back face
+        1, 0, 3,  1, 3, 2,
+        // Top face
+        7, 6, 2,  7, 2, 3,
+        // Bottom face
+        0, 1, 5,  0, 5, 4,
+        // Right face
+        5, 1, 2,  5, 2, 6,
+        // Left face
+        0, 4, 7,  0, 7, 3,
+    };
+
+    return scene_add_mesh(scene, verts, 8, indices, 36, color);
+}
+
 //------------------------------------------------------------------------------
 // Light Entity Creation
 //------------------------------------------------------------------------------
@@ -820,6 +970,12 @@ static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
                 break;
             case GEOM_TRIANGLE:
                 geom_triangle_batch_free(&scene->batches.triangles, (int)r->instance_slot);
+                break;
+            case GEOM_MESH:
+                // Free all contiguous triangle batch slots (segment_count holds face count)
+                for (uint32_t i = 0; i < r->segment_count; i++) {
+                    geom_triangle_batch_free(&scene->batches.triangles, (int)(r->instance_slot + i));
+                }
                 break;
             case GEOM_POLYLINE:
             case GEOM_ARC:
@@ -1108,6 +1264,17 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                                                 tri_far, tri_far, tri_far, tri_norm, invisible);
                         break;
                     }
+                    case GEOM_MESH: {
+                        // Hide all mesh face slots
+                        vec3_t tri_far = vec3_make(1e10f, 1e10f, 1e10f);
+                        vec3_t tri_norm = vec3_make(0.0f, 1.0f, 0.0f);
+                        for (uint32_t f = 0; f < r->segment_count; f++) {
+                            geom_triangle_batch_set(&scene->batches.triangles,
+                                                    (int)(r->instance_slot + f),
+                                                    tri_far, tri_far, tri_far, tri_norm, invisible);
+                        }
+                        break;
+                    }
                     case GEOM_POLYLINE:
                     case GEOM_ARC:
                     case GEOM_POLYGON:
@@ -1304,6 +1471,36 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     } else {
                         geom_triangle_batch_set(&scene->batches.triangles, (int)r->instance_slot,
                                                 world_a, world_b, world_c, normal, render_color);
+                    }
+                    break;
+                }
+                case GEOM_MESH: {
+                    // Re-expand indexed faces into contiguous triangle batch slots
+                    int face_count = geom_mesh_face_count(&g->data.mesh);
+                    bool mesh_highlighted = ecs_has_id(w->world, e, w->Selected_tag) ||
+                                            ecs_has_id(w->world, e, w->Hovered_tag);
+                    for (int f = 0; f < face_count && f < (int)r->segment_count; f++) {
+                        uint32_t i0 = g->data.mesh.indices[f * 3 + 0];
+                        uint32_t i1 = g->data.mesh.indices[f * 3 + 1];
+                        uint32_t i2 = g->data.mesh.indices[f * 3 + 2];
+
+                        vec3_t wa = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i0]);
+                        vec3_t wb = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i1]);
+                        vec3_t wc = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i2]);
+                        vec3_t fn = geom_triangle_compute_normal(wa, wb, wc);
+
+                        if (g->data.mesh.vertex_colors && !mesh_highlighted) {
+                            geom_triangle_batch_set_colored(&scene->batches.triangles,
+                                (int)(r->instance_slot + (uint32_t)f),
+                                wa, wb, wc, fn,
+                                g->data.mesh.vertex_colors[i0],
+                                g->data.mesh.vertex_colors[i1],
+                                g->data.mesh.vertex_colors[i2]);
+                        } else {
+                            geom_triangle_batch_set(&scene->batches.triangles,
+                                (int)(r->instance_slot + (uint32_t)f),
+                                wa, wb, wc, fn, render_color);
+                        }
                     }
                     break;
                 }
@@ -1537,6 +1734,20 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
                     vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
                     pick_buffer_add_triangle(pb, world_a, world_b, world_c, s->pick_id);
+                    break;
+                }
+                case GEOM_MESH: {
+                    // All faces share the same pick_id (entire mesh is one entity)
+                    int face_count = geom_mesh_face_count(&g->data.mesh);
+                    for (int f = 0; f < face_count; f++) {
+                        uint32_t i0 = g->data.mesh.indices[f * 3 + 0];
+                        uint32_t i1 = g->data.mesh.indices[f * 3 + 1];
+                        uint32_t i2 = g->data.mesh.indices[f * 3 + 2];
+                        vec3_t wa = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i0]);
+                        vec3_t wb = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i1]);
+                        vec3_t wc = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i2]);
+                        pick_buffer_add_triangle(pb, wa, wb, wc, s->pick_id);
+                    }
                     break;
                 }
                 default:

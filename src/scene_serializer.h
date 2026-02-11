@@ -111,7 +111,7 @@ static inline void json_write_indent(json_builder_t *b, int depth) {
 static inline const char* scene_geom_type_to_string(geometry_type_t type) {
     static const char* names[] = {
         "point", "line", "polyline", "arc", "polygon", "helix", "bezier",
-        "point_cloud", "triangle"
+        "point_cloud", "triangle", "mesh"
     };
     if (type >= 0 && type < GEOM_TYPE_COUNT) {
         return names[type];
@@ -128,6 +128,7 @@ static inline geometry_type_t scene_string_to_geom_type(const char *str) {
     if (strcmp(str, "helix") == 0) return GEOM_HELIX;
     if (strcmp(str, "bezier") == 0) return GEOM_BEZIER;
     if (strcmp(str, "triangle") == 0) return GEOM_TRIANGLE;
+    if (strcmp(str, "mesh") == 0) return GEOM_MESH;
     return GEOM_POINT;  // Default
 }
 
@@ -329,6 +330,43 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
                 json_write_indent(b, depth + 3);
                 json_builder_append(b, "\"color_c\": ");
                 json_write_vec4(b, g->data.triangle.color_c);
+            }
+            json_builder_append(b, "\n");
+            break;
+
+        case GEOM_MESH:
+            // Vertices array
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"vertices\": [\n");
+            for (int i = 0; i < g->data.mesh.vertex_count; i++) {
+                json_write_indent(b, depth + 4);
+                json_write_vec3(b, g->data.mesh.vertices[i]);
+                if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
+                json_builder_append(b, "\n");
+            }
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "],\n");
+            // Indices array
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"indices\": [");
+            for (int i = 0; i < g->data.mesh.index_count; i++) {
+                if (i > 0) json_builder_append(b, ", ");
+                json_builder_appendf(b, "%u", g->data.mesh.indices[i]);
+            }
+            json_builder_append(b, "]");
+            // Per-vertex colors (optional)
+            if (g->data.mesh.vertex_colors) {
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"vertex_colors\": [\n");
+                for (int i = 0; i < g->data.mesh.vertex_count; i++) {
+                    json_write_indent(b, depth + 4);
+                    json_write_vec4(b, g->data.mesh.vertex_colors[i]);
+                    if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
+                    json_builder_append(b, "\n");
+                }
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "]");
             }
             json_builder_append(b, "\n");
             break;
@@ -861,6 +899,97 @@ static inline bool json_parse_vec3_array(json_parser_t *p, vec3_t **out_points, 
     return true;
 }
 
+// Parse an array of uint32 (for mesh indices)
+static inline bool json_parse_uint_array(json_parser_t *p, uint32_t **out_values, int *out_count) {
+    if (p->token != JSON_TOK_LBRACKET) return false;
+
+    int capacity = 16;
+    int count = 0;
+    uint32_t *values = (uint32_t*)malloc(capacity * sizeof(uint32_t));
+
+    if (!json_next_token(p)) {
+        free(values);
+        return false;
+    }
+
+    while (p->token != JSON_TOK_RBRACKET) {
+        if (p->token != JSON_TOK_NUMBER) {
+            free(values);
+            return false;
+        }
+
+        if (count >= capacity) {
+            capacity *= 2;
+            values = (uint32_t*)realloc(values, capacity * sizeof(uint32_t));
+        }
+        values[count++] = (uint32_t)p->num_value;
+
+        if (!json_next_token(p)) {
+            free(values);
+            return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) {
+                free(values);
+                return false;
+            }
+        }
+    }
+
+    if (!json_next_token(p)) {  // Skip ]
+        free(values);
+        return false;
+    }
+
+    *out_values = values;
+    *out_count = count;
+    return true;
+}
+
+// Parse an array of vec4 (for mesh vertex colors)
+static inline bool json_parse_vec4_array(json_parser_t *p, vec4_t **out_colors, int *out_count) {
+    if (p->token != JSON_TOK_LBRACKET) return false;
+
+    int capacity = 16;
+    int count = 0;
+    vec4_t *colors = (vec4_t*)malloc(capacity * sizeof(vec4_t));
+
+    if (!json_next_token(p)) {
+        free(colors);
+        return false;
+    }
+
+    while (p->token != JSON_TOK_RBRACKET) {
+        if (count >= capacity) {
+            capacity *= 2;
+            colors = (vec4_t*)realloc(colors, capacity * sizeof(vec4_t));
+        }
+
+        if (!json_parse_vec4(p, &colors[count])) {
+            free(colors);
+            return false;
+        }
+        count++;
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) {
+                free(colors);
+                return false;
+            }
+        }
+    }
+
+    if (!json_next_token(p)) {  // Skip ]
+        free(colors);
+        return false;
+    }
+
+    *out_colors = colors;
+    *out_count = count;
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Entity Data Structure for Loading
 //------------------------------------------------------------------------------
@@ -895,6 +1024,13 @@ typedef struct {
             vec4_t color_a, color_b, color_c;
             bool has_vertex_colors;
         } triangle;
+        struct {
+            vec3_t *vertices;
+            int vertex_count;
+            uint32_t *indices;
+            int index_count;
+            vec4_t *vertex_colors;  // NULL if uniform color
+        } mesh;
     } geom_data;
 
     // Renderable
@@ -1017,6 +1153,24 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
                 ent->geom_data.polygon.points = pts;
                 ent->geom_data.polygon.count = count;
             }
+        } else if (strcmp(key, "vertices") == 0) {
+            // For mesh
+            vec3_t *verts = NULL;
+            int count = 0;
+            if (!json_parse_vec3_array(p, &verts, &count)) return false;
+            ent->geom_data.mesh.vertices = verts;
+            ent->geom_data.mesh.vertex_count = count;
+        } else if (strcmp(key, "indices") == 0) {
+            uint32_t *idx = NULL;
+            int count = 0;
+            if (!json_parse_uint_array(p, &idx, &count)) return false;
+            ent->geom_data.mesh.indices = idx;
+            ent->geom_data.mesh.index_count = count;
+        } else if (strcmp(key, "vertex_colors") == 0) {
+            vec4_t *colors = NULL;
+            int count = 0;
+            if (!json_parse_vec4_array(p, &colors, &count)) return false;
+            ent->geom_data.mesh.vertex_colors = colors;
         } else if (strcmp(key, "center") == 0) {
             if (!json_parse_vec3(p, &ent->geom_data.arc.center)) return false;
         } else if (strcmp(key, "radius") == 0) {
@@ -1332,6 +1486,23 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             }
             break;
 
+        case GEOM_MESH:
+            if (ent->geom_data.mesh.vertices && ent->geom_data.mesh.indices &&
+                ent->geom_data.mesh.vertex_count >= 3 && ent->geom_data.mesh.index_count >= 3) {
+                if (ent->geom_data.mesh.vertex_colors) {
+                    e = scene_add_mesh_colored(scene,
+                        ent->geom_data.mesh.vertices, ent->geom_data.mesh.vertex_count,
+                        ent->geom_data.mesh.indices, ent->geom_data.mesh.index_count,
+                        ent->geom_data.mesh.vertex_colors);
+                } else {
+                    e = scene_add_mesh(scene,
+                        ent->geom_data.mesh.vertices, ent->geom_data.mesh.vertex_count,
+                        ent->geom_data.mesh.indices, ent->geom_data.mesh.index_count,
+                        ent->color);
+                }
+            }
+            break;
+
         default:
             break;
     }
@@ -1423,6 +1594,10 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
                             free(entities[i].geom_data.polyline.points);
                         } else if (entities[i].geom_type == GEOM_POLYGON && entities[i].geom_data.polygon.points) {
                             free(entities[i].geom_data.polygon.points);
+                        } else if (entities[i].geom_type == GEOM_MESH) {
+                            if (entities[i].geom_data.mesh.vertices) free(entities[i].geom_data.mesh.vertices);
+                            if (entities[i].geom_data.mesh.indices) free(entities[i].geom_data.mesh.indices);
+                            if (entities[i].geom_data.mesh.vertex_colors) free(entities[i].geom_data.mesh.vertex_colors);
                         }
                     }
                     free(entities);
@@ -1533,6 +1708,10 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
             free(entities[i].geom_data.polyline.points);
         } else if (entities[i].geom_type == GEOM_POLYGON && entities[i].geom_data.polygon.points) {
             free(entities[i].geom_data.polygon.points);
+        } else if (entities[i].geom_type == GEOM_MESH) {
+            if (entities[i].geom_data.mesh.vertices) free(entities[i].geom_data.mesh.vertices);
+            if (entities[i].geom_data.mesh.indices) free(entities[i].geom_data.mesh.indices);
+            if (entities[i].geom_data.mesh.vertex_colors) free(entities[i].geom_data.mesh.vertex_colors);
         }
     }
     free(entities);
