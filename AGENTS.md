@@ -37,17 +37,17 @@ C/C++ cross-platform graphics application using:
 cmake -B build -G Ninja && ninja -C build
 ./build/bin/skl_tmp
 
-# Windows build (D3D11 backend)
-# Windows MinGW build (OpenGL backend)
-cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
-
-cmake -B build-msvc -G "Visual Studio 18"
-# Or with Ninja: cmake -B build -G Ninja && ninja -C build (untested)
-
-# MSVC with Vulkan backend - requires Vulkan SDK installed
+# MSVC with Vulkan backend - requires Vulkan SDK installed (default on windows)
 cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
 cmake --build build-vulkan --config Release
 .\build-vulkan\bin\Release\mdCAD.exe
+
+# Windows MinGW build (OpenGL backend)
+cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
+
+# Windows build (D3D11 backend)
+cmake -B build-msvc -G "Visual Studio 18"
+# Or with Ninja: cmake -B build -G Ninja && ninja -C build (untested)
 
 # iOS build (iPad/iPhone - Metal backend)
 cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0

@@ -13,7 +13,7 @@ Broken into 6 sprints with clear, testable deliverables.
 
 ---
 
-## Sprint 1: Add Entity Menu - Triangle & Test Mesh
+## Sprint 1: Add Entity Menu - Triangle & Test Mesh ✅ DONE
 
 **Goal:** Extend the Add Entity menu with mesh test commands.
 
@@ -471,7 +471,7 @@ Options:
 
 | Sprint | Deliverable | Key Files | Testable Outcome |
 |--------|-------------|-----------|------------------|
-| S1 | Add Entity menu items | `ui_scene_hierarchy.h` | Triangle & Box from menu |
+| S1 ✅ | Add Entity menu items | `ui_scene_hierarchy.h` | Triangle & Box from menu |
 | S2 | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
 | S3 | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
 | S4 | PLY binary support | `ply_loader.h` | Parse binary PLY files |
@@ -480,4 +480,4 @@ Options:
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 -> S2 -> S3 -> S4 -> S5 -> S6
+**Recommended order:** S1 ✅ -> S2 -> S3 -> S4 -> S5 -> S6

@@ -209,6 +209,13 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 1: Add Entity Menu Items (IMPLEMENTED)
+
+Added "Triangle (Mesh)" and "Test Mesh (Box)" menu items to the Add Entity menu. Both appear after the Helix item, separated by a visual divider. Triangle creates an equilateral mesh triangle in the XY plane using `scene_add_triangle()`. Box creates a unit-sized mesh box at origin using `scene_add_mesh_box()`. Both use random colors and are covered by existing undo/redo infrastructure. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `igSeparator()`, "Triangle (Mesh)" and "Test Mesh (Box)" menu items in `ui_scene_hierarchy_draw_add_menu()`, before the undo recording block
+
 ### Mesh Triangles - Sprint 6: Mesh Entities / Multi-Triangle Indexed (IMPLEMENTED)
 
 Added indexed triangle mesh as a new geometry type (`GEOM_MESH`). Meshes store shared vertices with an index buffer and expand to individual triangle batch slots each frame (reusing the existing instanced triangle infrastructure). Includes area-weighted smooth vertex normals, per-vertex colors, full undo/redo with deep-copy snapshots, JSON serialization, gizmo vertex editing, and GPU picking (all faces share one pick_id). Convenience helpers for quads and boxes. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
