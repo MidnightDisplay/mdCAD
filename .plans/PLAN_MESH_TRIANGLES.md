@@ -188,21 +188,21 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 
 ---
 
-## Sprint 3: Gizmo Vertex Editing
+## Sprint 3: Gizmo Vertex Editing (COMPLETED)
 
 **Goal**: Edit individual triangle vertices with the geometry mode gizmo.
 
 ### 3.1 Vertex Mode Support — `src/gizmo/gizmo_vertex_mode.h`
 
-- [ ] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_get_vertex_count()` → return 3
-- [ ] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_get_local_pos()`:
+- [x] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_get_vertex_count()` → return 3
+- [x] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_get_local_pos()`:
   ```c
   case GEOM_TRIANGLE:
       if (idx == 0) return geom->data.triangle.a;
       if (idx == 1) return geom->data.triangle.b;
       return geom->data.triangle.c;
   ```
-- [ ] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_set_local_pos()`:
+- [x] Add `GEOM_TRIANGLE` to `gizmo_vertex_mode_set_local_pos()`:
   ```c
   case GEOM_TRIANGLE:
       if (idx == 0) geom->data.triangle.a = pos;
@@ -213,17 +213,17 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 
 ### 3.2 Undo/Redo for Vertex Edits
 
-- [ ] Verify `CMD_SET_GEOMETRY_VERTICES` works for GEOM_TRIANGLE (should already work since it snapshots all vertices generically via `gizmo_vertex_mode_get/set_local_pos`)
+- [x] Verify `CMD_SET_GEOMETRY_VERTICES` works for GEOM_TRIANGLE (already works — `undo_set_vertex_pos()` handles GEOM_TRIANGLE since Sprint 2, and the gizmo snapshots vertices generically via `gizmo_vertex_mode_get/set_local_pos`)
 
 ### 3.3 Testing
 
-- Select triangle → Tab to geometry mode → 3 vertex dots appear
-- Click vertex → yellow highlight, gizmo arrows appear at vertex
-- Drag vertex with gizmo → triangle deforms in real time
-- Release → triangle stays deformed
-- Ctrl+Z → vertex returns to original position
-- Shift+Click multiple vertices → drag moves all selected
-- Tab back to transform mode → gizmo returns to entity center
+- [x] Select triangle → Tab to geometry mode → 3 vertex dots appear
+- [x] Click vertex → yellow highlight, gizmo arrows appear at vertex
+- [x] Drag vertex with gizmo → triangle deforms in real time
+- [x] Release → triangle stays deformed
+- [x] Ctrl+Z → vertex returns to original position
+- [x] Shift+Click multiple vertices → drag moves all selected
+- [x] Tab back to transform mode → gizmo returns to entity center
 
 ---
 

@@ -235,13 +235,23 @@ Added full interactivity to triangle entities: GPU picking for click-to-select, 
 - **No index buffer for pick triangles**: 3 vertices drawn directly via `sg_draw(0, 3, instance_count)`
 - **Overlay triangle picking deferred**: Not needed until gizmo-level triangle picking is required
 
+### Mesh Triangles - Sprint 3: Gizmo Vertex Editing (IMPLEMENTED)
+
+Added triangle vertex editing via the geometry mode gizmo. Select a triangle, press Tab to enter geometry mode, and drag individual vertices with the gizmo. Undo/redo works automatically via the existing `CMD_SET_GEOMETRY_VERTICES` command. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**Modified Files:**
+- `src/gizmo/gizmo_vertex_mode.h` - Added `GEOM_TRIANGLE` cases to `gizmo_vertex_mode_get_vertex_count()` (returns 3), `gizmo_vertex_mode_get_local_pos()` (returns triangle.a/b/c by index), and `gizmo_vertex_mode_set_local_pos()` (sets triangle.a/b/c by index)
+
+**Key Design Decisions:**
+- **No undo/redo changes needed**: `undo_set_vertex_pos()` already handles `GEOM_TRIANGLE` (added in Sprint 2), and the gizmo records vertex edits generically via `CMD_SET_GEOMETRY_VERTICES`
+- **Normal recomputation is automatic**: `ecs_scene_update()` recomputes the face normal from world-space vertices whenever `instance_dirty` is set
+
 **Remaining Sprints (see plan):**
-- Sprint 3: Gizmo vertex editing
 - Sprint 4: Per-vertex color & shader variants
 - Sprint 5: Lighting system (3-point studio)
 - Sprint 6: Mesh entities (multi-triangle indexed)
 
-### Mesh Triangles - Sprint 1: Core Triangle Rendering (IMPLEMENTED)
+### Mesh Triangles - Sprint 2: Picking, Selection, Undo/Redo & Serialization (IMPLEMENTED)
 
 Added instanced triangle rendering as a new geometry primitive alongside existing points and lines. Triangles are full ECS entities rendered via GPU instancing using the same architectural pattern as lines and points. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
 
@@ -267,13 +277,6 @@ Added instanced triangle rendering as a new geometry primitive alongside existin
 - **MVP-only uniform block** (`geom_triangle_params_t`): No line_width/aspect_ratio needed — triangles are solid geometry, not screen-space shapes
 - **Double-sided**: Cull mode NONE, consistent with lines/points
 - **Normal stored per instance**: Computed as `normalize(cross(B-A, C-A))` — ready for future lighting (Sprint 5)
-
-**Remaining Sprints (see plan):**
-- Sprint 2: Picking, selection, undo/redo, serialization
-- Sprint 3: Gizmo vertex editing
-- Sprint 4: Per-vertex color & shader variants
-- Sprint 5: Lighting system (3-point studio)
-- Sprint 6: Mesh entities (multi-triangle indexed)
 
 ## Older Changes
 
