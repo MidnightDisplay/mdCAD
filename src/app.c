@@ -110,8 +110,8 @@ static void init(void) {
         .logger.func = slog_func,
 #if defined(SOKOL_VULKAN)
         // Vulkan needs larger staging buffer for large point clouds (default 16MB)
-        // 1M points * 28 bytes = 28MB, so use 64MB for headroom
-        .vulkan.stream_staging_buffer_size = 64 * 1024 * 1024,
+        // 1M points * 28 bytes = 28MB, so use 512MB for headroom
+        .vulkan.stream_staging_buffer_size = 512 * 1024 * 1024,
 #endif
         // Note: Sokol validation is enabled by default in debug builds
         // Errors will be logged via slog_func
