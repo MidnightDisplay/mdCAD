@@ -316,6 +316,20 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
             json_write_indent(b, depth + 3);
             json_builder_append(b, "\"c\": ");
             json_write_vec3(b, g->data.triangle.c);
+            if (g->data.triangle.has_vertex_colors) {
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_a\": ");
+                json_write_vec4(b, g->data.triangle.color_a);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_b\": ");
+                json_write_vec4(b, g->data.triangle.color_b);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_c\": ");
+                json_write_vec4(b, g->data.triangle.color_c);
+            }
             json_builder_append(b, "\n");
             break;
 
@@ -787,7 +801,11 @@ typedef struct {
         struct { vec3_t center; float radius; float start_angle, end_angle; vec3_t normal; } arc;
         struct { vec3_t p0, p1, p2, p3; int segments; } bezier;
         struct { vec3_t axis_start, axis_end; float radius, turns; int segments; } helix;
-        struct { vec3_t a, b, c; } triangle;
+        struct {
+            vec3_t a, b, c;
+            vec4_t color_a, color_b, color_c;
+            bool has_vertex_colors;
+        } triangle;
     } geom_data;
 
     // Renderable
@@ -948,6 +966,13 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
             if (p->token != JSON_TOK_NUMBER) return false;
             ent->geom_data.helix.turns = (float)p->num_value;
             if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "color_a") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_a)) return false;
+            ent->geom_data.triangle.has_vertex_colors = true;
+        } else if (strcmp(key, "color_b") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_b)) return false;
+        } else if (strcmp(key, "color_c") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_c)) return false;
         } else {
             if (!json_skip_value(p)) return false;
         }
@@ -1138,9 +1163,17 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             break;
 
         case GEOM_TRIANGLE:
-            e = scene_add_triangle(scene,
-                                   ent->geom_data.triangle.a, ent->geom_data.triangle.b,
-                                   ent->geom_data.triangle.c, ent->color);
+            if (ent->geom_data.triangle.has_vertex_colors) {
+                e = scene_add_triangle_colored(scene,
+                    ent->geom_data.triangle.a, ent->geom_data.triangle.b,
+                    ent->geom_data.triangle.c,
+                    ent->geom_data.triangle.color_a, ent->geom_data.triangle.color_b,
+                    ent->geom_data.triangle.color_c);
+            } else {
+                e = scene_add_triangle(scene,
+                    ent->geom_data.triangle.a, ent->geom_data.triangle.b,
+                    ent->geom_data.triangle.c, ent->color);
+            }
             break;
 
         default:

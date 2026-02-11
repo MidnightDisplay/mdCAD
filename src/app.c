@@ -236,6 +236,15 @@ static void init(void) {
             vec3_make(0.0f, 0.8f, -1.0f),
             vec4_make(0.3f, 0.3f, 0.9f, 1.0f));   // Blue triangle (tilted up)
 
+        // Per-vertex colored triangle (RGB gradient)
+        scene_add_triangle_colored(&state.ecs_scene,
+            vec3_make(-2.0f, 0.0f, -0.5f),
+            vec3_make(-1.0f, 0.0f, -0.5f),
+            vec3_make(-1.5f, 0.0f, 0.5f),
+            vec4_make(1.0f, 0.0f, 0.0f, 1.0f),    // Vertex A: Red
+            vec4_make(0.0f, 1.0f, 0.0f, 1.0f),    // Vertex B: Green
+            vec4_make(0.0f, 0.0f, 1.0f, 1.0f));   // Vertex C: Blue
+
         // // Test points at axis endpoints
         // scene_add_point(&state.ecs_scene,
         //     vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X

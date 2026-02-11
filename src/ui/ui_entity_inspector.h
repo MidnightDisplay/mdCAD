@@ -373,6 +373,39 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 igTextDisabled("Point count: %d", count);
                 break;
             }
+            case GEOM_TRIANGLE: {
+                // Per-vertex color toggle
+                if (igCheckbox("Per-Vertex Colors", &g->data.triangle.has_vertex_colors)) {
+                    if (g->data.triangle.has_vertex_colors) {
+                        // Initialize vertex colors from uniform color
+                        g->data.triangle.color_a = g->color;
+                        g->data.triangle.color_b = g->color;
+                        g->data.triangle.color_c = g->color;
+                    }
+                    changed = true;
+                }
+                if (g->data.triangle.has_vertex_colors) {
+                    float ca[4] = { g->data.triangle.color_a.x, g->data.triangle.color_a.y,
+                                    g->data.triangle.color_a.z, g->data.triangle.color_a.w };
+                    if (igColorEdit4("Color A", ca, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_a = (vec4_t){ ca[0], ca[1], ca[2], ca[3] };
+                        changed = true;
+                    }
+                    float cb[4] = { g->data.triangle.color_b.x, g->data.triangle.color_b.y,
+                                    g->data.triangle.color_b.z, g->data.triangle.color_b.w };
+                    if (igColorEdit4("Color B", cb, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_b = (vec4_t){ cb[0], cb[1], cb[2], cb[3] };
+                        changed = true;
+                    }
+                    float cc[4] = { g->data.triangle.color_c.x, g->data.triangle.color_c.y,
+                                    g->data.triangle.color_c.z, g->data.triangle.color_c.w };
+                    if (igColorEdit4("Color C", cc, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_c = (vec4_t){ cc[0], cc[1], cc[2], cc[3] };
+                        changed = true;
+                    }
+                }
+                break;
+            }
             default:
                 break;
         }

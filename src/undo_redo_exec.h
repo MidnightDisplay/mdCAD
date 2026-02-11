@@ -95,6 +95,12 @@ static inline undo_entity_snapshot_t undo_snapshot_entity(ecs_scene_t *scene, ec
                 snap.data.triangle.a = g->data.triangle.a;
                 snap.data.triangle.b = g->data.triangle.b;
                 snap.data.triangle.c = g->data.triangle.c;
+                snap.data.triangle.has_vertex_colors = g->data.triangle.has_vertex_colors;
+                if (g->data.triangle.has_vertex_colors) {
+                    snap.data.triangle.color_a = g->data.triangle.color_a;
+                    snap.data.triangle.color_b = g->data.triangle.color_b;
+                    snap.data.triangle.color_c = g->data.triangle.color_c;
+                }
                 break;
             default:
                 break;
@@ -159,8 +165,15 @@ static inline ecs_entity_t undo_create_from_snapshot(ecs_scene_t *scene, undo_en
                                 snap->data.helix.segments, snap->color, snap->line_width);
             break;
         case UNDO_GEOM_TRIANGLE:
-            e = scene_add_triangle(scene, snap->data.triangle.a, snap->data.triangle.b,
-                                   snap->data.triangle.c, snap->color);
+            if (snap->data.triangle.has_vertex_colors) {
+                e = scene_add_triangle_colored(scene,
+                    snap->data.triangle.a, snap->data.triangle.b, snap->data.triangle.c,
+                    snap->data.triangle.color_a, snap->data.triangle.color_b,
+                    snap->data.triangle.color_c);
+            } else {
+                e = scene_add_triangle(scene, snap->data.triangle.a, snap->data.triangle.b,
+                                       snap->data.triangle.c, snap->color);
+            }
             break;
         default:
             break;

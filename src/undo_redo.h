@@ -145,6 +145,8 @@ typedef struct {
         } helix;
         struct {
             vec3_t a, b, c;
+            vec4_t color_a, color_b, color_c;
+            bool has_vertex_colors;
         } triangle;
     } data;
 } undo_entity_snapshot_t;

@@ -79,6 +79,8 @@ typedef struct {
 // Triangle geometry data (3 vertices)
 typedef struct {
     vec3_t a, b, c;
+    vec4_t color_a, color_b, color_c;  // Per-vertex colors (used when has_vertex_colors is true)
+    bool has_vertex_colors;
 } geom_triangle_data_t;
 
 typedef struct {
@@ -180,10 +182,25 @@ static inline GeometryComp geometry_comp_helix(vec3_t axis_start, vec3_t axis_en
 static inline GeometryComp geometry_comp_triangle(vec3_t a, vec3_t b, vec3_t c, vec4_t color) {
     return (GeometryComp){
         .type = GEOM_TRIANGLE,
-        .data.triangle = { .a = a, .b = b, .c = c },
+        .data.triangle = { .a = a, .b = b, .c = c, .has_vertex_colors = false },
         .line_width = 0.0f,
         .point_size = 0.0f,
         .color = color
+    };
+}
+
+static inline GeometryComp geometry_comp_triangle_colored(vec3_t a, vec3_t b, vec3_t c,
+                                                           vec4_t color_a, vec4_t color_b, vec4_t color_c) {
+    return (GeometryComp){
+        .type = GEOM_TRIANGLE,
+        .data.triangle = {
+            .a = a, .b = b, .c = c,
+            .color_a = color_a, .color_b = color_b, .color_c = color_c,
+            .has_vertex_colors = true
+        },
+        .line_width = 0.0f,
+        .point_size = 0.0f,
+        .color = color_a  // Uniform color fallback = color_a
     };
 }
 
