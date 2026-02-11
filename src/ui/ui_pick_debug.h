@@ -28,7 +28,7 @@ typedef struct {
 
 static inline void ui_pick_debug_init(ui_pick_debug_state_t *state, pick_buffer_t *pb) {
     state->pick_buffer = pb;
-    state->window_open = true;  // Closed by default
+    state->window_open = true;  // Open by default
 }
 
 //------------------------------------------------------------------------------
@@ -40,6 +40,14 @@ static inline void ui_pick_debug_draw(ui_pick_debug_state_t *state) {
 
     if (igBegin("Pick Buffer Debug", &state->window_open, 0)) {
         pick_buffer_t *pb = state->pick_buffer;
+
+        // Guard: don't display texture if pick pass hasn't run yet
+        // (Vulkan requires the image to be transitioned to TEXTURE access first)
+        if (!pb->has_rendered) {
+            igTextDisabled("Pick buffer not yet rendered (hover viewport)");
+            igEnd();
+            return;
+        }
 
         // Display pick buffer texture scaled 2x (100x100 -> 200x200)
         ImVec2_c size = { 200.0f, 200.0f };
