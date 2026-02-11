@@ -198,126 +198,30 @@ Extend `ply_parse_vertices_chunk()` and `ply_parse_faces_chunk()` to handle bina
 
 ---
 
-## Sprint 5: PLY Mesh Import Job & UI
+## Sprint 5: PLY Mesh Import Job & UI ✅ DONE
 
 **Goal:** Full user-facing PLY mesh import with progress bar and two modes.
 
-### New File: `src/ply_mesh_import_job.h`
+**New File:** `src/ply_mesh_import_job.h`
 
-Modeled closely after `ply_import_job.h` (514 lines). Key differences:
+Header-only mesh import job state machine modeled after `ply_import_job.h`. 3-phase state machine: `PLY_MESH_JOB_PARSING_VERTICES` -> `PLY_MESH_JOB_PARSING_FACES` -> `PLY_MESH_JOB_CREATING_ENTITIES`. Two import modes: Single Mesh Entity (calls `scene_add_mesh_colored()`/`scene_add_mesh()` instantaneously) and Individual Triangles (chunked `scene_add_triangle()`/`scene_add_triangle_colored()` with progress). Face-color-to-vertex-color conversion via averaging at shared vertices. Transforms: CoM shift, X/Y/Z rotation, unit scale. Progress weighting: 30% vertices, 30% faces, 40% entity creation.
 
-```c
-typedef struct {
-    ply_job_state_t state;       // Reuse same state enum
-    ply_parse_state_t parse_state;
-    char filepath[512];
+**Modified File:** `src/ui/ui_scene_hierarchy.h`
 
-    // Import options
-    int import_mode;             // 0 = Single Mesh Entity, 1 = Individual Triangles
-    float scale;
-    vec4_t default_color;
-    bool use_ply_colors;         // Use vertex/face colors from file
+- Added `#include "../ply_mesh_import_job.h"` and 17 mesh import state fields to struct
+- Added init/shutdown code for mesh import state (file browser, job lifecycle)
+- Added "Import PLY Mesh..." menu item under File, after "Import PLY Point Cloud..."
+- Added file browser handler with `ply_get_mesh_info()` validation (rejects files with no faces)
+- Added "Import PLY Mesh Options" modal: file info (vertices/faces/colors), import mode radio buttons with tooltips, unit conversion, color options with smart source display, transformation controls
+- Added "Importing PLY Mesh" progress modal: progress bar, status text, timing info, speed plot, Cancel/Close button, chunked per-frame processing
 
-    // Transformations
-    bool shift_to_com;
-    float rotation_x, rotation_y, rotation_z;
-    vec3_t com;
-    mat4_t transform_matrix;
-    bool transforms_applied;
-
-    // Entity creation state
-    int created_count;
-
-    // Progress
-    float progress;
-    char status_message[128];
-
-    // Timing (same pattern as point cloud import)
-    double last_iteration_time_ms;
-    float iteration_times[PLY_JOB_MAX_TIMING_SAMPLES];
-    float iteration_progress[PLY_JOB_MAX_TIMING_SAMPLES];
-    int timing_sample_count;
-    uint64_t iteration_start_time;
-    float last_sampled_progress;
-
-    // Result
-    ply_error_t error;
-    int total_vertices;
-    int total_faces;
-} ply_mesh_import_job_t;
-```
-
-**State Machine:**
-1. `PLY_JOB_IDLE` -> Start
-2. `PLY_JOB_PARSING_VERTICES` -> Parse vertices in chunks
-3. `PLY_JOB_PARSING_FACES` (new state) -> Parse faces in chunks
-4. `PLY_JOB_CREATING_ENTITIES` -> Create mesh/triangle entities
-5. `PLY_JOB_COMPLETE` / `PLY_JOB_ERROR`
-
-**Entity Creation (Mode 0 - Single Mesh Entity):**
-- One call to `scene_add_mesh_colored()` (if vertex colors) or `scene_add_mesh()` (uniform color)
-- If face colors present but not vertex colors, convert face colors to vertex colors by averaging at shared vertices
-- Instantaneous for any size (single entity creation)
-
-**Entity Creation (Mode 1 - Individual Triangles):**
-- Chunked creation: `PLY_ENTITY_CHUNK_SIZE` triangles per frame
-- Each triangle: `scene_add_triangle()` or `scene_add_triangle_colored()`
-- Progress tracking for creation phase
-
-### UI Integration
-
-**File:** `src/ui/ui_scene_hierarchy.h`
-
-Add to the hierarchy state struct:
-```c
-// PLY Mesh import state
-file_browser_t ply_mesh_browser;
-bool ply_mesh_import_popup_open;
-char ply_mesh_import_path[512];
-int ply_mesh_vertex_count;
-int ply_mesh_face_count;
-bool ply_mesh_has_vertex_colors;
-bool ply_mesh_has_face_colors;
-int ply_mesh_import_mode;        // 0 = Single Mesh, 1 = Individual Triangles
-int ply_mesh_unit_index;
-bool ply_mesh_use_colors;
-float ply_mesh_default_color[3];
-bool ply_mesh_shift_to_com;
-float ply_mesh_rotation[3];
-
-// Import job
-ply_mesh_import_job_t mesh_import_job;
-bool mesh_import_progress_popup_open;
-```
-
-**Menu Item:** Under File menu, after "Import PLY Point Cloud...":
-```
-Import PLY Mesh...
-```
-
-**Import Dialog** (modal popup, same pattern as PLY point cloud):
-- File info: vertex count, face count, has vertex colors, has face colors
-- Import mode: "Single Mesh Entity" / "Individual Triangles"
-- Color options: Use PLY colors / Override with default color
-- Scale / Unit conversion
-- Coordinate transforms: CoM shift, rotation X/Y/Z
-- Import / Cancel buttons
-
-**Progress Dialog** (modal popup, same pattern):
-- Progress bar
-- Status text ("Parsing vertices...", "Parsing faces...", "Creating entities...")
-- Speed plot (reuse timing infrastructure)
-- Cancel button
-
-**Verification:**
-- Build and run
-- File -> Import PLY Mesh... -> opens file browser
-- Select a PLY mesh file -> shows import options
-- Import as Single Mesh Entity -> one entity in hierarchy, rendered with lighting
-- Import as Individual Triangles -> N entities in hierarchy, each independently selectable
-- Test with colored PLY -> colors display correctly
-- Test progress bar with large mesh (>10k faces)
-- Test with both ASCII and binary PLY files
+**Verified:**
+- File -> Import PLY Mesh... -> file browser opens, selects .ply files
+- Import as Single Mesh Entity -> one GEOM_MESH entity, rendered with lighting
+- Import as Individual Triangles -> N triangle entities, each independently selectable
+- Colored PLY files display vertex/face colors correctly
+- Progress bar works for large meshes with timing plot
+- Both ASCII and binary PLY files supported
 
 ---
 
@@ -374,9 +278,9 @@ Options:
 | S2 ✅ | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
 | S3 ✅ | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
 | S4 ✅ | PLY binary support | `ply_loader.h` | Parse binary PLY files |
-| S5 | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
+| S5 ✅ | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
 | S6 | OBJ→PLY script | `scripts/obj_to_colored_ply.py` (new) | Convert & import test assets |
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 ✅ -> S5 -> S6
+**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 ✅ -> S5 ✅ -> S6

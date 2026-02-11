@@ -209,6 +209,16 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 5: PLY Mesh Import Job & UI (IMPLEMENTED)
+
+Added full user-facing PLY mesh import workflow with file browser, import options dialog, and progress bar. Two import modes: "Single Mesh Entity" (efficient, one indexed mesh entity via `scene_add_mesh_colored()`/`scene_add_mesh()`) and "Individual Triangles" (each face as a separate selectable entity via chunked `scene_add_triangle()`). Supports per-vertex colors, per-face colors (auto-converted to per-vertex by averaging at shared vertices), and uniform default color. Import options include unit conversion (m/mm/in), CoM shift, and X/Y/Z rotation. Progress popup with timing plot for large meshes. Works with both ASCII and binary PLY files. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**New File:**
+- `src/ply_mesh_import_job.h` - Header-only mesh import job state machine with 3-phase pipeline (`PARSING_VERTICES` -> `PARSING_FACES` -> `CREATING_ENTITIES`), coordinate transforms, face-color-to-vertex-color conversion, progress tracking, cancellation support
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `#include "../ply_mesh_import_job.h"`; added 17 mesh import state fields to `ui_scene_hierarchy_state_t`; init/shutdown for mesh import browser and job; "Import PLY Mesh..." menu item under File; file browser handler with `ply_get_mesh_info()` validation; "Import PLY Mesh Options" modal popup (mode selection, color options, unit conversion, transforms); "Importing PLY Mesh" progress modal with timing plot
+
 ### Mesh Features - Sprint 4: PLY Mesh Parser - ASCII (IMPLEMENTED)
 
 Extended `ply_loader.h` to parse triangle mesh data from binary PLY files.
