@@ -209,6 +209,13 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Features - Sprint 3: PLY Mesh Parser - ASCII (IMPLEMENTED)
+
+Extended `ply_loader.h` to parse triangle mesh data from ASCII PLY files. The existing parser only handled vertex positions and colors (point clouds), skipping face elements entirely. Now parses `element face` headers (vertex_indices list + optional face colors), ASCII face data lines with fan triangulation for quads/polygons, and provides both one-shot (`ply_load_mesh_file`) and incremental/chunked (`ply_parse_faces_chunk`) APIs for mesh loading. Output is compatible with `scene_add_mesh()` / `scene_add_mesh_colored()`. All changes are backward-compatible - existing point cloud import works unchanged. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ply_loader.h` - Extended `ply_property_t` with list property support; added `ply_face_data_t` and `ply_mesh_data_t` types; extended `ply_header_t` with face element fields; updated `ply_parse_header()` with element state machine; added `ply_parse_ascii_faces()` with fan triangulation; added `ply_load_mesh_file()`, `ply_mesh_data_free()`, `ply_get_mesh_info()`; extended `ply_parse_state_t` with face arrays; updated `ply_open()`, `ply_get_progress()`, `ply_is_complete()`, `ply_parse_state_free()`; added `ply_vertices_complete()`, `ply_parse_faces_chunk()`, `ply_parse_state_to_mesh_data()`
+
 ### Mesh Features - Sprint 2: Light Entities in Hierarchy & Inspector (IMPLEMENTED)
 
 Made light entities visible and editable from the UI. Scene hierarchy now has a collapsible "Lights" section (collapsed by default) that lists all light entities by type and ID. Clicking a light selects it; Ctrl+click toggles multi-select. The Entity Inspector shows a "Light" section for light entities with read-only type display, editable color picker, editable intensity drag, and direction/position info derived from the transform. Light property changes take effect immediately since `scene_collect_lights()` reads live component data each frame. No undo/redo for light properties in this sprint. Plan file: `.plans/PLAN_MESH_FEATURES.md`

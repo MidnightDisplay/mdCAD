@@ -123,128 +123,27 @@ static inline LightComp* ecs_world_get_light(ecs_world_state_t *w, ecs_entity_t 
 
 ---
 
-## Sprint 3: PLY Mesh Parser - ASCII
+## Sprint 3: PLY Mesh Parser - ASCII ✅ DONE
 
 **Goal:** Extend `ply_loader.h` to parse triangle meshes from ASCII PLY files.
 
-### Current State
-- Parser reads `element vertex` with properties x/y/z/red/green/blue/alpha
-- Skips `element face` and `property list` lines entirely
-- Returns `ply_data_t` with points + colors only
+**File modified:** `src/ply_loader.h`
 
-### New Data Structures
+**What was implemented:**
+1. Extended `ply_property_t` with `is_list` and `list_count_type` for face list properties
+2. Added `ply_face_data_t` (triangulated indices + optional per-face colors) and `ply_mesh_data_t` (vertices + faces combined output)
+3. Extended `ply_header_t` with face element fields: `face_count`, `has_face_element`, `face_properties[]`, `face_list_prop_index`, face color indices, `skip_lines_before_faces`
+4. Updated `ply_parse_header()` with `current_element` state machine (0=none, 1=vertex, 2=face, 3=other) to track vertex_indices list properties, face scalar color properties, and intermediate element line counts
+5. Added `ply_parse_ascii_faces()` with fan triangulation (tri=direct, quad=2 tris, polygon=N-2 tris), dynamic index buffer growth, and integer/float color normalization
+6. Added `ply_load_mesh_file()` one-shot API (header + vertices + faces)
+7. Added `ply_mesh_data_free()` and `ply_get_mesh_info()` (header-only scan)
+8. Extended `ply_parse_state_t` with face parsing fields (face_indices, face_colors, face_tri_count, face_tri_capacity, face_total, parsing_faces, etc.)
+9. Updated `ply_open()` to initialize face arrays when face element present
+10. Added `ply_parse_faces_chunk()` (incremental face parsing) and `ply_vertices_complete()` (phase gate)
+11. Updated `ply_get_progress()` (vertex+face combined) and `ply_is_complete()` (both phases)
+12. Updated `ply_parse_state_free()` (frees face arrays) and added `ply_parse_state_to_mesh_data()` (transfers all arrays)
 
-**File:** `src/ply_loader.h`
-
-```c
-// Face data from PLY
-typedef struct {
-    uint32_t *indices;       // Triangle indices (3 per face, triangulated)
-    vec4_t *face_colors;     // Per-face colors (NULL if no face colors)
-    int face_count;          // Number of triangles
-    int index_count;         // = face_count * 3
-} ply_face_data_t;
-
-// Extended loaded data (replaces ply_data_t for mesh mode)
-typedef struct {
-    vec3_t *vertices;        // Vertex positions
-    vec4_t *vertex_colors;   // Per-vertex colors (NULL if none)
-    int vertex_count;
-
-    ply_face_data_t faces;   // Face data
-
-    bool has_vertex_colors;  // Colors on vertex element
-    bool has_face_colors;    // Colors on face element
-    bool has_faces;          // Whether file has face data at all
-
-    vec3_t min_bounds;
-    vec3_t max_bounds;
-} ply_mesh_data_t;
-```
-
-### Header Parsing Extensions
-
-Extend `ply_parse_header()` to also detect:
-- `element face <count>` -> store `face_count`
-- `property list uchar int vertex_indices` (or `vertex_index`) -> mark face list property
-- `property uchar red/green/blue` on the face element -> per-face colors
-- Track which element we're in (vertex vs face) to correctly assign property indices
-
-New header fields:
-```c
-typedef struct {
-    // ... existing vertex fields ...
-
-    // Face element
-    int face_count;
-    bool has_face_element;
-    int face_prop_list_index;     // Index of vertex_indices list property
-
-    // Face color properties (-1 if absent)
-    int face_prop_red;
-    int face_prop_green;
-    int face_prop_blue;
-    int face_prop_alpha;
-
-    // Face element property tracking
-    ply_property_t face_properties[PLY_MAX_PROPERTIES];
-    int face_property_count;
-
-    // Track data offsets for multi-element parsing
-    long face_data_start_pos;     // For seeking to face data
-} ply_header_t;
-```
-
-### ASCII Face Parsing
-
-New function `ply_parse_ascii_faces()`:
-1. After vertex parsing completes, parse face lines
-2. Each face line format: `<vertex_count> <idx0> <idx1> ... [red green blue [alpha]]`
-3. If vertex_count == 3: direct triangle
-4. If vertex_count == 4: triangulate as two triangles (0,1,2) + (0,2,3)
-5. If vertex_count > 4: fan triangulation from vertex 0
-6. Collect per-face colors if present (after the indices on the same line)
-
-### Main API
-
-```c
-// Load PLY file as mesh (vertices + faces)
-static inline ply_error_t ply_load_mesh_file(const char *filepath, ply_mesh_data_t *data);
-
-// Quick info scan that also reports face count
-static inline ply_error_t ply_get_mesh_info(const char *filepath,
-    int *vertex_count, int *face_count, bool *has_vertex_colors, bool *has_face_colors);
-
-// Free mesh data
-static inline void ply_mesh_data_free(ply_mesh_data_t *data);
-```
-
-### Incremental Parsing Extension
-
-Extend `ply_parse_state_t` with face parsing fields:
-```c
-typedef struct {
-    // ... existing fields ...
-
-    // Face parsing state
-    uint32_t *face_indices;
-    vec4_t *face_colors;
-    int face_parsed_count;
-    int face_capacity;
-    int face_total;
-    bool parsing_faces;      // true when vertex parsing done, parsing faces
-    bool has_face_colors;
-} ply_parse_state_t;
-```
-
-Add `ply_parse_faces_chunk()` for incremental face parsing.
-
-**Verification:**
-- Create a simple test PLY file (ASCII) with vertices + faces
-- Call `ply_load_mesh_file()` -> returns correct vertex + face data
-- Test with per-vertex colors, per-face colors, and no colors
-- Test quad triangulation (4-vertex faces -> 2 triangles)
-- Test `ply_get_mesh_info()` returns correct counts
+All changes backward-compatible: existing point cloud import (`ply_load_file`, `ply_open` + `ply_parse_vertices_chunk`, `ply_get_info`) works unchanged since face_total=0 for files without faces.
 
 ---
 
@@ -473,11 +372,11 @@ Options:
 |--------|-------------|-----------|------------------|
 | S1 ✅ | Add Entity menu items | `ui_scene_hierarchy.h` | Triangle & Box from menu |
 | S2 ✅ | Light inspector | `ui_scene_hierarchy.h`, `ui_entity_inspector.h` | Select & edit lights |
-| S3 | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
+| S3 ✅ | PLY mesh parser (ASCII) | `ply_loader.h` | Parse PLY mesh files |
 | S4 | PLY binary support | `ply_loader.h` | Parse binary PLY files |
 | S5 | PLY mesh import UI | `ply_mesh_import_job.h` (new), `ui_scene_hierarchy.h` | Full import workflow |
 | S6 | OBJ→PLY script | `scripts/obj_to_colored_ply.py` (new) | Convert & import test assets |
 
 **Dependencies:** S5 depends on S3+S4. S6 is independent. S1 and S2 are independent of everything else.
 
-**Recommended order:** S1 ✅ -> S2 ✅ -> S3 -> S4 -> S5 -> S6
+**Recommended order:** S1 ✅ -> S2 ✅ -> S3 ✅ -> S4 -> S5 -> S6
