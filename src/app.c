@@ -82,6 +82,9 @@ static struct {
     // Undo/Redo system
     undo_redo_t undo_redo;
 
+    // Lighting
+    bool lighting_enabled;
+
     // Gizmo system
     gizmo_t gizmo;
     bool gizmo_drag_active;
@@ -280,6 +283,28 @@ static void init(void) {
         // Edit the parent's position in Entity Inspector to see children move together!
     }
 
+    // Create default 3-point studio lighting
+    state.lighting_enabled = true;
+    {
+        // Key light: warm white, from front-right-above
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(0.5f, -0.7f, -0.5f),
+            vec4_make(1.0f, 0.95f, 0.9f, 1.0f), 1.0f);
+
+        // Fill light: cool blue-white, from front-left
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(-0.5f, -0.3f, -0.5f),
+            vec4_make(0.8f, 0.85f, 1.0f, 1.0f), 0.4f);
+
+        // Rim light: neutral, from behind
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(0.0f, -0.2f, 0.8f),
+            vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 0.3f);
+    }
+
+    // Wire up lighting toggle to visibility panel
+    ui_visibility_set_lighting_ptr(&state.visibility, &state.lighting_enabled);
+
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
         .colors[0] = { .load_action = SG_LOADACTION_CLEAR, .clear_value = { 0.1f, 0.1f, 0.1f, 1.0f } }
@@ -434,9 +459,37 @@ static void frame(void) {
         }
     });
 
-    // Draw ECS scene entities (lines, points, etc.)
+    // Draw ECS scene entities (lines, points, triangles)
     if (state.visibility.show_ecs_entities) {
-        ecs_scene_draw(&state.ecs_scene, mvp, aspect_ratio);
+        // Build triangle shader params with lighting data
+        geom_triangle_params_t tri_params = {0};
+        tri_params.mvp = mvp;
+        tri_params.lighting_enabled = state.lighting_enabled ? 1.0f : 0.0f;
+
+        // Ambient light
+        tri_params.ambient[0] = 0.15f;  // R
+        tri_params.ambient[1] = 0.15f;  // G
+        tri_params.ambient[2] = 0.15f;  // B
+        tri_params.ambient[3] = 1.0f;   // intensity
+
+        // Collect lights from ECS
+        scene_light_data_t lights[TRIANGLE_MAX_LIGHTS];
+        int light_count = scene_collect_lights(&state.ecs_scene, lights, TRIANGLE_MAX_LIGHTS);
+        tri_params.num_lights = (float)light_count;
+
+        for (int i = 0; i < light_count; i++) {
+            tri_params.light_dirs[i * 4 + 0] = lights[i].dir_or_pos[0];
+            tri_params.light_dirs[i * 4 + 1] = lights[i].dir_or_pos[1];
+            tri_params.light_dirs[i * 4 + 2] = lights[i].dir_or_pos[2];
+            tri_params.light_dirs[i * 4 + 3] = lights[i].dir_or_pos[3];
+
+            tri_params.light_colors[i * 4 + 0] = lights[i].color[0];
+            tri_params.light_colors[i * 4 + 1] = lights[i].color[1];
+            tri_params.light_colors[i * 4 + 2] = lights[i].color[2];
+            tri_params.light_colors[i * 4 + 3] = lights[i].color[3];
+        }
+
+        ecs_scene_draw(&state.ecs_scene, &tri_params, aspect_ratio);
     }
 
     // Draw gizmo overlay (always on top via depth-always pipeline)

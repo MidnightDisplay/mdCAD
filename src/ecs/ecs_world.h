@@ -10,6 +10,7 @@
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
 #include "../components/label_comp.h"
+#include "../components/light_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -25,6 +26,7 @@ typedef struct {
     ecs_entity_t RenderableComp_id;
     ecs_entity_t SelectableComp_id;
     ecs_entity_t LabelComp_id;
+    ecs_entity_t LightComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -101,6 +103,12 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "LabelComp" }),
         .type.size = sizeof(LabelComp),
         .type.alignment = ECS_ALIGNOF(LabelComp)
+    });
+
+    s->LightComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "LightComp" }),
+        .type.size = sizeof(LightComp),
+        .type.alignment = ECS_ALIGNOF(LightComp)
     });
 
     // Register tag components (zero-size)
@@ -246,6 +254,10 @@ static inline LabelComp* ecs_world_get_label(ecs_world_state_t *s, ecs_entity_t 
 
 static inline void ecs_world_set_label(ecs_world_state_t *s, ecs_entity_t e, const LabelComp *label) {
     ecs_set_id(s->world, e, s->LabelComp_id, sizeof(LabelComp), label);
+}
+
+static inline LightComp* ecs_world_get_light(ecs_world_state_t *s, ecs_entity_t e) {
+    return (LightComp*)ecs_get_id(s->world, e, s->LightComp_id);
 }
 
 //------------------------------------------------------------------------------

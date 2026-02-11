@@ -28,6 +28,9 @@ typedef struct {
 
     // Selection state (pointer to external)
     int *selection_count;
+
+    // Lighting toggle (pointer to external)
+    bool *lighting_enabled;
 } ui_visibility_state_t;
 
 //------------------------------------------------------------------------------
@@ -43,6 +46,7 @@ static inline void ui_visibility_init(ui_visibility_state_t* vis) {
     vis->ecs_point_size = NULL;
     vis->pick_thickness_multiplier = NULL;
     vis->selection_count = NULL;
+    vis->lighting_enabled = NULL;
 }
 
 static inline void ui_visibility_set_pick_debug_ptr(ui_visibility_state_t* vis, bool *pick_debug_open) {
@@ -68,6 +72,10 @@ static inline void ui_visibility_set_ecs_thickness_ptrs(ui_visibility_state_t* v
 
 static inline void ui_visibility_set_selection_count_ptr(ui_visibility_state_t* vis, int *count) {
     vis->selection_count = count;
+}
+
+static inline void ui_visibility_set_lighting_ptr(ui_visibility_state_t* vis, bool *lighting_enabled) {
+    vis->lighting_enabled = lighting_enabled;
 }
 
 static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
@@ -101,6 +109,17 @@ static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
         igTextDisabled("(?)");
         if (igIsItemHovered(0)) {
             igSetTooltip("Multiplier for pick buffer line/point thickness.\nHigher values make entities easier to pick.");
+        }
+    }
+
+    // Lighting toggle
+    if (vis->lighting_enabled) {
+        igSeparatorText("Lighting");
+        igCheckbox("Enable Lighting", vis->lighting_enabled);
+        igSameLine(0, 5);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(0)) {
+            igSetTooltip("3-point studio lighting for triangle entities.\nLines and points remain flat-shaded.");
         }
     }
 

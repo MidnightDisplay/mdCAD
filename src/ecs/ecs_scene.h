@@ -706,6 +706,99 @@ static inline ecs_entity_t scene_add_triangle_colored(ecs_scene_t *scene,
 }
 
 //------------------------------------------------------------------------------
+// Light Entity Creation
+//------------------------------------------------------------------------------
+
+// Create a directional light entity (direction stored as transform position)
+static inline ecs_entity_t scene_add_directional_light(ecs_scene_t *scene,
+                                                         vec3_t direction, vec4_t color,
+                                                         float intensity) {
+    ecs_world_state_t *w = scene->world;
+    ecs_entity_t e = ecs_new(w->world);
+
+    // Add transform - position holds the light direction
+    TransformComp t = transform_comp_default();
+    t.position = direction;
+    ecs_set_id(w->world, e, w->TransformComp_id, sizeof(TransformComp), &t);
+
+    // Add light component
+    LightComp l = light_comp_directional(color, intensity);
+    ecs_set_id(w->world, e, w->LightComp_id, sizeof(LightComp), &l);
+
+    return e;
+}
+
+// Create a point light entity
+static inline ecs_entity_t scene_add_point_light(ecs_scene_t *scene,
+                                                    vec3_t position, vec4_t color,
+                                                    float intensity) {
+    ecs_world_state_t *w = scene->world;
+    ecs_entity_t e = ecs_new(w->world);
+
+    TransformComp t = transform_comp_default();
+    t.position = position;
+    ecs_set_id(w->world, e, w->TransformComp_id, sizeof(TransformComp), &t);
+
+    LightComp l = light_comp_point(color, intensity);
+    ecs_set_id(w->world, e, w->LightComp_id, sizeof(LightComp), &l);
+
+    return e;
+}
+
+// Packed light data for shader uniforms
+typedef struct {
+    float dir_or_pos[4];  // xyz = direction (directional) or position (point), w = type (0=dir, 1=point)
+    float color[4];       // rgb = color, a = intensity
+} scene_light_data_t;
+
+// Collect all lights in the scene into a flat array for shader use
+// Returns the number of lights collected (up to max_lights)
+static inline int scene_collect_lights(ecs_scene_t *scene,
+                                         scene_light_data_t *out_lights, int max_lights) {
+    ecs_world_state_t *w = scene->world;
+    int count = 0;
+
+    // Query all entities that have both TransformComp and LightComp
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->TransformComp_id },
+            { .id = w->LightComp_id }
+        }
+    });
+
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it) && count < max_lights) {
+        TransformComp *transforms = ecs_field(&it, TransformComp, 0);
+        LightComp *lights = ecs_field(&it, LightComp, 1);
+
+        for (int i = 0; i < it.count && count < max_lights; i++) {
+            TransformComp *t = &transforms[i];
+            LightComp *l = &lights[i];
+
+            out_lights[count].dir_or_pos[0] = t->position.x;
+            out_lights[count].dir_or_pos[1] = t->position.y;
+            out_lights[count].dir_or_pos[2] = t->position.z;
+            out_lights[count].dir_or_pos[3] = (l->type == LIGHT_POINT) ? 1.0f : 0.0f;
+
+            out_lights[count].color[0] = l->color.x;
+            out_lights[count].color[1] = l->color.y;
+            out_lights[count].color[2] = l->color.z;
+            out_lights[count].color[3] = l->intensity;
+
+            count++;
+        }
+
+        if (count >= max_lights) {
+            ecs_iter_fini(&it);
+            break;
+        }
+    }
+
+    ecs_query_fini(q);
+    return count;
+}
+
+//------------------------------------------------------------------------------
 // Entity Deletion
 //------------------------------------------------------------------------------
 
@@ -1255,9 +1348,11 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
 // Scene Rendering
 //------------------------------------------------------------------------------
 
-static inline void ecs_scene_draw(ecs_scene_t *scene, mat4_t mvp, float aspect_ratio) {
+static inline void ecs_scene_draw(ecs_scene_t *scene,
+                                   const geom_triangle_params_t *tri_params,
+                                   float aspect_ratio) {
     if (!scene->visible) return;
-    geometry_batch_manager_draw(&scene->batches, mvp, aspect_ratio);
+    geometry_batch_manager_draw(&scene->batches, tri_params, aspect_ratio);
 }
 
 //------------------------------------------------------------------------------

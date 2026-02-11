@@ -72,10 +72,21 @@ typedef struct {
     float _pad[2];
 } geom_batch_params_t;
 
-// Uniform block for triangle shaders (mvp only for Sprint 1)
+// Maximum lights supported by triangle shader
+#define TRIANGLE_MAX_LIGHTS 4
+
+// Uniform block for triangle shaders (std140 layout, VS block 0)
+// Contains MVP + lighting data. Lighting is computed in vertex shader
+// (valid for flat shading since face normal is constant per triangle).
 typedef struct {
-    mat4_t mvp;
-} geom_triangle_params_t;
+    mat4_t mvp;                                    // 64 bytes, offset 0
+    float light_dirs[TRIANGLE_MAX_LIGHTS * 4];     // 64 bytes, offset 64  (4 x vec4: xyz=dir/pos, w=type)
+    float light_colors[TRIANGLE_MAX_LIGHTS * 4];   // 64 bytes, offset 128 (4 x vec4: rgb=color, w=intensity)
+    float ambient[4];                              // 16 bytes, offset 192 (vec4: rgb=color, w=intensity)
+    float num_lights;                              // 4 bytes,  offset 208
+    float lighting_enabled;                        // 4 bytes,  offset 212
+    float _pad[2];                                 // 8 bytes,  offset 216 (pad to 224 = 14*16)
+} geom_triangle_params_t;                          // 224 bytes total
 
 //------------------------------------------------------------------------------
 // Line Batch
@@ -759,6 +770,11 @@ static inline void geom_triangle_batch_init(geom_triangle_batch_t* batch) {
             .layout = SG_UNIFORMLAYOUT_STD140,
             .glsl_uniforms = {
                 [0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" },
+                [1] = { .type = SG_UNIFORMTYPE_FLOAT4, .array_count = TRIANGLE_MAX_LIGHTS, .glsl_name = "light_dirs" },
+                [2] = { .type = SG_UNIFORMTYPE_FLOAT4, .array_count = TRIANGLE_MAX_LIGHTS, .glsl_name = "light_colors" },
+                [3] = { .type = SG_UNIFORMTYPE_FLOAT4, .glsl_name = "ambient_color" },
+                [4] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "num_lights" },
+                [5] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "lighting_enabled" },
             }
         },
         .label = "ecs-triangle-shader"
@@ -857,13 +873,10 @@ static inline void geom_triangle_batch_upload(geom_triangle_batch_t* batch) {
     instance_buffer_upload(&batch->instances);
 }
 
-static inline void geom_triangle_batch_draw(geom_triangle_batch_t* batch, mat4_t mvp) {
+static inline void geom_triangle_batch_draw(geom_triangle_batch_t* batch,
+                                              const geom_triangle_params_t *params) {
     int count = instance_buffer_count(&batch->instances);
     if (count == 0) return;
-
-    geom_triangle_params_t params = {
-        .mvp = mvp,
-    };
 
     sg_apply_pipeline(batch->pip);
     sg_apply_bindings(&(sg_bindings){
@@ -873,7 +886,7 @@ static inline void geom_triangle_batch_draw(geom_triangle_batch_t* batch, mat4_t
         },
         .index_buffer = batch->template_ibuf,
     });
-    sg_apply_uniforms(0, &SG_RANGE(params));
+    sg_apply_uniforms(0, &(sg_range){ .ptr = params, .size = sizeof(geom_triangle_params_t) });
     sg_draw(0, batch->template_index_count, count);
 }
 
@@ -943,10 +956,11 @@ static inline void geometry_batch_manager_upload(geometry_batch_manager_t* mgr) 
 }
 
 static inline void geometry_batch_manager_draw(geometry_batch_manager_t* mgr,
-                                                mat4_t mvp, float aspect_ratio) {
-    geom_triangle_batch_draw(&mgr->triangles, mvp);
-    geom_line_batch_draw(&mgr->lines, mvp, aspect_ratio);
-    geom_point_batch_draw(&mgr->points, mvp, aspect_ratio);
+                                                const geom_triangle_params_t *tri_params,
+                                                float aspect_ratio) {
+    geom_triangle_batch_draw(&mgr->triangles, tri_params);
+    geom_line_batch_draw(&mgr->lines, tri_params->mvp, aspect_ratio);
+    geom_point_batch_draw(&mgr->points, tri_params->mvp, aspect_ratio);
 }
 
 static inline void geometry_batch_manager_shutdown(geometry_batch_manager_t* mgr) {

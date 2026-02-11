@@ -357,6 +357,60 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     json_builder_append(b, "}");
 }
 
+// Write a light entity to JSON
+static inline void scene_write_light_json(json_builder_t *b, ecs_scene_t *scene,
+                                           ecs_entity_t e, int depth) {
+    ecs_world_state_t *w = scene->world;
+
+    TransformComp *t = ecs_world_get_transform(w, e);
+    LightComp *l = ecs_world_get_light(w, e);
+
+    if (!t || !l) return;
+
+    json_write_indent(b, depth);
+    json_builder_append(b, "{\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_appendf(b, "\"id\": %llu,\n", (unsigned long long)e);
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "\"parent\": null,\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "\"components\": {\n");
+
+    // Transform (direction/position stored in position field)
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "\"transform\": {\n");
+    json_write_indent(b, depth + 3);
+    json_builder_append(b, "\"position\": ");
+    json_write_vec3(b, t->position);
+    json_builder_append(b, "\n");
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "},\n");
+
+    // Light component
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "\"light\": {\n");
+    json_write_indent(b, depth + 3);
+    json_builder_appendf(b, "\"type\": \"%s\",\n",
+        l->type == LIGHT_DIRECTIONAL ? "directional" : "point");
+    json_write_indent(b, depth + 3);
+    json_builder_append(b, "\"color\": ");
+    json_write_vec4(b, l->color);
+    json_builder_append(b, ",\n");
+    json_write_indent(b, depth + 3);
+    json_builder_appendf(b, "\"intensity\": %.6g\n", l->intensity);
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "}\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "}\n");
+
+    json_write_indent(b, depth);
+    json_builder_append(b, "}");
+}
+
 // Save scene to JSON string (caller must free returned string)
 static inline char* scene_save_to_string(ecs_scene_t *scene) {
     json_builder_t b;
@@ -376,7 +430,7 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
         }
     });
 
-    // Collect entities first (to handle commas correctly)
+    // Collect geometry entities
     ecs_entity_t *entities = NULL;
     int entity_count = 0;
     int entity_capacity = 0;
@@ -393,16 +447,51 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     }
     ecs_query_fini(q);
 
-    // Write entities
+    // Also collect light entities
+    ecs_query_t *lq = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LightComp_id }
+        }
+    });
+
+    ecs_entity_t *light_entities = NULL;
+    int light_count = 0;
+    int light_capacity = 0;
+
+    ecs_iter_t lit = ecs_query_iter(w->world, lq);
+    while (ecs_query_next(&lit)) {
+        for (int i = 0; i < lit.count; i++) {
+            if (light_count >= light_capacity) {
+                light_capacity = light_capacity ? light_capacity * 2 : 8;
+                light_entities = (ecs_entity_t*)realloc(light_entities, light_capacity * sizeof(ecs_entity_t));
+            }
+            light_entities[light_count++] = lit.entities[i];
+        }
+    }
+    ecs_query_fini(lq);
+
+    int total_count = entity_count + light_count;
+
+    // Write geometry entities
     for (int i = 0; i < entity_count; i++) {
         scene_write_entity_json(&b, scene, entities[i], 2);
-        if (i < entity_count - 1) {
+        if (i < total_count - 1) {
+            json_builder_append(&b, ",");
+        }
+        json_builder_append(&b, "\n");
+    }
+
+    // Write light entities
+    for (int i = 0; i < light_count; i++) {
+        scene_write_light_json(&b, scene, light_entities[i], 2);
+        if (entity_count + i < total_count - 1) {
             json_builder_append(&b, ",");
         }
         json_builder_append(&b, "\n");
     }
 
     free(entities);
+    free(light_entities);
 
     json_builder_append(&b, "  ]\n");
     json_builder_append(&b, "}\n");
@@ -811,6 +900,12 @@ typedef struct {
     // Renderable
     bool visible;
     int layer;
+
+    // Light (when is_light is true, geometry fields are unused)
+    bool is_light;
+    light_type_t light_type;
+    vec4_t light_color;
+    float light_intensity;
 } loaded_entity_t;
 
 //------------------------------------------------------------------------------
@@ -1028,6 +1123,55 @@ static inline bool json_parse_renderable(json_parser_t *p, loaded_entity_t *ent)
 }
 
 //------------------------------------------------------------------------------
+// Parse Light Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_light(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->is_light = true;
+    ent->light_type = LIGHT_DIRECTIONAL;
+    ent->light_color = vec4_make(1, 1, 1, 1);
+    ent->light_intensity = 1.0f;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "type") == 0) {
+            if (p->token == JSON_TOK_STRING) {
+                if (strcmp(p->str_value, "point") == 0) {
+                    ent->light_type = LIGHT_POINT;
+                }
+            }
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "color") == 0) {
+            if (!json_parse_vec4(p, &ent->light_color)) return false;
+        } else if (strcmp(key, "intensity") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->light_intensity = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
 // Parse Single Entity
 //------------------------------------------------------------------------------
 
@@ -1082,6 +1226,8 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
                     if (!json_parse_geometry(p, ent)) return false;
                 } else if (strcmp(comp_key, "renderable") == 0) {
                     if (!json_parse_renderable(p, ent)) return false;
+                } else if (strcmp(comp_key, "light") == 0) {
+                    if (!json_parse_light(p, ent)) return false;
                 } else {
                     if (!json_skip_value(p)) return false;
                 }
@@ -1111,6 +1257,16 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
 // Helper to create entity in scene based on loaded data
 static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_entity_t *ent) {
     ecs_entity_t e = 0;
+
+    // Handle light entities
+    if (ent->is_light) {
+        if (ent->light_type == LIGHT_DIRECTIONAL) {
+            e = scene_add_directional_light(scene, ent->position, ent->light_color, ent->light_intensity);
+        } else {
+            e = scene_add_point_light(scene, ent->position, ent->light_color, ent->light_intensity);
+        }
+        return e;
+    }
 
     switch (ent->geom_type) {
         case GEOM_POINT:
@@ -1327,6 +1483,32 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
             scene_remove_entity(scene, to_delete[i]);
         }
         free(to_delete);
+
+        // Also delete light entities (they don't have GeometryComp)
+        ecs_query_t *lq = ecs_query(w->world, {
+            .terms = {{ .id = w->LightComp_id }}
+        });
+
+        ecs_entity_t *lights_to_delete = NULL;
+        int ld_count = 0;
+        int ld_capacity = 0;
+
+        ecs_iter_t lit = ecs_query_iter(w->world, lq);
+        while (ecs_query_next(&lit)) {
+            for (int i = 0; i < lit.count; i++) {
+                if (ld_count >= ld_capacity) {
+                    ld_capacity = ld_capacity ? ld_capacity * 2 : 8;
+                    lights_to_delete = (ecs_entity_t*)realloc(lights_to_delete, ld_capacity * sizeof(ecs_entity_t));
+                }
+                lights_to_delete[ld_count++] = lit.entities[i];
+            }
+        }
+        ecs_query_fini(lq);
+
+        for (int i = 0; i < ld_count; i++) {
+            ecs_delete(w->world, lights_to_delete[i]);
+        }
+        free(lights_to_delete);
     }
 
     // Create entities (first pass - create all entities)
