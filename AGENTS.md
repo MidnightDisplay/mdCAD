@@ -18,7 +18,7 @@ The **user <-> agent** collaboration worklow is:
 5) the user starts a new agent session and provides the path to the plan file and any docs useful for understanding the full context
 6) the agent runs implementation
 7) first pass is tested by the user
-8) after the user signs off on the feature, the agent marks off any todo's in the plan as completed and adds notes to CHECKPOINT.md as to what was done in the implementation session
+8) after the user signs off on the feature, the agent marks off any todo's in the plan as completed and adds notes to `CHECKPOINT.md` as to what was done in the implementation session. Keep the "Most Recent Changes" section tidy, hold only one feature plan (with all sprints). When the feature is delivered archive it to `CHANGELOG.md`
 
 ## Project Overview
 

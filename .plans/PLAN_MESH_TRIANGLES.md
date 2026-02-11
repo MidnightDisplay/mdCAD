@@ -113,21 +113,21 @@ For uniform-color mode, all three colors are set identically. The shader always 
 
 ---
 
-## Sprint 2: Picking, Selection, Undo/Redo & Serialization
+## Sprint 2: Picking, Selection, Undo/Redo & Serialization (COMPLETED)
 
 **Goal**: Fully interactive triangles with click-to-select, undo/redo, and save/load.
 
 ### 2.1 Triangle Pick Shaders — `src/shaders/pick_shaders.h`
 
-- [ ] Add `pick_triangle_vs_source` / `pick_triangle_fs_source` (all backends):
+- [x] Add `pick_triangle_vs_source` / `pick_triangle_fs_source` (all backends):
   - Same vertex shader as visual triangle but outputs pick_color (vec3) instead of visual color
   - Fragment shader outputs pick_color as RGB
   - Vertex attributes: template_pos + vertex_a/b/c + pick_color (no normal/colors needed)
-- [ ] SPIR-V: `pick_triangle.vert` / `pick_triangle.frag`, compile and include bytecode
+- [x] SPIR-V: `pick_triangle.vert` / `pick_triangle.frag`, compile and include bytecode
 
 ### 2.2 Pick Buffer Integration — `src/gpu/pick_buffer.h`
 
-- [ ] Define `pick_triangle_instance_t`:
+- [x] Define `pick_triangle_instance_t`:
   ```c
   typedef struct {
       float ax, ay, az;   // Vertex A
@@ -136,18 +136,18 @@ For uniform-color mode, all three colors are set identically. The shader always 
       float r, g, b;      // Pick color (encoded ID)
   } pick_triangle_instance_t;  // 12 floats
   ```
-- [ ] Add triangle template geometry buffers (same 3-vertex barycentric template)
-- [ ] Add `sg_pipeline triangle_pip` + `sg_shader triangle_shd` for pick
-- [ ] Add `instance_buffer_t triangle_instances`
-- [ ] Add overlay versions (for future gizmo-level triangle picking if needed)
-- [ ] `pick_buffer_add_triangle(pb, a, b, c, pick_id)` — allocate slot, encode pick_id as RGB
-- [ ] Update `pick_buffer_begin_frame()` — clear triangle instances
-- [ ] Update `pick_buffer_render()` — upload + draw triangle pick instances
-- [ ] Update `pick_buffer_init/shutdown` — create/destroy triangle resources
+- [x] Add triangle template geometry buffers (same 3-vertex barycentric template)
+- [x] Add `sg_pipeline triangle_pip` + `sg_shader triangle_shd` for pick
+- [x] Add `instance_buffer_t triangle_instances`
+- [x] Add overlay versions (for future gizmo-level triangle picking if needed) — deferred, not needed yet
+- [x] `pick_buffer_add_triangle(pb, a, b, c, pick_id)` — allocate slot, encode pick_id as RGB
+- [x] Update `pick_buffer_begin_frame()` — clear triangle instances
+- [x] Update `pick_buffer_render()` — upload + draw triangle pick instances
+- [x] Update `pick_buffer_init/shutdown` — create/destroy triangle resources
 
 ### 2.3 Scene Pick Integration — `src/ecs/ecs_scene.h`
 
-- [ ] Add `GEOM_TRIANGLE` case in `ecs_scene_populate_pick_buffer()`:
+- [x] Add `GEOM_TRIANGLE` case in `ecs_scene_populate_pick_buffer()`:
   - Transform 3 vertices through world_matrix
   - Call `pick_buffer_add_triangle()` with entity's pick_id
 
@@ -155,23 +155,25 @@ For uniform-color mode, all three colors are set identically. The shader always 
 
 Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET_VISIBLE, CMD_DELETE_ENTITY). We need:
 
-- [ ] Add `UNDO_GEOM_TRIANGLE` to `undo_geom_type_t` enum
-- [ ] Add triangle snapshot data to `undo_entity_snapshot_t` union:
+- [x] Add `UNDO_GEOM_TRIANGLE` to `undo_geom_type_t` enum
+- [x] Add triangle snapshot data to `undo_entity_snapshot_t` union:
   ```c
   struct { vec3_t a, b, c; } triangle;
   ```
-- [ ] Update `undo_snapshot_entity()` — capture triangle vertices
-- [ ] Update `undo_recreate_entity()` — recreate triangle from snapshot
-- [ ] Verify CMD_CREATE_ENTITY / CMD_DELETE_ENTITY work for triangles (should be automatic with snapshot)
+- [x] Update `undo_snapshot_entity()` — capture triangle vertices
+- [x] Update `undo_recreate_entity()` — recreate triangle from snapshot
+- [x] `undo_set_vertex_pos()` updated to handle GEOM_TRIANGLE vertices
+- [x] CMD_CREATE_ENTITY / CMD_DELETE_ENTITY work for triangles (automatic with snapshot)
 
 ### 2.5 Scene Serialization — `src/scene_serializer.h`
 
-- [ ] Add `"triangle"` case in `scene_serialize_geometry()`:
+- [x] Add `"triangle"` case in `scene_serialize_geometry()`:
   ```json
   { "type": "triangle", "a": [x,y,z], "b": [x,y,z], "c": [x,y,z] }
   ```
-- [ ] Add `"triangle"` case in `scene_deserialize_geometry()`:
+- [x] Add `"triangle"` case in `scene_deserialize_geometry()`:
   - Parse a, b, c arrays → call `scene_add_triangle()`
+- [x] Updated `scene_geom_type_to_string()` and `scene_string_to_geom_type()` for triangle
 - [ ] Test round-trip: create triangles, save, clear, load — verify identical
 
 ### 2.6 Testing
