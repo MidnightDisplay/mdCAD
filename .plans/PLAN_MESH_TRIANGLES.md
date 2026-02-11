@@ -365,64 +365,55 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 
 ---
 
-## Sprint 6: Mesh Entities (Multi-Triangle)
+## Sprint 6: Mesh Entities (Multi-Triangle) (COMPLETED)
 
 **Goal**: Support indexed mesh entities containing multiple triangles as a single ECS entity.
 
 ### 6.1 Geometry Component — `src/components/geometry_comp.h`
 
-- [ ] Add `GEOM_MESH = 9` to `geometry_type_t`
-- [ ] Define `geom_mesh_data_t`:
-  ```c
-  typedef struct {
-      vec3_t *vertices;         // Unique vertex positions
-      vec3_t *normals;          // Per-vertex normals (smooth) or NULL (compute per-face)
-      vec4_t *vertex_colors;    // Optional per-vertex colors, NULL if uniform
-      int vertex_count;
-      int vertex_capacity;
-      uint32_t *indices;        // Triangle indices (groups of 3)
-      int index_count;          // Must be multiple of 3
-      int index_capacity;
-  } geom_mesh_data_t;
-  ```
-- [ ] Add to GeometryComp union
-- [ ] Dynamic allocation helpers: `geom_mesh_init()`, `geom_mesh_add_vertex()`, `geom_mesh_add_triangle()`, `geom_mesh_free()`
-- [ ] `geom_mesh_compute_normals()` — average face normals at shared vertices for smooth shading
-- [ ] `geom_mesh_face_count()` — returns `index_count / 3`
+- [x] Add `GEOM_MESH = 9` to `geometry_type_t`
+- [x] Define `geom_mesh_data_t` with vertices, normals, vertex_colors, indices arrays
+- [x] Add to GeometryComp union
+- [x] Dynamic allocation helpers: `geom_mesh_init()`, `geom_mesh_add_vertex()`, `geom_mesh_add_triangle()`, `geom_mesh_free()`
+- [x] `geom_mesh_compute_normals()` — area-weighted average face normals at shared vertices for smooth shading
+- [x] `geom_mesh_face_count()` — returns `index_count / 3`
+- [x] `geometry_comp_mesh()` factory helper (copies data, computes normals)
+- [x] Updated `geometry_comp_free()` for GEOM_MESH
 
 ### 6.2 Scene API — `src/ecs/ecs_scene.h`
 
-- [ ] `scene_add_mesh(scene, vertices, vertex_count, indices, index_count, color)`:
+- [x] `scene_add_mesh(scene, vertices, vertex_count, indices, index_count, color)`:
   1. Allocate `index_count / 3` contiguous triangle batch slots
   2. Create entity with Transform + Geometry (GEOM_MESH) + Selectable + Renderable
-  3. Compute face normals (or vertex normals if provided)
+  3. Compute smooth normals via `geometry_comp_mesh()`
   4. Expand indexed triangles → fill triangle instance slots
   5. Configure RenderableComp: `batch_id = GEOM_MESH`, `instance_slot = first_slot`, `segment_count = face_count`
   6. Return entity handle
-- [ ] Add `GEOM_MESH` case in `ecs_scene_update()`:
-  - For each face: transform 3 vertices through world_matrix
-  - Recompute normals (or transform existing normals)
-  - Apply hover/selection color
-  - Write to contiguous triangle batch slots
-- [ ] Add `GEOM_MESH` case in `scene_free_entity_slots()`:
+- [x] `scene_add_mesh_colored()` — per-vertex color variant
+- [x] Add `GEOM_MESH` case in `ecs_scene_update()`:
+  - Visibility: hide all face slots with degenerate data
+  - Dirty update: re-expand indexed faces, recompute per-face normals, apply hover/selection or per-vertex colors
+- [x] Add `GEOM_MESH` case in `scene_free_entity_slots()`:
   - Free `segment_count` contiguous triangle batch slots
-- [ ] Add `GEOM_MESH` case in `ecs_scene_populate_pick_buffer()`:
+- [x] Add `GEOM_MESH` case in `ecs_scene_populate_pick_buffer()`:
   - All faces share entity's pick_id
   - Add each face as a triangle to pick buffer
 
 ### 6.3 Mesh Vertex Editing — `src/gizmo/gizmo_vertex_mode.h`
 
-- [ ] Add `GEOM_MESH` to `gizmo_vertex_mode_get_vertex_count()` → return mesh vertex_count (unique vertices)
-- [ ] Add `GEOM_MESH` to `gizmo_vertex_mode_get_local_pos()` → return mesh.vertices[idx]
-- [ ] Add `GEOM_MESH` to `gizmo_vertex_mode_set_local_pos()` → set mesh.vertices[idx]
-- [ ] Vertex editing automatically updates all faces sharing that vertex (because `ecs_scene_update` re-expands from indices each frame)
+- [x] Add `GEOM_MESH` to `gizmo_vertex_mode_get_vertex_count()` → return mesh vertex_count (unique vertices)
+- [x] Add `GEOM_MESH` to `gizmo_vertex_mode_get_local_pos()` → return mesh.vertices[idx]
+- [x] Add `GEOM_MESH` to `gizmo_vertex_mode_set_local_pos()` → set mesh.vertices[idx]
+- [x] Vertex editing automatically updates all faces sharing that vertex (because `ecs_scene_update` re-expands from indices each frame)
 
 ### 6.4 Undo/Redo & Serialization
 
-- [ ] Add `UNDO_GEOM_MESH` to undo snapshot types
-- [ ] Snapshot: deep copy vertices + indices arrays
-- [ ] Recreate: allocate fresh mesh from snapshot data
-- [ ] Serialize mesh in JSON:
+- [x] Add `UNDO_GEOM_MESH` to undo snapshot types
+- [x] Snapshot: deep copy vertices, normals, vertex_colors, indices arrays
+- [x] Recreate: allocate fresh mesh from snapshot data (uniform or per-vertex color)
+- [x] `undo_set_vertex_pos()` handles GEOM_MESH
+- [x] `undo_command_free()` cleans up mesh allocations (create, delete, child snapshots)
+- [x] Serialize mesh in JSON:
   ```json
   {
     "type": "mesh",
@@ -431,22 +422,24 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
     "vertex_colors": [[r,g,b,a], ...] // optional
   }
   ```
+- [x] Added `json_parse_uint_array()` and `json_parse_vec4_array()` parser helpers
+- [x] Deserialization handles mesh vertices, indices, optional vertex_colors
+- [x] All cleanup paths free mesh data on error
 
 ### 6.5 Mesh Helper API
 
-- [ ] `scene_add_mesh_quad(scene, a, b, c, d, color)` — convenience: 2 triangles
-- [ ] `scene_add_mesh_box(scene, center, size, color)` — convenience: 12 triangles (6 faces)
+- [x] `scene_add_mesh_quad(scene, a, b, c, d, color)` — convenience: 2 triangles
+- [x] `scene_add_mesh_box(scene, center, size, color)` — convenience: 12 triangles (6 faces, 8 vertices)
 
-### 6.6 Testing
+### 6.6 UI & App Integration
 
-- Create mesh with multiple faces → all faces rendered as one entity
-- Click any face → entire mesh entity selected
-- Move mesh → all faces move together
-- Tab to geometry mode → vertex handles at unique vertices
-- Drag shared vertex → all connected faces update
-- Ctrl+Z → vertex returns, faces restore
-- Save/load mesh → vertices + topology preserved
-- Delete mesh → all face instances freed
+- [x] Entity inspector shows vertex count, face count, index count, per-vertex color status for mesh entities
+- [x] Sample gold quad and steel blue box created at startup in `app.c`
+
+### 6.7 Testing
+
+- [x] Build verified on Windows
+- [x] Logic tested by user
 
 ---
 

@@ -209,6 +209,26 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
+### Mesh Triangles - Sprint 6: Mesh Entities / Multi-Triangle Indexed (IMPLEMENTED)
+
+Added indexed triangle mesh as a new geometry type (`GEOM_MESH`). Meshes store shared vertices with an index buffer and expand to individual triangle batch slots each frame (reusing the existing instanced triangle infrastructure). Includes area-weighted smooth vertex normals, per-vertex colors, full undo/redo with deep-copy snapshots, JSON serialization, gizmo vertex editing, and GPU picking (all faces share one pick_id). Convenience helpers for quads and boxes. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**Modified Files:**
+- `src/components/geometry_comp.h` - Added `GEOM_MESH = 9` enum; `geom_mesh_data_t` struct (vertices, normals, vertex_colors, indices with counts/capacities); helpers: `geom_mesh_init`, `geom_mesh_add_vertex`, `geom_mesh_add_triangle`, `geom_mesh_face_count`, `geom_mesh_compute_normals`, `geom_mesh_free`; `geometry_comp_mesh()` factory; updated `geometry_comp_free()`
+- `src/ecs/ecs_scene.h` - Added `scene_add_mesh()`, `scene_add_mesh_colored()`, `scene_add_mesh_quad()`, `scene_add_mesh_box()`; GEOM_MESH handling in `scene_free_entity_slots()`, `ecs_scene_update()` (visibility hide + dirty update with face-normal expansion and per-vertex color interpolation), `ecs_scene_populate_pick_buffer()`
+- `src/gizmo/gizmo_vertex_mode.h` - Added GEOM_MESH cases in `get_vertex_count`, `get_local_pos`, `set_local_pos`
+- `src/undo_redo.h` - Added `UNDO_GEOM_MESH` enum; mesh snapshot (vertices, normals, vertex_colors, indices) in `undo_entity_snapshot_t` union; updated `undo_command_free()` for mesh deep-copy cleanup
+- `src/undo_redo_exec.h` - Updated `undo_snapshot_entity()` with GEOM_MESH deep-copy; `undo_create_from_snapshot()` with mesh recreation; `undo_set_vertex_pos()` for mesh vertices
+- `src/scene_serializer.h` - Added `json_parse_uint_array()`, `json_parse_vec4_array()` helpers; mesh write (vertices/indices/vertex_colors arrays); mesh parse and `scene_create_from_loaded()` GEOM_MESH case; cleanup in all error/success paths
+- `src/ui/ui_entity_inspector.h` - Added GEOM_MESH case showing vertex count, face count, index count, per-vertex color status
+- `src/app.c` - Added sample gold quad and steel blue box after existing triangle samples
+
+**Key Design Decisions:**
+- **Indexed mesh expanding to triangle batch**: Meshes store compact shared-vertex data but expand to individual triangle instance slots each frame. This reuses the existing instanced triangle rendering pipeline with no shader changes.
+- **Area-weighted smooth normals**: `geom_mesh_compute_normals()` accumulates cross-product normals (proportional to triangle area) at each vertex, then normalizes. Larger triangles contribute more to the average.
+- **Contiguous slot allocation**: Like polylines/polygons, mesh faces use `instance_buffer_alloc_contiguous(face_count)` with `segment_count` tracking the slot count for proper cleanup.
+- **Single pick_id for all faces**: All triangle slots of a mesh share the entity's pick_id, so clicking any face selects the whole mesh entity.
+
 ### Mesh Triangles - Sprint 5: Lighting System (IMPLEMENTED)
 
 Added 3-point studio lighting for triangle entities. Lighting is computed in the vertex shader using Lambertian diffuse + ambient, with `abs(dot(N,L))` for double-sided triangles. Lights are ECS entities (TransformComp + LightComp) with full serialization. Global lighting toggle in the Visibility panel. Points and lines remain flat-shaded. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
@@ -232,9 +252,6 @@ Added 3-point studio lighting for triangle entities. Lighting is computed in the
 - **Global toggle, not per-entity mode**: Lighting enabled/disabled globally via Visibility panel. Per-vertex vs uniform color is orthogonal (handled at instance level). Simpler than 4 per-entity shading modes.
 - **Lights as ECS entities**: Enables serialization using existing infrastructure. Light data collected each frame and packed into shader uniforms (max 4 lights).
 - **Double-sided via abs(NdotL)**: `abs(dot(N, L))` handles both front and back faces without requiring face culling or `gl_FrontFacing`.
-
-**Remaining Sprints (see plan):**
-- Sprint 6: Mesh entities (multi-triangle indexed)
 
 **Note:** Vulkan SPIR-V bytecode must be recompiled after shader source changes: `scripts/vulkan-win/build-all.ps1`
 
