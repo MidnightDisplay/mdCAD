@@ -600,6 +600,26 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
             state->cache_dirty = true;
         }
 
+        igSeparator();
+
+        if (igMenuItem_Bool("Triangle (Mesh)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t a = vec3_make(0.0f, 0.8f, 0.0f);
+            vec3_t b = vec3_make(-0.693f, -0.4f, 0.0f);
+            vec3_t c = vec3_make(0.693f, -0.4f, 0.0f);
+            new_entity = scene_add_triangle(state->scene, a, b, c, color);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Test Mesh (Box)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            new_entity = scene_add_mesh_box(state->scene,
+                vec3_make(0.0f, 0.0f, 0.0f),
+                vec3_make(1.0f, 1.0f, 1.0f),
+                color);
+            state->cache_dirty = true;
+        }
+
         // Record undo command for entity creation
         if (new_entity != 0 && state->undo_redo) {
             undo_cmd_create_entity(state->undo_redo, new_entity);
