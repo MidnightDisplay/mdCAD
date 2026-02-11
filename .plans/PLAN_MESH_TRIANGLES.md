@@ -227,60 +227,60 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 
 ---
 
-## Sprint 4: Per-Vertex Color & Shader Variants
+## Sprint 4: Per-Vertex Color & Shader Variants (COMPLETED)
 
 **Goal**: Support per-vertex color gradients and togglable shading modes.
 
 ### 4.1 Geometry Component Update — `src/components/geometry_comp.h`
 
-- [ ] Extend `geom_triangle_data_t`:
-  ```c
-  typedef struct {
-      vec3_t a, b, c;
-      vec4_t color_a, color_b, color_c;  // Per-vertex colors (if has_vertex_colors)
-      bool has_vertex_colors;
-  } geom_triangle_data_t;
-  ```
-- [ ] Update `geometry_comp_triangle()` — default: no per-vertex colors (use GeometryComp.color)
-- [ ] Add `geometry_comp_triangle_colored(a, b, c, color_a, color_b, color_c)` — per-vertex color version
+- [x] Extend `geom_triangle_data_t` with `color_a`, `color_b`, `color_c` (vec4_t) and `has_vertex_colors` (bool)
+- [x] Update `geometry_comp_triangle()` — default: `has_vertex_colors = false` (use GeometryComp.color)
+- [x] Add `geometry_comp_triangle_colored(a, b, c, color_a, color_b, color_c)` — per-vertex color version
 
 ### 4.2 Scene Update Integration
 
-- [ ] Update GEOM_TRIANGLE case in `ecs_scene_update()`:
-  - If `has_vertex_colors`: set instance color_a/b/c from vertex colors (with hover/selection override)
-  - If not: replicate uniform color to all 3 instance color slots
+- [x] Update GEOM_TRIANGLE case in `ecs_scene_update()`:
+  - If `has_vertex_colors` and not hovered/selected: use `geom_triangle_batch_set_colored()` with per-vertex colors
+  - If not (or hovered/selected): use `geom_triangle_batch_set()` with uniform render_color
 
 ### 4.3 Shading Mode Toggle
 
-- [ ] Add `triangle_shading_mode` to scene or batch state:
-  - `SHADING_FLAT_UNIFORM` — single color per triangle (default)
-  - `SHADING_FLAT_VERTEX` — interpolated per-vertex colors
+- [x] Per-entity toggle via `has_vertex_colors` bool on `geom_triangle_data_t` — no global enum needed
+  - Uniform mode: `has_vertex_colors = false`, uses GeometryComp.color replicated to all 3 instance colors
+  - Per-vertex mode: `has_vertex_colors = true`, uses color_a/b/c from triangle data
   - (Lit modes deferred to Sprint 5)
-- [ ] For uniform mode: replicate GeometryComp.color to all 3 instance colors
-- [ ] For vertex mode: use per-vertex colors if available, else fall back to uniform
 
 ### 4.4 UI Control
 
-- [ ] Add shading mode dropdown to UI controls panel (or entity inspector for per-entity control)
+- [x] Added `GEOM_TRIANGLE` case in entity inspector with:
+  - "Per-Vertex Colors" checkbox toggle (initializes vertex colors from uniform color when enabled)
+  - Color A / Color B / Color C editors (shown when per-vertex colors enabled)
 
 ### 4.5 Scene API Update
 
-- [ ] `scene_add_triangle_colored(scene, a, b, c, color_a, color_b, color_c)` — per-vertex color variant
+- [x] `scene_add_triangle_colored(scene, a, b, c, color_a, color_b, color_c)` — per-vertex color variant
 
 ### 4.6 Serialization Update
 
-- [ ] Serialize per-vertex colors when present:
+- [x] Serialize per-vertex colors when `has_vertex_colors` is true:
   ```json
   { "type": "triangle", "a": [...], "b": [...], "c": [...],
     "color_a": [r,g,b,a], "color_b": [r,g,b,a], "color_c": [r,g,b,a] }
   ```
+- [x] Deserialize: parse `color_a`/`color_b`/`color_c`, set `has_vertex_colors`, call `scene_add_triangle_colored()`
 
-### 4.7 Testing
+### 4.7 Undo/Redo Update
 
-- Create triangle with 3 different vertex colors → smooth gradient visible
-- Toggle between uniform and per-vertex mode → visual changes
-- Save/load per-vertex color triangles → colors preserved
-- Hover/selection coloring still works in per-vertex mode
+- [x] Extended `undo_entity_snapshot_t` triangle member with `color_a`, `color_b`, `color_c`, `has_vertex_colors`
+- [x] `undo_snapshot_entity()` captures per-vertex color data
+- [x] `undo_create_from_snapshot()` uses `scene_add_triangle_colored()` when per-vertex colors present
+
+### 4.8 Testing
+
+- [x] RGB gradient triangle visible in viewport (sample in app.c)
+- [x] Per-vertex color toggle in entity inspector works
+- [x] Hover/selection coloring overrides per-vertex colors correctly
+- [x] Build and run on Windows (Vulkan) — verified working
 
 ---
 

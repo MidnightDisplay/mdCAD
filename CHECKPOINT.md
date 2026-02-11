@@ -209,74 +209,32 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
-### Mesh Triangles - Sprint 2: Picking, Selection, Undo/Redo & Serialization (IMPLEMENTED)
+### Mesh Triangles - Sprint 4: Per-Vertex Color & Shader Variants (IMPLEMENTED)
 
-Added full interactivity to triangle entities: GPU picking for click-to-select, undo/redo for create/delete/vertex editing, and JSON scene serialization. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
-
-**New Files:**
-- `src/shaders/spirv/pick_triangle.vert` - GLSL 450 triangle pick vertex shader
-- `src/shaders/spirv/pick_triangle.frag` - GLSL 450 triangle pick fragment shader
-- `src/shaders/spirv/pick_triangle_vs.spv` - Compiled SPIR-V vertex bytecode (1880 bytes)
-- `src/shaders/spirv/pick_triangle_fs.spv` - Compiled SPIR-V fragment bytecode (576 bytes)
+Added per-vertex color support for triangle entities. Triangles can now display smooth color gradients across their surface. Each triangle has an optional `has_vertex_colors` flag — when enabled, individual colors for vertices A, B, C are interpolated by the existing shader. Hover/selection highlighting overrides per-vertex colors. Includes entity inspector UI, serialization, and undo/redo support. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
 
 **Modified Files:**
-- `src/shaders/pick_shaders.h` - Added `pick_triangle_vs_source` / `pick_triangle_fs_source` for all backends (GLCORE, GLES3, Metal, WGPU, D3D11, Vulkan)
-- `src/gpu/pick_buffer.h` - Added `pick_triangle_instance_t` (12 floats), `pick_triangle_params_t` (MVP-only), triangle pipeline/shader/template/instances, `pick_buffer_add_triangle()`, triangle draw in render pass (before lines/points)
-- `src/ecs/ecs_scene.h` - Added `GEOM_TRIANGLE` case in `ecs_scene_populate_pick_buffer()` — transforms vertices through world_matrix and calls `pick_buffer_add_triangle()`
-- `src/undo_redo.h` - Added `UNDO_GEOM_TRIANGLE` and `UNDO_GEOM_POINT_CLOUD` to `undo_geom_type_t`, added `triangle` member to snapshot union
-- `src/undo_redo_exec.h` - Added GEOM_TRIANGLE snapshot/recreate, updated `undo_set_vertex_pos()` for triangle vertices
-- `src/scene_serializer.h` - Added triangle serialization/deserialization (`"type": "triangle", "a": [...], "b": [...], "c": [...]`), updated type name tables, added triangle member to `loaded_entity_t`
-- `src/shaders/spirv/spirv_bytecode.h` - Regenerated with pick_triangle shader bytecode
+- `src/components/geometry_comp.h` - Extended `geom_triangle_data_t` with `color_a`, `color_b`, `color_c` (vec4_t) and `has_vertex_colors` (bool); added `geometry_comp_triangle_colored()` factory
+- `src/ecs/ecs_scene.h` - Added `scene_add_triangle_colored()`; updated GEOM_TRIANGLE case in `ecs_scene_update()` to use `geom_triangle_batch_set_colored()` when per-vertex colors enabled and entity not highlighted
+- `src/scene_serializer.h` - Triangle save writes `color_a`/`color_b`/`color_c` when `has_vertex_colors` true; load parses them and calls `scene_add_triangle_colored()`; updated `loaded_entity_t` triangle union
+- `src/undo_redo.h` - Extended triangle snapshot with `color_a`, `color_b`, `color_c`, `has_vertex_colors`
+- `src/undo_redo_exec.h` - `undo_snapshot_entity()` captures per-vertex colors; `undo_create_from_snapshot()` uses `scene_add_triangle_colored()` when present
+- `src/ui/ui_entity_inspector.h` - Added GEOM_TRIANGLE case with "Per-Vertex Colors" checkbox and Color A/B/C editors
+- `src/app.c` - Added RGB gradient sample triangle using `scene_add_triangle_colored()`
 
 **Key Design Decisions:**
-- **Pick triangle shader uses MVP-only uniform** (`pick_triangle_params_t`): No line_width/aspect_ratio needed since triangles are solid geometry
-- **5 vertex attributes for pick**: template_pos + vertex_a/b/c + pick_color (vs 8 for visual shader)
-- **Draw order in pick pass**: Triangles first, then lines, then points — matches visual draw order
-- **No index buffer for pick triangles**: 3 vertices drawn directly via `sg_draw(0, 3, instance_count)`
-- **Overlay triangle picking deferred**: Not needed until gizmo-level triangle picking is required
-
-### Mesh Triangles - Sprint 3: Gizmo Vertex Editing (IMPLEMENTED)
-
-Added triangle vertex editing via the geometry mode gizmo. Select a triangle, press Tab to enter geometry mode, and drag individual vertices with the gizmo. Undo/redo works automatically via the existing `CMD_SET_GEOMETRY_VERTICES` command. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
-
-**Modified Files:**
-- `src/gizmo/gizmo_vertex_mode.h` - Added `GEOM_TRIANGLE` cases to `gizmo_vertex_mode_get_vertex_count()` (returns 3), `gizmo_vertex_mode_get_local_pos()` (returns triangle.a/b/c by index), and `gizmo_vertex_mode_set_local_pos()` (sets triangle.a/b/c by index)
-
-**Key Design Decisions:**
-- **No undo/redo changes needed**: `undo_set_vertex_pos()` already handles `GEOM_TRIANGLE` (added in Sprint 2), and the gizmo records vertex edits generically via `CMD_SET_GEOMETRY_VERTICES`
-- **Normal recomputation is automatic**: `ecs_scene_update()` recomputes the face normal from world-space vertices whenever `instance_dirty` is set
+- **Per-entity toggle, not global mode**: `has_vertex_colors` is a bool on `geom_triangle_data_t` — simpler than a global shading mode enum, allows mixed uniform/per-vertex triangles in same scene
+- **No shader changes needed**: The 96-byte instance layout already carries 3 per-vertex color slots; `geom_triangle_batch_set_colored()` was already implemented in Sprint 1
+- **Hover/selection overrides per-vertex colors**: When entity is hovered or selected, the uniform highlight color is used via `geom_triangle_batch_set()` instead of `set_colored()`
+- **Inspector initializes vertex colors from uniform**: Toggling "Per-Vertex Colors" on copies the current uniform color to all 3 vertex colors as a starting point
 
 **Remaining Sprints (see plan):**
-- Sprint 4: Per-vertex color & shader variants
 - Sprint 5: Lighting system (3-point studio)
 - Sprint 6: Mesh entities (multi-triangle indexed)
 
-### Mesh Triangles - Sprint 2: Picking, Selection, Undo/Redo & Serialization (IMPLEMENTED)
+### Mesh Triangles - Sprints 1-3 (IMPLEMENTED)
 
-Added instanced triangle rendering as a new geometry primitive alongside existing points and lines. Triangles are full ECS entities rendered via GPU instancing using the same architectural pattern as lines and points. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
-
-**New Files:**
-- `src/shaders/instanced_triangle_shaders.h` - Multi-backend triangle shaders (GLCORE, GLES3, Metal, WGPU, D3D11, Vulkan)
-- `src/shaders/spirv/instanced_triangle.vert` - GLSL 450 triangle vertex shader
-- `src/shaders/spirv/instanced_triangle.frag` - GLSL 450 triangle fragment shader
-- `src/shaders/spirv/instanced_triangle_vs.spv` - Compiled SPIR-V vertex bytecode
-- `src/shaders/spirv/instanced_triangle_fs.spv` - Compiled SPIR-V fragment bytecode
-
-**Modified Files:**
-- `src/components/geometry_comp.h` - Added `GEOM_TRIANGLE` enum, `geom_triangle_data_t` struct, `geometry_comp_triangle()` factory, updated type name table
-- `src/gpu/geometry_batch.h` - Added `geom_triangle_instance_t` (96 bytes), `geom_triangle_batch_t`, full batch API (init/alloc/set/free/upload/draw/shutdown), `geom_triangle_compute_normal()`, wired into batch manager
-- `src/ecs/ecs_scene.h` - Added `scene_add_triangle()`, GEOM_TRIANGLE cases in `ecs_scene_update()` (visibility hiding + dirty transform), `scene_free_entity_slots()`, `ecs_scene_triangle_count()`
-- `src/app.c` - 3 sample triangles at startup (red, green, blue)
-- `src/shaders/spirv/spirv_bytecode.h` - Regenerated with triangle shader bytecode
-
-**Key Design Decisions:**
-- **Barycentric selector template**: 3 vertices at (1,0,0), (0,1,0), (0,0,1) — vertex shader mixes instance vertex positions: `world_pos = sel.x * A + sel.y * B + sel.z * C`
-- **96-byte instances**: 3 vertex positions (9 floats) + face normal (3 floats) + 3 per-vertex colors (12 floats). All 3 colors set identical for uniform-color mode — avoids shader branching
-- **8 vertex attributes**: template_pos + vertex_a/b/c + normal + color_a/b/c (within SG_MAX_VERTEX_ATTRIBUTES = 16)
-- **Draw order**: Triangles drawn first, then lines, then points — correct depth layering
-- **MVP-only uniform block** (`geom_triangle_params_t`): No line_width/aspect_ratio needed — triangles are solid geometry, not screen-space shapes
-- **Double-sided**: Cull mode NONE, consistent with lines/points
-- **Normal stored per instance**: Computed as `normalize(cross(B-A, C-A))` — ready for future lighting (Sprint 5)
+Sprint 1 added instanced triangle rendering as a new geometry primitive (shaders, batch, scene API). Sprint 2 added GPU picking, undo/redo, and JSON serialization. Sprint 3 added gizmo vertex editing. See `.plans/PLAN_MESH_TRIANGLES.md` for full details.
 
 ## Older Changes
 
