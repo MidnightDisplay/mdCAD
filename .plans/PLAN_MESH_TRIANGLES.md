@@ -284,117 +284,84 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 
 ---
 
-## Sprint 5: Lighting System
+## Sprint 5: Lighting System (COMPLETED)
 
 **Goal**: 3-point studio lighting for triangles with togglable lit/unlit modes.
 
 ### 5.1 Light Component — `src/components/light_comp.h` (new file)
 
-- [ ] Define light types:
-  ```c
-  typedef enum { LIGHT_DIRECTIONAL, LIGHT_POINT } light_type_t;
-  ```
-- [ ] Define `LightComp`:
-  ```c
-  typedef struct {
-      light_type_t type;
-      vec4_t color;       // RGB + unused alpha
-      float intensity;    // Multiplier (0.0 - 10.0)
-  } LightComp;
-  ```
-- [ ] Light position/direction derived from entity's TransformComp
-  - Directional: forward direction from rotation (e.g., -Z in local space rotated by world_matrix)
-  - Point: position from world_matrix translation
+- [x] Define `light_type_t` enum: `LIGHT_DIRECTIONAL`, `LIGHT_POINT`
+- [x] Define `LightComp` struct: type, color (vec4_t), intensity (float)
+- [x] Factory helpers: `light_comp_directional()`, `light_comp_point()`
+- [x] Light direction stored in entity's TransformComp position field (directional lights)
 
 ### 5.2 ECS World Integration — `src/ecs/ecs_world.h`
 
-- [ ] Register `LightComp` as ECS component
-- [ ] Register `Light` tag for easy querying
-- [ ] `ecs_world_create_light()` helper
+- [x] Register `LightComp` as ECS component (`LightComp_id`)
+- [x] `ecs_world_get_light()` accessor helper
 
 ### 5.3 Scene API — `src/ecs/ecs_scene.h`
 
-- [ ] `scene_add_directional_light(scene, direction, color, intensity)`:
-  - Creates entity with TransformComp + LightComp
-  - Direction encoded as rotation to orient -Z toward desired direction
-  - No geometry/renderable (lights are invisible for now)
-  - Returns entity handle
-- [ ] `scene_add_point_light(scene, position, color, intensity)`:
-  - Similar but uses position
-- [ ] `scene_collect_lights(scene, out_lights, max_lights)`:
-  - Query all Light entities, extract world-space position/direction + color/intensity
-  - Output packed for shader uniform block
-  - Returns count of lights found
+- [x] `scene_add_directional_light(scene, direction, color, intensity)` — creates entity with TransformComp + LightComp only (no geometry/renderable/selectable)
+- [x] `scene_add_point_light(scene, position, color, intensity)` — same pattern for point lights
+- [x] `scene_collect_lights(scene, out_lights, max_lights)` — queries all LightComp entities, packs direction/color/intensity into `scene_light_data_t` array for shader use
 
 ### 5.4 Default 3-Point Studio Lighting
 
-- [ ] Create at app init (in `app.c` or scene initialization):
-  - **Key Light**: Directional, warm white (1.0, 0.95, 0.9), intensity 1.0, direction roughly (0.5, -0.7, -0.5) — front-right-above
-  - **Fill Light**: Directional, cool blue-white (0.8, 0.85, 1.0), intensity 0.4, direction roughly (-0.5, -0.3, -0.5) — front-left
-  - **Rim Light**: Directional, neutral (1.0, 1.0, 1.0), intensity 0.3, direction roughly (0.0, -0.2, 0.8) — behind
+- [x] Created at app init in `app.c`:
+  - **Key Light**: Directional, warm white (1.0, 0.95, 0.9), intensity 1.0, direction (0.5, -0.7, -0.5)
+  - **Fill Light**: Directional, cool blue-white (0.8, 0.85, 1.0), intensity 0.4, direction (-0.5, -0.3, -0.5)
+  - **Rim Light**: Directional, neutral (1.0, 1.0, 1.0), intensity 0.3, direction (0.0, -0.2, 0.8)
 
 ### 5.5 Shader Lighting Uniforms
 
-- [ ] Define `triangle_fs_params_t` uniform block:
-  ```c
-  typedef struct {
-      vec4_t light_dirs[8];       // Direction (directional) or position (point)
-      vec4_t light_colors[8];     // RGB + intensity in W
-      vec4_t ambient_color;       // Ambient light color + intensity in W
-      int num_lights;             // Active light count
-      int shading_mode;           // 0=flat, 1=flat+vertex_color, 2=lit, 3=lit+vertex_color
-      float _pad[2];
-  } triangle_fs_params_t;
-  ```
-- [ ] Update all triangle fragment shaders (all backends) with lighting calculation:
-  ```glsl
-  if (shading_mode >= 2) {
-      vec3 N = normalize(v_normal);
-      vec3 diffuse = vec3(0.0);
-      for (int i = 0; i < num_lights; i++) {
-          vec3 L = normalize(-light_dirs[i].xyz);  // directional
-          float NdotL = max(dot(N, L), 0.0);
-          diffuse += light_colors[i].rgb * light_colors[i].w * NdotL;
-      }
-      vec3 ambient = ambient_color.rgb * ambient_color.w;
-      color.rgb *= (ambient + diffuse);
-  }
-  ```
-- [ ] Update SPIR-V shaders and recompile
+- [x] Expanded `geom_triangle_params_t` (VS uniform block 0) from 64→224 bytes:
+  - `mat4_t mvp` (64B) + `light_dirs[4]` (64B) + `light_colors[4]` (64B) + `ambient_color` (16B) + `num_lights` + `lighting_enabled` + padding
+  - std140 layout, 224 bytes total
+- [x] Updated all 5 text-based shader backends (GLCORE, GLES3, Metal, WGPU, D3D11):
+  - VS computes `v_lighting = ambient + sum(diffuse * abs(NdotL))` from face normal
+  - `abs(dot(N,L))` for double-sided triangles (CULLMODE_NONE)
+  - FS multiplies: `frag_color = vec4(v_color.rgb * v_lighting, v_color.a)`
+- [x] Updated Vulkan SPIR-V source files (`instanced_triangle.vert/frag`)
+- [x] Updated shader descriptor `glsl_uniforms` with array uniforms for GLCORE/GLES3
+
+**Key design decision**: Lighting computed in **vertex shader** (not fragment shader). Valid for flat shading since face normal is constant per-triangle. Avoids adding a separate FS uniform block across all backends. Can be refactored to FS in Sprint 6 if smooth shading is needed.
 
 ### 5.6 Rendering Integration
 
-- [ ] Before triangle draw call: collect lights from ECS, fill `triangle_fs_params_t`
-- [ ] Pass as fragment shader uniform block to `sg_apply_uniforms()`
-- [ ] Existing points and lines remain unaffected (flat shaded, no lighting uniform)
+- [x] `geom_triangle_batch_draw()` now accepts `const geom_triangle_params_t*` (full struct with lighting)
+- [x] `geometry_batch_manager_draw()` and `ecs_scene_draw()` updated to thread lighting params through
+- [x] In `app.c` frame(): builds `geom_triangle_params_t` from collected ECS lights and passes to draw
+- [x] Points and lines remain flat-shaded (use their own `geom_batch_params_t` with just MVP)
 
-### 5.7 Shading Mode Extension
+### 5.7 Shading Mode — Global Toggle
 
-- [ ] Extend shading modes to 4 variants:
-  - `SHADING_FLAT_UNIFORM = 0` — flat, single color
-  - `SHADING_FLAT_VERTEX = 1` — flat, per-vertex color gradient
-  - `SHADING_LIT_UNIFORM = 2` — lit, single color
-  - `SHADING_LIT_VERTEX = 3` — lit, per-vertex color gradient
-- [ ] UI dropdown to select mode
-- [ ] Default: `SHADING_LIT_UNIFORM` for newly created triangles
+- [x] Implemented as global `lighting_enabled` bool in app state (not per-entity shading mode enum)
+- [x] "Enable Lighting" checkbox in Visibility panel with tooltip
+- [x] When disabled, shader passes `v_lighting = vec3(1.0)` (no change to colors)
+- [x] Per-vertex color is orthogonal — handled per-instance as before
+
+**Deviation from plan**: The plan called for 4 per-entity shading modes (flat/lit × uniform/vertex). Implemented as a simpler global toggle because per-vertex vs uniform color is already handled at the instance level, making the lit/unlit toggle the only meaningful axis. Per-entity shading modes can be added later if needed.
 
 ### 5.8 Light Serialization
 
-- [ ] Serialize lights in scene JSON:
+- [x] `scene_write_light_json()` — writes light entity with transform + light component:
   ```json
-  { "type": "directional_light", "color": [r,g,b,a], "intensity": 1.0 }
+  { "id": 456, "components": { "transform": {...}, "light": { "type": "directional", "color": [...], "intensity": 1.0 } } }
   ```
-  (Direction derived from transform rotation)
-- [ ] Deserialize lights on scene load
+- [x] Save function queries both GeometryComp and LightComp entities
+- [x] `json_parse_light()` — parses "light" component in entity JSON
+- [x] `scene_create_from_loaded()` handles `is_light` flag → calls `scene_add_directional_light/point_light`
+- [x] Scene clear (`clear_existing`) also deletes light entities
 
 ### 5.9 Testing
 
-- Triangles lit by 3-point studio setup → visible shading, shadows on faces
-- Toggle SHADING_FLAT ↔ SHADING_LIT → lighting appears/disappears
-- Rotate camera → lighting changes on triangle faces
-- Move light entity (via inspector or gizmo) → triangle shading updates
-- Save/load scene with lights → lighting preserved
-- Points and lines remain flat-shaded (unaffected by lights)
+- [x] Triangles lit by 3-point studio setup → visible shading on faces
+- [x] Toggle lighting on/off in Visibility panel → lighting appears/disappears
+- [x] Rotate camera → lighting changes on triangle faces (directional lights are view-independent)
+- [x] Save/load scene with lights → lighting preserved
+- [x] Points and lines remain flat-shaded (unaffected by lights)
+- [x] SPIR-V recompilation for Vulkan backend (`scripts/vulkan-win/build-all.ps1`)
 
 ---
 
@@ -535,3 +502,5 @@ Most commands already work generically (CMD_SET_POSITION, CMD_SET_COLOR, CMD_SET
 6. **Deferred tessellation pattern NOT used for triangles**: Unlike arcs/beziers which re-tessellate each frame, triangles use their stored vertices directly. Mesh `ecs_scene_update` expands indexed faces each frame (similar to how polyline segments are updated each frame).
 
 7. **Lighting only affects triangles**: Points and lines remain flat-shaded. The triangle shader has its own uniform block with light data. This avoids touching any existing shader code.
+
+8. **VS-computed lighting for flat shading (Sprint 5)**: Lighting is computed in the vertex shader rather than the fragment shader. This is valid because face normals are constant per-triangle, so VS and FS give identical results. Avoids adding a separate FS uniform block across 6 backends. Single VS uniform block (block 0) carries both MVP and lighting data (224 bytes). Can be refactored to FS in Sprint 6 if smooth shading is needed.

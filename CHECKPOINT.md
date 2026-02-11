@@ -209,32 +209,38 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-11)
 
-### Mesh Triangles - Sprint 4: Per-Vertex Color & Shader Variants (IMPLEMENTED)
+### Mesh Triangles - Sprint 5: Lighting System (IMPLEMENTED)
 
-Added per-vertex color support for triangle entities. Triangles can now display smooth color gradients across their surface. Each triangle has an optional `has_vertex_colors` flag — when enabled, individual colors for vertices A, B, C are interpolated by the existing shader. Hover/selection highlighting overrides per-vertex colors. Includes entity inspector UI, serialization, and undo/redo support. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+Added 3-point studio lighting for triangle entities. Lighting is computed in the vertex shader using Lambertian diffuse + ambient, with `abs(dot(N,L))` for double-sided triangles. Lights are ECS entities (TransformComp + LightComp) with full serialization. Global lighting toggle in the Visibility panel. Points and lines remain flat-shaded. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**New File:**
+- `src/components/light_comp.h` - `LightComp` with `light_type_t` (DIRECTIONAL/POINT), color, intensity, and factory helpers
 
 **Modified Files:**
-- `src/components/geometry_comp.h` - Extended `geom_triangle_data_t` with `color_a`, `color_b`, `color_c` (vec4_t) and `has_vertex_colors` (bool); added `geometry_comp_triangle_colored()` factory
-- `src/ecs/ecs_scene.h` - Added `scene_add_triangle_colored()`; updated GEOM_TRIANGLE case in `ecs_scene_update()` to use `geom_triangle_batch_set_colored()` when per-vertex colors enabled and entity not highlighted
-- `src/scene_serializer.h` - Triangle save writes `color_a`/`color_b`/`color_c` when `has_vertex_colors` true; load parses them and calls `scene_add_triangle_colored()`; updated `loaded_entity_t` triangle union
-- `src/undo_redo.h` - Extended triangle snapshot with `color_a`, `color_b`, `color_c`, `has_vertex_colors`
-- `src/undo_redo_exec.h` - `undo_snapshot_entity()` captures per-vertex colors; `undo_create_from_snapshot()` uses `scene_add_triangle_colored()` when present
-- `src/ui/ui_entity_inspector.h` - Added GEOM_TRIANGLE case with "Per-Vertex Colors" checkbox and Color A/B/C editors
-- `src/app.c` - Added RGB gradient sample triangle using `scene_add_triangle_colored()`
+- `src/ecs/ecs_world.h` - Registered `LightComp_id`; added `ecs_world_get_light()` accessor
+- `src/ecs/ecs_scene.h` - Added `scene_add_directional_light()`, `scene_add_point_light()`, `scene_collect_lights()`; light entities have TransformComp + LightComp only (no geometry/renderable/selectable)
+- `src/gpu/geometry_batch.h` - Expanded `geom_triangle_params_t` from 64→224 bytes (MVP + 4 lights + ambient + flags); updated `geom_triangle_batch_draw()`, `geometry_batch_manager_draw()` signatures; shader descriptor declares full uniform layout
+- `src/shaders/instanced_triangle_shaders.h` - All 5 text backends updated: VS computes `v_lighting` varying from face normal + light uniforms; FS multiplies `v_color.rgb * v_lighting`
+- `src/shaders/spirv/instanced_triangle.vert` - Updated GLSL 450 with lighting uniforms and computation
+- `src/shaders/spirv/instanced_triangle.frag` - Updated to receive and apply `v_lighting` varying
+- `src/app.c` - Creates 3 studio lights at init (key/fill/rim); builds `geom_triangle_params_t` with collected light data per frame; added `lighting_enabled` state
+- `src/ui/ui_visibility.h` - Added "Enable Lighting" checkbox with tooltip and `lighting_enabled` pointer
+- `src/scene_serializer.h` - Added `scene_write_light_json()` for light entity save; save queries both geometry + light entities; added `json_parse_light()` for load; `loaded_entity_t` extended with light fields; scene clear also deletes light entities
 
 **Key Design Decisions:**
-- **Per-entity toggle, not global mode**: `has_vertex_colors` is a bool on `geom_triangle_data_t` — simpler than a global shading mode enum, allows mixed uniform/per-vertex triangles in same scene
-- **No shader changes needed**: The 96-byte instance layout already carries 3 per-vertex color slots; `geom_triangle_batch_set_colored()` was already implemented in Sprint 1
-- **Hover/selection overrides per-vertex colors**: When entity is hovered or selected, the uniform highlight color is used via `geom_triangle_batch_set()` instead of `set_colored()`
-- **Inspector initializes vertex colors from uniform**: Toggling "Per-Vertex Colors" on copies the current uniform color to all 3 vertex colors as a starting point
+- **VS-computed lighting**: Face normals are constant per-triangle, so VS gives identical results to FS for flat shading. Avoids adding a separate FS uniform block across 6 backends. Single VS uniform block (block 0, 224 bytes) carries MVP + lighting data.
+- **Global toggle, not per-entity mode**: Lighting enabled/disabled globally via Visibility panel. Per-vertex vs uniform color is orthogonal (handled at instance level). Simpler than 4 per-entity shading modes.
+- **Lights as ECS entities**: Enables serialization using existing infrastructure. Light data collected each frame and packed into shader uniforms (max 4 lights).
+- **Double-sided via abs(NdotL)**: `abs(dot(N, L))` handles both front and back faces without requiring face culling or `gl_FrontFacing`.
 
 **Remaining Sprints (see plan):**
-- Sprint 5: Lighting system (3-point studio)
 - Sprint 6: Mesh entities (multi-triangle indexed)
 
-### Mesh Triangles - Sprints 1-3 (IMPLEMENTED)
+**Note:** Vulkan SPIR-V bytecode must be recompiled after shader source changes: `scripts/vulkan-win/build-all.ps1`
 
-Sprint 1 added instanced triangle rendering as a new geometry primitive (shaders, batch, scene API). Sprint 2 added GPU picking, undo/redo, and JSON serialization. Sprint 3 added gizmo vertex editing. See `.plans/PLAN_MESH_TRIANGLES.md` for full details.
+### Mesh Triangles - Sprints 1-4 (IMPLEMENTED)
+
+Sprint 1 added instanced triangle rendering as a new geometry primitive (shaders, batch, scene API). Sprint 2 added GPU picking, undo/redo, and JSON serialization. Sprint 3 added gizmo vertex editing. Sprint 4 added per-vertex color support with entity inspector UI. See `.plans/PLAN_MESH_TRIANGLES.md` for full details.
 
 ## Older Changes
 
