@@ -450,6 +450,38 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             }
         }
     }
+
+    // Light section (for light entities)
+    LightComp *light = ecs_world_get_light(w, e);
+    if (light && igCollapsingHeader_TreeNodeFlags("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // Type (read-only)
+        igText("Type: %s", light->type == LIGHT_DIRECTIONAL ? "Directional" : "Point");
+
+        // Color (editable)
+        float lcolor[3] = { light->color.x, light->color.y, light->color.z };
+        if (igColorEdit3("Light Color", lcolor, ImGuiColorEditFlags_None)) {
+            light->color.x = lcolor[0];
+            light->color.y = lcolor[1];
+            light->color.z = lcolor[2];
+        }
+
+        // Intensity (editable)
+        igDragFloat("Intensity", &light->intensity, 0.05f, 0.0f, 10.0f, "%.2f", 0);
+
+        // Direction / position info from transform
+        if (t) {
+            igSeparator();
+            if (light->type == LIGHT_DIRECTIONAL) {
+                igText("Direction: (%.2f, %.2f, %.2f)",
+                       t->position.x, t->position.y, t->position.z);
+                igTextDisabled("Edit via Transform > Position");
+            } else {
+                igText("Position: (%.2f, %.2f, %.2f)",
+                       t->position.x, t->position.y, t->position.z);
+                igTextDisabled("Edit via Transform > Position");
+            }
+        }
+    }
 }
 
 //------------------------------------------------------------------------------

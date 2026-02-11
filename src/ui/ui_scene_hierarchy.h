@@ -875,6 +875,80 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
 }
 
 //------------------------------------------------------------------------------
+// Internal: Draw Lights Section
+//------------------------------------------------------------------------------
+
+static inline void ui_scene_hierarchy_draw_lights_section(ui_scene_hierarchy_state_t *state) {
+    ecs_world_state_t *w = state->scene->world;
+    selection_buffer_t *sel = state->selection;
+
+    // Query all entities with LightComp
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LightComp_id }
+        }
+    });
+
+    // Count lights first
+    int light_count = 0;
+    ecs_iter_t count_it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&count_it)) {
+        light_count += count_it.count;
+    }
+
+    if (light_count == 0) {
+        ecs_query_fini(q);
+        return;
+    }
+
+    // Collapsible header (collapsed by default)
+    char header_label[64];
+    snprintf(header_label, sizeof(header_label), "Lights (%d)", light_count);
+    if (!igCollapsingHeader_TreeNodeFlags(header_label, ImGuiTreeNodeFlags_None)) {
+        ecs_query_fini(q);
+        return;
+    }
+
+    ImGuiIO* io = igGetIO_Nil();
+    bool ctrl_held = io->KeyCtrl;
+
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it)) {
+        LightComp *lights = ecs_field(&it, LightComp, 0);
+
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t e = it.entities[i];
+            LightComp *l = &lights[i];
+
+            bool is_selected = selection_contains(sel, e);
+
+            // Label: type + entity ID
+            const char *type_str = (l->type == LIGHT_DIRECTIONAL) ? "Dir" : "Point";
+            char label[128];
+            snprintf(label, sizeof(label), "  %s Light #%llu",
+                     type_str, (unsigned long long)e);
+
+            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+            if (is_selected) {
+                flags |= ImGuiTreeNodeFlags_Selected;
+            }
+
+            igTreeNodeEx_Str(label, flags);
+
+            if (igIsItemClicked(ImGuiMouseButton_Left)) {
+                if (ctrl_held) {
+                    selection_toggle(sel, e);
+                } else {
+                    selection_set_single(sel, e);
+                }
+            }
+        }
+    }
+
+    ecs_query_fini(q);
+}
+
+//------------------------------------------------------------------------------
 // Main Draw Function
 //------------------------------------------------------------------------------
 
@@ -1824,6 +1898,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     if (entity_deleted) {
         state->cache_dirty = true;
     }
+
+    igSeparator();
+
+    // Draw lights section (separate from geometry entities)
+    ui_scene_hierarchy_draw_lights_section(state);
 
     // Drop target at bottom of list: larger area for easy unparenting
     // This fills the remaining space in the window
