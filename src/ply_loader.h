@@ -1,9 +1,11 @@
 //------------------------------------------------------------------------------
-// ply_loader.h - PLY point cloud file loader (header-only)
+// ply_loader.h - PLY file loader (header-only)
 //
 // Supports ASCII PLY format with:
 // - Vertex positions (x, y, z) - required
 // - Vertex colors (red, green, blue, alpha) - optional
+// - Face elements (triangle/quad/polygon) with fan triangulation - optional
+// - Per-face colors - optional
 // - Unit conversion via scale factor
 //------------------------------------------------------------------------------
 #ifndef PLY_LOADER_H
@@ -58,7 +60,38 @@ typedef enum {
 typedef struct {
     char name[64];
     ply_property_type_t type;
+    bool is_list;                           // true for "property list ..." declarations
+    ply_property_type_t list_count_type;    // type of the list count (e.g., uchar)
 } ply_property_t;
+
+//------------------------------------------------------------------------------
+// Face data (triangulated indices + optional per-face colors)
+//------------------------------------------------------------------------------
+
+typedef struct {
+    uint32_t *indices;          // Triangulated index buffer (3 per triangle)
+    vec4_t *colors;             // Per-face colors (one per original face, NULL if none)
+    int tri_count;              // Number of triangles
+    int face_count;             // Number of original PLY faces
+} ply_face_data_t;
+
+//------------------------------------------------------------------------------
+// Mesh data (vertices + faces combined output)
+//------------------------------------------------------------------------------
+
+typedef struct {
+    vec3_t *vertices;           // Vertex positions
+    vec4_t *vertex_colors;      // Per-vertex colors (NULL if none)
+    int vertex_count;
+
+    ply_face_data_t faces;      // Triangulated face data
+
+    vec3_t min_bounds;
+    vec3_t max_bounds;
+
+    bool has_vertex_colors;
+    bool has_face_colors;
+} ply_mesh_data_t;
 
 //------------------------------------------------------------------------------
 // PLY header info
@@ -69,7 +102,7 @@ typedef struct {
     bool is_little_endian;  // For binary formats (future)
     int vertex_count;
 
-    // Property indices (-1 if not present)
+    // Vertex property indices (-1 if not present)
     int prop_x;
     int prop_y;
     int prop_z;
@@ -78,16 +111,28 @@ typedef struct {
     int prop_blue;
     int prop_alpha;
 
-    // All properties
+    // Vertex properties
     ply_property_t properties[PLY_MAX_PROPERTIES];
     int property_count;
+
+    // Face element info
+    bool has_face_element;
+    int face_count;
+    ply_property_t face_properties[PLY_MAX_PROPERTIES];
+    int face_property_count;
+    int face_list_prop_index;       // Index of vertex_indices list property (-1 if none)
+    int face_prop_red;              // Face color property indices (-1 if absent)
+    int face_prop_green;
+    int face_prop_blue;
+    int face_prop_alpha;
+    int skip_lines_before_faces;    // Lines of intermediate elements to skip
 
     // Header end position
     long data_start_pos;
 } ply_header_t;
 
 //------------------------------------------------------------------------------
-// Loaded PLY data
+// Loaded PLY data (point cloud - backward compatible)
 //------------------------------------------------------------------------------
 
 typedef struct {
@@ -144,13 +189,22 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
     header->prop_green = -1;
     header->prop_blue = -1;
     header->prop_alpha = -1;
+    header->face_list_prop_index = -1;
+    header->face_prop_red = -1;
+    header->face_prop_green = -1;
+    header->face_prop_blue = -1;
+    header->face_prop_alpha = -1;
 
     // Check magic number
     if (!fgets(line, sizeof(line), file)) return PLY_ERROR_INVALID_HEADER;
     ply_trim_end(line);
     if (strcmp(line, "ply") != 0) return PLY_ERROR_INVALID_HEADER;
 
-    bool in_vertex_element = false;
+    // Element tracking: 0=none, 1=vertex, 2=face, 3=other
+    int current_element = 0;
+    bool vertex_seen = false;
+    bool face_seen = false;
+    int other_element_count = 0;     // Lines to skip for current "other" element
 
     // Parse header lines
     while (fgets(line, sizeof(line), file)) {
@@ -175,11 +229,11 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
                 } else if (strncmp(format, "binary_little_endian", 20) == 0) {
                     header->is_ascii = false;
                     header->is_little_endian = true;
-                    return PLY_ERROR_UNSUPPORTED_FORMAT;  // Binary not yet supported
+                    return PLY_ERROR_UNSUPPORTED_FORMAT;
                 } else if (strncmp(format, "binary_big_endian", 17) == 0) {
                     header->is_ascii = false;
                     header->is_little_endian = false;
-                    return PLY_ERROR_UNSUPPORTED_FORMAT;  // Binary not yet supported
+                    return PLY_ERROR_UNSUPPORTED_FORMAT;
                 } else {
                     return PLY_ERROR_UNSUPPORTED_FORMAT;
                 }
@@ -189,46 +243,109 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
 
         // Parse element
         if (strncmp(line, "element", 7) == 0) {
+            // If we were in an "other" element, accumulate its skip count
+            if (current_element == 3 && vertex_seen && !face_seen) {
+                header->skip_lines_before_faces += other_element_count;
+            }
+
             char element_name[64];
             int element_count;
             if (sscanf(line, "element %63s %d", element_name, &element_count) == 2) {
                 if (strcmp(element_name, "vertex") == 0) {
                     header->vertex_count = element_count;
-                    in_vertex_element = true;
+                    current_element = 1;
+                    vertex_seen = true;
+                } else if (strcmp(element_name, "face") == 0) {
+                    header->face_count = element_count;
+                    header->has_face_element = true;
+                    current_element = 2;
+                    face_seen = true;
                 } else {
-                    in_vertex_element = false;
+                    current_element = 3;
+                    other_element_count = element_count;
                 }
             }
             continue;
         }
 
-        // Parse property (only for vertex element)
-        if (strncmp(line, "property", 8) == 0 && in_vertex_element) {
-            char type_str[64], name[64];
+        // Parse property
+        if (strncmp(line, "property", 8) == 0) {
+            // Vertex properties
+            if (current_element == 1) {
+                // Skip list properties in vertex element
+                if (strstr(line, "list") != NULL) continue;
 
-            // Skip list properties (e.g., "property list uchar int vertex_indices")
-            if (strstr(line, "list") != NULL) continue;
+                char type_str[64], name[64];
+                if (sscanf(line, "property %63s %63s", type_str, name) == 2) {
+                    if (header->property_count >= PLY_MAX_PROPERTIES) continue;
 
-            if (sscanf(line, "property %63s %63s", type_str, name) == 2) {
-                if (header->property_count >= PLY_MAX_PROPERTIES) continue;
+                    int prop_idx = header->property_count;
+                    strncpy(header->properties[prop_idx].name, name, 63);
+                    header->properties[prop_idx].name[63] = '\0';
+                    header->properties[prop_idx].type = ply_parse_property_type(type_str);
+                    header->properties[prop_idx].is_list = false;
+                    header->property_count++;
 
-                int prop_idx = header->property_count;
-                strncpy(header->properties[prop_idx].name, name, 63);
-                header->properties[prop_idx].name[63] = '\0';
-                header->properties[prop_idx].type = ply_parse_property_type(type_str);
-                header->property_count++;
-
-                // Track position and color properties
-                if (strcmp(name, "x") == 0) header->prop_x = prop_idx;
-                else if (strcmp(name, "y") == 0) header->prop_y = prop_idx;
-                else if (strcmp(name, "z") == 0) header->prop_z = prop_idx;
-                else if (strcmp(name, "red") == 0) header->prop_red = prop_idx;
-                else if (strcmp(name, "green") == 0) header->prop_green = prop_idx;
-                else if (strcmp(name, "blue") == 0) header->prop_blue = prop_idx;
-                else if (strcmp(name, "alpha") == 0) header->prop_alpha = prop_idx;
+                    // Track position and color properties
+                    if (strcmp(name, "x") == 0) header->prop_x = prop_idx;
+                    else if (strcmp(name, "y") == 0) header->prop_y = prop_idx;
+                    else if (strcmp(name, "z") == 0) header->prop_z = prop_idx;
+                    else if (strcmp(name, "red") == 0) header->prop_red = prop_idx;
+                    else if (strcmp(name, "green") == 0) header->prop_green = prop_idx;
+                    else if (strcmp(name, "blue") == 0) header->prop_blue = prop_idx;
+                    else if (strcmp(name, "alpha") == 0) header->prop_alpha = prop_idx;
+                }
             }
+            // Face properties
+            else if (current_element == 2) {
+                if (header->face_property_count >= PLY_MAX_PROPERTIES) continue;
+
+                int fp_idx = header->face_property_count;
+
+                if (strstr(line, "list") != NULL) {
+                    // "property list <count_type> <value_type> <name>"
+                    char count_type_str[64], value_type_str[64], name[64];
+                    if (sscanf(line, "property list %63s %63s %63s",
+                               count_type_str, value_type_str, name) == 3) {
+                        strncpy(header->face_properties[fp_idx].name, name, 63);
+                        header->face_properties[fp_idx].name[63] = '\0';
+                        header->face_properties[fp_idx].type = ply_parse_property_type(value_type_str);
+                        header->face_properties[fp_idx].is_list = true;
+                        header->face_properties[fp_idx].list_count_type = ply_parse_property_type(count_type_str);
+                        header->face_property_count++;
+
+                        // Track vertex_indices or vertex_index list property
+                        if (strcmp(name, "vertex_indices") == 0 || strcmp(name, "vertex_index") == 0) {
+                            header->face_list_prop_index = fp_idx;
+                        }
+                    }
+                } else {
+                    // Scalar face property
+                    char type_str[64], name[64];
+                    if (sscanf(line, "property %63s %63s", type_str, name) == 2) {
+                        strncpy(header->face_properties[fp_idx].name, name, 63);
+                        header->face_properties[fp_idx].name[63] = '\0';
+                        header->face_properties[fp_idx].type = ply_parse_property_type(type_str);
+                        header->face_properties[fp_idx].is_list = false;
+                        header->face_property_count++;
+
+                        // Track face color properties
+                        if (strcmp(name, "red") == 0) header->face_prop_red = fp_idx;
+                        else if (strcmp(name, "green") == 0) header->face_prop_green = fp_idx;
+                        else if (strcmp(name, "blue") == 0) header->face_prop_blue = fp_idx;
+                        else if (strcmp(name, "alpha") == 0) header->face_prop_alpha = fp_idx;
+                    }
+                }
+            }
+            // Other element properties - just skip
             continue;
         }
+    }
+
+    // If last element was "other" and faces haven't been seen yet but vertex was,
+    // accumulate skip lines (handles case where other elements come after vertex but no face)
+    if (current_element == 3 && vertex_seen && !face_seen) {
+        header->skip_lines_before_faces += other_element_count;
     }
 
     // Validate header
@@ -331,7 +448,148 @@ static inline ply_error_t ply_parse_ascii_vertices(FILE *file, const ply_header_
 }
 
 //------------------------------------------------------------------------------
-// Main load function
+// Parse ASCII face data (after vertices have been parsed)
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_parse_ascii_faces(FILE *file, const ply_header_t *header,
+                                                 ply_face_data_t *face_data) {
+    char line[PLY_MAX_LINE_LENGTH];
+
+    if (!header->has_face_element || header->face_count <= 0 || header->face_list_prop_index < 0) {
+        memset(face_data, 0, sizeof(ply_face_data_t));
+        return PLY_OK;
+    }
+
+    bool has_face_colors = (header->face_prop_red >= 0 &&
+                            header->face_prop_green >= 0 &&
+                            header->face_prop_blue >= 0);
+
+    // Skip intermediate element lines between vertex data and face data
+    for (int i = 0; i < header->skip_lines_before_faces; i++) {
+        if (!fgets(line, sizeof(line), file)) {
+            return PLY_ERROR_PARSE_ERROR;
+        }
+    }
+
+    // Allocate with initial capacity (face_count * 2 triangles worth of indices)
+    int tri_capacity = header->face_count * 2;
+    uint32_t *indices = (uint32_t*)malloc(tri_capacity * 3 * sizeof(uint32_t));
+    vec4_t *face_colors = has_face_colors ? (vec4_t*)malloc(header->face_count * sizeof(vec4_t)) : NULL;
+
+    if (!indices || (has_face_colors && !face_colors)) {
+        if (indices) free(indices);
+        if (face_colors) free(face_colors);
+        return PLY_ERROR_MEMORY_ALLOCATION;
+    }
+
+    int tri_count = 0;
+
+    for (int f = 0; f < header->face_count; f++) {
+        if (!fgets(line, sizeof(line), file)) {
+            free(indices);
+            if (face_colors) free(face_colors);
+            return PLY_ERROR_PARSE_ERROR;
+        }
+
+        char *ptr = line;
+        int face_vertex_indices[256];   // Max polygon vertices
+        int face_vertex_count = 0;
+        float face_scalar_values[PLY_MAX_PROPERTIES];
+
+        // Parse face properties in declared order
+        for (int p = 0; p < header->face_property_count; p++) {
+            if (header->face_properties[p].is_list) {
+                // Read count
+                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                if (!*ptr) { free(indices); if (face_colors) free(face_colors); return PLY_ERROR_PARSE_ERROR; }
+                char *end;
+                int count = (int)strtol(ptr, &end, 10);
+                ptr = end;
+
+                // Read N index values
+                if (p == header->face_list_prop_index) {
+                    face_vertex_count = count;
+                    for (int j = 0; j < count && j < 256; j++) {
+                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                        if (!*ptr) { free(indices); if (face_colors) free(face_colors); return PLY_ERROR_PARSE_ERROR; }
+                        face_vertex_indices[j] = (int)strtol(ptr, &end, 10);
+                        ptr = end;
+                    }
+                } else {
+                    // Skip unknown list property values
+                    for (int j = 0; j < count; j++) {
+                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                        if (!*ptr) break;
+                        strtof(ptr, &end);
+                        ptr = end;
+                    }
+                }
+            } else {
+                // Scalar property
+                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                if (!*ptr) { free(indices); if (face_colors) free(face_colors); return PLY_ERROR_PARSE_ERROR; }
+                char *end;
+                face_scalar_values[p] = strtof(ptr, &end);
+                ptr = end;
+            }
+        }
+
+        // Fan triangulation
+        int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
+
+        // Grow index buffer if needed
+        while (tri_count + new_tris > tri_capacity) {
+            tri_capacity *= 2;
+            uint32_t *new_indices = (uint32_t*)realloc(indices, tri_capacity * 3 * sizeof(uint32_t));
+            if (!new_indices) {
+                free(indices);
+                if (face_colors) free(face_colors);
+                return PLY_ERROR_MEMORY_ALLOCATION;
+            }
+            indices = new_indices;
+        }
+
+        // Emit triangles using fan from vertex 0
+        for (int t = 0; t < new_tris; t++) {
+            int base = (tri_count + t) * 3;
+            indices[base + 0] = (uint32_t)face_vertex_indices[0];
+            indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
+            indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
+        }
+        tri_count += new_tris;
+
+        // Extract face color if present
+        if (has_face_colors) {
+            float r = face_scalar_values[header->face_prop_red];
+            float g = face_scalar_values[header->face_prop_green];
+            float b = face_scalar_values[header->face_prop_blue];
+            float a = (header->face_prop_alpha >= 0) ? face_scalar_values[header->face_prop_alpha] : 255.0f;
+
+            // Normalize integer colors
+            ply_property_type_t r_type = header->face_properties[header->face_prop_red].type;
+            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                r /= 255.0f;
+                g /= 255.0f;
+                b /= 255.0f;
+                a /= 255.0f;
+            }
+
+            face_colors[f] = vec4_make(r, g, b, a);
+        }
+    }
+
+    face_data->indices = indices;
+    face_data->colors = face_colors;
+    face_data->tri_count = tri_count;
+    face_data->face_count = header->face_count;
+
+    return PLY_OK;
+}
+
+//------------------------------------------------------------------------------
+// Main load function (point cloud - backward compatible)
 //------------------------------------------------------------------------------
 
 static inline ply_error_t ply_load_file(const char *filepath, ply_data_t *data) {
@@ -362,7 +620,79 @@ static inline ply_error_t ply_load_file(const char *filepath, ply_data_t *data) 
 }
 
 //------------------------------------------------------------------------------
-// Free loaded data
+// Load mesh file (vertices + faces, one-shot)
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_load_mesh_file(const char *filepath, ply_mesh_data_t *mesh) {
+    FILE *file = fopen(filepath, "r");
+    if (!file) return PLY_ERROR_FILE_NOT_FOUND;
+
+    memset(mesh, 0, sizeof(ply_mesh_data_t));
+
+    // Parse header
+    ply_header_t header;
+    ply_error_t err = ply_parse_header(file, &header);
+    if (err != PLY_OK) {
+        fclose(file);
+        return err;
+    }
+
+    if (!header.is_ascii) {
+        fclose(file);
+        return PLY_ERROR_UNSUPPORTED_FORMAT;
+    }
+
+    // Parse vertices into a temporary ply_data_t
+    ply_data_t vdata;
+    memset(&vdata, 0, sizeof(ply_data_t));
+    err = ply_parse_ascii_vertices(file, &header, &vdata);
+    if (err != PLY_OK) {
+        fclose(file);
+        return err;
+    }
+
+    // Transfer vertex data to mesh
+    mesh->vertices = vdata.points;
+    mesh->vertex_colors = vdata.colors;
+    mesh->vertex_count = vdata.count;
+    mesh->has_vertex_colors = vdata.has_colors;
+    mesh->min_bounds = vdata.min_bounds;
+    mesh->max_bounds = vdata.max_bounds;
+
+    // Parse faces
+    err = ply_parse_ascii_faces(file, &header, &mesh->faces);
+    if (err != PLY_OK) {
+        free(mesh->vertices);
+        if (mesh->vertex_colors) free(mesh->vertex_colors);
+        memset(mesh, 0, sizeof(ply_mesh_data_t));
+        fclose(file);
+        return err;
+    }
+
+    mesh->has_face_colors = (mesh->faces.colors != NULL);
+
+    fclose(file);
+    return PLY_OK;
+}
+
+//------------------------------------------------------------------------------
+// Free mesh data
+//------------------------------------------------------------------------------
+
+static inline void ply_mesh_data_free(ply_mesh_data_t *mesh) {
+    if (mesh->vertices) { free(mesh->vertices); mesh->vertices = NULL; }
+    if (mesh->vertex_colors) { free(mesh->vertex_colors); mesh->vertex_colors = NULL; }
+    if (mesh->faces.indices) { free(mesh->faces.indices); mesh->faces.indices = NULL; }
+    if (mesh->faces.colors) { free(mesh->faces.colors); mesh->faces.colors = NULL; }
+    mesh->vertex_count = 0;
+    mesh->faces.tri_count = 0;
+    mesh->faces.face_count = 0;
+    mesh->has_vertex_colors = false;
+    mesh->has_face_colors = false;
+}
+
+//------------------------------------------------------------------------------
+// Free loaded point cloud data
 //------------------------------------------------------------------------------
 
 static inline void ply_data_free(ply_data_t *data) {
@@ -397,7 +727,7 @@ static inline const char* ply_error_string(ply_error_t err) {
 }
 
 //------------------------------------------------------------------------------
-// Get quick stats from header without loading all data
+// Get quick stats from header without loading all data (point cloud)
 //------------------------------------------------------------------------------
 
 static inline ply_error_t ply_get_info(const char *filepath, int *vertex_count, bool *has_colors) {
@@ -417,6 +747,30 @@ static inline ply_error_t ply_get_info(const char *filepath, int *vertex_count, 
 }
 
 //------------------------------------------------------------------------------
+// Get mesh info from header without loading data
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_get_mesh_info(const char *filepath,
+                                             int *vertex_count, int *face_count,
+                                             bool *has_vertex_colors, bool *has_face_colors) {
+    FILE *file = fopen(filepath, "r");
+    if (!file) return PLY_ERROR_FILE_NOT_FOUND;
+
+    ply_header_t header;
+    ply_error_t err = ply_parse_header(file, &header);
+    fclose(file);
+
+    if (err == PLY_OK) {
+        *vertex_count = header.vertex_count;
+        *face_count = header.has_face_element ? header.face_count : 0;
+        *has_vertex_colors = (header.prop_red >= 0 && header.prop_green >= 0 && header.prop_blue >= 0);
+        *has_face_colors = (header.face_prop_red >= 0 && header.face_prop_green >= 0 && header.face_prop_blue >= 0);
+    }
+
+    return err;
+}
+
+//------------------------------------------------------------------------------
 // Incremental parsing state (for chunked loading with progress)
 //------------------------------------------------------------------------------
 
@@ -424,11 +778,22 @@ typedef struct {
     FILE *file;                 // Open file handle
     ply_header_t header;        // Parsed header
 
-    // Parsed data (grows during parsing)
+    // Vertex data (grows during parsing)
     vec3_t *points;
     vec4_t *colors;
     int parsed_count;           // Number of vertices parsed so far
     int capacity;               // Allocated capacity
+
+    // Face data (grows during parsing)
+    uint32_t *face_indices;     // Triangulated index buffer
+    vec4_t *face_colors;        // Per-face colors (NULL if none)
+    int face_parsed_count;      // Number of original PLY faces parsed so far
+    int face_tri_count;         // Number of triangles emitted so far
+    int face_tri_capacity;      // Allocated capacity (in triangles)
+    int face_total;             // Total faces to parse (from header)
+    bool parsing_faces;         // Currently parsing faces (vs vertices)
+    bool has_face_colors;       // Face element has color properties
+    int face_lines_skipped;     // Intermediate lines already skipped
 
     // Bounding box (computed during load)
     vec3_t min_bounds;
@@ -469,7 +834,7 @@ static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *stat
         return PLY_ERROR_UNSUPPORTED_FORMAT;
     }
 
-    // Determine if we have colors
+    // Determine if we have vertex colors
     state->has_colors = (state->header.prop_red >= 0 &&
                          state->header.prop_green >= 0 &&
                          state->header.prop_blue >= 0);
@@ -498,8 +863,42 @@ static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *stat
 
     state->capacity = total;
     state->parsed_count = 0;
-    state->error = PLY_OK;
 
+    // Initialize face parsing state
+    state->face_total = (state->header.has_face_element && state->header.face_count > 0 &&
+                         state->header.face_list_prop_index >= 0) ? state->header.face_count : 0;
+    state->has_face_colors = (state->header.face_prop_red >= 0 &&
+                              state->header.face_prop_green >= 0 &&
+                              state->header.face_prop_blue >= 0);
+    state->parsing_faces = false;
+    state->face_parsed_count = 0;
+    state->face_tri_count = 0;
+    state->face_lines_skipped = 0;
+
+    if (state->face_total > 0) {
+        state->face_tri_capacity = state->face_total * 2;
+        state->face_indices = (uint32_t*)malloc(state->face_tri_capacity * 3 * sizeof(uint32_t));
+        if (state->has_face_colors) {
+            state->face_colors = (vec4_t*)malloc(state->face_total * sizeof(vec4_t));
+        }
+
+        if (!state->face_indices || (state->has_face_colors && !state->face_colors)) {
+            free(state->points);
+            if (state->colors) free(state->colors);
+            if (state->face_indices) free(state->face_indices);
+            if (state->face_colors) free(state->face_colors);
+            state->points = NULL;
+            state->colors = NULL;
+            state->face_indices = NULL;
+            state->face_colors = NULL;
+            fclose(state->file);
+            state->file = NULL;
+            state->error = PLY_ERROR_MEMORY_ALLOCATION;
+            return PLY_ERROR_MEMORY_ALLOCATION;
+        }
+    }
+
+    state->error = PLY_OK;
     return PLY_OK;
 }
 
@@ -590,24 +989,168 @@ static inline int ply_parse_vertices_chunk(ply_parse_state_t *state, int max_ver
 }
 
 //------------------------------------------------------------------------------
-// Get current parsing progress (0.0 - 1.0)
+// Check if all vertices have been parsed (caller uses to switch to face parsing)
 //------------------------------------------------------------------------------
 
-static inline float ply_get_progress(const ply_parse_state_t *state) {
-    if (state->header.vertex_count <= 0) return 1.0f;
-    return (float)state->parsed_count / (float)state->header.vertex_count;
-}
-
-//------------------------------------------------------------------------------
-// Check if parsing is complete
-//------------------------------------------------------------------------------
-
-static inline bool ply_is_complete(const ply_parse_state_t *state) {
+static inline bool ply_vertices_complete(const ply_parse_state_t *state) {
     return state->parsed_count >= state->header.vertex_count;
 }
 
 //------------------------------------------------------------------------------
-// Close and cleanup parse state
+// Parse up to max_faces original PLY faces, with triangulation and dynamic growth
+// Returns number of original faces parsed (0 when done or error)
+//------------------------------------------------------------------------------
+
+static inline int ply_parse_faces_chunk(ply_parse_state_t *state, int max_faces) {
+    if (!state->file || state->error != PLY_OK || state->face_total <= 0) {
+        return 0;
+    }
+
+    // Ensure vertices are fully parsed first
+    if (!ply_vertices_complete(state)) {
+        return 0;
+    }
+
+    // Skip intermediate element lines (once)
+    if (!state->parsing_faces) {
+        char line[PLY_MAX_LINE_LENGTH];
+        int to_skip = state->header.skip_lines_before_faces - state->face_lines_skipped;
+        for (int i = 0; i < to_skip; i++) {
+            if (!fgets(line, sizeof(line), state->file)) {
+                state->error = PLY_ERROR_PARSE_ERROR;
+                return 0;
+            }
+            state->face_lines_skipped++;
+        }
+        state->parsing_faces = true;
+    }
+
+    int remaining = state->face_total - state->face_parsed_count;
+    if (remaining <= 0) return 0;
+
+    int to_parse = (remaining < max_faces) ? remaining : max_faces;
+
+    char line[PLY_MAX_LINE_LENGTH];
+    int parsed = 0;
+
+    for (int i = 0; i < to_parse; i++) {
+        if (!fgets(line, sizeof(line), state->file)) {
+            state->error = PLY_ERROR_PARSE_ERROR;
+            return parsed;
+        }
+
+        char *ptr = line;
+        int face_vertex_indices[256];
+        int face_vertex_count = 0;
+        float face_scalar_values[PLY_MAX_PROPERTIES];
+
+        // Parse face properties in declared order
+        for (int p = 0; p < state->header.face_property_count; p++) {
+            if (state->header.face_properties[p].is_list) {
+                // Read count
+                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                char *end;
+                int count = (int)strtol(ptr, &end, 10);
+                ptr = end;
+
+                if (p == state->header.face_list_prop_index) {
+                    face_vertex_count = count;
+                    for (int j = 0; j < count && j < 256; j++) {
+                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                        if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                        face_vertex_indices[j] = (int)strtol(ptr, &end, 10);
+                        ptr = end;
+                    }
+                } else {
+                    for (int j = 0; j < count; j++) {
+                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                        if (!*ptr) break;
+                        strtof(ptr, &end);
+                        ptr = end;
+                    }
+                }
+            } else {
+                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                char *end;
+                face_scalar_values[p] = strtof(ptr, &end);
+                ptr = end;
+            }
+        }
+
+        // Fan triangulation
+        int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
+
+        // Grow index buffer if needed
+        while (state->face_tri_count + new_tris > state->face_tri_capacity) {
+            int new_cap = state->face_tri_capacity * 2;
+            uint32_t *new_indices = (uint32_t*)realloc(state->face_indices, new_cap * 3 * sizeof(uint32_t));
+            if (!new_indices) {
+                state->error = PLY_ERROR_MEMORY_ALLOCATION;
+                return parsed;
+            }
+            state->face_indices = new_indices;
+            state->face_tri_capacity = new_cap;
+        }
+
+        for (int t = 0; t < new_tris; t++) {
+            int base = (state->face_tri_count + t) * 3;
+            state->face_indices[base + 0] = (uint32_t)face_vertex_indices[0];
+            state->face_indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
+            state->face_indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
+        }
+        state->face_tri_count += new_tris;
+
+        // Extract face color if present
+        int f = state->face_parsed_count + parsed;
+        if (state->has_face_colors && state->face_colors) {
+            float r = face_scalar_values[state->header.face_prop_red];
+            float g = face_scalar_values[state->header.face_prop_green];
+            float b = face_scalar_values[state->header.face_prop_blue];
+            float a = (state->header.face_prop_alpha >= 0) ? face_scalar_values[state->header.face_prop_alpha] : 255.0f;
+
+            ply_property_type_t r_type = state->header.face_properties[state->header.face_prop_red].type;
+            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                r /= 255.0f;
+                g /= 255.0f;
+                b /= 255.0f;
+                a /= 255.0f;
+            }
+
+            state->face_colors[f] = vec4_make(r, g, b, a);
+        }
+
+        parsed++;
+    }
+
+    state->face_parsed_count += parsed;
+    return parsed;
+}
+
+//------------------------------------------------------------------------------
+// Get current parsing progress (0.0 - 1.0), accounts for both vertices and faces
+//------------------------------------------------------------------------------
+
+static inline float ply_get_progress(const ply_parse_state_t *state) {
+    int total = state->header.vertex_count + state->face_total;
+    if (total <= 0) return 1.0f;
+    return (float)(state->parsed_count + state->face_parsed_count) / (float)total;
+}
+
+//------------------------------------------------------------------------------
+// Check if parsing is complete (both vertices and faces)
+//------------------------------------------------------------------------------
+
+static inline bool ply_is_complete(const ply_parse_state_t *state) {
+    return state->parsed_count >= state->header.vertex_count &&
+           state->face_parsed_count >= state->face_total;
+}
+
+//------------------------------------------------------------------------------
+// Close file handle (caller takes ownership of data arrays)
 //------------------------------------------------------------------------------
 
 static inline void ply_close(ply_parse_state_t *state) {
@@ -615,7 +1158,7 @@ static inline void ply_close(ply_parse_state_t *state) {
         fclose(state->file);
         state->file = NULL;
     }
-    // Note: points/colors arrays are not freed here - caller takes ownership
+    // Note: data arrays are not freed here - caller takes ownership
 }
 
 //------------------------------------------------------------------------------
@@ -635,12 +1178,23 @@ static inline void ply_parse_state_free(ply_parse_state_t *state) {
         free(state->colors);
         state->colors = NULL;
     }
+    if (state->face_indices) {
+        free(state->face_indices);
+        state->face_indices = NULL;
+    }
+    if (state->face_colors) {
+        free(state->face_colors);
+        state->face_colors = NULL;
+    }
     state->parsed_count = 0;
     state->capacity = 0;
+    state->face_parsed_count = 0;
+    state->face_tri_count = 0;
+    state->face_tri_capacity = 0;
 }
 
 //------------------------------------------------------------------------------
-// Transfer ownership of parsed data to ply_data_t (for final result)
+// Transfer ownership of parsed data to ply_data_t (point cloud, backward compat)
 //------------------------------------------------------------------------------
 
 static inline void ply_parse_state_to_data(ply_parse_state_t *state, ply_data_t *data) {
@@ -656,6 +1210,36 @@ static inline void ply_parse_state_to_data(ply_parse_state_t *state, ply_data_t 
     state->colors = NULL;
     state->parsed_count = 0;
     state->capacity = 0;
+}
+
+//------------------------------------------------------------------------------
+// Transfer ownership of all parsed data to ply_mesh_data_t
+//------------------------------------------------------------------------------
+
+static inline void ply_parse_state_to_mesh_data(ply_parse_state_t *state, ply_mesh_data_t *mesh) {
+    mesh->vertices = state->points;
+    mesh->vertex_colors = state->colors;
+    mesh->vertex_count = state->parsed_count;
+    mesh->has_vertex_colors = state->has_colors;
+    mesh->min_bounds = state->min_bounds;
+    mesh->max_bounds = state->max_bounds;
+
+    mesh->faces.indices = state->face_indices;
+    mesh->faces.colors = state->face_colors;
+    mesh->faces.tri_count = state->face_tri_count;
+    mesh->faces.face_count = state->face_parsed_count;
+    mesh->has_face_colors = state->has_face_colors;
+
+    // Clear state pointers (ownership transferred)
+    state->points = NULL;
+    state->colors = NULL;
+    state->parsed_count = 0;
+    state->capacity = 0;
+    state->face_indices = NULL;
+    state->face_colors = NULL;
+    state->face_parsed_count = 0;
+    state->face_tri_count = 0;
+    state->face_tri_capacity = 0;
 }
 
 #endif // PLY_LOADER_H
