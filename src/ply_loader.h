@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 // ply_loader.h - PLY file loader (header-only)
 //
-// Supports ASCII PLY format with:
+// Supports ASCII, binary_little_endian, and binary_big_endian PLY formats with:
 // - Vertex positions (x, y, z) - required
 // - Vertex colors (red, green, blue, alpha) - optional
 // - Face elements (triangle/quad/polygon) with fan triangulation - optional
@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <ctype.h>
 
 //------------------------------------------------------------------------------
@@ -99,7 +100,7 @@ typedef struct {
 
 typedef struct {
     bool is_ascii;
-    bool is_little_endian;  // For binary formats (future)
+    bool is_little_endian;  // For binary formats
     int vertex_count;
 
     // Vertex property indices (-1 if not present)
@@ -114,6 +115,11 @@ typedef struct {
     // Vertex properties
     ply_property_t properties[PLY_MAX_PROPERTIES];
     int property_count;
+    bool has_vertex_list_props;     // true if vertex element has list properties (unsupported in binary)
+
+    // Binary vertex layout
+    int vertex_byte_stride;
+    int vertex_prop_offsets[PLY_MAX_PROPERTIES];    // byte offset of each vertex property
 
     // Face element info
     bool has_face_element;
@@ -125,7 +131,9 @@ typedef struct {
     int face_prop_green;
     int face_prop_blue;
     int face_prop_alpha;
-    int skip_lines_before_faces;    // Lines of intermediate elements to skip
+    int skip_lines_before_faces;    // Lines of intermediate elements to skip (ASCII)
+    long skip_bytes_before_faces;   // Bytes of intermediate elements to skip (binary)
+    bool binary_skip_valid;         // false if intermediate elements have list properties
 
     // Header end position
     long data_start_pos;
@@ -174,6 +182,76 @@ static inline void ply_trim_end(char *str) {
 }
 
 //------------------------------------------------------------------------------
+// Binary helpers: property byte sizes, endianness, byte swapping, typed reads
+//------------------------------------------------------------------------------
+
+static inline int ply_property_byte_size(ply_property_type_t type) {
+    switch (type) {
+        case PLY_PROP_CHAR:   case PLY_PROP_UCHAR:  return 1;
+        case PLY_PROP_SHORT:  case PLY_PROP_USHORT:  return 2;
+        case PLY_PROP_INT:    case PLY_PROP_UINT:    case PLY_PROP_FLOAT: return 4;
+        case PLY_PROP_DOUBLE: return 8;
+        default: return 0;
+    }
+}
+
+static inline bool ply_is_little_endian(void) {
+    uint32_t val = 1;
+    return *(uint8_t*)&val == 1;
+}
+
+static inline void ply_swap2(void *p) {
+    uint8_t *b = (uint8_t*)p;
+    uint8_t t = b[0]; b[0] = b[1]; b[1] = t;
+}
+
+static inline void ply_swap4(void *p) {
+    uint8_t *b = (uint8_t*)p;
+    uint8_t t;
+    t = b[0]; b[0] = b[3]; b[3] = t;
+    t = b[1]; b[1] = b[2]; b[2] = t;
+}
+
+static inline void ply_swap8(void *p) {
+    uint8_t *b = (uint8_t*)p;
+    uint8_t t;
+    t = b[0]; b[0] = b[7]; b[7] = t;
+    t = b[1]; b[1] = b[6]; b[6] = t;
+    t = b[2]; b[2] = b[5]; b[5] = t;
+    t = b[3]; b[3] = b[4]; b[4] = t;
+}
+
+// Read a typed value from buffer, byte-swap if needed, return as float
+static inline float ply_read_as_float(const uint8_t *buf, ply_property_type_t type, bool swap) {
+    switch (type) {
+        case PLY_PROP_CHAR:   return (float)(*(int8_t*)buf);
+        case PLY_PROP_UCHAR:  return (float)(*buf);
+        case PLY_PROP_SHORT:  { int16_t v;  memcpy(&v, buf, 2); if (swap) ply_swap2(&v); return (float)v; }
+        case PLY_PROP_USHORT: { uint16_t v; memcpy(&v, buf, 2); if (swap) ply_swap2(&v); return (float)v; }
+        case PLY_PROP_INT:    { int32_t v;  memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return (float)v; }
+        case PLY_PROP_UINT:   { uint32_t v; memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return (float)v; }
+        case PLY_PROP_FLOAT:  { float v;    memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return v; }
+        case PLY_PROP_DOUBLE: { double v;   memcpy(&v, buf, 8); if (swap) ply_swap8(&v); return (float)v; }
+        default: return 0.0f;
+    }
+}
+
+// Read a typed value from buffer, byte-swap if needed, return as int32
+static inline int32_t ply_read_as_int32(const uint8_t *buf, ply_property_type_t type, bool swap) {
+    switch (type) {
+        case PLY_PROP_CHAR:   return (int32_t)(*(int8_t*)buf);
+        case PLY_PROP_UCHAR:  return (int32_t)(*buf);
+        case PLY_PROP_SHORT:  { int16_t v;  memcpy(&v, buf, 2); if (swap) ply_swap2(&v); return (int32_t)v; }
+        case PLY_PROP_USHORT: { uint16_t v; memcpy(&v, buf, 2); if (swap) ply_swap2(&v); return (int32_t)v; }
+        case PLY_PROP_INT:    { int32_t v;  memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return v; }
+        case PLY_PROP_UINT:   { uint32_t v; memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return (int32_t)v; }
+        case PLY_PROP_FLOAT:  { float v;    memcpy(&v, buf, 4); if (swap) ply_swap4(&v); return (int32_t)v; }
+        case PLY_PROP_DOUBLE: { double v;   memcpy(&v, buf, 8); if (swap) ply_swap8(&v); return (int32_t)v; }
+        default: return 0;
+    }
+}
+
+//------------------------------------------------------------------------------
 // Parse PLY header
 //------------------------------------------------------------------------------
 
@@ -194,6 +272,7 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
     header->face_prop_green = -1;
     header->face_prop_blue = -1;
     header->face_prop_alpha = -1;
+    header->binary_skip_valid = true;
 
     // Check magic number
     if (!fgets(line, sizeof(line), file)) return PLY_ERROR_INVALID_HEADER;
@@ -205,6 +284,8 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
     bool vertex_seen = false;
     bool face_seen = false;
     int other_element_count = 0;     // Lines to skip for current "other" element
+    int other_byte_stride = 0;       // Byte stride of current "other" element (binary)
+    bool other_has_list = false;     // Current "other" element has a list property
 
     // Parse header lines
     while (fgets(line, sizeof(line), file)) {
@@ -229,11 +310,9 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
                 } else if (strncmp(format, "binary_little_endian", 20) == 0) {
                     header->is_ascii = false;
                     header->is_little_endian = true;
-                    return PLY_ERROR_UNSUPPORTED_FORMAT;
                 } else if (strncmp(format, "binary_big_endian", 17) == 0) {
                     header->is_ascii = false;
                     header->is_little_endian = false;
-                    return PLY_ERROR_UNSUPPORTED_FORMAT;
                 } else {
                     return PLY_ERROR_UNSUPPORTED_FORMAT;
                 }
@@ -246,6 +325,11 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
             // If we were in an "other" element, accumulate its skip count
             if (current_element == 3 && vertex_seen && !face_seen) {
                 header->skip_lines_before_faces += other_element_count;
+                if (other_has_list) {
+                    header->binary_skip_valid = false;
+                } else {
+                    header->skip_bytes_before_faces += (long)other_element_count * other_byte_stride;
+                }
             }
 
             char element_name[64];
@@ -263,6 +347,8 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
                 } else {
                     current_element = 3;
                     other_element_count = element_count;
+                    other_byte_stride = 0;
+                    other_has_list = false;
                 }
             }
             continue;
@@ -272,8 +358,11 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
         if (strncmp(line, "property", 8) == 0) {
             // Vertex properties
             if (current_element == 1) {
-                // Skip list properties in vertex element
-                if (strstr(line, "list") != NULL) continue;
+                // Track list properties in vertex element (unsupported in binary)
+                if (strstr(line, "list") != NULL) {
+                    header->has_vertex_list_props = true;
+                    continue;
+                }
 
                 char type_str[64], name[64];
                 if (sscanf(line, "property %63s %63s", type_str, name) == 2) {
@@ -337,7 +426,17 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
                     }
                 }
             }
-            // Other element properties - just skip
+            // Other element properties - track byte stride for binary skipping
+            else if (current_element == 3) {
+                if (strstr(line, "list") != NULL) {
+                    other_has_list = true;
+                } else {
+                    char type_str[64], name[64];
+                    if (sscanf(line, "property %63s %63s", type_str, name) == 2) {
+                        other_byte_stride += ply_property_byte_size(ply_parse_property_type(type_str));
+                    }
+                }
+            }
             continue;
         }
     }
@@ -346,12 +445,27 @@ static inline ply_error_t ply_parse_header(FILE *file, ply_header_t *header) {
     // accumulate skip lines (handles case where other elements come after vertex but no face)
     if (current_element == 3 && vertex_seen && !face_seen) {
         header->skip_lines_before_faces += other_element_count;
+        if (other_has_list) {
+            header->binary_skip_valid = false;
+        } else {
+            header->skip_bytes_before_faces += (long)other_element_count * other_byte_stride;
+        }
     }
 
     // Validate header
     if (header->vertex_count == 0) return PLY_ERROR_MISSING_VERTEX_ELEMENT;
     if (header->prop_x < 0 || header->prop_y < 0 || header->prop_z < 0) {
         return PLY_ERROR_MISSING_POSITION_PROPERTIES;
+    }
+
+    // Compute vertex byte stride and property offsets (for binary parsing)
+    {
+        int offset = 0;
+        for (int i = 0; i < header->property_count; i++) {
+            header->vertex_prop_offsets[i] = offset;
+            offset += ply_property_byte_size(header->properties[i].type);
+        }
+        header->vertex_byte_stride = offset;
     }
 
     return PLY_OK;
@@ -589,11 +703,243 @@ static inline ply_error_t ply_parse_ascii_faces(FILE *file, const ply_header_t *
 }
 
 //------------------------------------------------------------------------------
+// Parse binary vertex data (one-shot, bulk read)
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_parse_binary_vertices(FILE *file, const ply_header_t *header, ply_data_t *data) {
+    bool has_colors = (header->prop_red >= 0 && header->prop_green >= 0 && header->prop_blue >= 0);
+    bool need_swap = (header->is_little_endian != ply_is_little_endian());
+    int stride = header->vertex_byte_stride;
+
+    if (stride <= 0) return PLY_ERROR_PARSE_ERROR;
+
+    // Allocate output arrays
+    data->count = header->vertex_count;
+    data->has_colors = has_colors;
+    data->points = (vec3_t*)malloc(data->count * sizeof(vec3_t));
+    data->colors = has_colors ? (vec4_t*)malloc(data->count * sizeof(vec4_t)) : NULL;
+
+    if (!data->points || (has_colors && !data->colors)) {
+        if (data->points) free(data->points);
+        if (data->colors) free(data->colors);
+        return PLY_ERROR_MEMORY_ALLOCATION;
+    }
+
+    // Read all vertex data at once
+    size_t total_bytes = (size_t)header->vertex_count * stride;
+    uint8_t *raw = (uint8_t*)malloc(total_bytes);
+    if (!raw) {
+        free(data->points);
+        if (data->colors) free(data->colors);
+        return PLY_ERROR_MEMORY_ALLOCATION;
+    }
+
+    if (fread(raw, 1, total_bytes, file) != total_bytes) {
+        free(raw);
+        free(data->points);
+        if (data->colors) free(data->colors);
+        return PLY_ERROR_PARSE_ERROR;
+    }
+
+    // Initialize bounds
+    data->min_bounds = vec3_make(1e30f, 1e30f, 1e30f);
+    data->max_bounds = vec3_make(-1e30f, -1e30f, -1e30f);
+
+    for (int v = 0; v < header->vertex_count; v++) {
+        uint8_t *row = raw + (size_t)v * stride;
+
+        float x = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_x],
+                                     header->properties[header->prop_x].type, need_swap);
+        float y = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_y],
+                                     header->properties[header->prop_y].type, need_swap);
+        float z = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_z],
+                                     header->properties[header->prop_z].type, need_swap);
+        data->points[v] = vec3_make(x, y, z);
+
+        // Update bounds
+        if (x < data->min_bounds.x) data->min_bounds.x = x;
+        if (y < data->min_bounds.y) data->min_bounds.y = y;
+        if (z < data->min_bounds.z) data->min_bounds.z = z;
+        if (x > data->max_bounds.x) data->max_bounds.x = x;
+        if (y > data->max_bounds.y) data->max_bounds.y = y;
+        if (z > data->max_bounds.z) data->max_bounds.z = z;
+
+        // Extract color if available
+        if (has_colors) {
+            float r = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_red],
+                                         header->properties[header->prop_red].type, need_swap);
+            float g = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_green],
+                                         header->properties[header->prop_green].type, need_swap);
+            float b = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_blue],
+                                         header->properties[header->prop_blue].type, need_swap);
+            float a = (header->prop_alpha >= 0) ?
+                ply_read_as_float(row + header->vertex_prop_offsets[header->prop_alpha],
+                                   header->properties[header->prop_alpha].type, need_swap) : 1.0f;
+
+            // Normalize integer colors to 0-1
+            ply_property_type_t r_type = header->properties[header->prop_red].type;
+            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                r /= 255.0f;
+                g /= 255.0f;
+                b /= 255.0f;
+                a /= 255.0f;
+            }
+
+            data->colors[v] = vec4_make(r, g, b, a);
+        }
+    }
+
+    free(raw);
+    return PLY_OK;
+}
+
+//------------------------------------------------------------------------------
+// Parse binary face data (one-shot, sequential read per face)
+//------------------------------------------------------------------------------
+
+static inline ply_error_t ply_parse_binary_faces(FILE *file, const ply_header_t *header,
+                                                   ply_face_data_t *face_data) {
+    if (!header->has_face_element || header->face_count <= 0 || header->face_list_prop_index < 0) {
+        memset(face_data, 0, sizeof(ply_face_data_t));
+        return PLY_OK;
+    }
+
+    bool need_swap = (header->is_little_endian != ply_is_little_endian());
+    bool has_face_colors = (header->face_prop_red >= 0 &&
+                            header->face_prop_green >= 0 &&
+                            header->face_prop_blue >= 0);
+
+    // Skip intermediate element bytes
+    if (header->skip_bytes_before_faces > 0) {
+        if (fseek(file, header->skip_bytes_before_faces, SEEK_CUR) != 0) {
+            return PLY_ERROR_PARSE_ERROR;
+        }
+    }
+
+    // Allocate with initial capacity
+    int tri_capacity = header->face_count * 2;
+    uint32_t *indices = (uint32_t*)malloc(tri_capacity * 3 * sizeof(uint32_t));
+    vec4_t *face_colors = has_face_colors ? (vec4_t*)malloc(header->face_count * sizeof(vec4_t)) : NULL;
+
+    if (!indices || (has_face_colors && !face_colors)) {
+        if (indices) free(indices);
+        if (face_colors) free(face_colors);
+        return PLY_ERROR_MEMORY_ALLOCATION;
+    }
+
+    int tri_count = 0;
+    uint8_t buf[8];
+
+    for (int f = 0; f < header->face_count; f++) {
+        int face_vertex_indices[256];
+        int face_vertex_count = 0;
+        float face_scalar_values[PLY_MAX_PROPERTIES];
+
+        // Parse face properties in declared order
+        for (int p = 0; p < header->face_property_count; p++) {
+            const ply_property_t *prop = &header->face_properties[p];
+
+            if (prop->is_list) {
+                // Read list count
+                int count_size = ply_property_byte_size(prop->list_count_type);
+                if (fread(buf, 1, count_size, file) != (size_t)count_size) {
+                    free(indices); if (face_colors) free(face_colors);
+                    return PLY_ERROR_PARSE_ERROR;
+                }
+                int count = ply_read_as_int32(buf, prop->list_count_type, need_swap);
+
+                if (p == header->face_list_prop_index) {
+                    face_vertex_count = count;
+                    int val_size = ply_property_byte_size(prop->type);
+                    for (int j = 0; j < count && j < 256; j++) {
+                        if (fread(buf, 1, val_size, file) != (size_t)val_size) {
+                            free(indices); if (face_colors) free(face_colors);
+                            return PLY_ERROR_PARSE_ERROR;
+                        }
+                        face_vertex_indices[j] = ply_read_as_int32(buf, prop->type, need_swap);
+                    }
+                } else {
+                    // Skip unknown list values
+                    int val_size = ply_property_byte_size(prop->type);
+                    for (int j = 0; j < count; j++) {
+                        if (fread(buf, 1, val_size, file) != (size_t)val_size) {
+                            free(indices); if (face_colors) free(face_colors);
+                            return PLY_ERROR_PARSE_ERROR;
+                        }
+                    }
+                }
+            } else {
+                // Scalar property
+                int sz = ply_property_byte_size(prop->type);
+                if (fread(buf, 1, sz, file) != (size_t)sz) {
+                    free(indices); if (face_colors) free(face_colors);
+                    return PLY_ERROR_PARSE_ERROR;
+                }
+                face_scalar_values[p] = ply_read_as_float(buf, prop->type, need_swap);
+            }
+        }
+
+        // Fan triangulation
+        int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
+
+        // Grow index buffer if needed
+        while (tri_count + new_tris > tri_capacity) {
+            tri_capacity *= 2;
+            uint32_t *new_indices = (uint32_t*)realloc(indices, tri_capacity * 3 * sizeof(uint32_t));
+            if (!new_indices) {
+                free(indices); if (face_colors) free(face_colors);
+                return PLY_ERROR_MEMORY_ALLOCATION;
+            }
+            indices = new_indices;
+        }
+
+        // Emit triangles using fan from vertex 0
+        for (int t = 0; t < new_tris; t++) {
+            int base = (tri_count + t) * 3;
+            indices[base + 0] = (uint32_t)face_vertex_indices[0];
+            indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
+            indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
+        }
+        tri_count += new_tris;
+
+        // Extract face color if present
+        if (has_face_colors) {
+            float r = face_scalar_values[header->face_prop_red];
+            float g = face_scalar_values[header->face_prop_green];
+            float b = face_scalar_values[header->face_prop_blue];
+            float a = (header->face_prop_alpha >= 0) ? face_scalar_values[header->face_prop_alpha] : 1.0f;
+
+            // Normalize integer colors to 0-1
+            ply_property_type_t r_type = header->face_properties[header->face_prop_red].type;
+            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                r /= 255.0f;
+                g /= 255.0f;
+                b /= 255.0f;
+                a /= 255.0f;
+            }
+
+            face_colors[f] = vec4_make(r, g, b, a);
+        }
+    }
+
+    face_data->indices = indices;
+    face_data->colors = face_colors;
+    face_data->tri_count = tri_count;
+    face_data->face_count = header->face_count;
+
+    return PLY_OK;
+}
+
+//------------------------------------------------------------------------------
 // Main load function (point cloud - backward compatible)
 //------------------------------------------------------------------------------
 
 static inline ply_error_t ply_load_file(const char *filepath, ply_data_t *data) {
-    FILE *file = fopen(filepath, "r");
+    FILE *file = fopen(filepath, "rb");
     if (!file) return PLY_ERROR_FILE_NOT_FOUND;
 
     // Initialize data
@@ -611,8 +957,11 @@ static inline ply_error_t ply_load_file(const char *filepath, ply_data_t *data) 
     if (header.is_ascii) {
         err = ply_parse_ascii_vertices(file, &header, data);
     } else {
-        // Binary not yet supported
-        err = PLY_ERROR_UNSUPPORTED_FORMAT;
+        if (header.has_vertex_list_props) {
+            fclose(file);
+            return PLY_ERROR_UNSUPPORTED_FORMAT;
+        }
+        err = ply_parse_binary_vertices(file, &header, data);
     }
 
     fclose(file);
@@ -624,7 +973,7 @@ static inline ply_error_t ply_load_file(const char *filepath, ply_data_t *data) 
 //------------------------------------------------------------------------------
 
 static inline ply_error_t ply_load_mesh_file(const char *filepath, ply_mesh_data_t *mesh) {
-    FILE *file = fopen(filepath, "r");
+    FILE *file = fopen(filepath, "rb");
     if (!file) return PLY_ERROR_FILE_NOT_FOUND;
 
     memset(mesh, 0, sizeof(ply_mesh_data_t));
@@ -637,15 +986,26 @@ static inline ply_error_t ply_load_mesh_file(const char *filepath, ply_mesh_data
         return err;
     }
 
+    // Check binary prerequisites
     if (!header.is_ascii) {
-        fclose(file);
-        return PLY_ERROR_UNSUPPORTED_FORMAT;
+        if (header.has_vertex_list_props) {
+            fclose(file);
+            return PLY_ERROR_UNSUPPORTED_FORMAT;
+        }
+        if (header.has_face_element && !header.binary_skip_valid) {
+            fclose(file);
+            return PLY_ERROR_UNSUPPORTED_FORMAT;
+        }
     }
 
-    // Parse vertices into a temporary ply_data_t
+    // Parse vertices
     ply_data_t vdata;
     memset(&vdata, 0, sizeof(ply_data_t));
-    err = ply_parse_ascii_vertices(file, &header, &vdata);
+    if (header.is_ascii) {
+        err = ply_parse_ascii_vertices(file, &header, &vdata);
+    } else {
+        err = ply_parse_binary_vertices(file, &header, &vdata);
+    }
     if (err != PLY_OK) {
         fclose(file);
         return err;
@@ -660,7 +1020,11 @@ static inline ply_error_t ply_load_mesh_file(const char *filepath, ply_mesh_data
     mesh->max_bounds = vdata.max_bounds;
 
     // Parse faces
-    err = ply_parse_ascii_faces(file, &header, &mesh->faces);
+    if (header.is_ascii) {
+        err = ply_parse_ascii_faces(file, &header, &mesh->faces);
+    } else {
+        err = ply_parse_binary_faces(file, &header, &mesh->faces);
+    }
     if (err != PLY_OK) {
         free(mesh->vertices);
         if (mesh->vertex_colors) free(mesh->vertex_colors);
@@ -717,7 +1081,7 @@ static inline const char* ply_error_string(ply_error_t err) {
         case PLY_OK: return "OK";
         case PLY_ERROR_FILE_NOT_FOUND: return "File not found";
         case PLY_ERROR_INVALID_HEADER: return "Invalid PLY header";
-        case PLY_ERROR_UNSUPPORTED_FORMAT: return "Unsupported PLY format (only ASCII supported)";
+        case PLY_ERROR_UNSUPPORTED_FORMAT: return "Unsupported PLY format (e.g., vertex list properties in binary mode)";
         case PLY_ERROR_MISSING_VERTEX_ELEMENT: return "Missing vertex element";
         case PLY_ERROR_MISSING_POSITION_PROPERTIES: return "Missing x, y, z properties";
         case PLY_ERROR_MEMORY_ALLOCATION: return "Memory allocation failed";
@@ -731,7 +1095,7 @@ static inline const char* ply_error_string(ply_error_t err) {
 //------------------------------------------------------------------------------
 
 static inline ply_error_t ply_get_info(const char *filepath, int *vertex_count, bool *has_colors) {
-    FILE *file = fopen(filepath, "r");
+    FILE *file = fopen(filepath, "rb");
     if (!file) return PLY_ERROR_FILE_NOT_FOUND;
 
     ply_header_t header;
@@ -753,7 +1117,7 @@ static inline ply_error_t ply_get_info(const char *filepath, int *vertex_count, 
 static inline ply_error_t ply_get_mesh_info(const char *filepath,
                                              int *vertex_count, int *face_count,
                                              bool *has_vertex_colors, bool *has_face_colors) {
-    FILE *file = fopen(filepath, "r");
+    FILE *file = fopen(filepath, "rb");
     if (!file) return PLY_ERROR_FILE_NOT_FOUND;
 
     ply_header_t header;
@@ -793,7 +1157,7 @@ typedef struct {
     int face_total;             // Total faces to parse (from header)
     bool parsing_faces;         // Currently parsing faces (vs vertices)
     bool has_face_colors;       // Face element has color properties
-    int face_lines_skipped;     // Intermediate lines already skipped
+    int face_lines_skipped;     // Intermediate lines already skipped (ASCII)
 
     // Bounding box (computed during load)
     vec3_t min_bounds;
@@ -811,7 +1175,7 @@ typedef struct {
 static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *state) {
     memset(state, 0, sizeof(ply_parse_state_t));
 
-    state->file = fopen(filepath, "r");
+    state->file = fopen(filepath, "rb");
     if (!state->file) {
         state->error = PLY_ERROR_FILE_NOT_FOUND;
         return PLY_ERROR_FILE_NOT_FOUND;
@@ -826,12 +1190,20 @@ static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *stat
         return err;
     }
 
-    // Check for ASCII format (binary not yet supported)
+    // Check binary prerequisites
     if (!state->header.is_ascii) {
-        fclose(state->file);
-        state->file = NULL;
-        state->error = PLY_ERROR_UNSUPPORTED_FORMAT;
-        return PLY_ERROR_UNSUPPORTED_FORMAT;
+        if (state->header.has_vertex_list_props) {
+            fclose(state->file);
+            state->file = NULL;
+            state->error = PLY_ERROR_UNSUPPORTED_FORMAT;
+            return PLY_ERROR_UNSUPPORTED_FORMAT;
+        }
+        if (state->header.has_face_element && !state->header.binary_skip_valid) {
+            fclose(state->file);
+            state->file = NULL;
+            state->error = PLY_ERROR_UNSUPPORTED_FORMAT;
+            return PLY_ERROR_UNSUPPORTED_FORMAT;
+        }
     }
 
     // Determine if we have vertex colors
@@ -919,73 +1291,146 @@ static inline int ply_parse_vertices_chunk(ply_parse_state_t *state, int max_ver
 
     int to_parse = (remaining < max_vertices) ? remaining : max_vertices;
 
-    char line[PLY_MAX_LINE_LENGTH];
-    float values[PLY_MAX_PROPERTIES];
+    if (state->header.is_ascii) {
+        // --- ASCII vertex parsing ---
+        char line[PLY_MAX_LINE_LENGTH];
+        float values[PLY_MAX_PROPERTIES];
 
-    int parsed = 0;
-    for (int i = 0; i < to_parse; i++) {
-        if (!fgets(line, sizeof(line), state->file)) {
-            state->error = PLY_ERROR_PARSE_ERROR;
-            return parsed;
-        }
-
-        // Parse all values from line
-        char *ptr = line;
-        for (int p = 0; p < state->header.property_count; p++) {
-            while (*ptr && isspace((unsigned char)*ptr)) ptr++;
-            if (!*ptr) {
+        int parsed = 0;
+        for (int i = 0; i < to_parse; i++) {
+            if (!fgets(line, sizeof(line), state->file)) {
                 state->error = PLY_ERROR_PARSE_ERROR;
                 return parsed;
             }
 
-            char *end;
-            values[p] = strtof(ptr, &end);
-            ptr = end;
-        }
+            // Parse all values from line
+            char *ptr = line;
+            for (int p = 0; p < state->header.property_count; p++) {
+                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                if (!*ptr) {
+                    state->error = PLY_ERROR_PARSE_ERROR;
+                    return parsed;
+                }
 
-        int v = state->parsed_count + parsed;
-
-        // Extract position
-        float x = values[state->header.prop_x];
-        float y = values[state->header.prop_y];
-        float z = values[state->header.prop_z];
-        state->points[v] = vec3_make(x, y, z);
-
-        // Update bounds
-        if (x < state->min_bounds.x) state->min_bounds.x = x;
-        if (y < state->min_bounds.y) state->min_bounds.y = y;
-        if (z < state->min_bounds.z) state->min_bounds.z = z;
-        if (x > state->max_bounds.x) state->max_bounds.x = x;
-        if (y > state->max_bounds.y) state->max_bounds.y = y;
-        if (z > state->max_bounds.z) state->max_bounds.z = z;
-
-        // Extract color if available
-        if (state->has_colors) {
-            float r = values[state->header.prop_red];
-            float g = values[state->header.prop_green];
-            float b = values[state->header.prop_blue];
-            float a = (state->header.prop_alpha >= 0) ? values[state->header.prop_alpha] : 255.0f;
-
-            // Detect if colors are 0-255 (uchar) or 0-1 (float) by checking type
-            ply_property_type_t r_type = state->header.properties[state->header.prop_red].type;
-            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
-                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
-                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
-                // Integer colors: normalize to 0-1
-                r /= 255.0f;
-                g /= 255.0f;
-                b /= 255.0f;
-                a /= 255.0f;
+                char *end;
+                values[p] = strtof(ptr, &end);
+                ptr = end;
             }
 
-            state->colors[v] = vec4_make(r, g, b, a);
+            int v = state->parsed_count + parsed;
+
+            // Extract position
+            float x = values[state->header.prop_x];
+            float y = values[state->header.prop_y];
+            float z = values[state->header.prop_z];
+            state->points[v] = vec3_make(x, y, z);
+
+            // Update bounds
+            if (x < state->min_bounds.x) state->min_bounds.x = x;
+            if (y < state->min_bounds.y) state->min_bounds.y = y;
+            if (z < state->min_bounds.z) state->min_bounds.z = z;
+            if (x > state->max_bounds.x) state->max_bounds.x = x;
+            if (y > state->max_bounds.y) state->max_bounds.y = y;
+            if (z > state->max_bounds.z) state->max_bounds.z = z;
+
+            // Extract color if available
+            if (state->has_colors) {
+                float r = values[state->header.prop_red];
+                float g = values[state->header.prop_green];
+                float b = values[state->header.prop_blue];
+                float a = (state->header.prop_alpha >= 0) ? values[state->header.prop_alpha] : 255.0f;
+
+                // Detect if colors are 0-255 (uchar) or 0-1 (float) by checking type
+                ply_property_type_t r_type = state->header.properties[state->header.prop_red].type;
+                if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                    r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                    r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                    // Integer colors: normalize to 0-1
+                    r /= 255.0f;
+                    g /= 255.0f;
+                    b /= 255.0f;
+                    a /= 255.0f;
+                }
+
+                state->colors[v] = vec4_make(r, g, b, a);
+            }
+
+            parsed++;
         }
 
-        parsed++;
-    }
+        state->parsed_count += parsed;
+        return parsed;
+    } else {
+        // --- Binary vertex parsing ---
+        bool need_swap = (state->header.is_little_endian != ply_is_little_endian());
+        int stride = state->header.vertex_byte_stride;
 
-    state->parsed_count += parsed;
-    return parsed;
+        size_t chunk_bytes = (size_t)to_parse * stride;
+        uint8_t *raw = (uint8_t*)malloc(chunk_bytes);
+        if (!raw) {
+            state->error = PLY_ERROR_MEMORY_ALLOCATION;
+            return 0;
+        }
+
+        size_t bytes_read = fread(raw, 1, chunk_bytes, state->file);
+        int actually_parsed = (stride > 0) ? (int)(bytes_read / (size_t)stride) : 0;
+        if (actually_parsed <= 0) {
+            free(raw);
+            state->error = PLY_ERROR_PARSE_ERROR;
+            return 0;
+        }
+
+        for (int i = 0; i < actually_parsed; i++) {
+            uint8_t *row = raw + (size_t)i * stride;
+            int v = state->parsed_count + i;
+
+            float x = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_x],
+                                         state->header.properties[state->header.prop_x].type, need_swap);
+            float y = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_y],
+                                         state->header.properties[state->header.prop_y].type, need_swap);
+            float z = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_z],
+                                         state->header.properties[state->header.prop_z].type, need_swap);
+            state->points[v] = vec3_make(x, y, z);
+
+            // Update bounds
+            if (x < state->min_bounds.x) state->min_bounds.x = x;
+            if (y < state->min_bounds.y) state->min_bounds.y = y;
+            if (z < state->min_bounds.z) state->min_bounds.z = z;
+            if (x > state->max_bounds.x) state->max_bounds.x = x;
+            if (y > state->max_bounds.y) state->max_bounds.y = y;
+            if (z > state->max_bounds.z) state->max_bounds.z = z;
+
+            // Extract color if available
+            if (state->has_colors) {
+                float r = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_red],
+                                             state->header.properties[state->header.prop_red].type, need_swap);
+                float g = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_green],
+                                             state->header.properties[state->header.prop_green].type, need_swap);
+                float b = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_blue],
+                                             state->header.properties[state->header.prop_blue].type, need_swap);
+                float a = (state->header.prop_alpha >= 0) ?
+                    ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_alpha],
+                                       state->header.properties[state->header.prop_alpha].type, need_swap) : 1.0f;
+
+                // Normalize integer colors to 0-1
+                ply_property_type_t r_type = state->header.properties[state->header.prop_red].type;
+                if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                    r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                    r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                    r /= 255.0f;
+                    g /= 255.0f;
+                    b /= 255.0f;
+                    a /= 255.0f;
+                }
+
+                state->colors[v] = vec4_make(r, g, b, a);
+            }
+        }
+
+        free(raw);
+        state->parsed_count += actually_parsed;
+        return actually_parsed;
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -1011,123 +1456,245 @@ static inline int ply_parse_faces_chunk(ply_parse_state_t *state, int max_faces)
         return 0;
     }
 
-    // Skip intermediate element lines (once)
-    if (!state->parsing_faces) {
+    if (state->header.is_ascii) {
+        // --- ASCII face parsing ---
+
+        // Skip intermediate element lines (once)
+        if (!state->parsing_faces) {
+            char skip_line[PLY_MAX_LINE_LENGTH];
+            int to_skip = state->header.skip_lines_before_faces - state->face_lines_skipped;
+            for (int i = 0; i < to_skip; i++) {
+                if (!fgets(skip_line, sizeof(skip_line), state->file)) {
+                    state->error = PLY_ERROR_PARSE_ERROR;
+                    return 0;
+                }
+                state->face_lines_skipped++;
+            }
+            state->parsing_faces = true;
+        }
+
+        int remaining = state->face_total - state->face_parsed_count;
+        if (remaining <= 0) return 0;
+
+        int to_parse = (remaining < max_faces) ? remaining : max_faces;
+
         char line[PLY_MAX_LINE_LENGTH];
-        int to_skip = state->header.skip_lines_before_faces - state->face_lines_skipped;
-        for (int i = 0; i < to_skip; i++) {
+        int parsed = 0;
+
+        for (int i = 0; i < to_parse; i++) {
             if (!fgets(line, sizeof(line), state->file)) {
                 state->error = PLY_ERROR_PARSE_ERROR;
-                return 0;
-            }
-            state->face_lines_skipped++;
-        }
-        state->parsing_faces = true;
-    }
-
-    int remaining = state->face_total - state->face_parsed_count;
-    if (remaining <= 0) return 0;
-
-    int to_parse = (remaining < max_faces) ? remaining : max_faces;
-
-    char line[PLY_MAX_LINE_LENGTH];
-    int parsed = 0;
-
-    for (int i = 0; i < to_parse; i++) {
-        if (!fgets(line, sizeof(line), state->file)) {
-            state->error = PLY_ERROR_PARSE_ERROR;
-            return parsed;
-        }
-
-        char *ptr = line;
-        int face_vertex_indices[256];
-        int face_vertex_count = 0;
-        float face_scalar_values[PLY_MAX_PROPERTIES];
-
-        // Parse face properties in declared order
-        for (int p = 0; p < state->header.face_property_count; p++) {
-            if (state->header.face_properties[p].is_list) {
-                // Read count
-                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
-                if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
-                char *end;
-                int count = (int)strtol(ptr, &end, 10);
-                ptr = end;
-
-                if (p == state->header.face_list_prop_index) {
-                    face_vertex_count = count;
-                    for (int j = 0; j < count && j < 256; j++) {
-                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
-                        if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
-                        face_vertex_indices[j] = (int)strtol(ptr, &end, 10);
-                        ptr = end;
-                    }
-                } else {
-                    for (int j = 0; j < count; j++) {
-                        while (*ptr && isspace((unsigned char)*ptr)) ptr++;
-                        if (!*ptr) break;
-                        strtof(ptr, &end);
-                        ptr = end;
-                    }
-                }
-            } else {
-                while (*ptr && isspace((unsigned char)*ptr)) ptr++;
-                if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
-                char *end;
-                face_scalar_values[p] = strtof(ptr, &end);
-                ptr = end;
-            }
-        }
-
-        // Fan triangulation
-        int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
-
-        // Grow index buffer if needed
-        while (state->face_tri_count + new_tris > state->face_tri_capacity) {
-            int new_cap = state->face_tri_capacity * 2;
-            uint32_t *new_indices = (uint32_t*)realloc(state->face_indices, new_cap * 3 * sizeof(uint32_t));
-            if (!new_indices) {
-                state->error = PLY_ERROR_MEMORY_ALLOCATION;
                 return parsed;
             }
-            state->face_indices = new_indices;
-            state->face_tri_capacity = new_cap;
-        }
 
-        for (int t = 0; t < new_tris; t++) {
-            int base = (state->face_tri_count + t) * 3;
-            state->face_indices[base + 0] = (uint32_t)face_vertex_indices[0];
-            state->face_indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
-            state->face_indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
-        }
-        state->face_tri_count += new_tris;
+            char *ptr = line;
+            int face_vertex_indices[256];
+            int face_vertex_count = 0;
+            float face_scalar_values[PLY_MAX_PROPERTIES];
 
-        // Extract face color if present
-        int f = state->face_parsed_count + parsed;
-        if (state->has_face_colors && state->face_colors) {
-            float r = face_scalar_values[state->header.face_prop_red];
-            float g = face_scalar_values[state->header.face_prop_green];
-            float b = face_scalar_values[state->header.face_prop_blue];
-            float a = (state->header.face_prop_alpha >= 0) ? face_scalar_values[state->header.face_prop_alpha] : 255.0f;
+            // Parse face properties in declared order
+            for (int p = 0; p < state->header.face_property_count; p++) {
+                if (state->header.face_properties[p].is_list) {
+                    // Read count
+                    while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                    if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                    char *end;
+                    int count = (int)strtol(ptr, &end, 10);
+                    ptr = end;
 
-            ply_property_type_t r_type = state->header.face_properties[state->header.face_prop_red].type;
-            if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
-                r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
-                r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
-                r /= 255.0f;
-                g /= 255.0f;
-                b /= 255.0f;
-                a /= 255.0f;
+                    if (p == state->header.face_list_prop_index) {
+                        face_vertex_count = count;
+                        for (int j = 0; j < count && j < 256; j++) {
+                            while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                            if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                            face_vertex_indices[j] = (int)strtol(ptr, &end, 10);
+                            ptr = end;
+                        }
+                    } else {
+                        for (int j = 0; j < count; j++) {
+                            while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                            if (!*ptr) break;
+                            strtof(ptr, &end);
+                            ptr = end;
+                        }
+                    }
+                } else {
+                    while (*ptr && isspace((unsigned char)*ptr)) ptr++;
+                    if (!*ptr) { state->error = PLY_ERROR_PARSE_ERROR; return parsed; }
+                    char *end;
+                    face_scalar_values[p] = strtof(ptr, &end);
+                    ptr = end;
+                }
             }
 
-            state->face_colors[f] = vec4_make(r, g, b, a);
+            // Fan triangulation
+            int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
+
+            // Grow index buffer if needed
+            while (state->face_tri_count + new_tris > state->face_tri_capacity) {
+                int new_cap = state->face_tri_capacity * 2;
+                uint32_t *new_indices = (uint32_t*)realloc(state->face_indices, new_cap * 3 * sizeof(uint32_t));
+                if (!new_indices) {
+                    state->error = PLY_ERROR_MEMORY_ALLOCATION;
+                    return parsed;
+                }
+                state->face_indices = new_indices;
+                state->face_tri_capacity = new_cap;
+            }
+
+            for (int t = 0; t < new_tris; t++) {
+                int base = (state->face_tri_count + t) * 3;
+                state->face_indices[base + 0] = (uint32_t)face_vertex_indices[0];
+                state->face_indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
+                state->face_indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
+            }
+            state->face_tri_count += new_tris;
+
+            // Extract face color if present
+            int f = state->face_parsed_count + parsed;
+            if (state->has_face_colors && state->face_colors) {
+                float r = face_scalar_values[state->header.face_prop_red];
+                float g = face_scalar_values[state->header.face_prop_green];
+                float b = face_scalar_values[state->header.face_prop_blue];
+                float a = (state->header.face_prop_alpha >= 0) ? face_scalar_values[state->header.face_prop_alpha] : 255.0f;
+
+                ply_property_type_t r_type = state->header.face_properties[state->header.face_prop_red].type;
+                if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                    r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                    r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                    r /= 255.0f;
+                    g /= 255.0f;
+                    b /= 255.0f;
+                    a /= 255.0f;
+                }
+
+                state->face_colors[f] = vec4_make(r, g, b, a);
+            }
+
+            parsed++;
         }
 
-        parsed++;
-    }
+        state->face_parsed_count += parsed;
+        return parsed;
+    } else {
+        // --- Binary face parsing ---
 
-    state->face_parsed_count += parsed;
-    return parsed;
+        // Skip intermediate element bytes (once)
+        if (!state->parsing_faces) {
+            if (state->header.skip_bytes_before_faces > 0) {
+                if (fseek(state->file, state->header.skip_bytes_before_faces, SEEK_CUR) != 0) {
+                    state->error = PLY_ERROR_PARSE_ERROR;
+                    return 0;
+                }
+            }
+            state->parsing_faces = true;
+        }
+
+        int remaining = state->face_total - state->face_parsed_count;
+        if (remaining <= 0) return 0;
+
+        int to_parse = (remaining < max_faces) ? remaining : max_faces;
+
+        bool need_swap = (state->header.is_little_endian != ply_is_little_endian());
+        uint8_t buf[8];
+        int parsed = 0;
+
+        for (int i = 0; i < to_parse; i++) {
+            int face_vertex_indices[256];
+            int face_vertex_count = 0;
+            float face_scalar_values[PLY_MAX_PROPERTIES];
+
+            // Parse face properties in declared order
+            for (int p = 0; p < state->header.face_property_count; p++) {
+                const ply_property_t *prop = &state->header.face_properties[p];
+
+                if (prop->is_list) {
+                    int count_size = ply_property_byte_size(prop->list_count_type);
+                    if (fread(buf, 1, count_size, state->file) != (size_t)count_size) {
+                        state->error = PLY_ERROR_PARSE_ERROR;
+                        return parsed;
+                    }
+                    int count = ply_read_as_int32(buf, prop->list_count_type, need_swap);
+
+                    if (p == state->header.face_list_prop_index) {
+                        face_vertex_count = count;
+                        int val_size = ply_property_byte_size(prop->type);
+                        for (int j = 0; j < count && j < 256; j++) {
+                            if (fread(buf, 1, val_size, state->file) != (size_t)val_size) {
+                                state->error = PLY_ERROR_PARSE_ERROR;
+                                return parsed;
+                            }
+                            face_vertex_indices[j] = ply_read_as_int32(buf, prop->type, need_swap);
+                        }
+                    } else {
+                        int val_size = ply_property_byte_size(prop->type);
+                        for (int j = 0; j < count; j++) {
+                            if (fread(buf, 1, val_size, state->file) != (size_t)val_size) {
+                                state->error = PLY_ERROR_PARSE_ERROR;
+                                return parsed;
+                            }
+                        }
+                    }
+                } else {
+                    int sz = ply_property_byte_size(prop->type);
+                    if (fread(buf, 1, sz, state->file) != (size_t)sz) {
+                        state->error = PLY_ERROR_PARSE_ERROR;
+                        return parsed;
+                    }
+                    face_scalar_values[p] = ply_read_as_float(buf, prop->type, need_swap);
+                }
+            }
+
+            // Fan triangulation
+            int new_tris = (face_vertex_count >= 3) ? (face_vertex_count - 2) : 0;
+
+            // Grow index buffer if needed
+            while (state->face_tri_count + new_tris > state->face_tri_capacity) {
+                int new_cap = state->face_tri_capacity * 2;
+                uint32_t *new_indices = (uint32_t*)realloc(state->face_indices, new_cap * 3 * sizeof(uint32_t));
+                if (!new_indices) {
+                    state->error = PLY_ERROR_MEMORY_ALLOCATION;
+                    return parsed;
+                }
+                state->face_indices = new_indices;
+                state->face_tri_capacity = new_cap;
+            }
+
+            for (int t = 0; t < new_tris; t++) {
+                int base = (state->face_tri_count + t) * 3;
+                state->face_indices[base + 0] = (uint32_t)face_vertex_indices[0];
+                state->face_indices[base + 1] = (uint32_t)face_vertex_indices[t + 1];
+                state->face_indices[base + 2] = (uint32_t)face_vertex_indices[t + 2];
+            }
+            state->face_tri_count += new_tris;
+
+            // Extract face color if present
+            int f = state->face_parsed_count + parsed;
+            if (state->has_face_colors && state->face_colors) {
+                float r = face_scalar_values[state->header.face_prop_red];
+                float g = face_scalar_values[state->header.face_prop_green];
+                float b = face_scalar_values[state->header.face_prop_blue];
+                float a = (state->header.face_prop_alpha >= 0) ? face_scalar_values[state->header.face_prop_alpha] : 1.0f;
+
+                ply_property_type_t r_type = state->header.face_properties[state->header.face_prop_red].type;
+                if (r_type == PLY_PROP_UCHAR || r_type == PLY_PROP_CHAR ||
+                    r_type == PLY_PROP_USHORT || r_type == PLY_PROP_SHORT ||
+                    r_type == PLY_PROP_UINT || r_type == PLY_PROP_INT) {
+                    r /= 255.0f;
+                    g /= 255.0f;
+                    b /= 255.0f;
+                    a /= 255.0f;
+                }
+
+                state->face_colors[f] = vec4_make(r, g, b, a);
+            }
+
+            parsed++;
+        }
+
+        state->face_parsed_count += parsed;
+        return parsed;
+    }
 }
 
 //------------------------------------------------------------------------------
