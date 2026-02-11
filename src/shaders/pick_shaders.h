@@ -19,6 +19,16 @@
 //   - mvp (mat4) - model-view-projection matrix
 //   - line_width (float) - line/point size in NDC units
 //   - aspect_ratio (float) - viewport width/height
+//
+// Triangle Vertex attributes:
+//   - location 0: template_pos (vec3) - barycentric selector (1,0,0)/(0,1,0)/(0,0,1)
+//   - location 1: vertex_a (vec3) - triangle vertex A in world space
+//   - location 2: vertex_b (vec3) - triangle vertex B in world space
+//   - location 3: vertex_c (vec3) - triangle vertex C in world space
+//   - location 4: pick_color (vec3) - RGB encoded pick ID (0-1 range)
+//
+// Triangle Uniforms:
+//   - mvp (mat4) - model-view-projection matrix
 //------------------------------------------------------------------------------
 #ifndef PICK_SHADERS_H
 #define PICK_SHADERS_H
@@ -86,6 +96,32 @@ static const char* pick_point_vs_source =
     "}\n";
 
 static const char* pick_point_fs_source =
+    "#version 330\n"
+    "in vec3 v_pick_color;\n"
+    "out vec4 frag_color;\n"
+    "void main() {\n"
+    "    frag_color = vec4(v_pick_color, 1.0);\n"
+    "}\n";
+
+// Triangle pick shader
+static const char* pick_triangle_vs_source =
+    "#version 330\n"
+    "uniform mat4 mvp;\n"
+    "layout(location=0) in vec3 template_pos;\n"
+    "layout(location=1) in vec3 vertex_a;\n"
+    "layout(location=2) in vec3 vertex_b;\n"
+    "layout(location=3) in vec3 vertex_c;\n"
+    "layout(location=4) in vec3 pick_color;\n"
+    "out vec3 v_pick_color;\n"
+    "void main() {\n"
+    "    vec3 world_pos = template_pos.x * vertex_a\n"
+    "                   + template_pos.y * vertex_b\n"
+    "                   + template_pos.z * vertex_c;\n"
+    "    gl_Position = mvp * vec4(world_pos, 1.0);\n"
+    "    v_pick_color = pick_color;\n"
+    "}\n";
+
+static const char* pick_triangle_fs_source =
     "#version 330\n"
     "in vec3 v_pick_color;\n"
     "out vec4 frag_color;\n"
@@ -161,6 +197,35 @@ static const char* pick_point_vs_source =
     "}\n";
 
 static const char* pick_point_fs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "in vec3 v_pick_color;\n"
+    "out vec4 frag_color;\n"
+    "void main() {\n"
+    "    frag_color = vec4(v_pick_color, 1.0);\n"
+    "}\n";
+
+// Triangle pick shader
+static const char* pick_triangle_vs_source =
+    "#version 300 es\n"
+    "precision highp float;\n"
+    "precision highp int;\n"
+    "uniform mat4 mvp;\n"
+    "layout(location=0) in vec3 template_pos;\n"
+    "layout(location=1) in vec3 vertex_a;\n"
+    "layout(location=2) in vec3 vertex_b;\n"
+    "layout(location=3) in vec3 vertex_c;\n"
+    "layout(location=4) in vec3 pick_color;\n"
+    "out vec3 v_pick_color;\n"
+    "void main() {\n"
+    "    vec3 world_pos = template_pos.x * vertex_a\n"
+    "                   + template_pos.y * vertex_b\n"
+    "                   + template_pos.z * vertex_c;\n"
+    "    gl_Position = mvp * vec4(world_pos, 1.0);\n"
+    "    v_pick_color = pick_color;\n"
+    "}\n";
+
+static const char* pick_triangle_fs_source =
     "#version 300 es\n"
     "precision highp float;\n"
     "in vec3 v_pick_color;\n"
@@ -263,6 +328,44 @@ static const char* pick_point_fs_source =
     "    return float4(in.pick_color, 1.0);\n"
     "}\n";
 
+// Triangle pick shader
+static const char* pick_triangle_vs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct vs_in {\n"
+    "    float3 template_pos [[attribute(0)]];\n"
+    "    float3 vertex_a [[attribute(1)]];\n"
+    "    float3 vertex_b [[attribute(2)]];\n"
+    "    float3 vertex_c [[attribute(3)]];\n"
+    "    float3 pick_color [[attribute(4)]];\n"
+    "};\n"
+    "struct vs_out {\n"
+    "    float4 pos [[position]];\n"
+    "    float3 pick_color;\n"
+    "};\n"
+    "struct vs_params {\n"
+    "    float4x4 mvp;\n"
+    "};\n"
+    "vertex vs_out vs_main(vs_in in [[stage_in]], constant vs_params& params [[buffer(0)]]) {\n"
+    "    vs_out out;\n"
+    "    float3 world_pos = in.template_pos.x * in.vertex_a\n"
+    "                     + in.template_pos.y * in.vertex_b\n"
+    "                     + in.template_pos.z * in.vertex_c;\n"
+    "    out.pos = params.mvp * float4(world_pos, 1.0);\n"
+    "    out.pick_color = in.pick_color;\n"
+    "    return out;\n"
+    "}\n";
+
+static const char* pick_triangle_fs_source =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct fs_in {\n"
+    "    float3 pick_color;\n"
+    "};\n"
+    "fragment float4 fs_main(fs_in in [[stage_in]]) {\n"
+    "    return float4(in.pick_color, 1.0);\n"
+    "}\n";
+
 //------------------------------------------------------------------------------
 // WebGPU WGSL
 //------------------------------------------------------------------------------
@@ -352,6 +455,39 @@ static const char* pick_point_fs_source =
     "    return vec4<f32>(pick_color, 1.0);\n"
     "}\n";
 
+// Triangle pick shader
+static const char* pick_triangle_vs_source =
+    "struct vs_params {\n"
+    "    mvp: mat4x4<f32>,\n"
+    "};\n"
+    "@group(0) @binding(0) var<uniform> params: vs_params;\n"
+    "struct vs_out {\n"
+    "    @builtin(position) pos: vec4<f32>,\n"
+    "    @location(0) pick_color: vec3<f32>,\n"
+    "};\n"
+    "@vertex\n"
+    "fn vs_main(\n"
+    "    @location(0) template_pos: vec3<f32>,\n"
+    "    @location(1) vertex_a: vec3<f32>,\n"
+    "    @location(2) vertex_b: vec3<f32>,\n"
+    "    @location(3) vertex_c: vec3<f32>,\n"
+    "    @location(4) pick_color: vec3<f32>\n"
+    ") -> vs_out {\n"
+    "    var out: vs_out;\n"
+    "    let world_pos = template_pos.x * vertex_a\n"
+    "                  + template_pos.y * vertex_b\n"
+    "                  + template_pos.z * vertex_c;\n"
+    "    out.pos = params.mvp * vec4<f32>(world_pos, 1.0);\n"
+    "    out.pick_color = pick_color;\n"
+    "    return out;\n"
+    "}\n";
+
+static const char* pick_triangle_fs_source =
+    "@fragment\n"
+    "fn fs_main(@location(0) pick_color: vec3<f32>) -> @location(0) vec4<f32> {\n"
+    "    return vec4<f32>(pick_color, 1.0);\n"
+    "}\n";
+
 //------------------------------------------------------------------------------
 // Vulkan SPIR-V bytecode
 //------------------------------------------------------------------------------
@@ -359,7 +495,7 @@ static const char* pick_point_fs_source =
 
 #include "spirv/spirv_bytecode.h"
 
-// Bytecode pointers for Vulkan (uses pick_line_*_spirv and pick_point_*_spirv from spirv_bytecode.h)
+// Bytecode pointers for Vulkan (uses pick_line_*_spirv, pick_point_*_spirv, and pick_triangle_*_spirv from spirv_bytecode.h)
 
 //------------------------------------------------------------------------------
 // DirectX 11 HLSL
@@ -440,6 +576,40 @@ static const char* pick_point_vs_source =
     "}\n";
 
 static const char* pick_point_fs_source =
+    "struct fs_in {\n"
+    "    float3 pick_color : COLOR;\n"
+    "};\n"
+    "float4 fs_main(fs_in inp) : SV_Target0 {\n"
+    "    return float4(inp.pick_color, 1.0);\n"
+    "}\n";
+
+// Triangle pick shader
+static const char* pick_triangle_vs_source =
+    "cbuffer vs_params : register(b0) {\n"
+    "    float4x4 mvp;\n"
+    "};\n"
+    "struct vs_in {\n"
+    "    float3 template_pos : POSITION;\n"
+    "    float3 vertex_a : TEXCOORD0;\n"
+    "    float3 vertex_b : TEXCOORD1;\n"
+    "    float3 vertex_c : TEXCOORD2;\n"
+    "    float3 pick_color : COLOR;\n"
+    "};\n"
+    "struct vs_out {\n"
+    "    float3 pick_color : COLOR;\n"
+    "    float4 pos : SV_Position;\n"
+    "};\n"
+    "vs_out vs_main(vs_in inp) {\n"
+    "    vs_out outp;\n"
+    "    float3 world_pos = inp.template_pos.x * inp.vertex_a\n"
+    "                     + inp.template_pos.y * inp.vertex_b\n"
+    "                     + inp.template_pos.z * inp.vertex_c;\n"
+    "    outp.pos = mul(mvp, float4(world_pos, 1.0));\n"
+    "    outp.pick_color = inp.pick_color;\n"
+    "    return outp;\n"
+    "}\n";
+
+static const char* pick_triangle_fs_source =
     "struct fs_in {\n"
     "    float3 pick_color : COLOR;\n"
     "};\n"

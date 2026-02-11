@@ -110,7 +110,8 @@ static inline void json_write_indent(json_builder_t *b, int depth) {
 
 static inline const char* scene_geom_type_to_string(geometry_type_t type) {
     static const char* names[] = {
-        "point", "line", "polyline", "arc", "polygon", "helix", "bezier"
+        "point", "line", "polyline", "arc", "polygon", "helix", "bezier",
+        "point_cloud", "triangle"
     };
     if (type >= 0 && type < GEOM_TYPE_COUNT) {
         return names[type];
@@ -126,6 +127,7 @@ static inline geometry_type_t scene_string_to_geom_type(const char *str) {
     if (strcmp(str, "polygon") == 0) return GEOM_POLYGON;
     if (strcmp(str, "helix") == 0) return GEOM_HELIX;
     if (strcmp(str, "bezier") == 0) return GEOM_BEZIER;
+    if (strcmp(str, "triangle") == 0) return GEOM_TRIANGLE;
     return GEOM_POINT;  // Default
 }
 
@@ -300,6 +302,21 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
             json_builder_appendf(b, "\"turns\": %.6g,\n", g->data.helix.turns);
             json_write_indent(b, depth + 3);
             json_builder_appendf(b, "\"segments\": %d\n", g->data.helix.segments);
+            break;
+
+        case GEOM_TRIANGLE:
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"a\": ");
+            json_write_vec3(b, g->data.triangle.a);
+            json_builder_append(b, ",\n");
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"b\": ");
+            json_write_vec3(b, g->data.triangle.b);
+            json_builder_append(b, ",\n");
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"c\": ");
+            json_write_vec3(b, g->data.triangle.c);
+            json_builder_append(b, "\n");
             break;
 
         default:
@@ -770,6 +787,7 @@ typedef struct {
         struct { vec3_t center; float radius; float start_angle, end_angle; vec3_t normal; } arc;
         struct { vec3_t p0, p1, p2, p3; int segments; } bezier;
         struct { vec3_t axis_start, axis_end; float radius, turns; int segments; } helix;
+        struct { vec3_t a, b, c; } triangle;
     } geom_data;
 
     // Renderable
@@ -861,9 +879,19 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
         } else if (strcmp(key, "point") == 0) {
             if (!json_parse_vec3(p, &ent->geom_data.point.point)) return false;
         } else if (strcmp(key, "a") == 0) {
-            if (!json_parse_vec3(p, &ent->geom_data.line.a)) return false;
+            if (ent->geom_type == GEOM_TRIANGLE) {
+                if (!json_parse_vec3(p, &ent->geom_data.triangle.a)) return false;
+            } else {
+                if (!json_parse_vec3(p, &ent->geom_data.line.a)) return false;
+            }
         } else if (strcmp(key, "b") == 0) {
-            if (!json_parse_vec3(p, &ent->geom_data.line.b)) return false;
+            if (ent->geom_type == GEOM_TRIANGLE) {
+                if (!json_parse_vec3(p, &ent->geom_data.triangle.b)) return false;
+            } else {
+                if (!json_parse_vec3(p, &ent->geom_data.line.b)) return false;
+            }
+        } else if (strcmp(key, "c") == 0) {
+            if (!json_parse_vec3(p, &ent->geom_data.triangle.c)) return false;
         } else if (strcmp(key, "points") == 0) {
             // For polyline or polygon
             vec3_t *pts = NULL;
@@ -1107,6 +1135,12 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
                                ent->geom_data.helix.radius, ent->geom_data.helix.turns,
                                ent->geom_data.helix.segments,
                                ent->color, ent->line_width);
+            break;
+
+        case GEOM_TRIANGLE:
+            e = scene_add_triangle(scene,
+                                   ent->geom_data.triangle.a, ent->geom_data.triangle.b,
+                                   ent->geom_data.triangle.c, ent->color);
             break;
 
         default:

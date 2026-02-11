@@ -91,6 +91,11 @@ static inline undo_entity_snapshot_t undo_snapshot_entity(ecs_scene_t *scene, ec
                 snap.data.helix.turns = g->data.helix.turns;
                 snap.data.helix.segments = g->data.helix.segments;
                 break;
+            case GEOM_TRIANGLE:
+                snap.data.triangle.a = g->data.triangle.a;
+                snap.data.triangle.b = g->data.triangle.b;
+                snap.data.triangle.c = g->data.triangle.c;
+                break;
             default:
                 break;
         }
@@ -152,6 +157,10 @@ static inline ecs_entity_t undo_create_from_snapshot(ecs_scene_t *scene, undo_en
             e = scene_add_helix(scene, snap->data.helix.axis_start, snap->data.helix.axis_end,
                                 snap->data.helix.radius, snap->data.helix.turns,
                                 snap->data.helix.segments, snap->color, snap->line_width);
+            break;
+        case UNDO_GEOM_TRIANGLE:
+            e = scene_add_triangle(scene, snap->data.triangle.a, snap->data.triangle.b,
+                                   snap->data.triangle.c, snap->color);
             break;
         default:
             break;
@@ -429,6 +438,11 @@ static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
         case GEOM_LINE:     if (idx == 0) g->data.line.a = pos; else g->data.line.b = pos; break;
         case GEOM_POLYLINE: if (idx < g->data.polyline.count) g->data.polyline.points[idx] = pos; break;
         case GEOM_POLYGON:  if (idx < g->data.polygon.count) g->data.polygon.points[idx] = pos; break;
+        case GEOM_TRIANGLE:
+            if (idx == 0) g->data.triangle.a = pos;
+            else if (idx == 1) g->data.triangle.b = pos;
+            else g->data.triangle.c = pos;
+            break;
         default: break;
     }
 }

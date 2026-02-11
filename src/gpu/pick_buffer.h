@@ -43,6 +43,14 @@ typedef struct {
     float r, g, b;      // Pick color (encoded pick ID)
 } pick_point_instance_t;
 
+// Triangle pick instance: three vertices + pick color
+typedef struct {
+    float ax, ay, az;   // Vertex A position
+    float bx, by, bz;   // Vertex B position
+    float cx, cy, cz;   // Vertex C position
+    float r, g, b;      // Pick color (encoded pick ID)
+} pick_triangle_instance_t;
+
 //------------------------------------------------------------------------------
 // Pick uniform block
 //------------------------------------------------------------------------------
@@ -52,6 +60,11 @@ typedef struct {
     float aspect_ratio;
     float _pad[2];
 } pick_params_t;
+
+// Triangle pick uniform block (MVP only - triangles are solid geometry)
+typedef struct {
+    mat4_t mvp;
+} pick_triangle_params_t;
 
 //------------------------------------------------------------------------------
 // Pick Buffer State
@@ -70,6 +83,8 @@ typedef struct {
     sg_shader line_shd;
     sg_pipeline point_pip;
     sg_shader point_shd;
+    sg_pipeline triangle_pip;
+    sg_shader triangle_shd;
 
     // Template geometry (reused from geometry_batch)
     sg_buffer line_template_vbuf;
@@ -82,9 +97,12 @@ typedef struct {
     int point_template_vertex_count;
     int point_template_index_count;
 
+    sg_buffer triangle_template_vbuf;
+
     // Instance buffers for pick rendering
     instance_buffer_t line_instances;
     instance_buffer_t point_instances;
+    instance_buffer_t triangle_instances;
 
     // Overlay pick (depth-always, renders on top — for gizmo handles)
     sg_pipeline overlay_line_pip;
@@ -457,9 +475,103 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     free(point_vertices);
     free(point_indices);
 
+    // Create triangle pick shader
+#if defined(SOKOL_VULKAN)
+    pb->triangle_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(pick_triangle_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(pick_triangle_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // vertex_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // vertex_b
+            [3] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 2 },   // vertex_c
+            [4] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(pick_triangle_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "pick-triangle-shader"
+    });
+#else
+    pb->triangle_shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .source = pick_triangle_vs_source,
+            .entry = "vs_main",
+        },
+        .fragment_func = {
+            .source = pick_triangle_fs_source,
+            .entry = "fs_main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // vertex_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // vertex_b
+            [3] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 2 },   // vertex_c
+            [4] = { .hlsl_sem_name = "COLOR", .hlsl_sem_index = 0 },      // pick_color
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(pick_triangle_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+            .glsl_uniforms = {
+                [0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" },
+            }
+        },
+        .label = "pick-triangle-shader"
+    });
+#endif
+
+    // Create triangle pick pipeline (no index buffer — 3 vertices drawn directly)
+    pb->triangle_pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = pb->triangle_shd,
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },                     // template_pos
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },        // vertex_a
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },       // vertex_b
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },       // vertex_c
+                [4] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 36 },       // pick_color
+            }
+        },
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = {
+            .compare = SG_COMPAREFUNC_LESS_EQUAL,
+            .write_enabled = true,
+            .pixel_format = SG_PIXELFORMAT_DEPTH
+        },
+        .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "pick-triangle-pipeline"
+    });
+
+    // Generate triangle template geometry (3 vertices with barycentric selectors, no index buffer)
+    geom_template_vertex_t tri_verts[3] = {
+        { 1.0f, 0.0f, 0.0f },  // Selector for vertex A
+        { 0.0f, 1.0f, 0.0f },  // Selector for vertex B
+        { 0.0f, 0.0f, 1.0f },  // Selector for vertex C
+    };
+    pb->triangle_template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .data = SG_RANGE(tri_verts),
+        .label = "pick-triangle-template-vbuf"
+    });
+
     // Initialize instance buffers
     instance_buffer_init(&pb->line_instances, sizeof(pick_line_instance_t), 64, "pick-line-instances");
     instance_buffer_init(&pb->point_instances, sizeof(pick_point_instance_t), 64, "pick-point-instances");
+    instance_buffer_init(&pb->triangle_instances, sizeof(pick_triangle_instance_t), 64, "pick-triangle-instances");
 
     // Create overlay pipelines (depth-always, no depth write — for gizmo picks on top)
     pb->overlay_line_pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -524,6 +636,7 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
 static inline void pick_buffer_shutdown(pick_buffer_t *pb) {
     instance_buffer_shutdown(&pb->line_instances);
     instance_buffer_shutdown(&pb->point_instances);
+    instance_buffer_shutdown(&pb->triangle_instances);
     instance_buffer_shutdown(&pb->overlay_line_instances);
     instance_buffer_shutdown(&pb->overlay_point_instances);
 
@@ -531,6 +644,8 @@ static inline void pick_buffer_shutdown(pick_buffer_t *pb) {
     sg_destroy_shader(pb->line_shd);
     sg_destroy_pipeline(pb->point_pip);
     sg_destroy_shader(pb->point_shd);
+    sg_destroy_pipeline(pb->triangle_pip);
+    sg_destroy_shader(pb->triangle_shd);
     sg_destroy_pipeline(pb->overlay_line_pip);
     sg_destroy_pipeline(pb->overlay_point_pip);
 
@@ -538,6 +653,7 @@ static inline void pick_buffer_shutdown(pick_buffer_t *pb) {
     sg_destroy_buffer(pb->line_template_ibuf);
     sg_destroy_buffer(pb->point_template_vbuf);
     sg_destroy_buffer(pb->point_template_ibuf);
+    sg_destroy_buffer(pb->triangle_template_vbuf);
 
     sg_destroy_view(pb->color_att_view);
     sg_destroy_view(pb->depth_att_view);
@@ -567,6 +683,7 @@ static inline void pick_buffer_begin_frame(pick_buffer_t *pb) {
     // Reset instance buffers (free all slots)
     instance_buffer_clear(&pb->line_instances);
     instance_buffer_clear(&pb->point_instances);
+    instance_buffer_clear(&pb->triangle_instances);
     instance_buffer_clear(&pb->overlay_line_instances);
     instance_buffer_clear(&pb->overlay_point_instances);
 }
@@ -607,6 +724,27 @@ static inline void pick_buffer_add_point(pick_buffer_t *pb,
             .r = r, .g = g, .b = b
         };
         instance_buffer_set(&pb->point_instances, slot, &inst);
+    }
+}
+
+//------------------------------------------------------------------------------
+// Add a triangle for pick rendering
+//------------------------------------------------------------------------------
+static inline void pick_buffer_add_triangle(pick_buffer_t *pb,
+                                             vec3_t a, vec3_t b, vec3_t c,
+                                             uint32_t pick_id) {
+    int slot = instance_buffer_alloc_slot(&pb->triangle_instances);
+    if (slot >= 0) {
+        float r, g, bl;
+        pick_id_to_rgb_float(pick_id, &r, &g, &bl);
+
+        pick_triangle_instance_t inst = {
+            .ax = a.x, .ay = a.y, .az = a.z,
+            .bx = b.x, .by = b.y, .bz = b.z,
+            .cx = c.x, .cy = c.y, .cz = c.z,
+            .r = r, .g = g, .b = bl
+        };
+        instance_buffer_set(&pb->triangle_instances, slot, &inst);
     }
 }
 
@@ -700,6 +838,7 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
     // Upload instance data
     instance_buffer_upload(&pb->line_instances);
     instance_buffer_upload(&pb->point_instances);
+    instance_buffer_upload(&pb->triangle_instances);
 
     // Compute modified MVP for pick region (also sets pb->zoom_factor)
     mat4_t mvp = pick_buffer_compute_mvp(pb, view, proj);
@@ -730,6 +869,21 @@ static inline void pick_buffer_render(pick_buffer_t *pb, mat4_t view, mat4_t pro
         .line_width = scaled_line_width,
         .aspect_ratio = pick_aspect  // Use viewport aspect ratio for correct line rendering
     };
+
+    // Draw triangles first (solid geometry, drawn before lines/points for correct depth)
+    int triangle_count = instance_buffer_count(&pb->triangle_instances);
+    if (triangle_count > 0) {
+        pick_triangle_params_t tri_params = { .mvp = mvp };
+        sg_apply_pipeline(pb->triangle_pip);
+        sg_apply_bindings(&(sg_bindings){
+            .vertex_buffers = {
+                [0] = pb->triangle_template_vbuf,
+                [1] = instance_buffer_gpu_buffer(&pb->triangle_instances)
+            }
+        });
+        sg_apply_uniforms(0, &SG_RANGE(tri_params));
+        sg_draw(0, 3, triangle_count);
+    }
 
     // Draw lines
     int line_count = instance_buffer_count(&pb->line_instances);

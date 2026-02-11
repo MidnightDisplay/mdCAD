@@ -1391,6 +1391,13 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     }
                     break;
                 }
+                case GEOM_TRIANGLE: {
+                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.triangle.a);
+                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
+                    vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
+                    pick_buffer_add_triangle(pb, world_a, world_b, world_c, s->pick_id);
+                    break;
+                }
                 default:
                     break;
             }

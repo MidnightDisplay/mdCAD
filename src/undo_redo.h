@@ -86,6 +86,8 @@ typedef enum {
     UNDO_GEOM_POLYGON,
     UNDO_GEOM_HELIX,
     UNDO_GEOM_BEZIER,
+    UNDO_GEOM_POINT_CLOUD,
+    UNDO_GEOM_TRIANGLE,
     UNDO_GEOM_TYPE_COUNT
 } undo_geom_type_t;
 
@@ -141,6 +143,9 @@ typedef struct {
             float radius, turns;
             int segments;
         } helix;
+        struct {
+            vec3_t a, b, c;
+        } triangle;
     } data;
 } undo_entity_snapshot_t;
 
