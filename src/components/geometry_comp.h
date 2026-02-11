@@ -15,6 +15,7 @@ typedef enum {
     GEOM_HELIX,
     GEOM_BEZIER,        // Cubic bezier curve
     GEOM_POINT_CLOUD,   // Point cloud (many points in single entity)
+    GEOM_TRIANGLE,      // Single triangle (3 vertices)
     GEOM_TYPE_COUNT
 } geometry_type_t;
 
@@ -75,6 +76,11 @@ typedef struct {
     int capacity;        // Allocated capacity
 } geom_point_cloud_data_t;
 
+// Triangle geometry data (3 vertices)
+typedef struct {
+    vec3_t a, b, c;
+} geom_triangle_data_t;
+
 typedef struct {
     geometry_type_t type;
 
@@ -88,6 +94,7 @@ typedef struct {
         geom_helix_data_t helix;
         geom_bezier_data_t bezier;
         geom_point_cloud_data_t point_cloud;
+        geom_triangle_data_t triangle;
     } data;
 
     // Rendering properties
@@ -170,10 +177,21 @@ static inline GeometryComp geometry_comp_helix(vec3_t axis_start, vec3_t axis_en
     };
 }
 
+static inline GeometryComp geometry_comp_triangle(vec3_t a, vec3_t b, vec3_t c, vec4_t color) {
+    return (GeometryComp){
+        .type = GEOM_TRIANGLE,
+        .data.triangle = { .a = a, .b = b, .c = c },
+        .line_width = 0.0f,
+        .point_size = 0.0f,
+        .color = color
+    };
+}
+
 // Get geometry type name for display
 static inline const char* geometry_type_name(geometry_type_t type) {
     static const char* names[] = {
-        "Point", "Line", "Polyline", "Arc", "Polygon", "Helix", "Bezier", "Point Cloud"
+        "Point", "Line", "Polyline", "Arc", "Polygon", "Helix", "Bezier", "Point Cloud",
+        "Triangle"
     };
     if (type >= 0 && type < GEOM_TYPE_COUNT) {
         return names[type];

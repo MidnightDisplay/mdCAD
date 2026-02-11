@@ -217,6 +217,25 @@ static void init(void) {
         scene_set_parent(&state.ecs_scene, yAxis, parent_point);
         scene_set_parent(&state.ecs_scene, zAxis, parent_point);
 
+        // Sample triangles in the XZ plane
+        scene_add_triangle(&state.ecs_scene,
+            vec3_make(0.5f, 0.0f, 0.5f),
+            vec3_make(1.5f, 0.0f, 0.5f),
+            vec3_make(1.0f, 0.0f, 1.5f),
+            vec4_make(0.9f, 0.3f, 0.3f, 1.0f));   // Red triangle
+
+        scene_add_triangle(&state.ecs_scene,
+            vec3_make(-1.5f, 0.0f, 0.5f),
+            vec3_make(-0.5f, 0.0f, 0.5f),
+            vec3_make(-1.0f, 0.0f, 1.5f),
+            vec4_make(0.3f, 0.9f, 0.3f, 1.0f));   // Green triangle
+
+        scene_add_triangle(&state.ecs_scene,
+            vec3_make(-0.5f, 0.0f, -1.5f),
+            vec3_make(0.5f, 0.0f, -1.5f),
+            vec3_make(0.0f, 0.8f, -1.0f),
+            vec4_make(0.3f, 0.3f, 0.9f, 1.0f));   // Blue triangle (tilted up)
+
         // // Test points at axis endpoints
         // scene_add_point(&state.ecs_scene,
         //     vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X

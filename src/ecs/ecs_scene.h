@@ -636,6 +636,40 @@ static inline ecs_entity_t scene_add_point_cloud(ecs_scene_t *scene,
     return e;
 }
 
+// Create a triangle entity
+static inline ecs_entity_t scene_add_triangle(ecs_scene_t *scene,
+                                                vec3_t a, vec3_t b, vec3_t c,
+                                                vec4_t color) {
+    // Allocate slot BEFORE creating entity so we can fail cleanly
+    int slot = geom_triangle_batch_alloc(&scene->batches.triangles);
+    if (slot < 0) return 0;
+
+    ecs_entity_t e = ecs_world_create_entity(scene->world);
+
+    GeometryComp g = geometry_comp_triangle(a, b, c, color);
+    ecs_world_set_geometry(scene->world, e, &g);
+
+    TransformComp *t = ecs_world_get_transform(scene->world, e);
+    vec3_t world_a = mat4_transform_point(t->world_matrix, a);
+    vec3_t world_b = mat4_transform_point(t->world_matrix, b);
+    vec3_t world_c = mat4_transform_point(t->world_matrix, c);
+    vec3_t normal = geom_triangle_compute_normal(world_a, world_b, world_c);
+
+    geom_triangle_batch_set(&scene->batches.triangles, slot,
+                            world_a, world_b, world_c, normal, color);
+    geom_triangle_batch_set_entity(&scene->batches.triangles, slot,
+                                   (uint64_t)e, (uint8_t)GEOM_TRIANGLE);
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, e);
+    if (r) {
+        r->batch_id = GEOM_TRIANGLE;
+        r->instance_slot = (uint32_t)slot;
+        r->instance_dirty = false;
+    }
+
+    return e;
+}
+
 //------------------------------------------------------------------------------
 // Entity Deletion
 //------------------------------------------------------------------------------
@@ -655,6 +689,9 @@ static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
             case GEOM_POINT_CLOUD:
                 // Free all point slots (segment_count holds point count)
                 geom_point_cloud_batch_free(&scene->batches.points, (int)r->instance_slot, (int)r->segment_count);
+                break;
+            case GEOM_TRIANGLE:
+                geom_triangle_batch_free(&scene->batches.triangles, (int)r->instance_slot);
                 break;
             case GEOM_POLYLINE:
             case GEOM_ARC:
@@ -936,6 +973,13 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                                                  far_away, invisible);
                         }
                         break;
+                    case GEOM_TRIANGLE: {
+                        vec3_t tri_far = vec3_make(1e10f, 1e10f, 1e10f);
+                        vec3_t tri_norm = vec3_make(0.0f, 1.0f, 0.0f);
+                        geom_triangle_batch_set(&scene->batches.triangles, (int)r->instance_slot,
+                                                tri_far, tri_far, tri_far, tri_norm, invisible);
+                        break;
+                    }
                     case GEOM_POLYLINE:
                     case GEOM_ARC:
                     case GEOM_POLYGON:
@@ -1115,6 +1159,15 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     }
                     break;
                 }
+                case GEOM_TRIANGLE: {
+                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.triangle.a);
+                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
+                    vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
+                    vec3_t normal = geom_triangle_compute_normal(world_a, world_b, world_c);
+                    geom_triangle_batch_set(&scene->batches.triangles, (int)r->instance_slot,
+                                            world_a, world_b, world_c, normal, render_color);
+                    break;
+                }
                 case GEOM_POINT_CLOUD: {
                     // Update all point cloud slots (segment_count holds point count)
                     int pc_count = g->data.point_cloud.count;
@@ -1171,6 +1224,10 @@ static inline int ecs_scene_line_count(ecs_scene_t *scene) {
 
 static inline int ecs_scene_point_count(ecs_scene_t *scene) {
     return instance_buffer_count(&scene->batches.points.instances);
+}
+
+static inline int ecs_scene_triangle_count(ecs_scene_t *scene) {
+    return instance_buffer_count(&scene->batches.triangles.instances);
 }
 
 //------------------------------------------------------------------------------
