@@ -2,6 +2,104 @@
 
 This file contains changes archived from CHECKPOINT.md and can be referred to if necessary.
 
+## Session (2026-02-11)
+
+### Mesh Features - Sprint 6: OBJ to PLY Conversion Script (IMPLEMENTED)
+
+Added Python utility `scripts/obj_to_colored_ply.py` for converting OBJ mesh files to colored PLY files. Parses OBJ vertices and faces (handles all face formats: `f v`, `f v/vt`, `f v/vt/vn`, `f v//vn`), fan-triangulates quads and n-gons, and generates random colors using four palettes (rainbow, pastel, earth, grayscale). Outputs both ASCII and binary_little_endian PLY format. Supports per-vertex and per-face color modes, configurable alpha, and reproducible colors via seed. Compatible with mdCAD's PLY mesh import (Sprint 5). Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**New File:**
+- `scripts/obj_to_colored_ply.py` - Standalone Python script with argparse CLI; OBJ parser with negative index support; HSV-based color palettes; ASCII and binary PLY writers with proper header format
+
+### Mesh Features - Sprint 5: PLY Mesh Import Job & UI (IMPLEMENTED)
+
+Added full user-facing PLY mesh import workflow with file browser, import options dialog, and progress bar. Two import modes: "Single Mesh Entity" (efficient, one indexed mesh entity via `scene_add_mesh_colored()`/`scene_add_mesh()`) and "Individual Triangles" (each face as a separate selectable entity via chunked `scene_add_triangle()`). Supports per-vertex colors, per-face colors (auto-converted to per-vertex by averaging at shared vertices), and uniform default color. Import options include unit conversion (m/mm/in), CoM shift, and X/Y/Z rotation. Progress popup with timing plot for large meshes. Works with both ASCII and binary PLY files. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**New File:**
+- `src/ply_mesh_import_job.h` - Header-only mesh import job state machine with 3-phase pipeline (`PARSING_VERTICES` -> `PARSING_FACES` -> `CREATING_ENTITIES`), coordinate transforms, face-color-to-vertex-color conversion, progress tracking, cancellation support
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `#include "../ply_mesh_import_job.h"`; added 17 mesh import state fields to `ui_scene_hierarchy_state_t`; init/shutdown for mesh import browser and job; "Import PLY Mesh..." menu item under File; file browser handler with `ply_get_mesh_info()` validation; "Import PLY Mesh Options" modal popup (mode selection, color options, unit conversion, transforms); "Importing PLY Mesh" progress modal with timing plot
+
+### Mesh Features - Sprint 4: PLY Mesh Parser - ASCII (IMPLEMENTED)
+
+Extended `ply_loader.h` to parse triangle mesh data from binary PLY files.
+
+**Modified Files:**
+- `src/ply_loader.h` extended `ply_parse_vertices_chunk()` and `ply_parse_faces_chunk()` to handle binary mode: read `chunk_size * vertex_byte_stride` bytes at once; parse from memory buffer rather than line-by-lines
+
+### Mesh Features - Sprint 3: PLY Mesh Parser - ASCII (IMPLEMENTED)
+
+Extended `ply_loader.h` to parse triangle mesh data from ASCII PLY files. The existing parser only handled vertex positions and colors (point clouds), skipping face elements entirely. Now parses `element face` headers (vertex_indices list + optional face colors), ASCII face data lines with fan triangulation for quads/polygons, and provides both one-shot (`ply_load_mesh_file`) and incremental/chunked (`ply_parse_faces_chunk`) APIs for mesh loading. Output is compatible with `scene_add_mesh()` / `scene_add_mesh_colored()`. All changes are backward-compatible - existing point cloud import works unchanged. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ply_loader.h` - Extended `ply_property_t` with list property support; added `ply_face_data_t` and `ply_mesh_data_t` types; extended `ply_header_t` with face element fields; updated `ply_parse_header()` with element state machine; added `ply_parse_ascii_faces()` with fan triangulation; added `ply_load_mesh_file()`, `ply_mesh_data_free()`, `ply_get_mesh_info()`; extended `ply_parse_state_t` with face arrays; updated `ply_open()`, `ply_get_progress()`, `ply_is_complete()`, `ply_parse_state_free()`; added `ply_vertices_complete()`, `ply_parse_faces_chunk()`, `ply_parse_state_to_mesh_data()`
+
+### Mesh Features - Sprint 2: Light Entities in Hierarchy & Inspector (IMPLEMENTED)
+
+Made light entities visible and editable from the UI. Scene hierarchy now has a collapsible "Lights" section (collapsed by default) that lists all light entities by type and ID. Clicking a light selects it; Ctrl+click toggles multi-select. The Entity Inspector shows a "Light" section for light entities with read-only type display, editable color picker, editable intensity drag, and direction/position info derived from the transform. Light property changes take effect immediately since `scene_collect_lights()` reads live component data each frame. No undo/redo for light properties in this sprint. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `ui_scene_hierarchy_draw_lights_section()` function that queries `LightComp` entities and renders them as selectable tree leaves; called from `ui_scene_hierarchy_draw()` after the entity list
+- `src/ui/ui_entity_inspector.h` - Added Light section in `ui_entity_inspector_draw_single()` after the Renderable section, with type display, `igColorEdit3` for color, `igDragFloat` for intensity, and direction/position readout from transform
+
+### Mesh Features - Sprint 1: Add Entity Menu Items (IMPLEMENTED)
+
+Added "Triangle (Mesh)" and "Test Mesh (Box)" menu items to the Add Entity menu. Both appear after the Helix item, separated by a visual divider. Triangle creates an equilateral mesh triangle in the XY plane using `scene_add_triangle()`. Box creates a unit-sized mesh box at origin using `scene_add_mesh_box()`. Both use random colors and are covered by existing undo/redo infrastructure. Plan file: `.plans/PLAN_MESH_FEATURES.md`
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Added `igSeparator()`, "Triangle (Mesh)" and "Test Mesh (Box)" menu items in `ui_scene_hierarchy_draw_add_menu()`, before the undo recording block
+
+### Mesh Triangles - Sprint 6: Mesh Entities / Multi-Triangle Indexed (IMPLEMENTED)
+
+Added indexed triangle mesh as a new geometry type (`GEOM_MESH`). Meshes store shared vertices with an index buffer and expand to individual triangle batch slots each frame (reusing the existing instanced triangle infrastructure). Includes area-weighted smooth vertex normals, per-vertex colors, full undo/redo with deep-copy snapshots, JSON serialization, gizmo vertex editing, and GPU picking (all faces share one pick_id). Convenience helpers for quads and boxes. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**Modified Files:**
+- `src/components/geometry_comp.h` - Added `GEOM_MESH = 9` enum; `geom_mesh_data_t` struct (vertices, normals, vertex_colors, indices with counts/capacities); helpers: `geom_mesh_init`, `geom_mesh_add_vertex`, `geom_mesh_add_triangle`, `geom_mesh_face_count`, `geom_mesh_compute_normals`, `geom_mesh_free`; `geometry_comp_mesh()` factory; updated `geometry_comp_free()`
+- `src/ecs/ecs_scene.h` - Added `scene_add_mesh()`, `scene_add_mesh_colored()`, `scene_add_mesh_quad()`, `scene_add_mesh_box()`; GEOM_MESH handling in `scene_free_entity_slots()`, `ecs_scene_update()` (visibility hide + dirty update with face-normal expansion and per-vertex color interpolation), `ecs_scene_populate_pick_buffer()`
+- `src/gizmo/gizmo_vertex_mode.h` - Added GEOM_MESH cases in `get_vertex_count`, `get_local_pos`, `set_local_pos`
+- `src/undo_redo.h` - Added `UNDO_GEOM_MESH` enum; mesh snapshot (vertices, normals, vertex_colors, indices) in `undo_entity_snapshot_t` union; updated `undo_command_free()` for mesh deep-copy cleanup
+- `src/undo_redo_exec.h` - Updated `undo_snapshot_entity()` with GEOM_MESH deep-copy; `undo_create_from_snapshot()` with mesh recreation; `undo_set_vertex_pos()` for mesh vertices
+- `src/scene_serializer.h` - Added `json_parse_uint_array()`, `json_parse_vec4_array()` helpers; mesh write (vertices/indices/vertex_colors arrays); mesh parse and `scene_create_from_loaded()` GEOM_MESH case; cleanup in all error/success paths
+- `src/ui/ui_entity_inspector.h` - Added GEOM_MESH case showing vertex count, face count, index count, per-vertex color status
+- `src/app.c` - Added sample gold quad and steel blue box after existing triangle samples
+
+**Key Design Decisions:**
+- **Indexed mesh expanding to triangle batch**: Meshes store compact shared-vertex data but expand to individual triangle instance slots each frame. This reuses the existing instanced triangle rendering pipeline with no shader changes.
+- **Area-weighted smooth normals**: `geom_mesh_compute_normals()` accumulates cross-product normals (proportional to triangle area) at each vertex, then normalizes. Larger triangles contribute more to the average.
+- **Contiguous slot allocation**: Like polylines/polygons, mesh faces use `instance_buffer_alloc_contiguous(face_count)` with `segment_count` tracking the slot count for proper cleanup.
+- **Single pick_id for all faces**: All triangle slots of a mesh share the entity's pick_id, so clicking any face selects the whole mesh entity.
+
+### Mesh Triangles - Sprint 5: Lighting System (IMPLEMENTED)
+
+Added 3-point studio lighting for triangle entities. Lighting is computed in the vertex shader using Lambertian diffuse + ambient, with `abs(dot(N,L))` for double-sided triangles. Lights are ECS entities (TransformComp + LightComp) with full serialization. Global lighting toggle in the Visibility panel. Points and lines remain flat-shaded. Plan file: `.plans/PLAN_MESH_TRIANGLES.md`
+
+**New File:**
+- `src/components/light_comp.h` - `LightComp` with `light_type_t` (DIRECTIONAL/POINT), color, intensity, and factory helpers
+
+**Modified Files:**
+- `src/ecs/ecs_world.h` - Registered `LightComp_id`; added `ecs_world_get_light()` accessor
+- `src/ecs/ecs_scene.h` - Added `scene_add_directional_light()`, `scene_add_point_light()`, `scene_collect_lights()`; light entities have TransformComp + LightComp only (no geometry/renderable/selectable)
+- `src/gpu/geometry_batch.h` - Expanded `geom_triangle_params_t` from 64→224 bytes (MVP + 4 lights + ambient + flags); updated `geom_triangle_batch_draw()`, `geometry_batch_manager_draw()` signatures; shader descriptor declares full uniform layout
+- `src/shaders/instanced_triangle_shaders.h` - All 5 text backends updated: VS computes `v_lighting` varying from face normal + light uniforms; FS multiplies `v_color.rgb * v_lighting`
+- `src/shaders/spirv/instanced_triangle.vert` - Updated GLSL 450 with lighting uniforms and computation
+- `src/shaders/spirv/instanced_triangle.frag` - Updated to receive and apply `v_lighting` varying
+- `src/app.c` - Creates 3 studio lights at init (key/fill/rim); builds `geom_triangle_params_t` with collected light data per frame; added `lighting_enabled` state
+- `src/ui/ui_visibility.h` - Added "Enable Lighting" checkbox with tooltip and `lighting_enabled` pointer
+- `src/scene_serializer.h` - Added `scene_write_light_json()` for light entity save; save queries both geometry + light entities; added `json_parse_light()` for load; `loaded_entity_t` extended with light fields; scene clear also deletes light entities
+
+**Key Design Decisions:**
+- **VS-computed lighting**: Face normals are constant per-triangle, so VS gives identical results to FS for flat shading. Avoids adding a separate FS uniform block across 6 backends. Single VS uniform block (block 0, 224 bytes) carries MVP + lighting data.
+- **Global toggle, not per-entity mode**: Lighting enabled/disabled globally via Visibility panel. Per-vertex vs uniform color is orthogonal (handled at instance level). Simpler than 4 per-entity shading modes.
+- **Lights as ECS entities**: Enables serialization using existing infrastructure. Light data collected each frame and packed into shader uniforms (max 4 lights).
+- **Double-sided via abs(NdotL)**: `abs(dot(N, L))` handles both front and back faces without requiring face culling or `gl_FrontFacing`.
+
+**Note:** Vulkan SPIR-V bytecode must be recompiled after shader source changes: `scripts/vulkan-win/build-all.ps1`
+
+### Mesh Triangles - Sprints 1-4 (IMPLEMENTED)
+
+Sprint 1 added instanced triangle rendering as a new geometry primitive (shaders, batch, scene API). Sprint 2 added GPU picking, undo/redo, and JSON serialization. Sprint 3 added gizmo vertex editing. Sprint 4 added per-vertex color support with entity inspector UI. See `.plans/PLAN_MESH_TRIANGLES.md` for full details.
+
 ## Session (2026-02-10)
 
 ### Licensing, Attribution & Help -> About Window (IMPLEMENTED)
