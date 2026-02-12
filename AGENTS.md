@@ -45,7 +45,7 @@ cmake --build build-vulkan --config Release
 # Windows MinGW build (OpenGL backend)
 cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
 
-# Windows build (D3D11 backend)
+# Windows build (D3D11 backend) (optional, but deprecated)
 cmake -B build-msvc -G "Visual Studio 18"
 # Or with Ninja: cmake -B build -G Ninja && ninja -C build (untested)
 

@@ -14,25 +14,25 @@ Based on `SomePart.jsonl`, the mesh format is:
 
 ```json
 {
-  "$type": "Geo.NET.Log.GeometryLogEntry, Geo.NET Log",
+  "$type": "gn.Log.GeometryLogEntry, gn Log",
   "Name": "Part Mesh",
   "Elements": [{
-    "$type": "Geo.NET.Log.GeometryLogElement, Geo.NET Log",
+    "$type": "gn.Log.GeometryLogElement, gn Log",
     "Name": "Mesh",
     "Element": {
-      "$type": "Geo.NET.Shapes.MeshBody, Geo.NET Core",
+      "$type": "gn.Shapes.MeshBody, gn Core",
       "_Points": [
-        {"$type": "Geo.NET.Geometry.Point3D, Geo.NET Core", "X": 121.2, "Y": 0.0, "Z": -3.97},
+        {"$type": "gn.Geometry.Point3D, gn Core", "X": 121.2, "Y": 0.0, "Z": -3.97},
         ...
       ],
       "_Normals": [
-        {"$type": "Geo.NET.Geometry.Vector3D, Geo.NET Core", "I": 0.0, "J": 1.0, "K": 0.0},
+        {"$type": "gn.Geometry.Vector3D, gn Core", "I": 0.0, "J": 1.0, "K": 0.0},
         ...
       ],
       "_Indices": [
-        {"$type": "Geo.NET.Shapes.MeshBody+Index, Geo.NET Core", "PointIndex": 0, "NormalIndex": 0},
-        {"$type": "Geo.NET.Shapes.MeshBody+Index, Geo.NET Core", "PointIndex": 1, "NormalIndex": 0},
-        {"$type": "Geo.NET.Shapes.MeshBody+Index, Geo.NET Core", "PointIndex": 2, "NormalIndex": 0},
+        {"$type": "gn.Shapes.MeshBody+Index, gn Core", "PointIndex": 0, "NormalIndex": 0},
+        {"$type": "gn.Shapes.MeshBody+Index, gn Core", "PointIndex": 1, "NormalIndex": 0},
+        {"$type": "gn.Shapes.MeshBody+Index, gn Core", "PointIndex": 2, "NormalIndex": 0},
         ...
       ]
     },
@@ -527,29 +527,34 @@ Full end-to-end test:
 ## Implementation Checklist
 
 ### Sprint 1: Parser Extension
-- [ ] Add `JSONL_GEOM_MESH` to `jsonl_geom_type_t` enum
-- [ ] Add `jsonl_mesh_data_t` struct
-- [ ] Extend `jsonl_element_t` union with mesh field
-- [ ] Implement `jsonl_parse_mesh_body()` function
-- [ ] Add mesh case to `jsonl_parse_element()`
-- [ ] Update `jsonl_data_free()` for mesh memory cleanup
-- [ ] Verify SomePart.jsonl parses without errors
+- [x] Add `JSONL_GEOM_MESH` to `jsonl_geom_type_t` enum
+- [x] Add `jsonl_mesh_data_t` struct
+- [x] Extend `jsonl_element_t` union with mesh field
+- [x] Implement `jsonl_parse_mesh_body()` function
+- [x] Add mesh case to `jsonl_parse_element()`
+- [x] Update `jsonl_data_free()` for mesh memory cleanup
+- [x] Verify SomePart.jsonl parses without errors
 
 ### Sprint 2: Entity Creation
-- [ ] Add `mesh_import_mode` to `jsonl_import_job_t`
-- [ ] Extend transform application for mesh vertices/normals
-- [ ] Implement `jsonl_face_normals_to_vertex_normals()`
-- [ ] Add Single Mesh mode entity creation
-- [ ] Add Individual Triangles mode entity creation (chunked)
-- [ ] Test both modes with SomePart.jsonl
+- [x] Add `mesh_import_mode` to `jsonl_import_job_t`
+- [x] Extend transform application for mesh vertices/normals
+- [x] Implement `jsonl_face_normals_to_vertex_normals()` (not needed - scene API computes normals)
+- [x] Add Single Mesh mode entity creation
+- [x] Add Individual Triangles mode entity creation (chunked)
+- [x] Test both modes with SomePart.jsonl
 
 ### Sprint 3: UI Integration
-- [ ] Add mesh detection helpers
-- [ ] Add UI state fields for mesh options
-- [ ] Extend quick scan to detect mesh data
-- [ ] Add mesh import mode radio buttons to dialog
-- [ ] Pass mesh mode to import job
-- [ ] Full workflow test
+- [x] Add mesh detection helpers
+- [x] Add UI state fields for mesh options
+- [x] Extend quick scan to detect mesh data
+- [x] Add mesh import mode radio buttons to dialog
+- [x] Pass mesh mode to import job
+- [x] Full workflow test
+
+### Bonus: Enhanced Colour Parsing
+- [x] Named colours (White, Black, Red, Green, Blue, etc.)
+- [x] RGB format: "R, G, B" (values 0-255)
+- [x] ARGB format: "A, R, G, B" (values 0-255, preserves alpha)
 
 ---
 

@@ -20,7 +20,7 @@ A C/C++ cross-platform graphics application using:
 6. **Undo/Redo System** - 100-command stack with Ctrl+Z/Ctrl+Shift+Z
 7. **Manipulator Gizmo** - On-screen draggable manipulator - one movement mode: Translation (Rotation & Scale to be added); two target modes: Entity Transform Component and Geometery Component Vertex direct edit.
 8. **Scene Serialisation** - JSON save/load.
-9. **Non-native Format Loaders** - *.PLY, *.JSONL - implemented. More planned.
+9. **Non-native Format Loaders** - *.PLY (point clouds, meshes), *.JSONL (geometry logs with primitives and meshes) - implemented. More planned.
 10. **Theme System** - Visual Studio Dark, iOS Light, Catppuccin Frappé
 
 ## Project Structure
@@ -209,6 +209,26 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-12)
 
+### JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
+
+Extended the JSONL geometry log loader to support `MeshBody` elements from .NET geometry exports. Meshes can be imported in two modes matching the PLY mesh import pattern.
+
+**Features:**
+- **Parser Extension:** Added `JSONL_GEOM_MESH` type with `jsonl_mesh_data_t` struct to parse `_Points`, `_Normals`, and `_Indices` arrays from MeshBody JSON
+- **Two Import Modes:**
+  - **Single Mesh Entity (efficient):** Indexed mesh rendered as one entity, single pick selection
+  - **Individual Triangles (selectable):** Each face as separate entity for per-triangle selection/editing
+- **Enhanced Colour Parsing:** Now supports named colours (White, Red, Blue, etc.), RGB format "R, G, B", and ARGB format "A, R, G, B"
+- **UI Integration:** Import options dialog shows mesh vertex/face counts and mode selection radio buttons when MeshBody elements detected
+- **Transform Support:** Mesh vertices participate in CoM shift, rotation, and scale transforms
+
+**Modified Files:**
+- `src/jsonl_loader.h` - Added `JSONL_GEOM_MESH` to `jsonl_geom_type_t`; added `jsonl_mesh_data_t` struct; implemented `jsonl_parse_mesh_body()` function; enhanced `jsonl_parse_colour()` with named colours and ARGB support; added `jsonl_quick_scan_mesh()` and mesh detection helpers
+- `src/jsonl_import_job.h` - Added `mesh_import_mode` field; extended `jsonl_import_job_apply_transforms()` for mesh vertices/normals; added mesh entity creation in both modes with chunked triangle creation for Individual Triangles mode; added `jsonl_import_job_set_mesh_mode()` setter
+- `src/ui/ui_scene_hierarchy.h` - Added mesh UI state fields (`jsonl_has_mesh_data`, `jsonl_mesh_import_mode`, vertex/face counts); updated quick scan to use `jsonl_quick_scan_mesh()`; added mesh import mode radio buttons to JSONL import options dialog
+
+**Plan File:** `.plans/PLAN_JSONL_MESH_SUPPORT.md`
+
 ### Bug Fix: Light Entity Jumping in Scene Hierarchy (FIXED)
 
 Fixed light entities jumping to the end of the list when selected in the Scene Hierarchy. Root cause: `selection_set_single()` calls `ecs_world_select()` which adds a `Selected` tag via `ecs_add_id()`, changing the entity's archetype in Flecs. This caused the ECS query iteration order to change on the next frame, making the selected light appear at a different position. Fix: collect light entities into a local array sorted by entity ID before rendering, matching the approach used by the geometry entity cache. Same underlying issue was previously solved for geometry entities by the cached/sorted entity list.
@@ -228,6 +248,10 @@ Added a "Triangles" tab to the Slot Buffer Debug window (alongside existing Line
 For older changes please refer to `CHANGELOG.md`. Keep the index up to date with archived content.
 
 ### `CHANGELOG.md` Index:
+- Session (2026-02-12):
+  - JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
+  - Bug Fix: Light Entity Jumping in Scene Hierarchy (FIXED)
+  - Enhancement: Triangles Tab in Slot Buffer Debug Window (IMPLEMENTED)
 - Session (2026-02-11):
   - Mesh Features - Sprint 6: OBJ to PLY Conversion Script (IMPLEMENTED)
   - Mesh Features - Sprint 5: PLY Mesh Import Job & UI (IMPLEMENTED)

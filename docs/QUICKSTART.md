@@ -19,21 +19,6 @@ ninja -C build -d stats && ./build/bin/mdCAD
 
 ## Windows build (MinGW or MSVC)
 
-Clean
-``` powershell
-Remove-Item -Recurse -Force build-mingw; cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
-```
-
-Configure and build:
-``` powershell
-cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
-```
-
-Quick build & run:
-``` powershell
-cmake --build build-mingw; .\build-mingw\bin\mdCAD.exe
-```
-
 ### MinGW Vulkan Build (Default MinGW)
 
 Optional clean:
