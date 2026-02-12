@@ -86,6 +86,9 @@ typedef enum {
     UNDO_GEOM_POLYGON,
     UNDO_GEOM_HELIX,
     UNDO_GEOM_BEZIER,
+    UNDO_GEOM_POINT_CLOUD,
+    UNDO_GEOM_TRIANGLE,
+    UNDO_GEOM_MESH,
     UNDO_GEOM_TYPE_COUNT
 } undo_geom_type_t;
 
@@ -141,6 +144,19 @@ typedef struct {
             float radius, turns;
             int segments;
         } helix;
+        struct {
+            vec3_t a, b, c;
+            vec4_t color_a, color_b, color_c;
+            bool has_vertex_colors;
+        } triangle;
+        struct {
+            vec3_t *vertices;
+            vec3_t *normals;
+            vec4_t *vertex_colors;
+            int vertex_count;
+            uint32_t *indices;
+            int index_count;
+        } mesh;
     } data;
 } undo_entity_snapshot_t;
 
@@ -276,6 +292,12 @@ static inline void undo_command_free(undo_command_t *cmd) {
                 cmd->data.create.snapshot.data.polygon.points) {
                 free(cmd->data.create.snapshot.data.polygon.points);
             }
+            if (cmd->data.create.snapshot.geom_type == UNDO_GEOM_MESH) {
+                if (cmd->data.create.snapshot.data.mesh.vertices) free(cmd->data.create.snapshot.data.mesh.vertices);
+                if (cmd->data.create.snapshot.data.mesh.normals) free(cmd->data.create.snapshot.data.mesh.normals);
+                if (cmd->data.create.snapshot.data.mesh.vertex_colors) free(cmd->data.create.snapshot.data.mesh.vertex_colors);
+                if (cmd->data.create.snapshot.data.mesh.indices) free(cmd->data.create.snapshot.data.mesh.indices);
+            }
             break;
 
         case CMD_DELETE_ENTITY:
@@ -288,6 +310,12 @@ static inline void undo_command_free(undo_command_t *cmd) {
                 cmd->data.delete_.snapshot.data.polygon.points) {
                 free(cmd->data.delete_.snapshot.data.polygon.points);
             }
+            if (cmd->data.delete_.snapshot.geom_type == UNDO_GEOM_MESH) {
+                if (cmd->data.delete_.snapshot.data.mesh.vertices) free(cmd->data.delete_.snapshot.data.mesh.vertices);
+                if (cmd->data.delete_.snapshot.data.mesh.normals) free(cmd->data.delete_.snapshot.data.mesh.normals);
+                if (cmd->data.delete_.snapshot.data.mesh.vertex_colors) free(cmd->data.delete_.snapshot.data.mesh.vertex_colors);
+                if (cmd->data.delete_.snapshot.data.mesh.indices) free(cmd->data.delete_.snapshot.data.mesh.indices);
+            }
             // Free child snapshots
             if (cmd->data.delete_.child_snapshots) {
                 for (int i = 0; i < cmd->data.delete_.child_count; i++) {
@@ -297,6 +325,12 @@ static inline void undo_command_free(undo_command_t *cmd) {
                     }
                     if (snap->geom_type == UNDO_GEOM_POLYGON && snap->data.polygon.points) {
                         free(snap->data.polygon.points);
+                    }
+                    if (snap->geom_type == UNDO_GEOM_MESH) {
+                        if (snap->data.mesh.vertices) free(snap->data.mesh.vertices);
+                        if (snap->data.mesh.normals) free(snap->data.mesh.normals);
+                        if (snap->data.mesh.vertex_colors) free(snap->data.mesh.vertex_colors);
+                        if (snap->data.mesh.indices) free(snap->data.mesh.indices);
                     }
                 }
                 free(cmd->data.delete_.child_snapshots);

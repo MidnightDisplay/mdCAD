@@ -373,6 +373,48 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 igTextDisabled("Point count: %d", count);
                 break;
             }
+            case GEOM_TRIANGLE: {
+                // Per-vertex color toggle
+                if (igCheckbox("Per-Vertex Colors", &g->data.triangle.has_vertex_colors)) {
+                    if (g->data.triangle.has_vertex_colors) {
+                        // Initialize vertex colors from uniform color
+                        g->data.triangle.color_a = g->color;
+                        g->data.triangle.color_b = g->color;
+                        g->data.triangle.color_c = g->color;
+                    }
+                    changed = true;
+                }
+                if (g->data.triangle.has_vertex_colors) {
+                    float ca[4] = { g->data.triangle.color_a.x, g->data.triangle.color_a.y,
+                                    g->data.triangle.color_a.z, g->data.triangle.color_a.w };
+                    if (igColorEdit4("Color A", ca, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_a = (vec4_t){ ca[0], ca[1], ca[2], ca[3] };
+                        changed = true;
+                    }
+                    float cb[4] = { g->data.triangle.color_b.x, g->data.triangle.color_b.y,
+                                    g->data.triangle.color_b.z, g->data.triangle.color_b.w };
+                    if (igColorEdit4("Color B", cb, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_b = (vec4_t){ cb[0], cb[1], cb[2], cb[3] };
+                        changed = true;
+                    }
+                    float cc[4] = { g->data.triangle.color_c.x, g->data.triangle.color_c.y,
+                                    g->data.triangle.color_c.z, g->data.triangle.color_c.w };
+                    if (igColorEdit4("Color C", cc, ImGuiColorEditFlags_AlphaBar)) {
+                        g->data.triangle.color_c = (vec4_t){ cc[0], cc[1], cc[2], cc[3] };
+                        changed = true;
+                    }
+                }
+                break;
+            }
+            case GEOM_MESH: {
+                igTextDisabled("Vertices: %d", g->data.mesh.vertex_count);
+                igTextDisabled("Faces: %d", geom_mesh_face_count(&g->data.mesh));
+                igTextDisabled("Indices: %d", g->data.mesh.index_count);
+                if (g->data.mesh.vertex_colors) {
+                    igTextDisabled("Per-vertex colors: Yes");
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -405,6 +447,38 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             igSameLine(0, 4);
             if (igButton("Hide Children", (ImVec2){0, 0})) {
                 ecs_world_set_descendants_visible(w, e, false);
+            }
+        }
+    }
+
+    // Light section (for light entities)
+    LightComp *light = ecs_world_get_light(w, e);
+    if (light && igCollapsingHeader_TreeNodeFlags("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // Type (read-only)
+        igText("Type: %s", light->type == LIGHT_DIRECTIONAL ? "Directional" : "Point");
+
+        // Color (editable)
+        float lcolor[3] = { light->color.x, light->color.y, light->color.z };
+        if (igColorEdit3("Light Color", lcolor, ImGuiColorEditFlags_None)) {
+            light->color.x = lcolor[0];
+            light->color.y = lcolor[1];
+            light->color.z = lcolor[2];
+        }
+
+        // Intensity (editable)
+        igDragFloat("Intensity", &light->intensity, 0.05f, 0.0f, 10.0f, "%.2f", 0);
+
+        // Direction / position info from transform
+        if (t) {
+            igSeparator();
+            if (light->type == LIGHT_DIRECTIONAL) {
+                igText("Direction: (%.2f, %.2f, %.2f)",
+                       t->position.x, t->position.y, t->position.z);
+                igTextDisabled("Edit via Transform > Position");
+            } else {
+                igText("Position: (%.2f, %.2f, %.2f)",
+                       t->position.x, t->position.y, t->position.z);
+                igTextDisabled("Edit via Transform > Position");
             }
         }
     }

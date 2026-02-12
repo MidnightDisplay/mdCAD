@@ -44,6 +44,8 @@ static inline int gizmo_vertex_mode_get_vertex_count(const GeometryComp *geom) {
         case GEOM_LINE:     return 2;
         case GEOM_POLYLINE: return geom->data.polyline.count;
         case GEOM_POLYGON:  return geom->data.polygon.count;
+        case GEOM_TRIANGLE: return 3;
+        case GEOM_MESH:     return geom->data.mesh.vertex_count;
         default:            return 0;  // Not supported for geometry mode
     }
 }
@@ -55,6 +57,14 @@ static inline vec3_t gizmo_vertex_mode_get_local_pos(const GeometryComp *geom, i
         case GEOM_LINE:     return (idx == 0) ? geom->data.line.a : geom->data.line.b;
         case GEOM_POLYLINE: return geom->data.polyline.points[idx];
         case GEOM_POLYGON:  return geom->data.polygon.points[idx];
+        case GEOM_TRIANGLE:
+            if (idx == 0) return geom->data.triangle.a;
+            if (idx == 1) return geom->data.triangle.b;
+            return geom->data.triangle.c;
+        case GEOM_MESH:
+            if (idx >= 0 && idx < geom->data.mesh.vertex_count)
+                return geom->data.mesh.vertices[idx];
+            return vec3_make(0, 0, 0);
         default:            return vec3_make(0, 0, 0);
     }
 }
@@ -69,6 +79,15 @@ static inline void gizmo_vertex_mode_set_local_pos(GeometryComp *geom, int idx, 
             break;
         case GEOM_POLYLINE: geom->data.polyline.points[idx] = pos; break;
         case GEOM_POLYGON:  geom->data.polygon.points[idx] = pos;  break;
+        case GEOM_TRIANGLE:
+            if (idx == 0) geom->data.triangle.a = pos;
+            else if (idx == 1) geom->data.triangle.b = pos;
+            else geom->data.triangle.c = pos;
+            break;
+        case GEOM_MESH:
+            if (idx >= 0 && idx < geom->data.mesh.vertex_count)
+                geom->data.mesh.vertices[idx] = pos;
+            break;
         default: break;
     }
 }

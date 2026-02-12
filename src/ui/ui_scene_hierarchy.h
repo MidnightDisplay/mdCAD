@@ -21,6 +21,7 @@
 #include "ui_about.h"
 #include "../ply_loader.h"
 #include "../ply_import_job.h"
+#include "../ply_mesh_import_job.h"
 #include "../jsonl_loader.h"
 #include "../jsonl_import_job.h"
 
@@ -97,6 +98,25 @@ typedef struct {
     ply_import_job_t import_job;
     bool import_progress_popup_open;
 
+    // PLY Mesh Import state
+    file_browser_t ply_mesh_browser;
+    bool ply_mesh_import_popup_open;
+    char ply_mesh_import_path[512];
+    int ply_mesh_vertex_count;
+    int ply_mesh_face_count;
+    bool ply_mesh_has_vertex_colors;
+    bool ply_mesh_has_face_colors;
+    int ply_mesh_import_mode;        // 0 = Single Mesh, 1 = Individual Triangles
+    int ply_mesh_unit_index;
+    bool ply_mesh_use_colors;
+    float ply_mesh_default_color[3];
+    bool ply_mesh_shift_to_com;
+    float ply_mesh_rotation[3];
+
+    // PLY Mesh Import job
+    ply_mesh_import_job_t mesh_import_job;
+    bool mesh_import_progress_popup_open;
+
     // JSONL Import state
     file_browser_t jsonl_browser;
     bool jsonl_import_popup_open;
@@ -108,6 +128,12 @@ typedef struct {
     float jsonl_default_colour[3];
     bool jsonl_shift_to_com;
     float jsonl_rotation[3];
+
+    // JSONL mesh import options
+    bool jsonl_has_mesh_data;
+    int jsonl_mesh_vertex_count;
+    int jsonl_mesh_face_count;
+    int jsonl_mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
 
     // JSONL Import job
     jsonl_import_job_t jsonl_import_job;
@@ -170,6 +196,29 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     ply_import_job_init(&state->import_job);
     state->import_progress_popup_open = false;
 
+    // Initialize PLY Mesh import state
+    file_browser_init(&state->ply_mesh_browser);
+    state->ply_mesh_import_popup_open = false;
+    state->ply_mesh_import_path[0] = '\0';
+    state->ply_mesh_vertex_count = 0;
+    state->ply_mesh_face_count = 0;
+    state->ply_mesh_has_vertex_colors = false;
+    state->ply_mesh_has_face_colors = false;
+    state->ply_mesh_import_mode = 0;       // Single Mesh Entity (default, more efficient)
+    state->ply_mesh_unit_index = 0;        // Meters (default)
+    state->ply_mesh_use_colors = true;     // Use PLY colors by default
+    state->ply_mesh_default_color[0] = 0.7f;
+    state->ply_mesh_default_color[1] = 0.7f;
+    state->ply_mesh_default_color[2] = 0.7f;
+    state->ply_mesh_shift_to_com = false;
+    state->ply_mesh_rotation[0] = 0.0f;
+    state->ply_mesh_rotation[1] = 0.0f;
+    state->ply_mesh_rotation[2] = 0.0f;
+
+    // Initialize mesh import job
+    ply_mesh_import_job_init(&state->mesh_import_job);
+    state->mesh_import_progress_popup_open = false;
+
     // Initialize JSONL import state
     file_browser_init(&state->jsonl_browser);
     state->jsonl_import_popup_open = false;
@@ -185,6 +234,10 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->jsonl_rotation[0] = 0.0f;
     state->jsonl_rotation[1] = 0.0f;
     state->jsonl_rotation[2] = 0.0f;
+    state->jsonl_has_mesh_data = false;
+    state->jsonl_mesh_vertex_count = 0;
+    state->jsonl_mesh_face_count = 0;
+    state->jsonl_mesh_import_mode = 0;  // Single Mesh (efficient, default)
 
     // Initialize JSONL import job
     jsonl_import_job_init(&state->jsonl_import_job);
@@ -209,6 +262,7 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     state->cache_capacity = 0;
     file_browser_shutdown(&state->file_browser);
     file_browser_shutdown(&state->ply_browser);
+    file_browser_shutdown(&state->ply_mesh_browser);
     file_browser_shutdown(&state->jsonl_browser);
 
     // Cleanup any running import job
@@ -216,6 +270,12 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
         ply_import_job_cancel(&state->import_job, state->scene);
     }
     ply_import_job_reset(&state->import_job);
+
+    // Cleanup any running mesh import job
+    if (ply_mesh_import_job_is_running(&state->mesh_import_job)) {
+        ply_mesh_import_job_cancel(&state->mesh_import_job, state->scene);
+    }
+    ply_mesh_import_job_reset(&state->mesh_import_job);
 
     // Cleanup any running JSONL import job
     if (jsonl_import_job_is_running(&state->jsonl_import_job)) {
@@ -600,6 +660,26 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
             state->cache_dirty = true;
         }
 
+        igSeparator();
+
+        if (igMenuItem_Bool("Triangle (Mesh)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            vec3_t a = vec3_make(0.0f, 0.8f, 0.0f);
+            vec3_t b = vec3_make(-0.693f, -0.4f, 0.0f);
+            vec3_t c = vec3_make(0.693f, -0.4f, 0.0f);
+            new_entity = scene_add_triangle(state->scene, a, b, c, color);
+            state->cache_dirty = true;
+        }
+
+        if (igMenuItem_Bool("Test Mesh (Box)", NULL, false, true)) {
+            vec4_t color = ui_scene_hierarchy_random_color();
+            new_entity = scene_add_mesh_box(state->scene,
+                vec3_make(0.0f, 0.0f, 0.0f),
+                vec3_make(1.0f, 1.0f, 1.0f),
+                color);
+            state->cache_dirty = true;
+        }
+
         // Record undo command for entity creation
         if (new_entity != 0 && state->undo_redo) {
             undo_cmd_create_entity(state->undo_redo, new_entity);
@@ -855,6 +935,89 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
 }
 
 //------------------------------------------------------------------------------
+// Internal: Draw Lights Section
+//------------------------------------------------------------------------------
+
+// Comparison function for sorting light entries by entity ID
+static inline int ui_hierarchy_compare_light_entries(const void *a, const void *b) {
+    ecs_entity_t ea = *(const ecs_entity_t*)a;
+    ecs_entity_t eb = *(const ecs_entity_t*)b;
+    if (ea < eb) return -1;
+    if (ea > eb) return 1;
+    return 0;
+}
+
+static inline void ui_scene_hierarchy_draw_lights_section(ui_scene_hierarchy_state_t *state) {
+    ecs_world_state_t *w = state->scene->world;
+    selection_buffer_t *sel = state->selection;
+
+    // Query all entities with LightComp - collect into local array and sort
+    // by entity ID to maintain stable display order. Without sorting, selecting
+    // a light adds the Selected tag (ecs_add_id) which moves the entity to a
+    // different archetype table, changing ECS query iteration order.
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LightComp_id }
+        }
+    });
+
+    ecs_entity_t light_entities[16];  // Max 16 lights
+    int light_count = 0;
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it)) {
+        for (int i = 0; i < it.count && light_count < 16; i++) {
+            light_entities[light_count++] = it.entities[i];
+        }
+    }
+    ecs_query_fini(q);
+
+    if (light_count == 0) return;
+
+    // Sort by entity ID for stable display order
+    qsort(light_entities, light_count, sizeof(ecs_entity_t),
+          ui_hierarchy_compare_light_entries);
+
+    // Collapsible header (collapsed by default)
+    char header_label[64];
+    snprintf(header_label, sizeof(header_label), "Lights (%d)", light_count);
+    if (!igCollapsingHeader_TreeNodeFlags(header_label, ImGuiTreeNodeFlags_None)) {
+        return;
+    }
+
+    ImGuiIO* io = igGetIO_Nil();
+    bool ctrl_held = io->KeyCtrl;
+
+    for (int i = 0; i < light_count; i++) {
+        ecs_entity_t e = light_entities[i];
+        LightComp *l = ecs_world_get_light(w, e);
+        if (!l) continue;
+
+        bool is_selected = selection_contains(sel, e);
+
+        // Label: type + entity ID
+        const char *type_str = (l->type == LIGHT_DIRECTIONAL) ? "Dir" : "Point";
+        char label[128];
+        snprintf(label, sizeof(label), "  %s Light #%llu",
+                 type_str, (unsigned long long)e);
+
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+        if (is_selected) {
+            flags |= ImGuiTreeNodeFlags_Selected;
+        }
+
+        igTreeNodeEx_Str(label, flags);
+
+        if (igIsItemClicked(ImGuiMouseButton_Left)) {
+            if (ctrl_held) {
+                selection_toggle(sel, e);
+            } else {
+                selection_set_single(sel, e);
+            }
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
 // Main Draw Function
 //------------------------------------------------------------------------------
 
@@ -887,6 +1050,10 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             if (igMenuItem_Bool("Import PLY Point Cloud...", NULL, false, true)) {
                 // Open PLY file browser
                 file_browser_open_file(&state->ply_browser, "Import PLY", ".ply",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
+            if (igMenuItem_Bool("Import PLY Mesh...", NULL, false, true)) {
+                file_browser_open_file(&state->ply_mesh_browser, "Import PLY Mesh", ".ply",
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
             if (igMenuItem_Bool("Import JSONL Geometry Log...", NULL, false, true)) {
@@ -1340,6 +1507,309 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igEndPopup();
     }
 
+    // Handle PLY Mesh file browser (opens import options popup when file is selected)
+    if (file_browser_draw(&state->ply_mesh_browser)) {
+        const char *path = file_browser_get_result(&state->ply_mesh_browser);
+        if (path && path[0]) {
+            strncpy(state->ply_mesh_import_path, path, sizeof(state->ply_mesh_import_path) - 1);
+            state->ply_mesh_import_path[sizeof(state->ply_mesh_import_path) - 1] = '\0';
+
+            // Get mesh info from header
+            ply_error_t err = ply_get_mesh_info(path,
+                &state->ply_mesh_vertex_count, &state->ply_mesh_face_count,
+                &state->ply_mesh_has_vertex_colors, &state->ply_mesh_has_face_colors);
+            if (err == PLY_OK) {
+                if (state->ply_mesh_face_count > 0) {
+                    state->ply_mesh_import_popup_open = true;
+                    igOpenPopup_Str("Import PLY Mesh Options", ImGuiPopupFlags_None);
+                } else {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "PLY file has no faces (use Point Cloud import instead)");
+                }
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Error: %s", ply_error_string(err));
+            }
+
+            // Remember folder
+            const char *last_sep_m = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win_m = strrchr(path, '\\');
+            if (last_sep_win_m > last_sep_m) last_sep_m = last_sep_win_m;
+#endif
+            if (last_sep_m && last_sep_m > path) {
+                size_t dir_len = (size_t)(last_sep_m - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->ply_mesh_browser);
+    }
+
+    // PLY Mesh Import Options Popup
+    if (igBeginPopupModal("Import PLY Mesh Options", &state->ply_mesh_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // File info
+        igText("File: %s", state->ply_mesh_import_path);
+        igText("Vertices: %d", state->ply_mesh_vertex_count);
+        igText("Faces: %d", state->ply_mesh_face_count);
+        igText("Vertex Colors: %s", state->ply_mesh_has_vertex_colors ? "Yes" : "No");
+        igText("Face Colors: %s", state->ply_mesh_has_face_colors ? "Yes" : "No");
+        igSeparator();
+
+        // Import Mode
+        igText("Import Mode:");
+        igRadioButton_IntPtr("Single Mesh Entity (efficient)", &state->ply_mesh_import_mode, 0);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Single indexed mesh entity. Best for large meshes.\nSupports lighting, vertex editing, and undo/redo.");
+        }
+        igRadioButton_IntPtr("Individual Triangles (editable)", &state->ply_mesh_import_mode, 1);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Each triangle as a separate entity.\nBest for small meshes (<10k faces).\nEach face independently selectable.");
+        }
+        igSeparator();
+
+        // Unit conversion
+        igText("Units:");
+        const char* mesh_unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##mesh_units", &state->ply_mesh_unit_index, mesh_unit_items, 3, -1);
+        igSeparator();
+
+        // Color options
+        bool has_any_colors = state->ply_mesh_has_vertex_colors || state->ply_mesh_has_face_colors;
+        if (has_any_colors) {
+            igCheckbox("Use PLY Colors##mesh", &state->ply_mesh_use_colors);
+            if (state->ply_mesh_use_colors) {
+                if (state->ply_mesh_has_vertex_colors && state->ply_mesh_has_face_colors) {
+                    igTextDisabled("Using vertex colors (preferred over face colors)");
+                } else if (state->ply_mesh_has_vertex_colors) {
+                    igTextDisabled("Using vertex colors");
+                } else {
+                    igTextDisabled("Using face colors (converted to per-vertex)");
+                }
+            }
+        } else {
+            state->ply_mesh_use_colors = false;
+            igTextDisabled("PLY has no colors, using default");
+        }
+        if (!state->ply_mesh_use_colors) {
+            igColorEdit3("Default Color##mesh", state->ply_mesh_default_color, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        // Transformation options
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass##mesh", &state->ply_mesh_shift_to_com);
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Shifts all vertices so the centre of mass is at the origin.");
+        }
+
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##mesh_rot", &state->ply_mesh_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##mesh_rot", &state->ply_mesh_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##mesh_rot", &state->ply_mesh_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+        igSameLine(0, -1);
+        igTextDisabled("(?)");
+        if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+            igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).\nUseful for coordinate system conversion.");
+        }
+        igSeparator();
+
+        // Import/Cancel buttons
+        if (igButton("Import##mesh", (ImVec2){120, 0})) {
+            float scale = 1.0f;
+            switch (state->ply_mesh_unit_index) {
+                case 1: scale = 0.001f; break;   // Millimeters
+                case 2: scale = 0.0254f; break;  // Inches
+                default: scale = 1.0f; break;    // Meters
+            }
+
+            vec4_t default_color = vec4_make(
+                state->ply_mesh_default_color[0],
+                state->ply_mesh_default_color[1],
+                state->ply_mesh_default_color[2],
+                1.0f
+            );
+
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->ply_mesh_rotation[0] * deg_to_rad;
+            float rot_y = state->ply_mesh_rotation[1] * deg_to_rad;
+            float rot_z = state->ply_mesh_rotation[2] * deg_to_rad;
+
+            bool started = ply_mesh_import_job_start(
+                &state->mesh_import_job,
+                state->ply_mesh_import_path,
+                state->ply_mesh_import_mode,
+                scale,
+                default_color,
+                state->ply_mesh_use_colors,
+                state->ply_mesh_shift_to_com,
+                rot_x, rot_y, rot_z
+            );
+
+            if (started) {
+                if (ply_mesh_import_job_should_sync(&state->mesh_import_job)) {
+                    // Small mesh - import synchronously
+                    while (!ply_mesh_import_job_tick(&state->mesh_import_job, state->scene)) {
+                    }
+
+                    if (state->mesh_import_job.state == PLY_MESH_JOB_COMPLETE) {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "%s", state->mesh_import_job.status_message);
+                        state->cache_dirty = true;
+                    } else {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "PLY Mesh Error: %s", state->mesh_import_job.status_message);
+                    }
+                    ply_mesh_import_job_reset(&state->mesh_import_job);
+                } else {
+                    // Large mesh - use progress bar
+                    state->mesh_import_progress_popup_open = true;
+                }
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "PLY Mesh Error: %s", state->mesh_import_job.status_message);
+            }
+
+            state->ply_mesh_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igSameLine(0, -1);
+        if (igButton("Cancel##mesh", (ImVec2){120, 0})) {
+            state->ply_mesh_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igEndPopup();
+    }
+
+    // PLY Mesh Progress popup
+    if (state->mesh_import_progress_popup_open) {
+        igOpenPopup_Str("Importing PLY Mesh", ImGuiPopupFlags_None);
+    }
+
+    if (igBeginPopupModal("Importing PLY Mesh", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        // Extract filename from path
+        const char *mesh_filename = state->ply_mesh_import_path;
+        const char *last_sep_mf = strrchr(state->ply_mesh_import_path, '/');
+#ifdef _WIN32
+        const char *last_sep_win_mf = strrchr(state->ply_mesh_import_path, '\\');
+        if (last_sep_win_mf > last_sep_mf) last_sep_mf = last_sep_win_mf;
+#endif
+        if (last_sep_mf) mesh_filename = last_sep_mf + 1;
+
+        igText("File: %s", mesh_filename);
+        igSeparator();
+
+        // Progress bar
+        igProgressBar(state->mesh_import_job.progress, (ImVec2){-FLT_MIN, 0}, NULL);
+
+        // Status message
+        igText("%s", state->mesh_import_job.status_message);
+
+        // Timing info
+        bool show_mesh_timing = (state->mesh_import_job.state == PLY_MESH_JOB_CREATING_ENTITIES) &&
+                                 state->mesh_import_job.last_iteration_time_ms > 0;
+
+        if (show_mesh_timing) {
+            float seconds_per_it = (float)state->mesh_import_job.last_iteration_time_ms / 1000.0f;
+            igText("%.0f%%  |  %.3f s/it (creating, %d/it)",
+                   state->mesh_import_job.progress * 100.0f,
+                   seconds_per_it,
+                   PLY_MESH_ENTITY_CHUNK_SIZE);
+        } else if (state->mesh_import_job.state == PLY_MESH_JOB_COMPLETE) {
+            igText("100%% - Complete");
+        } else if (state->mesh_import_job.state == PLY_MESH_JOB_ERROR) {
+            igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "Error!");
+        } else {
+            igText("%.0f%%", state->mesh_import_job.progress * 100.0f);
+        }
+
+        // Speed plot
+        bool show_mesh_plot = state->mesh_import_job.timing_sample_count > 1;
+        if (show_mesh_plot) {
+            igSeparator();
+            igText("Iteration Time (ms) vs Progress");
+
+            float max_time_m = 0.0f;
+            for (int i = 0; i < state->mesh_import_job.timing_sample_count; i++) {
+                if (state->mesh_import_job.iteration_times[i] > max_time_m) {
+                    max_time_m = state->mesh_import_job.iteration_times[i];
+                }
+            }
+            max_time_m *= 1.1f;
+            if (max_time_m < 1.0f) max_time_m = 1.0f;
+
+            char overlay_m[32];
+            snprintf(overlay_m, sizeof(overlay_m), "%.1f ms", state->mesh_import_job.last_iteration_time_ms);
+
+            igPlotLines_FloatPtr(
+                "##mesh_speed_plot",
+                state->mesh_import_job.iteration_times,
+                state->mesh_import_job.timing_sample_count,
+                0, overlay_m, 0.0f, max_time_m,
+                (ImVec2){-FLT_MIN, 80}, sizeof(float)
+            );
+        }
+
+        igSeparator();
+
+        // Button: "Cancel" while running, "Close" when complete/error
+        float mesh_btn_width = 120.0f;
+        float mesh_avail_width = igGetContentRegionAvail().x;
+        igSetCursorPosX(igGetCursorPosX() + (mesh_avail_width - mesh_btn_width) * 0.5f);
+
+        bool mesh_is_finished = (state->mesh_import_job.state == PLY_MESH_JOB_COMPLETE ||
+                                  state->mesh_import_job.state == PLY_MESH_JOB_ERROR ||
+                                  state->mesh_import_job.state == PLY_MESH_JOB_CANCELLED);
+        const char *mesh_btn_label = mesh_is_finished ? "Close" : "Cancel";
+
+        if (igButton(mesh_btn_label, (ImVec2){mesh_btn_width, 0})) {
+            if (!mesh_is_finished) {
+                ply_mesh_import_job_cancel(&state->mesh_import_job, state->scene);
+                snprintf(state->last_status, sizeof(state->last_status), "Mesh import cancelled");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "%s", state->mesh_import_job.status_message);
+            }
+            state->mesh_import_progress_popup_open = false;
+            state->cache_dirty = true;
+            ply_mesh_import_job_reset(&state->mesh_import_job);
+            igCloseCurrentPopup();
+        }
+
+        // Process one chunk of work (only if still running)
+        if (ply_mesh_import_job_is_running(&state->mesh_import_job)) {
+            bool mesh_complete = ply_mesh_import_job_tick(&state->mesh_import_job, state->scene);
+
+            if (mesh_complete) {
+                state->cache_dirty = true;
+
+                if (state->mesh_import_job.state == PLY_MESH_JOB_COMPLETE) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "%s", state->mesh_import_job.status_message);
+                } else if (state->mesh_import_job.state == PLY_MESH_JOB_ERROR) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "PLY Mesh Error: %s", state->mesh_import_job.status_message);
+                }
+            }
+        }
+
+        igEndPopup();
+    }
+
     // Handle JSONL file browser (opens import options popup when file is selected)
     if (file_browser_draw(&state->jsonl_browser)) {
         const char *path = file_browser_get_result(&state->jsonl_browser);
@@ -1347,12 +1817,18 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             strncpy(state->jsonl_import_path, path, sizeof(state->jsonl_import_path) - 1);
             state->jsonl_import_path[sizeof(state->jsonl_import_path) - 1] = '\0';
 
-            // Quick scan the file
+            // Quick scan the file (includes mesh detection)
             int entry_count = 0, element_count = 0;
-            jsonl_error_t err = jsonl_quick_scan(path, &entry_count, &element_count);
+            bool has_mesh = false;
+            int mesh_verts = 0, mesh_faces = 0;
+            jsonl_error_t err = jsonl_quick_scan_mesh(path, &entry_count, &element_count,
+                                                       &has_mesh, &mesh_verts, &mesh_faces);
             if (err == JSONL_OK) {
                 state->jsonl_entry_count = entry_count;
                 state->jsonl_element_count = element_count;
+                state->jsonl_has_mesh_data = has_mesh;
+                state->jsonl_mesh_vertex_count = mesh_verts;
+                state->jsonl_mesh_face_count = mesh_faces;
                 state->jsonl_import_popup_open = true;
                 igOpenPopup_Str("Import JSONL Options", ImGuiPopupFlags_None);
             } else {
@@ -1420,6 +1896,24 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         if (igIsItemHovered(ImGuiHoveredFlags_None)) {
             igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).");
         }
+
+        // Mesh import options (only shown when file contains mesh data)
+        if (state->jsonl_has_mesh_data) {
+            igSeparator();
+            igText("Mesh Import Options");
+            igText("Mesh vertices: %d, faces: %d",
+                   state->jsonl_mesh_vertex_count, state->jsonl_mesh_face_count);
+
+            igRadioButton_IntPtr("Single Mesh Entity (efficient)", &state->jsonl_mesh_import_mode, 0);
+            if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                igSetTooltip("Import mesh as one indexed entity. Efficient rendering, entire mesh selected together.");
+            }
+
+            igRadioButton_IntPtr("Individual Triangles (selectable)", &state->jsonl_mesh_import_mode, 1);
+            if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                igSetTooltip("Each triangle as separate entity. Allows selecting and editing individual faces.");
+            }
+        }
         igSeparator();
 
         // Import/Cancel buttons
@@ -1452,6 +1946,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 state->jsonl_shift_to_com,
                 rot_x, rot_y, rot_z
             );
+
+            // Set mesh import mode (if mesh data present)
+            if (state->jsonl_has_mesh_data) {
+                jsonl_import_job_set_mesh_mode(&state->jsonl_import_job, state->jsonl_mesh_import_mode);
+            }
 
             if (started) {
                 if (jsonl_import_job_should_sync(&state->jsonl_import_job)) {
@@ -1804,6 +2303,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     if (entity_deleted) {
         state->cache_dirty = true;
     }
+
+    igSeparator();
+
+    // Draw lights section (separate from geometry entities)
+    ui_scene_hierarchy_draw_lights_section(state);
 
     // Drop target at bottom of list: larger area for easy unparenting
     // This fills the remaining space in the window

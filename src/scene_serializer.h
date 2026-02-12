@@ -110,7 +110,8 @@ static inline void json_write_indent(json_builder_t *b, int depth) {
 
 static inline const char* scene_geom_type_to_string(geometry_type_t type) {
     static const char* names[] = {
-        "point", "line", "polyline", "arc", "polygon", "helix", "bezier"
+        "point", "line", "polyline", "arc", "polygon", "helix", "bezier",
+        "point_cloud", "triangle", "mesh"
     };
     if (type >= 0 && type < GEOM_TYPE_COUNT) {
         return names[type];
@@ -126,6 +127,8 @@ static inline geometry_type_t scene_string_to_geom_type(const char *str) {
     if (strcmp(str, "polygon") == 0) return GEOM_POLYGON;
     if (strcmp(str, "helix") == 0) return GEOM_HELIX;
     if (strcmp(str, "bezier") == 0) return GEOM_BEZIER;
+    if (strcmp(str, "triangle") == 0) return GEOM_TRIANGLE;
+    if (strcmp(str, "mesh") == 0) return GEOM_MESH;
     return GEOM_POINT;  // Default
 }
 
@@ -302,6 +305,72 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
             json_builder_appendf(b, "\"segments\": %d\n", g->data.helix.segments);
             break;
 
+        case GEOM_TRIANGLE:
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"a\": ");
+            json_write_vec3(b, g->data.triangle.a);
+            json_builder_append(b, ",\n");
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"b\": ");
+            json_write_vec3(b, g->data.triangle.b);
+            json_builder_append(b, ",\n");
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"c\": ");
+            json_write_vec3(b, g->data.triangle.c);
+            if (g->data.triangle.has_vertex_colors) {
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_a\": ");
+                json_write_vec4(b, g->data.triangle.color_a);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_b\": ");
+                json_write_vec4(b, g->data.triangle.color_b);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"color_c\": ");
+                json_write_vec4(b, g->data.triangle.color_c);
+            }
+            json_builder_append(b, "\n");
+            break;
+
+        case GEOM_MESH:
+            // Vertices array
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"vertices\": [\n");
+            for (int i = 0; i < g->data.mesh.vertex_count; i++) {
+                json_write_indent(b, depth + 4);
+                json_write_vec3(b, g->data.mesh.vertices[i]);
+                if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
+                json_builder_append(b, "\n");
+            }
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "],\n");
+            // Indices array
+            json_write_indent(b, depth + 3);
+            json_builder_append(b, "\"indices\": [");
+            for (int i = 0; i < g->data.mesh.index_count; i++) {
+                if (i > 0) json_builder_append(b, ", ");
+                json_builder_appendf(b, "%u", g->data.mesh.indices[i]);
+            }
+            json_builder_append(b, "]");
+            // Per-vertex colors (optional)
+            if (g->data.mesh.vertex_colors) {
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"vertex_colors\": [\n");
+                for (int i = 0; i < g->data.mesh.vertex_count; i++) {
+                    json_write_indent(b, depth + 4);
+                    json_write_vec4(b, g->data.mesh.vertex_colors[i]);
+                    if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
+                    json_builder_append(b, "\n");
+                }
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "]");
+            }
+            json_builder_append(b, "\n");
+            break;
+
         default:
             break;
     }
@@ -316,6 +385,60 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     json_builder_appendf(b, "\"visible\": %s,\n", r && r->visible ? "true" : "false");
     json_write_indent(b, depth + 3);
     json_builder_appendf(b, "\"layer\": %d\n", r ? r->layer : 0);
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "}\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "}\n");
+
+    json_write_indent(b, depth);
+    json_builder_append(b, "}");
+}
+
+// Write a light entity to JSON
+static inline void scene_write_light_json(json_builder_t *b, ecs_scene_t *scene,
+                                           ecs_entity_t e, int depth) {
+    ecs_world_state_t *w = scene->world;
+
+    TransformComp *t = ecs_world_get_transform(w, e);
+    LightComp *l = ecs_world_get_light(w, e);
+
+    if (!t || !l) return;
+
+    json_write_indent(b, depth);
+    json_builder_append(b, "{\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_appendf(b, "\"id\": %llu,\n", (unsigned long long)e);
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "\"parent\": null,\n");
+
+    json_write_indent(b, depth + 1);
+    json_builder_append(b, "\"components\": {\n");
+
+    // Transform (direction/position stored in position field)
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "\"transform\": {\n");
+    json_write_indent(b, depth + 3);
+    json_builder_append(b, "\"position\": ");
+    json_write_vec3(b, t->position);
+    json_builder_append(b, "\n");
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "},\n");
+
+    // Light component
+    json_write_indent(b, depth + 2);
+    json_builder_append(b, "\"light\": {\n");
+    json_write_indent(b, depth + 3);
+    json_builder_appendf(b, "\"type\": \"%s\",\n",
+        l->type == LIGHT_DIRECTIONAL ? "directional" : "point");
+    json_write_indent(b, depth + 3);
+    json_builder_append(b, "\"color\": ");
+    json_write_vec4(b, l->color);
+    json_builder_append(b, ",\n");
+    json_write_indent(b, depth + 3);
+    json_builder_appendf(b, "\"intensity\": %.6g\n", l->intensity);
     json_write_indent(b, depth + 2);
     json_builder_append(b, "}\n");
 
@@ -345,7 +468,7 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
         }
     });
 
-    // Collect entities first (to handle commas correctly)
+    // Collect geometry entities
     ecs_entity_t *entities = NULL;
     int entity_count = 0;
     int entity_capacity = 0;
@@ -362,16 +485,51 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     }
     ecs_query_fini(q);
 
-    // Write entities
+    // Also collect light entities
+    ecs_query_t *lq = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LightComp_id }
+        }
+    });
+
+    ecs_entity_t *light_entities = NULL;
+    int light_count = 0;
+    int light_capacity = 0;
+
+    ecs_iter_t lit = ecs_query_iter(w->world, lq);
+    while (ecs_query_next(&lit)) {
+        for (int i = 0; i < lit.count; i++) {
+            if (light_count >= light_capacity) {
+                light_capacity = light_capacity ? light_capacity * 2 : 8;
+                light_entities = (ecs_entity_t*)realloc(light_entities, light_capacity * sizeof(ecs_entity_t));
+            }
+            light_entities[light_count++] = lit.entities[i];
+        }
+    }
+    ecs_query_fini(lq);
+
+    int total_count = entity_count + light_count;
+
+    // Write geometry entities
     for (int i = 0; i < entity_count; i++) {
         scene_write_entity_json(&b, scene, entities[i], 2);
-        if (i < entity_count - 1) {
+        if (i < total_count - 1) {
+            json_builder_append(&b, ",");
+        }
+        json_builder_append(&b, "\n");
+    }
+
+    // Write light entities
+    for (int i = 0; i < light_count; i++) {
+        scene_write_light_json(&b, scene, light_entities[i], 2);
+        if (entity_count + i < total_count - 1) {
             json_builder_append(&b, ",");
         }
         json_builder_append(&b, "\n");
     }
 
     free(entities);
+    free(light_entities);
 
     json_builder_append(&b, "  ]\n");
     json_builder_append(&b, "}\n");
@@ -741,6 +899,97 @@ static inline bool json_parse_vec3_array(json_parser_t *p, vec3_t **out_points, 
     return true;
 }
 
+// Parse an array of uint32 (for mesh indices)
+static inline bool json_parse_uint_array(json_parser_t *p, uint32_t **out_values, int *out_count) {
+    if (p->token != JSON_TOK_LBRACKET) return false;
+
+    int capacity = 16;
+    int count = 0;
+    uint32_t *values = (uint32_t*)malloc(capacity * sizeof(uint32_t));
+
+    if (!json_next_token(p)) {
+        free(values);
+        return false;
+    }
+
+    while (p->token != JSON_TOK_RBRACKET) {
+        if (p->token != JSON_TOK_NUMBER) {
+            free(values);
+            return false;
+        }
+
+        if (count >= capacity) {
+            capacity *= 2;
+            values = (uint32_t*)realloc(values, capacity * sizeof(uint32_t));
+        }
+        values[count++] = (uint32_t)p->num_value;
+
+        if (!json_next_token(p)) {
+            free(values);
+            return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) {
+                free(values);
+                return false;
+            }
+        }
+    }
+
+    if (!json_next_token(p)) {  // Skip ]
+        free(values);
+        return false;
+    }
+
+    *out_values = values;
+    *out_count = count;
+    return true;
+}
+
+// Parse an array of vec4 (for mesh vertex colors)
+static inline bool json_parse_vec4_array(json_parser_t *p, vec4_t **out_colors, int *out_count) {
+    if (p->token != JSON_TOK_LBRACKET) return false;
+
+    int capacity = 16;
+    int count = 0;
+    vec4_t *colors = (vec4_t*)malloc(capacity * sizeof(vec4_t));
+
+    if (!json_next_token(p)) {
+        free(colors);
+        return false;
+    }
+
+    while (p->token != JSON_TOK_RBRACKET) {
+        if (count >= capacity) {
+            capacity *= 2;
+            colors = (vec4_t*)realloc(colors, capacity * sizeof(vec4_t));
+        }
+
+        if (!json_parse_vec4(p, &colors[count])) {
+            free(colors);
+            return false;
+        }
+        count++;
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) {
+                free(colors);
+                return false;
+            }
+        }
+    }
+
+    if (!json_next_token(p)) {  // Skip ]
+        free(colors);
+        return false;
+    }
+
+    *out_colors = colors;
+    *out_count = count;
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Entity Data Structure for Loading
 //------------------------------------------------------------------------------
@@ -770,11 +1019,29 @@ typedef struct {
         struct { vec3_t center; float radius; float start_angle, end_angle; vec3_t normal; } arc;
         struct { vec3_t p0, p1, p2, p3; int segments; } bezier;
         struct { vec3_t axis_start, axis_end; float radius, turns; int segments; } helix;
+        struct {
+            vec3_t a, b, c;
+            vec4_t color_a, color_b, color_c;
+            bool has_vertex_colors;
+        } triangle;
+        struct {
+            vec3_t *vertices;
+            int vertex_count;
+            uint32_t *indices;
+            int index_count;
+            vec4_t *vertex_colors;  // NULL if uniform color
+        } mesh;
     } geom_data;
 
     // Renderable
     bool visible;
     int layer;
+
+    // Light (when is_light is true, geometry fields are unused)
+    bool is_light;
+    light_type_t light_type;
+    vec4_t light_color;
+    float light_intensity;
 } loaded_entity_t;
 
 //------------------------------------------------------------------------------
@@ -861,9 +1128,19 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
         } else if (strcmp(key, "point") == 0) {
             if (!json_parse_vec3(p, &ent->geom_data.point.point)) return false;
         } else if (strcmp(key, "a") == 0) {
-            if (!json_parse_vec3(p, &ent->geom_data.line.a)) return false;
+            if (ent->geom_type == GEOM_TRIANGLE) {
+                if (!json_parse_vec3(p, &ent->geom_data.triangle.a)) return false;
+            } else {
+                if (!json_parse_vec3(p, &ent->geom_data.line.a)) return false;
+            }
         } else if (strcmp(key, "b") == 0) {
-            if (!json_parse_vec3(p, &ent->geom_data.line.b)) return false;
+            if (ent->geom_type == GEOM_TRIANGLE) {
+                if (!json_parse_vec3(p, &ent->geom_data.triangle.b)) return false;
+            } else {
+                if (!json_parse_vec3(p, &ent->geom_data.line.b)) return false;
+            }
+        } else if (strcmp(key, "c") == 0) {
+            if (!json_parse_vec3(p, &ent->geom_data.triangle.c)) return false;
         } else if (strcmp(key, "points") == 0) {
             // For polyline or polygon
             vec3_t *pts = NULL;
@@ -876,6 +1153,24 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
                 ent->geom_data.polygon.points = pts;
                 ent->geom_data.polygon.count = count;
             }
+        } else if (strcmp(key, "vertices") == 0) {
+            // For mesh
+            vec3_t *verts = NULL;
+            int count = 0;
+            if (!json_parse_vec3_array(p, &verts, &count)) return false;
+            ent->geom_data.mesh.vertices = verts;
+            ent->geom_data.mesh.vertex_count = count;
+        } else if (strcmp(key, "indices") == 0) {
+            uint32_t *idx = NULL;
+            int count = 0;
+            if (!json_parse_uint_array(p, &idx, &count)) return false;
+            ent->geom_data.mesh.indices = idx;
+            ent->geom_data.mesh.index_count = count;
+        } else if (strcmp(key, "vertex_colors") == 0) {
+            vec4_t *colors = NULL;
+            int count = 0;
+            if (!json_parse_vec4_array(p, &colors, &count)) return false;
+            ent->geom_data.mesh.vertex_colors = colors;
         } else if (strcmp(key, "center") == 0) {
             if (!json_parse_vec3(p, &ent->geom_data.arc.center)) return false;
         } else if (strcmp(key, "radius") == 0) {
@@ -920,6 +1215,13 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
             if (p->token != JSON_TOK_NUMBER) return false;
             ent->geom_data.helix.turns = (float)p->num_value;
             if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "color_a") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_a)) return false;
+            ent->geom_data.triangle.has_vertex_colors = true;
+        } else if (strcmp(key, "color_b") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_b)) return false;
+        } else if (strcmp(key, "color_c") == 0) {
+            if (!json_parse_vec4(p, &ent->geom_data.triangle.color_c)) return false;
         } else {
             if (!json_skip_value(p)) return false;
         }
@@ -961,6 +1263,55 @@ static inline bool json_parse_renderable(json_parser_t *p, loaded_entity_t *ent)
         } else if (strcmp(key, "layer") == 0) {
             if (p->token != JSON_TOK_NUMBER) return false;
             ent->layer = (int)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
+// Parse Light Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_light(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->is_light = true;
+    ent->light_type = LIGHT_DIRECTIONAL;
+    ent->light_color = vec4_make(1, 1, 1, 1);
+    ent->light_intensity = 1.0f;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "type") == 0) {
+            if (p->token == JSON_TOK_STRING) {
+                if (strcmp(p->str_value, "point") == 0) {
+                    ent->light_type = LIGHT_POINT;
+                }
+            }
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "color") == 0) {
+            if (!json_parse_vec4(p, &ent->light_color)) return false;
+        } else if (strcmp(key, "intensity") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->light_intensity = (float)p->num_value;
             if (!json_next_token(p)) return false;
         } else {
             if (!json_skip_value(p)) return false;
@@ -1029,6 +1380,8 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
                     if (!json_parse_geometry(p, ent)) return false;
                 } else if (strcmp(comp_key, "renderable") == 0) {
                     if (!json_parse_renderable(p, ent)) return false;
+                } else if (strcmp(comp_key, "light") == 0) {
+                    if (!json_parse_light(p, ent)) return false;
                 } else {
                     if (!json_skip_value(p)) return false;
                 }
@@ -1058,6 +1411,16 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
 // Helper to create entity in scene based on loaded data
 static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_entity_t *ent) {
     ecs_entity_t e = 0;
+
+    // Handle light entities
+    if (ent->is_light) {
+        if (ent->light_type == LIGHT_DIRECTIONAL) {
+            e = scene_add_directional_light(scene, ent->position, ent->light_color, ent->light_intensity);
+        } else {
+            e = scene_add_point_light(scene, ent->position, ent->light_color, ent->light_intensity);
+        }
+        return e;
+    }
 
     switch (ent->geom_type) {
         case GEOM_POINT:
@@ -1107,6 +1470,37 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
                                ent->geom_data.helix.radius, ent->geom_data.helix.turns,
                                ent->geom_data.helix.segments,
                                ent->color, ent->line_width);
+            break;
+
+        case GEOM_TRIANGLE:
+            if (ent->geom_data.triangle.has_vertex_colors) {
+                e = scene_add_triangle_colored(scene,
+                    ent->geom_data.triangle.a, ent->geom_data.triangle.b,
+                    ent->geom_data.triangle.c,
+                    ent->geom_data.triangle.color_a, ent->geom_data.triangle.color_b,
+                    ent->geom_data.triangle.color_c);
+            } else {
+                e = scene_add_triangle(scene,
+                    ent->geom_data.triangle.a, ent->geom_data.triangle.b,
+                    ent->geom_data.triangle.c, ent->color);
+            }
+            break;
+
+        case GEOM_MESH:
+            if (ent->geom_data.mesh.vertices && ent->geom_data.mesh.indices &&
+                ent->geom_data.mesh.vertex_count >= 3 && ent->geom_data.mesh.index_count >= 3) {
+                if (ent->geom_data.mesh.vertex_colors) {
+                    e = scene_add_mesh_colored(scene,
+                        ent->geom_data.mesh.vertices, ent->geom_data.mesh.vertex_count,
+                        ent->geom_data.mesh.indices, ent->geom_data.mesh.index_count,
+                        ent->geom_data.mesh.vertex_colors);
+                } else {
+                    e = scene_add_mesh(scene,
+                        ent->geom_data.mesh.vertices, ent->geom_data.mesh.vertex_count,
+                        ent->geom_data.mesh.indices, ent->geom_data.mesh.index_count,
+                        ent->color);
+                }
+            }
             break;
 
         default:
@@ -1200,6 +1594,10 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
                             free(entities[i].geom_data.polyline.points);
                         } else if (entities[i].geom_type == GEOM_POLYGON && entities[i].geom_data.polygon.points) {
                             free(entities[i].geom_data.polygon.points);
+                        } else if (entities[i].geom_type == GEOM_MESH) {
+                            if (entities[i].geom_data.mesh.vertices) free(entities[i].geom_data.mesh.vertices);
+                            if (entities[i].geom_data.mesh.indices) free(entities[i].geom_data.mesh.indices);
+                            if (entities[i].geom_data.mesh.vertex_colors) free(entities[i].geom_data.mesh.vertex_colors);
                         }
                     }
                     free(entities);
@@ -1260,6 +1658,32 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
             scene_remove_entity(scene, to_delete[i]);
         }
         free(to_delete);
+
+        // Also delete light entities (they don't have GeometryComp)
+        ecs_query_t *lq = ecs_query(w->world, {
+            .terms = {{ .id = w->LightComp_id }}
+        });
+
+        ecs_entity_t *lights_to_delete = NULL;
+        int ld_count = 0;
+        int ld_capacity = 0;
+
+        ecs_iter_t lit = ecs_query_iter(w->world, lq);
+        while (ecs_query_next(&lit)) {
+            for (int i = 0; i < lit.count; i++) {
+                if (ld_count >= ld_capacity) {
+                    ld_capacity = ld_capacity ? ld_capacity * 2 : 8;
+                    lights_to_delete = (ecs_entity_t*)realloc(lights_to_delete, ld_capacity * sizeof(ecs_entity_t));
+                }
+                lights_to_delete[ld_count++] = lit.entities[i];
+            }
+        }
+        ecs_query_fini(lq);
+
+        for (int i = 0; i < ld_count; i++) {
+            ecs_delete(w->world, lights_to_delete[i]);
+        }
+        free(lights_to_delete);
     }
 
     // Create entities (first pass - create all entities)
@@ -1284,6 +1708,10 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
             free(entities[i].geom_data.polyline.points);
         } else if (entities[i].geom_type == GEOM_POLYGON && entities[i].geom_data.polygon.points) {
             free(entities[i].geom_data.polygon.points);
+        } else if (entities[i].geom_type == GEOM_MESH) {
+            if (entities[i].geom_data.mesh.vertices) free(entities[i].geom_data.mesh.vertices);
+            if (entities[i].geom_data.mesh.indices) free(entities[i].geom_data.mesh.indices);
+            if (entities[i].geom_data.mesh.vertex_colors) free(entities[i].geom_data.mesh.vertex_colors);
         }
     }
     free(entities);

@@ -82,6 +82,9 @@ static struct {
     // Undo/Redo system
     undo_redo_t undo_redo;
 
+    // Lighting
+    bool lighting_enabled;
+
     // Gizmo system
     gizmo_t gizmo;
     bool gizmo_drag_active;
@@ -107,8 +110,8 @@ static void init(void) {
         .logger.func = slog_func,
 #if defined(SOKOL_VULKAN)
         // Vulkan needs larger staging buffer for large point clouds (default 16MB)
-        // 1M points * 28 bytes = 28MB, so use 64MB for headroom
-        .vulkan.stream_staging_buffer_size = 64 * 1024 * 1024,
+        // 1M points * 28 bytes = 28MB, so use 512MB for headroom
+        .vulkan.stream_staging_buffer_size = 512 * 1024 * 1024,
 #endif
         // Note: Sokol validation is enabled by default in debug builds
         // Errors will be logged via slog_func
@@ -217,6 +220,48 @@ static void init(void) {
         scene_set_parent(&state.ecs_scene, yAxis, parent_point);
         scene_set_parent(&state.ecs_scene, zAxis, parent_point);
 
+        // // Sample triangles in the XZ plane
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(0.5f, 0.0f, 0.5f),
+        //     vec3_make(1.5f, 0.0f, 0.5f),
+        //     vec3_make(1.0f, 0.0f, 1.5f),
+        //     vec4_make(0.9f, 0.3f, 0.3f, 1.0f));   // Red triangle
+
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(-1.5f, 0.0f, 0.5f),
+        //     vec3_make(-0.5f, 0.0f, 0.5f),
+        //     vec3_make(-1.0f, 0.0f, 1.5f),
+        //     vec4_make(0.3f, 0.9f, 0.3f, 1.0f));   // Green triangle
+
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(-0.5f, 0.0f, -1.5f),
+        //     vec3_make(0.5f, 0.0f, -1.5f),
+        //     vec3_make(0.0f, 0.8f, -1.0f),
+        //     vec4_make(0.3f, 0.3f, 0.9f, 1.0f));   // Blue triangle (tilted up)
+
+        // // Per-vertex colored triangle (RGB gradient)
+        // scene_add_triangle_colored(&state.ecs_scene,
+        //     vec3_make(-2.0f, 0.0f, -0.5f),
+        //     vec3_make(-1.0f, 0.0f, -0.5f),
+        //     vec3_make(-1.5f, 0.0f, 0.5f),
+        //     vec4_make(1.0f, 0.0f, 0.0f, 1.0f),    // Vertex A: Red
+        //     vec4_make(0.0f, 1.0f, 0.0f, 1.0f),    // Vertex B: Green
+        //     vec4_make(0.0f, 0.0f, 1.0f, 1.0f));   // Vertex C: Blue
+
+        // // Sample mesh: a quad (2 triangles sharing vertices)
+        // scene_add_mesh_quad(&state.ecs_scene,
+        //     vec3_make(1.5f, 0.0f, -1.5f),
+        //     vec3_make(2.5f, 0.0f, -1.5f),
+        //     vec3_make(2.5f, 0.0f, -0.5f),
+        //     vec3_make(1.5f, 0.0f, -0.5f),
+        //     vec4_make(0.8f, 0.6f, 0.2f, 1.0f));   // Gold quad
+
+        // // Sample mesh: a box (12 triangles, 8 shared vertices)
+        // scene_add_mesh_box(&state.ecs_scene,
+        //     vec3_make(2.0f, 0.5f, 1.0f),
+        //     vec3_make(0.6f, 0.6f, 0.6f),
+        //     vec4_make(0.5f, 0.7f, 0.9f, 1.0f));   // Steel blue box
+
         // // Test points at axis endpoints
         // scene_add_point(&state.ecs_scene,
         //     vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1.0f, 0.4f, 0.4f, 1.0f), 0.08f);  // +X
@@ -251,6 +296,28 @@ static void init(void) {
         // and child_y from (1.5, 1.0, 0) to (1.5, 2.0, 0)
         // Edit the parent's position in Entity Inspector to see children move together!
     }
+
+    // Create default 3-point studio lighting
+    state.lighting_enabled = true;
+    {
+        // Key light: warm white, from front-right-above
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(0.5f, -0.7f, -0.5f),
+            vec4_make(1.0f, 0.95f, 0.9f, 1.0f), 1.0f);
+
+        // Fill light: cool blue-white, from front-left
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(-0.5f, -0.3f, -0.5f),
+            vec4_make(0.8f, 0.85f, 1.0f, 1.0f), 0.4f);
+
+        // Rim light: neutral, from behind
+        scene_add_directional_light(&state.ecs_scene,
+            vec3_make(0.0f, -0.2f, 0.8f),
+            vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 0.3f);
+    }
+
+    // Wire up lighting toggle to visibility panel
+    ui_visibility_set_lighting_ptr(&state.visibility, &state.lighting_enabled);
 
     // Main pass action (just clear to dark gray)
     state.main_pass_action = (sg_pass_action){
@@ -406,9 +473,37 @@ static void frame(void) {
         }
     });
 
-    // Draw ECS scene entities (lines, points, etc.)
+    // Draw ECS scene entities (lines, points, triangles)
     if (state.visibility.show_ecs_entities) {
-        ecs_scene_draw(&state.ecs_scene, mvp, aspect_ratio);
+        // Build triangle shader params with lighting data
+        geom_triangle_params_t tri_params = {0};
+        tri_params.mvp = mvp;
+        tri_params.lighting_enabled = state.lighting_enabled ? 1.0f : 0.0f;
+
+        // Ambient light
+        tri_params.ambient[0] = 0.15f;  // R
+        tri_params.ambient[1] = 0.15f;  // G
+        tri_params.ambient[2] = 0.15f;  // B
+        tri_params.ambient[3] = 1.0f;   // intensity
+
+        // Collect lights from ECS
+        scene_light_data_t lights[TRIANGLE_MAX_LIGHTS];
+        int light_count = scene_collect_lights(&state.ecs_scene, lights, TRIANGLE_MAX_LIGHTS);
+        tri_params.num_lights = (float)light_count;
+
+        for (int i = 0; i < light_count; i++) {
+            tri_params.light_dirs[i * 4 + 0] = lights[i].dir_or_pos[0];
+            tri_params.light_dirs[i * 4 + 1] = lights[i].dir_or_pos[1];
+            tri_params.light_dirs[i * 4 + 2] = lights[i].dir_or_pos[2];
+            tri_params.light_dirs[i * 4 + 3] = lights[i].dir_or_pos[3];
+
+            tri_params.light_colors[i * 4 + 0] = lights[i].color[0];
+            tri_params.light_colors[i * 4 + 1] = lights[i].color[1];
+            tri_params.light_colors[i * 4 + 2] = lights[i].color[2];
+            tri_params.light_colors[i * 4 + 3] = lights[i].color[3];
+        }
+
+        ecs_scene_draw(&state.ecs_scene, &tri_params, aspect_ratio);
     }
 
     // Draw gizmo overlay (always on top via depth-always pipeline)

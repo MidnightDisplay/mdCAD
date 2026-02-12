@@ -18,7 +18,7 @@ The **user <-> agent** collaboration worklow is:
 5) the user starts a new agent session and provides the path to the plan file and any docs useful for understanding the full context
 6) the agent runs implementation
 7) first pass is tested by the user
-8) after the user signs off on the feature, the agent marks off any todo's in the plan as completed and adds notes to CHECKPOINT.md as to what was done in the implementation session
+8) after the user signs off on the feature, the agent marks off any todo's in the plan as completed and adds notes to `CHECKPOINT.md` as to what was done in the implementation session. Keep the "Most Recent Changes" section tidy, hold only one feature plan (with all sprints). When the feature is delivered archive it to `CHANGELOG.md`
 
 ## Project Overview
 
@@ -37,17 +37,17 @@ C/C++ cross-platform graphics application using:
 cmake -B build -G Ninja && ninja -C build
 ./build/bin/skl_tmp
 
-# Windows build (D3D11 backend)
-# Windows MinGW build (OpenGL backend)
-cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
-
-cmake -B build-msvc -G "Visual Studio 18"
-# Or with Ninja: cmake -B build -G Ninja && ninja -C build (untested)
-
-# MSVC with Vulkan backend - requires Vulkan SDK installed
+# MSVC with Vulkan backend - requires Vulkan SDK installed (default on windows)
 cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
 cmake --build build-vulkan --config Release
 .\build-vulkan\bin\Release\mdCAD.exe
+
+# Windows MinGW build (OpenGL backend)
+cmake -B build-mingw -G "MinGW Makefiles"; cmake --build build-mingw
+
+# Windows build (D3D11 backend) (optional, but deprecated)
+cmake -B build-msvc -G "Visual Studio 18"
+# Or with Ninja: cmake -B build -G Ninja && ninja -C build (untested)
 
 # iOS build (iPad/iPhone - Metal backend)
 cmake -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0

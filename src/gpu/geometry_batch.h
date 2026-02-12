@@ -12,6 +12,7 @@
 #include "../math3d.h"
 #include "../shaders/instanced_line_shaders.h"
 #include "../shaders/join_shaders.h"
+#include "../shaders/instanced_triangle_shaders.h"
 #include "instance_buffer.h"
 #include "../components/geometry_comp.h"
 #include <math.h>
@@ -24,6 +25,7 @@
 #define GEOM_BATCH_CIRCLE_SEGMENTS 16    // Segments for point circles
 #define GEOM_BATCH_INITIAL_LINES 64
 #define GEOM_BATCH_INITIAL_POINTS 64
+#define GEOM_BATCH_INITIAL_TRIANGLES 64
 
 //------------------------------------------------------------------------------
 // Instance Data Types (matches shader expectations)
@@ -42,6 +44,17 @@ typedef struct {
     float r, g, b, a;   // Color
 } geom_point_instance_t;
 
+// Triangle instance: three vertices + normal + three colors
+typedef struct {
+    float ax, ay, az;    // Vertex A position
+    float bx, by, bz;    // Vertex B position
+    float cx, cy, cz;    // Vertex C position
+    float nx, ny, nz;    // Face normal
+    float ra, ga, ba, aa; // Color at vertex A
+    float rb, gb, bb, ab; // Color at vertex B
+    float rc, gc, bc, ac; // Color at vertex C
+} geom_triangle_instance_t;  // 24 floats = 96 bytes
+
 //------------------------------------------------------------------------------
 // Template vertex (shared for lines and points)
 //------------------------------------------------------------------------------
@@ -58,6 +71,22 @@ typedef struct {
     float aspect_ratio;
     float _pad[2];
 } geom_batch_params_t;
+
+// Maximum lights supported by triangle shader
+#define TRIANGLE_MAX_LIGHTS 4
+
+// Uniform block for triangle shaders (std140 layout, VS block 0)
+// Contains MVP + lighting data. Lighting is computed in vertex shader
+// (valid for flat shading since face normal is constant per triangle).
+typedef struct {
+    mat4_t mvp;                                    // 64 bytes, offset 0
+    float light_dirs[TRIANGLE_MAX_LIGHTS * 4];     // 64 bytes, offset 64  (4 x vec4: xyz=dir/pos, w=type)
+    float light_colors[TRIANGLE_MAX_LIGHTS * 4];   // 64 bytes, offset 128 (4 x vec4: rgb=color, w=intensity)
+    float ambient[4];                              // 16 bytes, offset 192 (vec4: rgb=color, w=intensity)
+    float num_lights;                              // 4 bytes,  offset 208
+    float lighting_enabled;                        // 4 bytes,  offset 212
+    float _pad[2];                                 // 8 bytes,  offset 216 (pad to 224 = 14*16)
+} geom_triangle_params_t;                          // 224 bytes total
 
 //------------------------------------------------------------------------------
 // Line Batch
@@ -102,12 +131,30 @@ typedef struct {
 } geom_point_batch_t;
 
 //------------------------------------------------------------------------------
+// Triangle Batch
+//------------------------------------------------------------------------------
+typedef struct {
+    // Instance buffer
+    instance_buffer_t instances;
+
+    // Template geometry (3 vertices with barycentric selectors)
+    sg_buffer template_vbuf;
+    sg_buffer template_ibuf;
+    int template_vertex_count;
+    int template_index_count;
+
+    // Pipeline and shader
+    sg_pipeline pip;
+    sg_shader shd;
+} geom_triangle_batch_t;
+
+//------------------------------------------------------------------------------
 // Combined Batch Manager
 //------------------------------------------------------------------------------
 typedef struct {
     geom_line_batch_t lines;
     geom_point_batch_t points;
-    // Future: polyline_batch, arc_batch, etc.
+    geom_triangle_batch_t triangles;
 } geometry_batch_manager_t;
 
 //------------------------------------------------------------------------------
@@ -601,6 +648,257 @@ static inline void geom_point_batch_shutdown(geom_point_batch_t* batch) {
 }
 
 //------------------------------------------------------------------------------
+// Triangle Batch Functions
+//------------------------------------------------------------------------------
+
+// Compute face normal from triangle vertices: normalize(cross(b-a, c-a))
+static inline vec3_t geom_triangle_compute_normal(vec3_t a, vec3_t b, vec3_t c) {
+    vec3_t ab = vec3_sub(b, a);
+    vec3_t ac = vec3_sub(c, a);
+    vec3_t n = vec3_cross(ab, ac);
+    float len = sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
+    if (len < 1e-10f) return vec3_make(0.0f, 1.0f, 0.0f);
+    return vec3_scale(n, 1.0f / len);
+}
+
+// Triangle template: 3 vertices with barycentric selectors
+static inline void geom_batch_generate_triangle_template(
+    geom_template_vertex_t* vertices, int* vertex_count,
+    uint16_t* indices, int* index_count
+) {
+    // Vertex 0: selector (1,0,0) -> maps to instance vertex A
+    vertices[0] = (geom_template_vertex_t){ 1.0f, 0.0f, 0.0f };
+    // Vertex 1: selector (0,1,0) -> maps to instance vertex B
+    vertices[1] = (geom_template_vertex_t){ 0.0f, 1.0f, 0.0f };
+    // Vertex 2: selector (0,0,1) -> maps to instance vertex C
+    vertices[2] = (geom_template_vertex_t){ 0.0f, 0.0f, 1.0f };
+
+    indices[0] = 0;
+    indices[1] = 1;
+    indices[2] = 2;
+
+    *vertex_count = 3;
+    *index_count = 3;
+}
+
+static inline void geom_triangle_batch_init(geom_triangle_batch_t* batch) {
+    // Initialize instance buffer
+    instance_buffer_init(&batch->instances,
+                         sizeof(geom_triangle_instance_t),
+                         GEOM_BATCH_INITIAL_TRIANGLES,
+                         "ecs-triangle-instances");
+
+    // Generate template geometry (3 barycentric selector vertices)
+    geom_template_vertex_t template_vertices[3];
+    uint16_t template_indices[3];
+
+    geom_batch_generate_triangle_template(
+        template_vertices, &batch->template_vertex_count,
+        template_indices, &batch->template_index_count
+    );
+
+    // Create template buffers
+    batch->template_vbuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.vertex_buffer = true,
+        .data = {
+            .ptr = template_vertices,
+            .size = batch->template_vertex_count * sizeof(geom_template_vertex_t)
+        },
+        .label = "ecs-triangle-template-vbuf"
+    });
+
+    batch->template_ibuf = sg_make_buffer(&(sg_buffer_desc){
+        .usage.index_buffer = true,
+        .data = {
+            .ptr = template_indices,
+            .size = batch->template_index_count * sizeof(uint16_t)
+        },
+        .label = "ecs-triangle-template-ibuf"
+    });
+
+    // Create shader
+#if defined(SOKOL_VULKAN)
+    batch->shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .bytecode = SG_RANGE(instanced_triangle_vs_spirv),
+            .entry = "main",
+        },
+        .fragment_func = {
+            .bytecode = SG_RANGE(instanced_triangle_fs_spirv),
+            .entry = "main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // vertex_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // vertex_b
+            [3] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 2 },   // vertex_c
+            [4] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 3 },   // normal
+            [5] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 4 },   // color_a
+            [6] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 5 },   // color_b
+            [7] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 6 },   // color_c
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(geom_triangle_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+        },
+        .label = "ecs-triangle-shader"
+    });
+#else
+    batch->shd = sg_make_shader(&(sg_shader_desc){
+        .vertex_func = {
+            .source = instanced_triangle_vs_source,
+            .entry = "vs_main",
+        },
+        .fragment_func = {
+            .source = instanced_triangle_fs_source,
+            .entry = "fs_main",
+        },
+        .attrs = {
+            [0] = { .hlsl_sem_name = "POSITION", .hlsl_sem_index = 0 },   // template_pos
+            [1] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 0 },   // vertex_a
+            [2] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 1 },   // vertex_b
+            [3] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 2 },   // vertex_c
+            [4] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 3 },   // normal
+            [5] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 4 },   // color_a
+            [6] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 5 },   // color_b
+            [7] = { .hlsl_sem_name = "TEXCOORD", .hlsl_sem_index = 6 },   // color_c
+        },
+        .uniform_blocks[0] = {
+            .stage = SG_SHADERSTAGE_VERTEX,
+            .size = sizeof(geom_triangle_params_t),
+            .layout = SG_UNIFORMLAYOUT_STD140,
+            .glsl_uniforms = {
+                [0] = { .type = SG_UNIFORMTYPE_MAT4, .glsl_name = "mvp" },
+                [1] = { .type = SG_UNIFORMTYPE_FLOAT4, .array_count = TRIANGLE_MAX_LIGHTS, .glsl_name = "light_dirs" },
+                [2] = { .type = SG_UNIFORMTYPE_FLOAT4, .array_count = TRIANGLE_MAX_LIGHTS, .glsl_name = "light_colors" },
+                [3] = { .type = SG_UNIFORMTYPE_FLOAT4, .glsl_name = "ambient_color" },
+                [4] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "num_lights" },
+                [5] = { .type = SG_UNIFORMTYPE_FLOAT, .glsl_name = "lighting_enabled" },
+            }
+        },
+        .label = "ecs-triangle-shader"
+    });
+#endif
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[DEBUG] Triangle shader state: %d (2=valid, 4=failed)\n", sg_query_shader_state(batch->shd));
+#endif
+
+    // Create pipeline with instancing
+    batch->pip = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = batch->shd,
+        .layout = {
+            .buffers = {
+                [0] = { .step_func = SG_VERTEXSTEP_PER_VERTEX },
+                [1] = { .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+            },
+            .attrs = {
+                [0] = { .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },                  // template_pos
+                [1] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 0 },     // vertex_a
+                [2] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 12 },    // vertex_b
+                [3] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 24 },    // vertex_c
+                [4] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT3, .offset = 36 },    // normal
+                [5] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 48 },    // color_a
+                [6] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 64 },    // color_b
+                [7] = { .buffer_index = 1, .format = SG_VERTEXFORMAT_FLOAT4, .offset = 80 },    // color_c
+            }
+        },
+        .index_type = SG_INDEXTYPE_UINT16,
+        .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+        .depth = {
+            .compare = SG_COMPAREFUNC_LESS_EQUAL,
+            .write_enabled = true,
+            .pixel_format = SG_PIXELFORMAT_DEPTH
+        },
+        .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
+        .cull_mode = SG_CULLMODE_NONE,
+        .label = "ecs-triangle-pipeline"
+    });
+
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("[DEBUG] Triangle pipeline state: %d (2=valid, 4=failed)\n", sg_query_pipeline_state(batch->pip));
+#endif
+}
+
+static inline int geom_triangle_batch_alloc(geom_triangle_batch_t* batch) {
+    return instance_buffer_alloc_slot(&batch->instances);
+}
+
+static inline int geom_triangle_batch_alloc_contiguous(geom_triangle_batch_t* batch, int n) {
+    return instance_buffer_alloc_contiguous(&batch->instances, n);
+}
+
+static inline void geom_triangle_batch_free(geom_triangle_batch_t* batch, int slot) {
+    instance_buffer_free_slot(&batch->instances, slot);
+}
+
+static inline void geom_triangle_batch_set(geom_triangle_batch_t* batch, int slot,
+                                            vec3_t a, vec3_t b, vec3_t c,
+                                            vec3_t normal, vec4_t color) {
+    geom_triangle_instance_t inst = {
+        .ax = a.x, .ay = a.y, .az = a.z,
+        .bx = b.x, .by = b.y, .bz = b.z,
+        .cx = c.x, .cy = c.y, .cz = c.z,
+        .nx = normal.x, .ny = normal.y, .nz = normal.z,
+        .ra = color.x, .ga = color.y, .ba = color.z, .aa = color.w,
+        .rb = color.x, .gb = color.y, .bb = color.z, .ab = color.w,
+        .rc = color.x, .gc = color.y, .bc = color.z, .ac = color.w,
+    };
+    instance_buffer_set(&batch->instances, slot, &inst);
+}
+
+static inline void geom_triangle_batch_set_colored(geom_triangle_batch_t* batch, int slot,
+                                                     vec3_t a, vec3_t b, vec3_t c,
+                                                     vec3_t normal,
+                                                     vec4_t color_a, vec4_t color_b, vec4_t color_c) {
+    geom_triangle_instance_t inst = {
+        .ax = a.x, .ay = a.y, .az = a.z,
+        .bx = b.x, .by = b.y, .bz = b.z,
+        .cx = c.x, .cy = c.y, .cz = c.z,
+        .nx = normal.x, .ny = normal.y, .nz = normal.z,
+        .ra = color_a.x, .ga = color_a.y, .ba = color_a.z, .aa = color_a.w,
+        .rb = color_b.x, .gb = color_b.y, .bb = color_b.z, .ab = color_b.w,
+        .rc = color_c.x, .gc = color_c.y, .bc = color_c.z, .ac = color_c.w,
+    };
+    instance_buffer_set(&batch->instances, slot, &inst);
+}
+
+static inline void geom_triangle_batch_set_entity(geom_triangle_batch_t* batch, int slot,
+                                                    uint64_t entity_id, uint8_t geom_type) {
+    instance_buffer_set_entity(&batch->instances, slot, entity_id, geom_type);
+}
+
+static inline void geom_triangle_batch_upload(geom_triangle_batch_t* batch) {
+    instance_buffer_upload(&batch->instances);
+}
+
+static inline void geom_triangle_batch_draw(geom_triangle_batch_t* batch,
+                                              const geom_triangle_params_t *params) {
+    int count = instance_buffer_count(&batch->instances);
+    if (count == 0) return;
+
+    sg_apply_pipeline(batch->pip);
+    sg_apply_bindings(&(sg_bindings){
+        .vertex_buffers = {
+            [0] = batch->template_vbuf,
+            [1] = instance_buffer_gpu_buffer(&batch->instances),
+        },
+        .index_buffer = batch->template_ibuf,
+    });
+    sg_apply_uniforms(0, &(sg_range){ .ptr = params, .size = sizeof(geom_triangle_params_t) });
+    sg_draw(0, batch->template_index_count, count);
+}
+
+static inline void geom_triangle_batch_shutdown(geom_triangle_batch_t* batch) {
+    instance_buffer_shutdown(&batch->instances);
+    sg_destroy_pipeline(batch->pip);
+    sg_destroy_shader(batch->shd);
+    sg_destroy_buffer(batch->template_vbuf);
+    sg_destroy_buffer(batch->template_ibuf);
+}
+
+//------------------------------------------------------------------------------
 // Point Cloud Batch Helper Functions
 // Point clouds use the point batch with contiguous slot allocation
 //------------------------------------------------------------------------------
@@ -648,22 +946,27 @@ static inline void geom_point_cloud_batch_free(geom_point_batch_t* batch, int fi
 static inline void geometry_batch_manager_init(geometry_batch_manager_t* mgr) {
     geom_line_batch_init(&mgr->lines);
     geom_point_batch_init(&mgr->points);
+    geom_triangle_batch_init(&mgr->triangles);
 }
 
 static inline void geometry_batch_manager_upload(geometry_batch_manager_t* mgr) {
     geom_line_batch_upload(&mgr->lines);
     geom_point_batch_upload(&mgr->points);
+    geom_triangle_batch_upload(&mgr->triangles);
 }
 
 static inline void geometry_batch_manager_draw(geometry_batch_manager_t* mgr,
-                                                mat4_t mvp, float aspect_ratio) {
-    geom_line_batch_draw(&mgr->lines, mvp, aspect_ratio);
-    geom_point_batch_draw(&mgr->points, mvp, aspect_ratio);
+                                                const geom_triangle_params_t *tri_params,
+                                                float aspect_ratio) {
+    geom_triangle_batch_draw(&mgr->triangles, tri_params);
+    geom_line_batch_draw(&mgr->lines, tri_params->mvp, aspect_ratio);
+    geom_point_batch_draw(&mgr->points, tri_params->mvp, aspect_ratio);
 }
 
 static inline void geometry_batch_manager_shutdown(geometry_batch_manager_t* mgr) {
     geom_line_batch_shutdown(&mgr->lines);
     geom_point_batch_shutdown(&mgr->points);
+    geom_triangle_batch_shutdown(&mgr->triangles);
 }
 
 #endif // GEOMETRY_BATCH_H

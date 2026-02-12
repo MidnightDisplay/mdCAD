@@ -57,6 +57,7 @@ typedef struct {
     vec4_t default_colour;
     bool shift_to_com;
     float rotation_x, rotation_y, rotation_z;  // radians
+    int mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
 
     // Parse state
     jsonl_parse_state_t parse_state;
@@ -74,6 +75,10 @@ typedef struct {
     ecs_entity_t *all_created_entities;   // flat array of all geometry entities
     int *entity_to_entry_map;             // maps each entity index to its entry index
     int all_created_count;
+
+    // Mesh triangles mode state (for Individual Triangles import)
+    int mesh_tri_created;       // triangles created so far for current mesh
+    int mesh_tri_total;         // total triangles in current mesh
 
     // Computed transforms
     vec3_t com;
@@ -108,10 +113,13 @@ static inline void jsonl_import_job_init(jsonl_import_job_t *job) {
     job->rotation_x = 0.0f;
     job->rotation_y = 0.0f;
     job->rotation_z = 0.0f;
+    job->mesh_import_mode = 0;  // Default: Single Mesh (efficient)
     job->transforms_applied = false;
     job->last_iteration_time_ms = 0.0;
     job->timing_sample_count = 0;
     job->last_sampled_progress = -1.0f;
+    job->mesh_tri_created = 0;
+    job->mesh_tri_total = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -157,6 +165,8 @@ static inline bool jsonl_import_job_start(jsonl_import_job_t *job,
     job->all_created_entities = NULL;
     job->entity_to_entry_map = NULL;
     job->all_created_count = 0;
+    job->mesh_tri_created = 0;
+    job->mesh_tri_total = 0;
     job->progress = 0.0f;
     job->error = JSONL_OK;
     job->total_elements = 0;
@@ -240,6 +250,14 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                             point_count++;
                         }
                         break;
+                    case JSONL_GEOM_MESH: {
+                        jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
+                        for (int v = 0; v < mesh->vertex_count; v++) {
+                            sum = vec3_add(sum, mesh->vertices[v]);
+                            point_count++;
+                        }
+                        break;
+                    }
                     default: break;
                 }
             }
@@ -305,6 +323,21 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                         JSONL_TRANSFORM_POINT(elem->data.polyline.points[p]);
                     }
                     break;
+                case JSONL_GEOM_MESH: {
+                    jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
+                    // Transform vertices
+                    for (int v = 0; v < mesh->vertex_count; v++) {
+                        JSONL_TRANSFORM_POINT(mesh->vertices[v]);
+                    }
+                    // Rotate normals (but don't translate or scale)
+                    if (has_rotation) {
+                        for (int n = 0; n < mesh->normal_count; n++) {
+                            mesh->normals[n] = mat4_mul_point(rot_matrix, mesh->normals[n]);
+                            mesh->normals[n] = vec3_normalize(mesh->normals[n]);
+                        }
+                    }
+                    break;
+                }
                 default: break;
             }
 
@@ -351,6 +384,21 @@ static inline ecs_entity_t jsonl_import_job_create_entity(
         case JSONL_GEOM_POLYGON:
             return scene_add_polygon(scene, elem->data.polyline.points,
                                      elem->data.polyline.count, colour, width);
+
+        case JSONL_GEOM_MESH: {
+            // Mesh handled separately - needs special logic for import modes
+            // This case only handles Single Mesh mode (mode 0);
+            // Individual Triangles mode (mode 1) is handled in tick()
+            if (job->mesh_import_mode == 0) {
+                jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
+                int index_count = mesh->index_count;
+                return scene_add_mesh(scene,
+                                      mesh->vertices, mesh->vertex_count,
+                                      mesh->point_indices, index_count,
+                                      colour);
+            }
+            return 0;  // Individual Triangles mode handled elsewhere
+        }
 
         default:
             return 0;
@@ -416,13 +464,30 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
             // Apply all transformations to parsed data
             jsonl_import_job_apply_transforms(job);
 
+            // Compute entity count for allocation
+            // In Individual Triangles mode, meshes create multiple entities
+            int expected_entities = job->total_elements;
+            if (job->mesh_import_mode == 1) {
+                // Add extra space for mesh triangles (each mesh element -> N triangles)
+                jsonl_data_t *data = &job->parse_state.data;
+                for (int e = 0; e < data->entry_count; e++) {
+                    for (int i = 0; i < data->entries[e].element_count; i++) {
+                        jsonl_element_t *elem = &data->entries[e].elements[i];
+                        if (elem->type == JSONL_GEOM_MESH) {
+                            int tri_count = elem->data.mesh.mesh.index_count / 3;
+                            expected_entities += (tri_count - 1);  // -1 because we already counted 1
+                        }
+                    }
+                }
+            }
+
             // Allocate tracking arrays
             int num_entries = job->parse_state.data.entry_count;
             job->entry_entities = (ecs_entity_t*)calloc(num_entries, sizeof(ecs_entity_t));
             job->all_created_entities = (ecs_entity_t*)malloc(
-                sizeof(ecs_entity_t) * (job->total_elements + num_entries + 1));
+                sizeof(ecs_entity_t) * (expected_entities + num_entries + 1));
             job->entity_to_entry_map = (int*)malloc(
-                sizeof(int) * (job->total_elements + num_entries + 1));
+                sizeof(int) * (expected_entities + num_entries + 1));
 
             if (!job->entry_entities || !job->all_created_entities || !job->entity_to_entry_map) {
                 job->state = JSONL_JOB_ERROR;
@@ -492,24 +557,79 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                    created_this_frame < JSONL_ENTITY_CHUNK_SIZE) {
 
                 jsonl_element_t *elem = &entry->elements[job->current_element_idx];
-                ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
 
-                if (e != 0) {
-                    // Set label if element has a name
-                    if (elem->name[0] || elem->description[0]) {
-                        LabelComp lbl = label_comp_make(elem->name, elem->description);
-                        ecs_world_set_label(scene->world, e, &lbl);
+                // Special handling for mesh in Individual Triangles mode
+                if (elem->type == JSONL_GEOM_MESH && job->mesh_import_mode == 1) {
+                    jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
+                    int tri_count = mesh->index_count / 3;
+
+                    // Initialize mesh triangle state if starting new mesh
+                    if (job->mesh_tri_created == 0) {
+                        job->mesh_tri_total = tri_count;
                     }
 
-                    // Track for parenting
-                    job->all_created_entities[job->all_created_count] = e;
-                    job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
-                    job->all_created_count++;
-                    job->total_entities_created++;
-                }
+                    vec4_t colour = job->use_jsonl_colours ? elem->colour : job->default_colour;
 
-                job->current_element_idx++;
-                created_this_frame++;
+                    // Create triangles in chunks
+                    while (job->mesh_tri_created < tri_count &&
+                           created_this_frame < JSONL_ENTITY_CHUNK_SIZE) {
+                        int t = job->mesh_tri_created;
+
+                        uint32_t i0 = mesh->point_indices[t * 3 + 0];
+                        uint32_t i1 = mesh->point_indices[t * 3 + 1];
+                        uint32_t i2 = mesh->point_indices[t * 3 + 2];
+
+                        // Bounds check
+                        if ((int)i0 < mesh->vertex_count &&
+                            (int)i1 < mesh->vertex_count &&
+                            (int)i2 < mesh->vertex_count) {
+
+                            vec3_t a = mesh->vertices[i0];
+                            vec3_t b = mesh->vertices[i1];
+                            vec3_t c = mesh->vertices[i2];
+
+                            ecs_entity_t tri = scene_add_triangle(scene, a, b, c, colour);
+                            if (tri != 0) {
+                                // Track for parenting
+                                job->all_created_entities[job->all_created_count] = tri;
+                                job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
+                                job->all_created_count++;
+                                job->total_entities_created++;
+                            }
+                        }
+
+                        job->mesh_tri_created++;
+                        created_this_frame++;
+                    }
+
+                    // Finished this mesh?
+                    if (job->mesh_tri_created >= tri_count) {
+                        job->mesh_tri_created = 0;
+                        job->mesh_tri_total = 0;
+                        job->current_element_idx++;
+                    }
+                }
+                else {
+                    // Normal element handling (non-mesh or Single Mesh mode)
+                    ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
+
+                    if (e != 0) {
+                        // Set label if element has a name
+                        if (elem->name[0] || elem->description[0]) {
+                            LabelComp lbl = label_comp_make(elem->name, elem->description);
+                            ecs_world_set_label(scene->world, e, &lbl);
+                        }
+
+                        // Track for parenting
+                        job->all_created_entities[job->all_created_count] = e;
+                        job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
+                        job->all_created_count++;
+                        job->total_entities_created++;
+                    }
+
+                    job->current_element_idx++;
+                    created_this_frame++;
+                }
             }
 
             // Move to next entry if current one is done
@@ -727,6 +847,16 @@ static inline void jsonl_import_job_reset(jsonl_import_job_t *job) {
     job->progress = 0.0f;
     job->status_message[0] = '\0';
     job->transforms_applied = false;
+}
+
+//------------------------------------------------------------------------------
+// Set mesh import mode (call before starting job)
+// 0 = Single Mesh Entity (efficient, one pick_id for entire mesh)
+// 1 = Individual Triangles (each face is a separate selectable entity)
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_set_mesh_mode(jsonl_import_job_t *job, int mode) {
+    job->mesh_import_mode = mode;
 }
 
 #endif // JSONL_IMPORT_JOB_H
