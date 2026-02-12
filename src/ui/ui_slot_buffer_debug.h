@@ -42,6 +42,8 @@ typedef enum {
     SLOT_TYPE_HELIX_SEGMENT,
     SLOT_TYPE_POLYGON_SEGMENT,
     SLOT_TYPE_JOIN,
+    SLOT_TYPE_TRIANGLE,
+    SLOT_TYPE_MESH_FACE,
     SLOT_TYPE_COUNT
 } slot_type_t;
 
@@ -51,11 +53,12 @@ typedef enum {
 
 typedef struct {
     bool window_open;
-    int current_tab;           // 0=lines, 1=points
+    int current_tab;           // 0=lines, 1=points, 2=triangles
     int cell_size_preset;      // 0=small, 1=medium, 2=large
     int cell_size;             // Actual size (5-50 range)
     int page_lines;            // Current page for lines tab
     int page_points;           // Current page for points tab
+    int page_triangles;        // Current page for triangles tab
 
     // Pointer to ECS scene (for accessing batches and entity data)
     ecs_scene_t *scene;
@@ -79,6 +82,8 @@ static inline ImU32 slot_debug_get_color(slot_type_t type) {
         case SLOT_TYPE_HELIX_SEGMENT:   return SLOT_COL32(68, 136, 255, 255);     // Blue #4488ff
         case SLOT_TYPE_POLYGON_SEGMENT: return SLOT_COL32(255, 255, 68, 255);     // Yellow #ffff44
         case SLOT_TYPE_JOIN:            return SLOT_COL32(68, 255, 255, 255);     // Cyan #44ffff
+        case SLOT_TYPE_TRIANGLE:       return SLOT_COL32(255, 136, 68, 255);    // Orange #ff8844
+        case SLOT_TYPE_MESH_FACE:      return SLOT_COL32(200, 68, 255, 255);    // Purple #c844ff
         default:                        return SLOT_COL32(26, 26, 26, 255);
     }
 }
@@ -94,6 +99,8 @@ static inline const char* slot_debug_get_type_name(slot_type_t type) {
         case SLOT_TYPE_HELIX_SEGMENT:   return "Helix Seg";
         case SLOT_TYPE_POLYGON_SEGMENT: return "Polygon Seg";
         case SLOT_TYPE_JOIN:            return "Join";
+        case SLOT_TYPE_TRIANGLE:       return "Triangle";
+        case SLOT_TYPE_MESH_FACE:      return "Mesh Face";
         default:                        return "Unknown";
     }
 }
@@ -124,6 +131,15 @@ static inline slot_type_t slot_debug_geom_to_slot_type_point(uint8_t geom_type) 
     }
 }
 
+// Map geometry_type_t to slot_type_t for triangle buffer
+static inline slot_type_t slot_debug_geom_to_slot_type_triangle(uint8_t geom_type) {
+    switch ((geometry_type_t)geom_type) {
+        case GEOM_TRIANGLE: return SLOT_TYPE_TRIANGLE;
+        case GEOM_MESH:     return SLOT_TYPE_MESH_FACE;
+        default:            return SLOT_TYPE_EMPTY;
+    }
+}
+
 //------------------------------------------------------------------------------
 // Functions
 //------------------------------------------------------------------------------
@@ -135,6 +151,7 @@ static inline void ui_slot_buffer_debug_init(ui_slot_buffer_debug_state_t* state
     state->cell_size = SLOT_DEBUG_SIZE_MEDIUM;
     state->page_lines = 0;
     state->page_points = 0;
+    state->page_triangles = 0;
     state->scene = scene;
 }
 
@@ -144,12 +161,19 @@ static inline int slot_debug_get_slots_per_page(int cell_size) {
     return SLOT_DEBUG_PAGE_LARGE;
 }
 
+// Buffer type enum for draw function
+typedef enum {
+    SLOT_BUFFER_LINES = 0,
+    SLOT_BUFFER_POINTS,
+    SLOT_BUFFER_TRIANGLES
+} slot_buffer_type_t;
+
 // Draw a single buffer tab
 static inline void ui_slot_buffer_debug_draw_buffer(
     ui_slot_buffer_debug_state_t* state,
     instance_buffer_t* buffer,
     int* page,
-    bool is_point_buffer  // true for points, false for lines
+    slot_buffer_type_t buffer_type
 ) {
     int total_slots = buffer->count;
     int slots_per_page = slot_debug_get_slots_per_page(state->cell_size);
@@ -236,10 +260,10 @@ static inline void ui_slot_buffer_debug_draw_buffer(
 
         if (entity_id != 0) {
             uint8_t geom_type = instance_buffer_get_geom_type(buffer, slot);
-            if (is_point_buffer) {
-                slot_type = slot_debug_geom_to_slot_type_point(geom_type);
-            } else {
-                slot_type = slot_debug_geom_to_slot_type_line(geom_type);
+            switch (buffer_type) {
+                case SLOT_BUFFER_POINTS:    slot_type = slot_debug_geom_to_slot_type_point(geom_type); break;
+                case SLOT_BUFFER_TRIANGLES: slot_type = slot_debug_geom_to_slot_type_triangle(geom_type); break;
+                default:                    slot_type = slot_debug_geom_to_slot_type_line(geom_type); break;
             }
         }
 
@@ -278,9 +302,12 @@ static inline void ui_slot_buffer_debug_draw_buffer(
         uint64_t entity_id = instance_buffer_get_entity(buffer, hovered_slot);
         if (entity_id != 0) {
             uint8_t geom_type = instance_buffer_get_geom_type(buffer, hovered_slot);
-            slot_type_t slot_type = is_point_buffer
-                ? slot_debug_geom_to_slot_type_point(geom_type)
-                : slot_debug_geom_to_slot_type_line(geom_type);
+            slot_type_t slot_type;
+            switch (buffer_type) {
+                case SLOT_BUFFER_POINTS:    slot_type = slot_debug_geom_to_slot_type_point(geom_type); break;
+                case SLOT_BUFFER_TRIANGLES: slot_type = slot_debug_geom_to_slot_type_triangle(geom_type); break;
+                default:                    slot_type = slot_debug_geom_to_slot_type_line(geom_type); break;
+            }
 
             igText("Entity: #%llu", (unsigned long long)entity_id);
             igText("Type: %s", slot_debug_get_type_name(slot_type));
@@ -288,10 +315,17 @@ static inline void ui_slot_buffer_debug_draw_buffer(
             // Get instance data for position/color info
             void* data = instance_buffer_get(buffer, hovered_slot);
             if (data) {
-                if (is_point_buffer) {
+                if (buffer_type == SLOT_BUFFER_POINTS) {
                     geom_point_instance_t* pt = (geom_point_instance_t*)data;
                     igText("Position: (%.2f, %.2f, %.2f)", pt->x, pt->y, pt->z);
                     igText("Color: (%.2f, %.2f, %.2f, %.2f)", pt->r, pt->g, pt->b, pt->a);
+                } else if (buffer_type == SLOT_BUFFER_TRIANGLES) {
+                    geom_triangle_instance_t* tri = (geom_triangle_instance_t*)data;
+                    igText("Vert A: (%.2f, %.2f, %.2f)", tri->ax, tri->ay, tri->az);
+                    igText("Vert B: (%.2f, %.2f, %.2f)", tri->bx, tri->by, tri->bz);
+                    igText("Vert C: (%.2f, %.2f, %.2f)", tri->cx, tri->cy, tri->cz);
+                    igText("Normal: (%.2f, %.2f, %.2f)", tri->nx, tri->ny, tri->nz);
+                    igText("Color A: (%.2f, %.2f, %.2f, %.2f)", tri->ra, tri->ga, tri->ba, tri->aa);
                 } else {
                     geom_line_instance_t* ln = (geom_line_instance_t*)data;
                     igText("Point A: (%.2f, %.2f, %.2f)", ln->ax, ln->ay, ln->az);
@@ -389,7 +423,7 @@ static inline void ui_slot_buffer_debug_draw(ui_slot_buffer_debug_state_t* state
                 state,
                 &state->scene->batches.lines.instances,
                 &state->page_lines,
-                false  // is_point_buffer
+                SLOT_BUFFER_LINES
             );
             igEndTabItem();
         }
@@ -401,7 +435,19 @@ static inline void ui_slot_buffer_debug_draw(ui_slot_buffer_debug_state_t* state
                 state,
                 &state->scene->batches.points.instances,
                 &state->page_points,
-                true  // is_point_buffer
+                SLOT_BUFFER_POINTS
+            );
+            igEndTabItem();
+        }
+
+        // Triangles tab
+        if (igBeginTabItem("Triangles", NULL, 0)) {
+            state->current_tab = 2;
+            ui_slot_buffer_debug_draw_buffer(
+                state,
+                &state->scene->batches.triangles.instances,
+                &state->page_triangles,
+                SLOT_BUFFER_TRIANGLES
             );
             igEndTabItem();
         }
