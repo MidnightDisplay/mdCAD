@@ -928,74 +928,83 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
 // Internal: Draw Lights Section
 //------------------------------------------------------------------------------
 
+// Comparison function for sorting light entries by entity ID
+static inline int ui_hierarchy_compare_light_entries(const void *a, const void *b) {
+    ecs_entity_t ea = *(const ecs_entity_t*)a;
+    ecs_entity_t eb = *(const ecs_entity_t*)b;
+    if (ea < eb) return -1;
+    if (ea > eb) return 1;
+    return 0;
+}
+
 static inline void ui_scene_hierarchy_draw_lights_section(ui_scene_hierarchy_state_t *state) {
     ecs_world_state_t *w = state->scene->world;
     selection_buffer_t *sel = state->selection;
 
-    // Query all entities with LightComp
+    // Query all entities with LightComp - collect into local array and sort
+    // by entity ID to maintain stable display order. Without sorting, selecting
+    // a light adds the Selected tag (ecs_add_id) which moves the entity to a
+    // different archetype table, changing ECS query iteration order.
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
             { .id = w->LightComp_id }
         }
     });
 
-    // Count lights first
+    ecs_entity_t light_entities[16];  // Max 16 lights
     int light_count = 0;
-    ecs_iter_t count_it = ecs_query_iter(w->world, q);
-    while (ecs_query_next(&count_it)) {
-        light_count += count_it.count;
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it)) {
+        for (int i = 0; i < it.count && light_count < 16; i++) {
+            light_entities[light_count++] = it.entities[i];
+        }
     }
+    ecs_query_fini(q);
 
-    if (light_count == 0) {
-        ecs_query_fini(q);
-        return;
-    }
+    if (light_count == 0) return;
+
+    // Sort by entity ID for stable display order
+    qsort(light_entities, light_count, sizeof(ecs_entity_t),
+          ui_hierarchy_compare_light_entries);
 
     // Collapsible header (collapsed by default)
     char header_label[64];
     snprintf(header_label, sizeof(header_label), "Lights (%d)", light_count);
     if (!igCollapsingHeader_TreeNodeFlags(header_label, ImGuiTreeNodeFlags_None)) {
-        ecs_query_fini(q);
         return;
     }
 
     ImGuiIO* io = igGetIO_Nil();
     bool ctrl_held = io->KeyCtrl;
 
-    ecs_iter_t it = ecs_query_iter(w->world, q);
-    while (ecs_query_next(&it)) {
-        LightComp *lights = ecs_field(&it, LightComp, 0);
+    for (int i = 0; i < light_count; i++) {
+        ecs_entity_t e = light_entities[i];
+        LightComp *l = ecs_world_get_light(w, e);
+        if (!l) continue;
 
-        for (int i = 0; i < it.count; i++) {
-            ecs_entity_t e = it.entities[i];
-            LightComp *l = &lights[i];
+        bool is_selected = selection_contains(sel, e);
 
-            bool is_selected = selection_contains(sel, e);
+        // Label: type + entity ID
+        const char *type_str = (l->type == LIGHT_DIRECTIONAL) ? "Dir" : "Point";
+        char label[128];
+        snprintf(label, sizeof(label), "  %s Light #%llu",
+                 type_str, (unsigned long long)e);
 
-            // Label: type + entity ID
-            const char *type_str = (l->type == LIGHT_DIRECTIONAL) ? "Dir" : "Point";
-            char label[128];
-            snprintf(label, sizeof(label), "  %s Light #%llu",
-                     type_str, (unsigned long long)e);
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+        if (is_selected) {
+            flags |= ImGuiTreeNodeFlags_Selected;
+        }
 
-            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-            if (is_selected) {
-                flags |= ImGuiTreeNodeFlags_Selected;
-            }
+        igTreeNodeEx_Str(label, flags);
 
-            igTreeNodeEx_Str(label, flags);
-
-            if (igIsItemClicked(ImGuiMouseButton_Left)) {
-                if (ctrl_held) {
-                    selection_toggle(sel, e);
-                } else {
-                    selection_set_single(sel, e);
-                }
+        if (igIsItemClicked(ImGuiMouseButton_Left)) {
+            if (ctrl_held) {
+                selection_toggle(sel, e);
+            } else {
+                selection_set_single(sel, e);
             }
         }
     }
-
-    ecs_query_fini(q);
 }
 
 //------------------------------------------------------------------------------
