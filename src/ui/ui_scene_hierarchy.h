@@ -129,6 +129,12 @@ typedef struct {
     bool jsonl_shift_to_com;
     float jsonl_rotation[3];
 
+    // JSONL mesh import options
+    bool jsonl_has_mesh_data;
+    int jsonl_mesh_vertex_count;
+    int jsonl_mesh_face_count;
+    int jsonl_mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
+
     // JSONL Import job
     jsonl_import_job_t jsonl_import_job;
     bool jsonl_import_progress_popup_open;
@@ -228,6 +234,10 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     state->jsonl_rotation[0] = 0.0f;
     state->jsonl_rotation[1] = 0.0f;
     state->jsonl_rotation[2] = 0.0f;
+    state->jsonl_has_mesh_data = false;
+    state->jsonl_mesh_vertex_count = 0;
+    state->jsonl_mesh_face_count = 0;
+    state->jsonl_mesh_import_mode = 0;  // Single Mesh (efficient, default)
 
     // Initialize JSONL import job
     jsonl_import_job_init(&state->jsonl_import_job);
@@ -1807,12 +1817,18 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             strncpy(state->jsonl_import_path, path, sizeof(state->jsonl_import_path) - 1);
             state->jsonl_import_path[sizeof(state->jsonl_import_path) - 1] = '\0';
 
-            // Quick scan the file
+            // Quick scan the file (includes mesh detection)
             int entry_count = 0, element_count = 0;
-            jsonl_error_t err = jsonl_quick_scan(path, &entry_count, &element_count);
+            bool has_mesh = false;
+            int mesh_verts = 0, mesh_faces = 0;
+            jsonl_error_t err = jsonl_quick_scan_mesh(path, &entry_count, &element_count,
+                                                       &has_mesh, &mesh_verts, &mesh_faces);
             if (err == JSONL_OK) {
                 state->jsonl_entry_count = entry_count;
                 state->jsonl_element_count = element_count;
+                state->jsonl_has_mesh_data = has_mesh;
+                state->jsonl_mesh_vertex_count = mesh_verts;
+                state->jsonl_mesh_face_count = mesh_faces;
                 state->jsonl_import_popup_open = true;
                 igOpenPopup_Str("Import JSONL Options", ImGuiPopupFlags_None);
             } else {
@@ -1880,6 +1896,24 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         if (igIsItemHovered(ImGuiHoveredFlags_None)) {
             igSetTooltip("Rotations around global axes. Applied after CoM shift (if enabled).");
         }
+
+        // Mesh import options (only shown when file contains mesh data)
+        if (state->jsonl_has_mesh_data) {
+            igSeparator();
+            igText("Mesh Import Options");
+            igText("Mesh vertices: %d, faces: %d",
+                   state->jsonl_mesh_vertex_count, state->jsonl_mesh_face_count);
+
+            igRadioButton_IntPtr("Single Mesh Entity (efficient)", &state->jsonl_mesh_import_mode, 0);
+            if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                igSetTooltip("Import mesh as one indexed entity. Efficient rendering, entire mesh selected together.");
+            }
+
+            igRadioButton_IntPtr("Individual Triangles (selectable)", &state->jsonl_mesh_import_mode, 1);
+            if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                igSetTooltip("Each triangle as separate entity. Allows selecting and editing individual faces.");
+            }
+        }
         igSeparator();
 
         // Import/Cancel buttons
@@ -1912,6 +1946,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 state->jsonl_shift_to_com,
                 rot_x, rot_y, rot_z
             );
+
+            // Set mesh import mode (if mesh data present)
+            if (state->jsonl_has_mesh_data) {
+                jsonl_import_job_set_mesh_mode(&state->jsonl_import_job, state->jsonl_mesh_import_mode);
+            }
 
             if (started) {
                 if (jsonl_import_job_should_sync(&state->jsonl_import_job)) {

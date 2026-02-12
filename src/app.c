@@ -220,47 +220,47 @@ static void init(void) {
         scene_set_parent(&state.ecs_scene, yAxis, parent_point);
         scene_set_parent(&state.ecs_scene, zAxis, parent_point);
 
-        // Sample triangles in the XZ plane
-        scene_add_triangle(&state.ecs_scene,
-            vec3_make(0.5f, 0.0f, 0.5f),
-            vec3_make(1.5f, 0.0f, 0.5f),
-            vec3_make(1.0f, 0.0f, 1.5f),
-            vec4_make(0.9f, 0.3f, 0.3f, 1.0f));   // Red triangle
+        // // Sample triangles in the XZ plane
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(0.5f, 0.0f, 0.5f),
+        //     vec3_make(1.5f, 0.0f, 0.5f),
+        //     vec3_make(1.0f, 0.0f, 1.5f),
+        //     vec4_make(0.9f, 0.3f, 0.3f, 1.0f));   // Red triangle
 
-        scene_add_triangle(&state.ecs_scene,
-            vec3_make(-1.5f, 0.0f, 0.5f),
-            vec3_make(-0.5f, 0.0f, 0.5f),
-            vec3_make(-1.0f, 0.0f, 1.5f),
-            vec4_make(0.3f, 0.9f, 0.3f, 1.0f));   // Green triangle
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(-1.5f, 0.0f, 0.5f),
+        //     vec3_make(-0.5f, 0.0f, 0.5f),
+        //     vec3_make(-1.0f, 0.0f, 1.5f),
+        //     vec4_make(0.3f, 0.9f, 0.3f, 1.0f));   // Green triangle
 
-        scene_add_triangle(&state.ecs_scene,
-            vec3_make(-0.5f, 0.0f, -1.5f),
-            vec3_make(0.5f, 0.0f, -1.5f),
-            vec3_make(0.0f, 0.8f, -1.0f),
-            vec4_make(0.3f, 0.3f, 0.9f, 1.0f));   // Blue triangle (tilted up)
+        // scene_add_triangle(&state.ecs_scene,
+        //     vec3_make(-0.5f, 0.0f, -1.5f),
+        //     vec3_make(0.5f, 0.0f, -1.5f),
+        //     vec3_make(0.0f, 0.8f, -1.0f),
+        //     vec4_make(0.3f, 0.3f, 0.9f, 1.0f));   // Blue triangle (tilted up)
 
-        // Per-vertex colored triangle (RGB gradient)
-        scene_add_triangle_colored(&state.ecs_scene,
-            vec3_make(-2.0f, 0.0f, -0.5f),
-            vec3_make(-1.0f, 0.0f, -0.5f),
-            vec3_make(-1.5f, 0.0f, 0.5f),
-            vec4_make(1.0f, 0.0f, 0.0f, 1.0f),    // Vertex A: Red
-            vec4_make(0.0f, 1.0f, 0.0f, 1.0f),    // Vertex B: Green
-            vec4_make(0.0f, 0.0f, 1.0f, 1.0f));   // Vertex C: Blue
+        // // Per-vertex colored triangle (RGB gradient)
+        // scene_add_triangle_colored(&state.ecs_scene,
+        //     vec3_make(-2.0f, 0.0f, -0.5f),
+        //     vec3_make(-1.0f, 0.0f, -0.5f),
+        //     vec3_make(-1.5f, 0.0f, 0.5f),
+        //     vec4_make(1.0f, 0.0f, 0.0f, 1.0f),    // Vertex A: Red
+        //     vec4_make(0.0f, 1.0f, 0.0f, 1.0f),    // Vertex B: Green
+        //     vec4_make(0.0f, 0.0f, 1.0f, 1.0f));   // Vertex C: Blue
 
-        // Sample mesh: a quad (2 triangles sharing vertices)
-        scene_add_mesh_quad(&state.ecs_scene,
-            vec3_make(1.5f, 0.0f, -1.5f),
-            vec3_make(2.5f, 0.0f, -1.5f),
-            vec3_make(2.5f, 0.0f, -0.5f),
-            vec3_make(1.5f, 0.0f, -0.5f),
-            vec4_make(0.8f, 0.6f, 0.2f, 1.0f));   // Gold quad
+        // // Sample mesh: a quad (2 triangles sharing vertices)
+        // scene_add_mesh_quad(&state.ecs_scene,
+        //     vec3_make(1.5f, 0.0f, -1.5f),
+        //     vec3_make(2.5f, 0.0f, -1.5f),
+        //     vec3_make(2.5f, 0.0f, -0.5f),
+        //     vec3_make(1.5f, 0.0f, -0.5f),
+        //     vec4_make(0.8f, 0.6f, 0.2f, 1.0f));   // Gold quad
 
-        // Sample mesh: a box (12 triangles, 8 shared vertices)
-        scene_add_mesh_box(&state.ecs_scene,
-            vec3_make(2.0f, 0.5f, 1.0f),
-            vec3_make(0.6f, 0.6f, 0.6f),
-            vec4_make(0.5f, 0.7f, 0.9f, 1.0f));   // Steel blue box
+        // // Sample mesh: a box (12 triangles, 8 shared vertices)
+        // scene_add_mesh_box(&state.ecs_scene,
+        //     vec3_make(2.0f, 0.5f, 1.0f),
+        //     vec3_make(0.6f, 0.6f, 0.6f),
+        //     vec4_make(0.5f, 0.7f, 0.9f, 1.0f));   // Steel blue box
 
         // // Test points at axis endpoints
         // scene_add_point(&state.ecs_scene,

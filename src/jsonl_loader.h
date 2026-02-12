@@ -50,8 +50,25 @@ typedef enum {
     JSONL_GEOM_ARC,
     JSONL_GEOM_POLYLINE,
     JSONL_GEOM_POLYGON,
+    JSONL_GEOM_MESH,
     JSONL_GEOM_UNKNOWN,
 } jsonl_geom_type_t;
+
+//------------------------------------------------------------------------------
+// Mesh data structure for MeshBody elements
+//------------------------------------------------------------------------------
+
+typedef struct {
+    vec3_t *vertices;           // _Points array
+    vec3_t *normals;            // _Normals array (face normals)
+    int vertex_count;
+    int normal_count;
+
+    // _Indices array (groups of 3 form triangles)
+    uint32_t *point_indices;    // PointIndex values
+    uint32_t *normal_indices;   // NormalIndex values
+    int index_count;            // Total indices (must be multiple of 3)
+} jsonl_mesh_data_t;
 
 //------------------------------------------------------------------------------
 // Parsed geometry element
@@ -77,6 +94,9 @@ typedef struct {
             vec3_t *points;
             int count;
         } polyline;  // also used for polygon
+        struct {
+            jsonl_mesh_data_t mesh;
+        } mesh;
     } data;
 } jsonl_element_t;
 
@@ -181,27 +201,88 @@ static inline vec3_t jsonl_parse_vector3d(const cJSON *json) {
 }
 
 //------------------------------------------------------------------------------
-// Internal: Parse colour string "R, G, B" or "R, G, B, A" -> vec4_t
-// Alpha always defaults to 1.0 regardless of file value.
+// Internal: Parse colour from string
+// Supports:
+//   - Named colours: "White", "Black", "Red", "Green", "Blue", "Yellow", etc.
+//   - RGB format: "R, G, B" (values 0-255)
+//   - ARGB format: "A, R, G, B" (values 0-255, A is alpha)
+// Alpha is preserved for ARGB format, defaults to 1.0 for RGB and named colours.
 //------------------------------------------------------------------------------
 
 static inline vec4_t jsonl_parse_colour(const char *str) {
     vec4_t c = {1.0f, 1.0f, 1.0f, 1.0f};
     if (!str) return c;
 
-    int r = 255, g = 255, b = 255;
-    // Try parsing R, G, B, A first, then R, G, B
-    int a_unused = 0;
-    int parsed = sscanf(str, "%d, %d, %d, %d", &r, &g, &b, &a_unused);
+    // Skip leading whitespace
+    while (*str == ' ' || *str == '\t') str++;
+    if (*str == '\0') return c;
+
+    // Check for named colours first (case-insensitive comparison)
+    // Common .NET System.Drawing.Color names
+    #define COLOR_MATCH(name, r, g, b) \
+        if (_stricmp(str, name) == 0) { return vec4_make(r/255.0f, g/255.0f, b/255.0f, 1.0f); }
+
+    COLOR_MATCH("White",       255, 255, 255)
+    COLOR_MATCH("Black",       0,   0,   0)
+    COLOR_MATCH("Red",         255, 0,   0)
+    COLOR_MATCH("Green",       0,   128, 0)
+    COLOR_MATCH("Blue",        0,   0,   255)
+    COLOR_MATCH("Yellow",      255, 255, 0)
+    COLOR_MATCH("Cyan",        0,   255, 255)
+    COLOR_MATCH("Magenta",     255, 0,   255)
+    COLOR_MATCH("Orange",      255, 165, 0)
+    COLOR_MATCH("Purple",      128, 0,   128)
+    COLOR_MATCH("Pink",        255, 192, 203)
+    COLOR_MATCH("Brown",       139, 69,  19)
+    COLOR_MATCH("Gray",        128, 128, 128)
+    COLOR_MATCH("Grey",        128, 128, 128)
+    COLOR_MATCH("Silver",      192, 192, 192)
+    COLOR_MATCH("Gold",        255, 215, 0)
+    COLOR_MATCH("Navy",        0,   0,   128)
+    COLOR_MATCH("Teal",        0,   128, 128)
+    COLOR_MATCH("Olive",       128, 128, 0)
+    COLOR_MATCH("Maroon",      128, 0,   0)
+    COLOR_MATCH("Lime",        0,   255, 0)
+    COLOR_MATCH("Aqua",        0,   255, 255)
+    COLOR_MATCH("Fuchsia",     255, 0,   255)
+    COLOR_MATCH("LightGray",   211, 211, 211)
+    COLOR_MATCH("LightGrey",   211, 211, 211)
+    COLOR_MATCH("DarkGray",    169, 169, 169)
+    COLOR_MATCH("DarkGrey",    169, 169, 169)
+    COLOR_MATCH("LightBlue",   173, 216, 230)
+    COLOR_MATCH("LightGreen",  144, 238, 144)
+    COLOR_MATCH("LightRed",    255, 102, 102)
+    COLOR_MATCH("DarkBlue",    0,   0,   139)
+    COLOR_MATCH("DarkGreen",   0,   100, 0)
+    COLOR_MATCH("DarkRed",     139, 0,   0)
+    COLOR_MATCH("Coral",       255, 127, 80)
+    COLOR_MATCH("Crimson",     220, 20,  60)
+    COLOR_MATCH("Indigo",      75,  0,   130)
+    COLOR_MATCH("Violet",      238, 130, 238)
+    COLOR_MATCH("Transparent", 0,   0,   0)  // Transparent -> alpha handled below if ARGB
+
+    #undef COLOR_MATCH
+
+    // Parse numeric format (RGB or ARGB)
+    int v1 = 0, v2 = 0, v3 = 0, v4 = 0;
+    int parsed = sscanf(str, "%d, %d, %d, %d", &v1, &v2, &v3, &v4);
     if (parsed < 3) {
         // Try without spaces after commas
-        parsed = sscanf(str, "%d,%d,%d,%d", &r, &g, &b, &a_unused);
+        parsed = sscanf(str, "%d,%d,%d,%d", &v1, &v2, &v3, &v4);
     }
-    if (parsed >= 3) {
-        c.x = (float)r / 255.0f;
-        c.y = (float)g / 255.0f;
-        c.z = (float)b / 255.0f;
-        c.w = 1.0f;  // Alpha always 1.0
+
+    if (parsed == 4) {
+        // ARGB format: A, R, G, B
+        c.x = (float)v2 / 255.0f;  // R
+        c.y = (float)v3 / 255.0f;  // G
+        c.z = (float)v4 / 255.0f;  // B
+        c.w = (float)v1 / 255.0f;  // A
+    } else if (parsed == 3) {
+        // RGB format: R, G, B
+        c.x = (float)v1 / 255.0f;
+        c.y = (float)v2 / 255.0f;
+        c.z = (float)v3 / 255.0f;
+        c.w = 1.0f;
     }
 
     return c;
@@ -268,6 +349,83 @@ static inline bool jsonl_parse_arc3d(const cJSON *json, jsonl_element_t *element
     element->data.arc.normal = normal;
     element->data.arc.start_angle = start_angle;
     element->data.arc.end_angle = end_angle;
+
+    return true;
+}
+
+//------------------------------------------------------------------------------
+// Internal: Parse MeshBody from cJSON object
+//------------------------------------------------------------------------------
+
+static inline bool jsonl_parse_mesh_body(const cJSON *json, jsonl_element_t *element) {
+    // Get _Points array
+    cJSON *points_arr = cJSON_GetObjectItemCaseSensitive(json, "_Points");
+    if (!points_arr || !cJSON_IsArray(points_arr)) return false;
+
+    int vertex_count = cJSON_GetArraySize(points_arr);
+    if (vertex_count < 3) return false;  // Need at least one triangle
+
+    // Get _Normals array
+    cJSON *normals_arr = cJSON_GetObjectItemCaseSensitive(json, "_Normals");
+    if (!normals_arr || !cJSON_IsArray(normals_arr)) return false;
+
+    int normal_count = cJSON_GetArraySize(normals_arr);
+
+    // Get _Indices array
+    cJSON *indices_arr = cJSON_GetObjectItemCaseSensitive(json, "_Indices");
+    if (!indices_arr || !cJSON_IsArray(indices_arr)) return false;
+
+    int index_count = cJSON_GetArraySize(indices_arr);
+    if (index_count < 3 || (index_count % 3) != 0) return false;  // Must be triangle triplets
+
+    // Set type and get mesh pointer
+    element->type = JSONL_GEOM_MESH;
+    jsonl_mesh_data_t *mesh = &element->data.mesh.mesh;
+
+    // Allocate storage
+    mesh->vertices = (vec3_t*)malloc(sizeof(vec3_t) * vertex_count);
+    mesh->normals = (vec3_t*)malloc(sizeof(vec3_t) * normal_count);
+    mesh->point_indices = (uint32_t*)malloc(sizeof(uint32_t) * index_count);
+    mesh->normal_indices = (uint32_t*)malloc(sizeof(uint32_t) * index_count);
+
+    if (!mesh->vertices || !mesh->normals || !mesh->point_indices || !mesh->normal_indices) {
+        // Cleanup on failure
+        if (mesh->vertices) free(mesh->vertices);
+        if (mesh->normals) free(mesh->normals);
+        if (mesh->point_indices) free(mesh->point_indices);
+        if (mesh->normal_indices) free(mesh->normal_indices);
+        return false;
+    }
+
+    mesh->vertex_count = vertex_count;
+    mesh->normal_count = normal_count;
+    mesh->index_count = index_count;
+
+    // Parse vertices (_Points)
+    int idx = 0;
+    cJSON *pt;
+    cJSON_ArrayForEach(pt, points_arr) {
+        mesh->vertices[idx++] = jsonl_parse_point3d(pt);
+    }
+
+    // Parse normals (_Normals as Vector3D with I, J, K)
+    idx = 0;
+    cJSON *nm;
+    cJSON_ArrayForEach(nm, normals_arr) {
+        mesh->normals[idx++] = jsonl_parse_vector3d(nm);
+    }
+
+    // Parse indices (_Indices)
+    idx = 0;
+    cJSON *ix;
+    cJSON_ArrayForEach(ix, indices_arr) {
+        cJSON *pi = cJSON_GetObjectItemCaseSensitive(ix, "PointIndex");
+        cJSON *ni = cJSON_GetObjectItemCaseSensitive(ix, "NormalIndex");
+
+        mesh->point_indices[idx] = (pi && cJSON_IsNumber(pi)) ? (uint32_t)pi->valuedouble : 0;
+        mesh->normal_indices[idx] = (ni && cJSON_IsNumber(ni)) ? (uint32_t)ni->valuedouble : 0;
+        idx++;
+    }
 
     return true;
 }
@@ -370,6 +528,9 @@ static inline bool jsonl_parse_element(const cJSON *elem_json, jsonl_element_t *
             element->data.polyline.points[idx++] = jsonl_parse_point3d(pt);
         }
         return true;
+    }
+    else if (strcmp(class_name, "MeshBody") == 0) {
+        return jsonl_parse_mesh_body(geom, element);
     }
 
     // Unknown type - skip
@@ -615,12 +776,19 @@ static inline void jsonl_data_free(jsonl_data_t *data) {
         for (int i = 0; i < data->entry_count; i++) {
             jsonl_log_entry_t *entry = &data->entries[i];
             if (entry->elements) {
-                // Free dynamically allocated point arrays in polyline/polygon elements
+                // Free dynamically allocated data in elements
                 for (int j = 0; j < entry->element_count; j++) {
                     jsonl_element_t *elem = &entry->elements[j];
                     if ((elem->type == JSONL_GEOM_POLYLINE || elem->type == JSONL_GEOM_POLYGON) &&
                         elem->data.polyline.points) {
                         free(elem->data.polyline.points);
+                    }
+                    else if (elem->type == JSONL_GEOM_MESH) {
+                        jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
+                        if (mesh->vertices) free(mesh->vertices);
+                        if (mesh->normals) free(mesh->normals);
+                        if (mesh->point_indices) free(mesh->point_indices);
+                        if (mesh->normal_indices) free(mesh->normal_indices);
                     }
                 }
                 free(entry->elements);
@@ -642,6 +810,121 @@ static inline void jsonl_parse_state_free(jsonl_parse_state_t *state) {
     jsonl_close(state);
     jsonl_data_free(&state->data);
     memset(state, 0, sizeof(jsonl_parse_state_t));
+}
+
+//------------------------------------------------------------------------------
+// Mesh detection helpers
+//------------------------------------------------------------------------------
+
+// Check if parsed JSONL contains any mesh elements
+static inline bool jsonl_data_has_mesh(const jsonl_data_t *data) {
+    for (int e = 0; e < data->entry_count; e++) {
+        for (int i = 0; i < data->entries[e].element_count; i++) {
+            if (data->entries[e].elements[i].type == JSONL_GEOM_MESH) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Get total mesh vertex count across all mesh elements
+static inline int jsonl_data_mesh_vertex_count(const jsonl_data_t *data) {
+    int total = 0;
+    for (int e = 0; e < data->entry_count; e++) {
+        for (int i = 0; i < data->entries[e].element_count; i++) {
+            if (data->entries[e].elements[i].type == JSONL_GEOM_MESH) {
+                total += data->entries[e].elements[i].data.mesh.mesh.vertex_count;
+            }
+        }
+    }
+    return total;
+}
+
+// Get total mesh face (triangle) count across all mesh elements
+static inline int jsonl_data_mesh_face_count(const jsonl_data_t *data) {
+    int total = 0;
+    for (int e = 0; e < data->entry_count; e++) {
+        for (int i = 0; i < data->entries[e].element_count; i++) {
+            if (data->entries[e].elements[i].type == JSONL_GEOM_MESH) {
+                total += data->entries[e].elements[i].data.mesh.mesh.index_count / 3;
+            }
+        }
+    }
+    return total;
+}
+
+// Quick scan for mesh data in file (parses file, checks for mesh, and reports counts)
+static inline jsonl_error_t jsonl_quick_scan_mesh(const char *filepath,
+                                                    int *out_entry_count,
+                                                    int *out_element_count,
+                                                    bool *out_has_mesh,
+                                                    int *out_mesh_vertex_count,
+                                                    int *out_mesh_face_count) {
+    *out_has_mesh = false;
+    *out_mesh_vertex_count = 0;
+    *out_mesh_face_count = 0;
+
+    FILE *f = fopen(filepath, "r");
+    if (!f) return JSONL_ERROR_FILE_NOT_FOUND;
+
+    *out_entry_count = 0;
+    *out_element_count = 0;
+
+    // Use larger buffer for mesh data
+    char *line_buf = (char*)malloc(8 * 1024 * 1024);  // 8MB line buffer for mesh JSONL
+    if (!line_buf) {
+        fclose(f);
+        return JSONL_ERROR_MEMORY_ALLOCATION;
+    }
+
+    while (fgets(line_buf, 8 * 1024 * 1024, f)) {
+        // Skip empty lines
+        char *p = line_buf;
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '\0') continue;
+
+        cJSON *root = cJSON_Parse(p);
+        if (root) {
+            (*out_entry_count)++;
+            cJSON *elements = cJSON_GetObjectItemCaseSensitive(root, "Elements");
+            if (elements && cJSON_IsArray(elements)) {
+                int elem_count = cJSON_GetArraySize(elements);
+                *out_element_count += elem_count;
+
+                // Check each element for mesh type
+                cJSON *elem;
+                cJSON_ArrayForEach(elem, elements) {
+                    cJSON *geom = cJSON_GetObjectItemCaseSensitive(elem, "Element");
+                    if (geom) {
+                        cJSON *type_field = cJSON_GetObjectItemCaseSensitive(geom, "$type");
+                        if (type_field && cJSON_IsString(type_field)) {
+                            const char *type_str = type_field->valuestring;
+                            // Check if it's a MeshBody
+                            if (strstr(type_str, "MeshBody") != NULL) {
+                                *out_has_mesh = true;
+
+                                // Count vertices and faces
+                                cJSON *points = cJSON_GetObjectItemCaseSensitive(geom, "_Points");
+                                cJSON *indices = cJSON_GetObjectItemCaseSensitive(geom, "_Indices");
+                                if (points && cJSON_IsArray(points)) {
+                                    *out_mesh_vertex_count += cJSON_GetArraySize(points);
+                                }
+                                if (indices && cJSON_IsArray(indices)) {
+                                    *out_mesh_face_count += cJSON_GetArraySize(indices) / 3;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    free(line_buf);
+    fclose(f);
+    return JSONL_OK;
 }
 
 #endif // JSONL_LOADER_H
