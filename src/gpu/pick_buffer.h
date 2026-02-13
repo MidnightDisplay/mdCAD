@@ -129,6 +129,15 @@ typedef struct {
 
     // Tracks whether the pick pass has run at least once (image is valid for sampling)
     bool has_rendered;
+
+    // Cursor-gated rebuild: skip pick buffer rebuild when nothing changed
+    float prev_center_x;        // Previous cursor position (normalized 0-1)
+    float prev_center_y;
+    bool needs_rebuild;          // True when pick buffer must be rebuilt this frame
+    bool first_frame;            // True until first successful render
+
+    // Camera change detection (view+proj matrix hash)
+    uint32_t prev_camera_hash;
 } pick_buffer_t;
 
 //------------------------------------------------------------------------------
@@ -214,6 +223,11 @@ static inline void pick_buffer_init(pick_buffer_t *pb) {
     pb->hovered_pick_id = 0;
     pb->zoom_factor = 1.0f;  // Default zoom factor
     pb->thickness_multiplier = 4.0f;  // Default: same thickness as visual rendering
+    pb->needs_rebuild = true;
+    pb->first_frame = true;
+    pb->prev_center_x = -1.0f;
+    pb->prev_center_y = -1.0f;
+    pb->prev_camera_hash = 0;
 
     // Create render target
     pb->color_img = sg_make_image(&(sg_image_desc){
@@ -670,10 +684,54 @@ static inline void pick_buffer_shutdown(pick_buffer_t *pb) {
 //------------------------------------------------------------------------------
 static inline void pick_buffer_set_center(pick_buffer_t *pb, float x, float y,
                                            float viewport_width, float viewport_height) {
+    // Detect cursor movement > 1 pixel (in viewport pixel coordinates)
+    float dx = (x - pb->prev_center_x) * viewport_width;
+    float dy = (y - pb->prev_center_y) * viewport_height;
+    if (dx * dx + dy * dy > 1.0f) {
+        pb->needs_rebuild = true;
+    }
+
+    pb->prev_center_x = x;
+    pb->prev_center_y = y;
     pb->center_x = x;
     pb->center_y = y;
     pb->viewport_width = viewport_width;
     pb->viewport_height = viewport_height;
+}
+
+// Force pick buffer rebuild (call when scene changes: entity add/remove/move, visibility toggle)
+static inline void pick_buffer_invalidate(pick_buffer_t *pb) {
+    pb->needs_rebuild = true;
+}
+
+// Check if pick buffer needs rebuild this frame.
+// Also detects camera changes via view+proj matrix hash.
+static inline bool pick_buffer_needs_rebuild(pick_buffer_t *pb, mat4_t view, mat4_t proj) {
+    if (pb->first_frame) {
+        pb->first_frame = false;
+        pb->needs_rebuild = true;
+    }
+
+    // Simple camera change detection: hash the first few floats of view+proj
+    // Using a fast FNV-1a-style hash on the raw float bits
+    uint32_t h = 2166136261u;
+    const uint32_t *vf = (const uint32_t *)view.m;
+    const uint32_t *pf = (const uint32_t *)proj.m;
+    for (int i = 0; i < 16; i++) {
+        h ^= vf[i]; h *= 16777619u;
+        h ^= pf[i]; h *= 16777619u;
+    }
+    if (h != pb->prev_camera_hash) {
+        pb->prev_camera_hash = h;
+        pb->needs_rebuild = true;
+    }
+
+    return pb->needs_rebuild;
+}
+
+// Reset the rebuild flag after a successful rebuild cycle
+static inline void pick_buffer_clear_rebuild_flag(pick_buffer_t *pb) {
+    pb->needs_rebuild = false;
 }
 
 //------------------------------------------------------------------------------

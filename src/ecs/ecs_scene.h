@@ -1597,8 +1597,32 @@ static inline int ecs_scene_triangle_count(ecs_scene_t *scene) {
 // GPU Picking Support
 //------------------------------------------------------------------------------
 
-// Populate pick buffer with all visible, pickable entities
-static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffer_t *pb) {
+// Helper: Check if an AABB of projected NDC points overlaps the pick viewport.
+// Returns true if the entity MIGHT be visible (conservative — never false-negatives).
+// ndc_min/max are the bounding box of all projected points.
+// margin accounts for point/line radius extending beyond the projected center.
+static inline bool pick_ndc_aabb_overlaps(float ndc_min_x, float ndc_max_x,
+                                           float ndc_min_y, float ndc_max_y,
+                                           float margin) {
+    // The pick buffer viewport in NDC is [-1,1] x [-1,1].
+    // With margin, an entity is culled only if ALL its points are beyond margin on one side.
+    return !(ndc_min_x > margin || ndc_max_x < -margin ||
+             ndc_min_y > margin || ndc_max_y < -margin);
+}
+
+// Helper: Update NDC bounding box with a new projected point
+static inline void pick_ndc_aabb_expand(float ndc_x, float ndc_y,
+                                         float *min_x, float *max_x,
+                                         float *min_y, float *max_y) {
+    if (ndc_x < *min_x) *min_x = ndc_x;
+    if (ndc_x > *max_x) *max_x = ndc_x;
+    if (ndc_y < *min_y) *min_y = ndc_y;
+    if (ndc_y > *max_y) *max_y = ndc_y;
+}
+
+// Populate pick buffer with all visible, pickable entities.
+// pick_mvp is the combined pick-projection * view * model MVP used for the pick buffer render.
+static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffer_t *pb, mat4_t pick_mvp) {
     if (!scene->visible) return;
 
     ecs_world_state_t *w = scene->world;
@@ -1612,6 +1636,11 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
             { .id = w->TransformComp_id }
         }
     });
+
+    // Margin values for NDC culling (accounts for point/line screen-space radius)
+    const float POINT_MARGIN = 1.5f;
+    const float LINE_MARGIN  = 2.0f;
+    const float TRI_MARGIN   = 2.0f;
 
     ecs_iter_t it = ecs_query_iter(w->world, q);
     while (ecs_query_next(&it)) {
@@ -1631,28 +1660,57 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
             GeometryComp *g = &geoms[i];
             TransformComp *t = &transforms[i];
 
-            // Add to pick buffer based on geometry type
+            // Add to pick buffer based on geometry type, with screen-space frustum culling
             switch (g->type) {
                 case GEOM_LINE: {
                     vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.line.a);
                     vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.line.b);
+                    // Frustum cull: project both endpoints
+                    float na_x, na_y, nb_x, nb_y;
+                    bool va = clip_space_project(pick_mvp, world_a, &na_x, &na_y);
+                    bool vb = clip_space_project(pick_mvp, world_b, &nb_x, &nb_y);
+                    if (!va && !vb) break;  // Both behind camera
+                    float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                    if (va) pick_ndc_aabb_expand(na_x, na_y, &min_x, &max_x, &min_y, &max_y);
+                    if (vb) pick_ndc_aabb_expand(nb_x, nb_y, &min_x, &max_x, &min_y, &max_y);
+                    if (!va || !vb) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; } // Straddles camera — don't cull
+                    if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) break;
                     pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                     break;
                 }
                 case GEOM_POINT: {
                     vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point.point);
+                    float ndc_x, ndc_y;
+                    if (!clip_space_project(pick_mvp, world_pos, &ndc_x, &ndc_y)) break;
+                    if (ndc_x > POINT_MARGIN || ndc_x < -POINT_MARGIN ||
+                        ndc_y > POINT_MARGIN || ndc_y < -POINT_MARGIN) break;
                     pick_buffer_add_point(pb, world_pos, s->pick_id);
                     break;
                 }
                 case GEOM_POLYLINE: {
-                    // Add all segments to pick buffer (all with same pick_id)
+                    // Pre-cull: build AABB of all projected polyline vertices
                     int point_count = g->data.polyline.count;
+                    float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                    bool any_behind = false, any_visible = false;
+                    for (int j = 0; j < point_count; j++) {
+                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.polyline.points[j]);
+                        float nx, ny;
+                        if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                            pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                            any_visible = true;
+                        } else {
+                            any_behind = true;
+                        }
+                    }
+                    if (!any_visible && !any_behind) break;
+                    if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                    if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) break;
+                    // Passed culling — add all segments
                     for (int seg = 0; seg < point_count - 1; seg++) {
                         vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polyline.points[seg]);
                         vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polyline.points[seg + 1]);
                         pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                     }
-                    // Add all joins to pick buffer (for easier picking at vertices)
                     for (int j = 1; j < point_count - 1; j++) {
                         vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polyline.points[j]);
                         pick_buffer_add_point(pb, world_pos, s->pick_id);
@@ -1660,7 +1718,6 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     break;
                 }
                 case GEOM_ARC: {
-                    // Tessellate arc and add segments to pick buffer
                     int arc_point_count = 0;
                     vec3_t *arc_points = ecs_scene_tessellate_arc(
                         g->data.arc.center, g->data.arc.radius,
@@ -1668,37 +1725,67 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         g->data.arc.normal, &arc_point_count
                     );
                     if (arc_points && arc_point_count >= 2) {
-                        for (int seg = 0; seg < arc_point_count - 1; seg++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, arc_points[seg]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, arc_points[seg + 1]);
-                            pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                        // Pre-cull via AABB
+                        float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                        bool any_behind = false, any_visible = false;
+                        for (int j = 0; j < arc_point_count; j++) {
+                            vec3_t wp = mat4_transform_point(t->world_matrix, arc_points[j]);
+                            float nx, ny;
+                            if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                                pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                                any_visible = true;
+                            } else {
+                                any_behind = true;
+                            }
                         }
-                        for (int j = 1; j < arc_point_count - 1; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, arc_points[j]);
-                            pick_buffer_add_point(pb, world_pos, s->pick_id);
+                        if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                        if ((any_visible || any_behind) &&
+                            pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
+                            for (int seg = 0; seg < arc_point_count - 1; seg++) {
+                                vec3_t world_a = mat4_transform_point(t->world_matrix, arc_points[seg]);
+                                vec3_t world_b = mat4_transform_point(t->world_matrix, arc_points[seg + 1]);
+                                pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                            }
+                            for (int j = 1; j < arc_point_count - 1; j++) {
+                                vec3_t world_pos = mat4_transform_point(t->world_matrix, arc_points[j]);
+                                pick_buffer_add_point(pb, world_pos, s->pick_id);
+                            }
                         }
                         free(arc_points);
                     }
                     break;
                 }
                 case GEOM_POLYGON: {
-                    // Add all segments (closed polygon: N segments for N points)
                     int point_count = g->data.polygon.count;
-                    for (int seg = 0; seg < point_count; seg++) {
-                        int next = (seg + 1) % point_count;
-                        vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polygon.points[seg]);
-                        vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polygon.points[next]);
-                        pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
-                    }
-                    // Add all vertices as pick points
+                    float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                    bool any_behind = false, any_visible = false;
                     for (int j = 0; j < point_count; j++) {
-                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
-                        pick_buffer_add_point(pb, world_pos, s->pick_id);
+                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
+                        float nx, ny;
+                        if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                            pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                            any_visible = true;
+                        } else {
+                            any_behind = true;
+                        }
+                    }
+                    if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                    if ((any_visible || any_behind) &&
+                        pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
+                        for (int seg = 0; seg < point_count; seg++) {
+                            int next = (seg + 1) % point_count;
+                            vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polygon.points[seg]);
+                            vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polygon.points[next]);
+                            pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                        }
+                        for (int j = 0; j < point_count; j++) {
+                            vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
+                            pick_buffer_add_point(pb, world_pos, s->pick_id);
+                        }
                     }
                     break;
                 }
                 case GEOM_BEZIER: {
-                    // Tessellate bezier and add segments to pick buffer
                     int bezier_point_count = 0;
                     vec3_t *bezier_points = ecs_scene_tessellate_bezier(
                         g->data.bezier.p0, g->data.bezier.p1,
@@ -1706,21 +1793,36 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         g->data.bezier.segments, &bezier_point_count
                     );
                     if (bezier_points && bezier_point_count >= 2) {
-                        for (int seg = 0; seg < bezier_point_count - 1; seg++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, bezier_points[seg]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, bezier_points[seg + 1]);
-                            pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                        float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                        bool any_behind = false, any_visible = false;
+                        for (int j = 0; j < bezier_point_count; j++) {
+                            vec3_t wp = mat4_transform_point(t->world_matrix, bezier_points[j]);
+                            float nx, ny;
+                            if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                                pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                                any_visible = true;
+                            } else {
+                                any_behind = true;
+                            }
                         }
-                        for (int j = 1; j < bezier_point_count - 1; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, bezier_points[j]);
-                            pick_buffer_add_point(pb, world_pos, s->pick_id);
+                        if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                        if ((any_visible || any_behind) &&
+                            pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
+                            for (int seg = 0; seg < bezier_point_count - 1; seg++) {
+                                vec3_t world_a = mat4_transform_point(t->world_matrix, bezier_points[seg]);
+                                vec3_t world_b = mat4_transform_point(t->world_matrix, bezier_points[seg + 1]);
+                                pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                            }
+                            for (int j = 1; j < bezier_point_count - 1; j++) {
+                                vec3_t world_pos = mat4_transform_point(t->world_matrix, bezier_points[j]);
+                                pick_buffer_add_point(pb, world_pos, s->pick_id);
+                            }
                         }
                         free(bezier_points);
                     }
                     break;
                 }
                 case GEOM_HELIX: {
-                    // Tessellate helix and add segments to pick buffer
                     int helix_point_count = 0;
                     vec3_t *helix_points = ecs_scene_tessellate_helix(
                         g->data.helix.axis_start, g->data.helix.axis_end,
@@ -1728,24 +1830,47 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         g->data.helix.segments, &helix_point_count
                     );
                     if (helix_points && helix_point_count >= 2) {
-                        for (int seg = 0; seg < helix_point_count - 1; seg++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, helix_points[seg]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, helix_points[seg + 1]);
-                            pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                        float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                        bool any_behind = false, any_visible = false;
+                        for (int j = 0; j < helix_point_count; j++) {
+                            vec3_t wp = mat4_transform_point(t->world_matrix, helix_points[j]);
+                            float nx, ny;
+                            if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                                pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                                any_visible = true;
+                            } else {
+                                any_behind = true;
+                            }
                         }
-                        for (int j = 1; j < helix_point_count - 1; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, helix_points[j]);
-                            pick_buffer_add_point(pb, world_pos, s->pick_id);
+                        if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                        if ((any_visible || any_behind) &&
+                            pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
+                            for (int seg = 0; seg < helix_point_count - 1; seg++) {
+                                vec3_t world_a = mat4_transform_point(t->world_matrix, helix_points[seg]);
+                                vec3_t world_b = mat4_transform_point(t->world_matrix, helix_points[seg + 1]);
+                                pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                            }
+                            for (int j = 1; j < helix_point_count - 1; j++) {
+                                vec3_t world_pos = mat4_transform_point(t->world_matrix, helix_points[j]);
+                                pick_buffer_add_point(pb, world_pos, s->pick_id);
+                            }
                         }
                         free(helix_points);
                     }
                     break;
                 }
                 case GEOM_POINT_CLOUD: {
-                    // Add point cloud points to pick buffer
-                    // For large clouds, we sample points to avoid overwhelming the pick buffer
+                    // Pre-cull with center point
+                    vec3_t center = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[0]);
+                    float ndc_cx, ndc_cy;
+                    bool center_visible = clip_space_project(pick_mvp, center, &ndc_cx, &ndc_cy);
+                    // For point clouds, use a generous margin since points are spread out
+                    // If center is way off screen, skip entirely
+                    if (center_visible && (ndc_cx > 10.0f || ndc_cx < -10.0f ||
+                                           ndc_cy > 10.0f || ndc_cy < -10.0f)) break;
+
                     int pc_count = g->data.point_cloud.count;
-                    int max_pick_points = 1000;  // Limit to avoid overwhelming pick buffer
+                    int max_pick_points = 1000;
                     int step = (pc_count > max_pick_points) ? (pc_count / max_pick_points) : 1;
 
                     for (int p = 0; p < pc_count; p += step) {
@@ -1758,12 +1883,45 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.triangle.a);
                     vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
                     vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
+                    // Frustum cull triangle
+                    float na_x, na_y, nb_x, nb_y, nc_x, nc_y;
+                    bool va = clip_space_project(pick_mvp, world_a, &na_x, &na_y);
+                    bool vb = clip_space_project(pick_mvp, world_b, &nb_x, &nb_y);
+                    bool vc = clip_space_project(pick_mvp, world_c, &nc_x, &nc_y);
+                    if (!va && !vb && !vc) break;
+                    float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                    if (va) pick_ndc_aabb_expand(na_x, na_y, &min_x, &max_x, &min_y, &max_y);
+                    if (vb) pick_ndc_aabb_expand(nb_x, nb_y, &min_x, &max_x, &min_y, &max_y);
+                    if (vc) pick_ndc_aabb_expand(nc_x, nc_y, &min_x, &max_x, &min_y, &max_y);
+                    if (!va || !vb || !vc) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                    if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, TRI_MARGIN)) break;
                     pick_buffer_add_triangle(pb, world_a, world_b, world_c, s->pick_id);
                     break;
                 }
                 case GEOM_MESH: {
-                    // All faces share the same pick_id (entire mesh is one entity)
+                    // Coarse cull: project a few sample vertices to check if mesh is near viewport
                     int face_count = geom_mesh_face_count(&g->data.mesh);
+                    int vert_count = g->data.mesh.vertex_count;
+                    if (face_count == 0 || vert_count == 0) break;
+
+                    // Sample up to 8 vertices for coarse cull
+                    float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
+                    bool any_behind = false, any_visible = false;
+                    int sample_step = (vert_count > 8) ? (vert_count / 8) : 1;
+                    for (int sv = 0; sv < vert_count; sv += sample_step) {
+                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[sv]);
+                        float nx, ny;
+                        if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
+                            pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
+                            any_visible = true;
+                        } else {
+                            any_behind = true;
+                        }
+                    }
+                    if (!any_visible && !any_behind) break;
+                    if (any_behind) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; }
+                    if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, TRI_MARGIN)) break;
+
                     for (int f = 0; f < face_count; f++) {
                         uint32_t i0 = g->data.mesh.indices[f * 3 + 0];
                         uint32_t i1 = g->data.mesh.indices[f * 3 + 1];

@@ -545,20 +545,28 @@ static void frame(void) {
             // Pass the actual render target dimensions for proper zoom calculation
             pick_buffer_set_center(&state.pick_buffer, vp_x, vp_y, (float)vp_width, (float)vp_height);
 
-            // Populate pick buffer with ECS entities (only if visible)
-            pick_buffer_begin_frame(&state.pick_buffer);
-            if (state.visibility.show_ecs_entities) {
-                ecs_scene_populate_pick_buffer(&state.ecs_scene, &state.pick_buffer);
+            // Cursor-gated rebuild: skip expensive pick buffer cycle when nothing changed
+            if (pick_buffer_needs_rebuild(&state.pick_buffer, view, proj)) {
+                // Compute the pick MVP for frustum culling (same matrix used for rendering)
+                mat4_t pick_mvp = pick_buffer_compute_mvp(&state.pick_buffer, view, proj);
+
+                // Populate pick buffer with ECS entities (only if visible)
+                pick_buffer_begin_frame(&state.pick_buffer);
+                if (state.visibility.show_ecs_entities) {
+                    ecs_scene_populate_pick_buffer(&state.ecs_scene, &state.pick_buffer, pick_mvp);
+                }
+                // Add gizmo handles + vertex handles to pick buffer
+                gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
+
+                // Render pick pass
+                pick_buffer_render(&state.pick_buffer, view, proj);
+
+                // Readback and update hover state
+                pick_buffer_readback(&state.pick_buffer);
+                pick_buffer_update_hover(&state.pick_buffer);
+
+                pick_buffer_clear_rebuild_flag(&state.pick_buffer);
             }
-            // Add gizmo handles + vertex handles to pick buffer
-            gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
-
-            // Render pick pass
-            pick_buffer_render(&state.pick_buffer, view, proj);
-
-            // Readback and update hover state
-            pick_buffer_readback(&state.pick_buffer);
-            pick_buffer_update_hover(&state.pick_buffer);
 
             uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
 
@@ -652,6 +660,9 @@ static void frame(void) {
                 float delta_len = vec3_length(delta);
 
                 if (delta_len > 1e-7f) {
+                    // Scene changed — invalidate pick buffer
+                    pick_buffer_invalidate(&state.pick_buffer);
+
                     if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
                         // Apply delta to all selected entities
                         for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
