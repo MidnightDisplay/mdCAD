@@ -209,6 +209,38 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-02-12)
 
+### ECS Batch Parenting and other fixes (IMPLEMENTED)
+
+  **Sprint 1: Infrastructure**
+
+  - ecs_world.h: Added ImportPending_tag (zero-size tag), ecs_world_create_anchor_entity() (TransformComp-only), ecs_world_set_parent_batch()
+  (all children → one parent, deferred), ecs_world_set_parents_batch() (each child → own parent, deferred)                                     
+  - ecs_scene.h: Added scene_add_anchor(), scene_set_parent_batch(), scene_set_parents_batch() wrappers. Updated both                        
+  ecs_scene_update_transforms() and ecs_scene_update() queries to skip ImportPending entities
+
+  **Sprint 2: PLY Import**
+
+  - ply_import_job.h: Added PLY_JOB_PARENTING state, created_entities[] tracking array, anchor_entity field. Entity creation now tags with
+  ImportPending and tracks IDs. After creation completes, transitions to PLY_JOB_PARENTING which creates a transform-only anchor and
+  batch-parents all entities in one deferred block (removing ImportPending simultaneously). Updated cancel/reset/is_running handlers.
+  - ui_scene_hierarchy.h: Progress UI shows "Parenting..." during PLY_JOB_PARENTING state
+
+  **Sprint 3: JSONL Import**
+
+  - jsonl_import_job.h: Replaced scene_add_point() invisible anchors with scene_add_anchor() (no GPU slot waste). Entity creation tags with
+  ImportPending. Replaced chunked scene_set_parent() loop with single deferred batch (all parenting + ImportPending removal in one
+  ecs_defer_begin/end block). Updated cancel handler to remove ImportPending tags.
+
+  Sprint 4: Scene Serializer
+
+  - scene_serializer.h: Replaced per-entity scene_set_parent() loop with scene_set_parents_batch() for O(n) batched parenting
+
+  Additional fixes
+
+  - geometry_comp.h: geometry_type_name() returns "Anchor" for GEOM_TYPE_COUNT sentinel
+  - ui_scene_hierarchy.h: Hierarchy cache now includes anchor entities (LabelComp + TransformComp, no GeometryComp)
+  - jsonl_loader.h: Fixed pre-existing _stricmp build error on non-Windows platforms (uses strcasecmp)
+
 ### JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
 
 Extended the JSONL geometry log loader to support `MeshBody` elements from .NET geometry exports. Meshes can be imported in two modes matching the PLY mesh import pattern.
@@ -255,7 +287,7 @@ For older changes please refer to `CHANGELOG.md`. Keep the index up to date with
 - Session (2026-02-11):
   - Mesh Features - Sprint 6: OBJ to PLY Conversion Script (IMPLEMENTED)
   - Mesh Features - Sprint 5: PLY Mesh Import Job & UI (IMPLEMENTED)
-  - Mesh Features - Sprint 4: PLY Mesh Parser - ASCII (IMPLEMENTED)
+  - Mesh Features - Sprint 4: PLY Mesh Parser - Binary (IMPLEMENTED)
   - Mesh Features - Sprint 3: PLY Mesh Parser - ASCII (IMPLEMENTED)
   - Mesh Features - Sprint 2: Light Entities in Hierarchy & Inspector (IMPLEMENTED)
   - Mesh Features - Sprint 1: Add Entity Menu Items (IMPLEMENTED)
