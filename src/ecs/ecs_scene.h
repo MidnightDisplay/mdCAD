@@ -1032,6 +1032,29 @@ static inline void scene_set_parent(ecs_scene_t *scene, ecs_entity_t child, ecs_
     ecs_world_set_parent(scene->world, child, parent);
 }
 
+// Create a transform-only anchor entity (no geometry, no GPU slot)
+static inline ecs_entity_t scene_add_anchor(ecs_scene_t *scene,
+                                              const char *name, const char *desc) {
+    ecs_entity_t e = ecs_world_create_anchor_entity(scene->world);
+    if (name || desc) {
+        LabelComp label = label_comp_make(name ? name : "", desc ? desc : "");
+        ecs_world_set_label(scene->world, e, &label);
+    }
+    return e;
+}
+
+// Batch-parent all children to a single parent
+static inline void scene_set_parent_batch(ecs_scene_t *scene,
+    ecs_entity_t *children, int count, ecs_entity_t parent) {
+    ecs_world_set_parent_batch(scene->world, children, count, parent);
+}
+
+// Batch-parent each child to its own parent
+static inline void scene_set_parents_batch(ecs_scene_t *scene,
+    ecs_entity_t *children, ecs_entity_t *parents, int count) {
+    ecs_world_set_parents_batch(scene->world, children, parents, count);
+}
+
 // Get parent of an entity (returns 0 if no parent)
 static inline ecs_entity_t scene_get_parent(ecs_scene_t *scene, ecs_entity_t child) {
     return ecs_world_get_parent(scene->world, child);
@@ -1138,10 +1161,11 @@ static inline void ecs_scene_update_transform_recursive(ecs_scene_t *scene, ecs_
 static inline void ecs_scene_update_transforms(ecs_scene_t *scene) {
     ecs_world_state_t *w = scene->world;
 
-    // Query all entities with TransformComp
+    // Query all entities with TransformComp (skip ImportPending)
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
-            { .id = w->TransformComp_id }
+            { .id = w->TransformComp_id },
+            { .id = w->ImportPending_tag, .oper = EcsNot }
         }
     });
 
@@ -1209,12 +1233,13 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
         selection_color = vec4_make(select_col.x, select_col.y, select_col.z, 1.0f);
     }
 
-    // Query all entities with geometry and renderable
+    // Query all entities with geometry and renderable (skip ImportPending)
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
             { .id = w->GeometryComp_id },
             { .id = w->RenderableComp_id },
-            { .id = w->TransformComp_id }
+            { .id = w->TransformComp_id },
+            { .id = w->ImportPending_tag, .oper = EcsNot }
         }
     });
 

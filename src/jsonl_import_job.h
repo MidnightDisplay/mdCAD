@@ -497,12 +497,8 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                 return true;
             }
 
-            // Create root anchor entity (invisible point at origin)
-            job->root_entity = scene_add_point(scene, vec3_make(0, 0, 0),
-                                                vec4_make(0, 0, 0, 0), 0.0f);
-            if (job->root_entity) {
-                scene_set_visible(scene, job->root_entity, false);
-                // Extract filename from path for root label
+            // Create root anchor entity (transform-only, no GPU slot)
+            {
                 const char *fname = job->filepath;
                 const char *sep = strrchr(job->filepath, '/');
 #ifdef _WIN32
@@ -510,22 +506,14 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                 if (sep_win > sep) sep = sep_win;
 #endif
                 if (sep) fname = sep + 1;
-                LabelComp root_label = label_comp_make(fname, "JSONL import root");
-                ecs_world_set_label(scene->world, job->root_entity, &root_label);
+                job->root_entity = scene_add_anchor(scene, fname, "JSONL import root");
             }
 
-            // Create entry anchor entities (one per log entry)
+            // Create entry anchor entities (one per log entry, transform-only)
             for (int i = 0; i < num_entries; i++) {
-                ecs_entity_t entry_e = scene_add_point(scene, vec3_make(0, 0, 0),
-                                                        vec4_make(0, 0, 0, 0), 0.0f);
-                if (entry_e) {
-                    scene_set_visible(scene, entry_e, false);
-                    LabelComp entry_label = label_comp_make(
-                        job->parse_state.data.entries[i].name,
-                        job->parse_state.data.entries[i].description);
-                    ecs_world_set_label(scene->world, entry_e, &entry_label);
-                }
-                job->entry_entities[i] = entry_e;
+                job->entry_entities[i] = scene_add_anchor(scene,
+                    job->parse_state.data.entries[i].name,
+                    job->parse_state.data.entries[i].description);
             }
 
             job->current_entry_idx = 0;
@@ -590,6 +578,8 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
 
                             ecs_entity_t tri = scene_add_triangle(scene, a, b, c, colour);
                             if (tri != 0) {
+                                // Tag as import-pending
+                                ecs_add_id(scene->world->world, tri, scene->world->ImportPending_tag);
                                 // Track for parenting
                                 job->all_created_entities[job->all_created_count] = tri;
                                 job->entity_to_entry_map[job->all_created_count] = job->current_entry_idx;
@@ -614,6 +604,9 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                     ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
 
                     if (e != 0) {
+                        // Tag as import-pending
+                        ecs_add_id(scene->world->world, e, scene->world->ImportPending_tag);
+
                         // Set label if element has a name
                         if (elem->name[0] || elem->description[0]) {
                             LabelComp lbl = label_comp_make(elem->name, elem->description);
@@ -677,101 +670,77 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
 
     //--------------------------------------------------------------------------
     // State: PARENTING_ENTITIES (80-100% progress)
+    // Batch parent all entities in one deferred step
     //--------------------------------------------------------------------------
     if (job->state == JSONL_JOB_PARENTING_ENTITIES) {
-        uint64_t iter_start = stm_now();
-
         jsonl_data_t *data = &job->parse_state.data;
-        int parented_this_frame = 0;
+        ecs_world_state_t *w = scene->world;
 
-        while (parented_this_frame < JSONL_PARENT_CHUNK_SIZE &&
-               job->parented_count < job->total_to_parent) {
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Parenting %d entities...", job->all_created_count + data->entry_count);
 
-            if (job->parented_count < job->all_created_count) {
-                // Parent geometry entity to its entry anchor
-                int idx = job->parented_count;
-                ecs_entity_t child = job->all_created_entities[idx];
-                int entry_idx = job->entity_to_entry_map[idx];
-                ecs_entity_t parent = job->entry_entities[entry_idx];
-                if (child && parent) {
-                    scene_set_parent(scene, child, parent);
-                }
-            } else {
-                // Parent entry anchor to root
-                int entry_idx = job->parented_count - job->all_created_count;
-                if (entry_idx < data->entry_count) {
-                    ecs_entity_t entry_e = job->entry_entities[entry_idx];
-                    if (entry_e && job->root_entity) {
-                        scene_set_parent(scene, entry_e, job->root_entity);
-                    }
-                }
+        // Batch parent + remove ImportPending in one defer block
+        ecs_defer_begin(w->world);
+        // Parent geometry entities to entry anchors
+        for (int i = 0; i < job->all_created_count; i++) {
+            ecs_entity_t child = job->all_created_entities[i];
+            int entry_idx = job->entity_to_entry_map[i];
+            ecs_entity_t parent = job->entry_entities[entry_idx];
+            if (child && parent) {
+                ecs_add_pair(w->world, child, EcsChildOf, parent);
+                ecs_remove_id(w->world, child, w->ImportPending_tag);
             }
+        }
+        // Parent entry anchors to root
+        for (int i = 0; i < data->entry_count; i++) {
+            if (job->entry_entities[i] && job->root_entity) {
+                ecs_add_pair(w->world, job->entry_entities[i], EcsChildOf, job->root_entity);
+            }
+        }
+        ecs_defer_end(w->world);
 
-            job->parented_count++;
-            parented_this_frame++;
+        // Mark all dirty (after flush)
+        for (int i = 0; i < job->all_created_count; i++) {
+            TransformComp *t = ecs_world_get_transform(w, job->all_created_entities[i]);
+            if (t) t->dirty = true;
+            RenderableComp *r = ecs_world_get_renderable(w, job->all_created_entities[i]);
+            if (r) r->instance_dirty = true;
         }
 
-        uint64_t iter_end = stm_now();
-        job->last_iteration_time_ms = stm_ms(stm_diff(iter_end, iter_start));
+        // Store entry count before freeing
+        int num_entries = data->entry_count;
 
-        // Update progress (80-100%)
-        float parent_progress = (job->total_to_parent > 0) ?
-            (float)job->parented_count / (float)job->total_to_parent : 1.0f;
-        job->progress = 0.80f + 0.20f * parent_progress;
+        // Free tracking arrays
+        if (job->all_created_entities) {
+            free(job->all_created_entities);
+            job->all_created_entities = NULL;
+        }
+        if (job->entity_to_entry_map) {
+            free(job->entity_to_entry_map);
+            job->entity_to_entry_map = NULL;
+        }
+        if (job->entry_entities) {
+            free(job->entry_entities);
+            job->entry_entities = NULL;
+        }
 
-        // Store timing sample
-        float progress_pct = job->progress * 100.0f;
-        if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES &&
-            (progress_pct - job->last_sampled_progress) >= 1.0f) {
+        // Free parsed data
+        jsonl_parse_state_free(&job->parse_state);
+
+        job->progress = 1.0f;
+        job->state = JSONL_JOB_COMPLETE;
+
+        // Record final 100% sample
+        if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES) {
             job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-            job->iteration_progress[job->timing_sample_count] = progress_pct;
+            job->iteration_progress[job->timing_sample_count] = 100.0f;
             job->timing_sample_count++;
-            job->last_sampled_progress = progress_pct;
         }
 
         snprintf(job->status_message, sizeof(job->status_message),
-                 "Parenting: %d / %d",
-                 job->parented_count, job->total_to_parent);
-
-        // Check if parenting is complete
-        if (job->parented_count >= job->total_to_parent) {
-            // Store entry count before freeing
-            int num_entries = data->entry_count;
-
-            // Free tracking arrays
-            if (job->all_created_entities) {
-                free(job->all_created_entities);
-                job->all_created_entities = NULL;
-            }
-            if (job->entity_to_entry_map) {
-                free(job->entity_to_entry_map);
-                job->entity_to_entry_map = NULL;
-            }
-            if (job->entry_entities) {
-                free(job->entry_entities);
-                job->entry_entities = NULL;
-            }
-
-            // Free parsed data
-            jsonl_parse_state_free(&job->parse_state);
-
-            job->progress = 1.0f;
-            job->state = JSONL_JOB_COMPLETE;
-
-            // Record final 100% sample
-            if (job->timing_sample_count < JSONL_JOB_MAX_TIMING_SAMPLES) {
-                job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-                job->iteration_progress[job->timing_sample_count] = 100.0f;
-                job->timing_sample_count++;
-            }
-
-            snprintf(job->status_message, sizeof(job->status_message),
-                     "Imported %d elements in %d entries",
-                     job->total_elements, num_entries);
-            return true;
-        }
-
-        return false;
+                 "Imported %d elements in %d entries",
+                 job->total_elements, num_entries);
+        return true;
     }
 
     return true;  // Unknown state
@@ -782,13 +751,21 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
 //------------------------------------------------------------------------------
 
 static inline void jsonl_import_job_cancel(jsonl_import_job_t *job, ecs_scene_t *scene) {
-    (void)scene;
-
     if (job->state == JSONL_JOB_IDLE ||
         job->state == JSONL_JOB_COMPLETE ||
         job->state == JSONL_JOB_CANCELLED ||
         job->state == JSONL_JOB_ERROR) {
         return;
+    }
+
+    // Remove ImportPending tags from any entities created so far
+    if (job->all_created_entities && scene) {
+        ecs_world_state_t *w = scene->world;
+        for (int i = 0; i < job->all_created_count; i++) {
+            if (ecs_is_alive(w->world, job->all_created_entities[i])) {
+                ecs_remove_id(w->world, job->all_created_entities[i], w->ImportPending_tag);
+            }
+        }
     }
 
     // Free parsed data

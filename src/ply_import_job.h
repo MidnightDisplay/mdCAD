@@ -35,6 +35,7 @@ typedef enum {
     PLY_JOB_IDLE = 0,           // No job running
     PLY_JOB_PARSING_VERTICES,   // Parsing PLY vertex data
     PLY_JOB_CREATING_ENTITIES,  // Creating ECS entities (Editable mode only)
+    PLY_JOB_PARENTING,          // Batch-parent entities to anchor
     PLY_JOB_COMPLETE,           // Job finished successfully
     PLY_JOB_CANCELLED,          // Job was cancelled
     PLY_JOB_ERROR               // Job failed with error
@@ -74,6 +75,9 @@ typedef struct {
 
     // Entity creation state (for Editable Subtree mode)
     int created_count;          // Number of entities created so far
+    ecs_entity_t *created_entities;  // Array of created entity IDs
+    int created_capacity;            // Capacity of array
+    ecs_entity_t anchor_entity;      // Transform-only parent anchor
 
     // Progress (0.0 - 1.0)
     float progress;
@@ -113,6 +117,9 @@ static inline void ply_import_job_init(ply_import_job_t *job) {
     job->timing_sample_count = 0;
     job->iteration_start_time = 0;
     job->last_sampled_progress = -1.0f;  // Force first sample
+    job->created_entities = NULL;
+    job->created_capacity = 0;
+    job->anchor_entity = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -157,6 +164,14 @@ static inline bool ply_import_job_start(ply_import_job_t *job,
     job->error = PLY_OK;
     job->total_points = 0;
     job->transforms_applied = false;
+
+    // Free any existing entity tracking array
+    if (job->created_entities) {
+        free(job->created_entities);
+        job->created_entities = NULL;
+    }
+    job->created_capacity = 0;
+    job->anchor_entity = 0;
     job->com = vec3_make(0, 0, 0);
     job->transform_matrix = mat4_identity();
 
@@ -356,10 +371,15 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                          "Imported %d points as Point Cloud", job->total_points);
                 return true;
             } else {
-                // Editable Subtree mode - create individual point entities (no parent)
+                // Editable Subtree mode - create individual point entities
                 // Transformations already applied to coordinates
                 job->created_count = 0;
                 job->state = PLY_JOB_CREATING_ENTITIES;
+
+                // Allocate entity tracking array for batch parenting
+                job->created_entities = (ecs_entity_t*)malloc(job->total_points * sizeof(ecs_entity_t));
+                job->created_capacity = job->total_points;
+
                 snprintf(job->status_message, sizeof(job->status_message),
                          "Creating: 0 / %d entities", job->total_points);
             }
@@ -384,7 +404,7 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
             colors = job->parse_state.colors;
         }
 
-        // Create entities as top-level (no parenting)
+        // Create entities with ImportPending tag (excluded from update loop)
         // Coordinates already have CoM shift, rotation, and scale applied
         int actually_created = 0;
         for (int i = 0; i < to_create; i++) {
@@ -398,6 +418,10 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
             );
             if (pt == 0) {
                 // Slot buffer at capacity - stop creating and report error
+                if (job->created_entities) {
+                    free(job->created_entities);
+                    job->created_entities = NULL;
+                }
                 ply_parse_state_free(&job->parse_state);
                 job->state = PLY_JOB_ERROR;
                 job->error = PLY_ERROR_MEMORY_ALLOCATION;
@@ -407,6 +431,10 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                          INSTANCE_BUFFER_MAX_CAPACITY / (1024 * 1024));
                 return true;
             }
+            // Tag as import-pending (excluded from update loop)
+            ecs_add_id(scene->world->world, pt, scene->world->ImportPending_tag);
+            // Track entity ID for batch parenting
+            job->created_entities[job->created_count + i] = pt;
             actually_created++;
         }
 
@@ -439,22 +467,66 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
             // Free parsed data (no longer needed)
             ply_parse_state_free(&job->parse_state);
 
-            job->progress = 1.0f;
-            job->state = PLY_JOB_COMPLETE;
-
-            // Record final 100% sample for the plot
-            if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
-                job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
-                job->iteration_progress[job->timing_sample_count] = 100.0f;
-                job->timing_sample_count++;
-            }
-
+            // Transition to parenting phase
+            job->progress = 0.95f;
+            job->state = PLY_JOB_PARENTING;
             snprintf(job->status_message, sizeof(job->status_message),
-                     "Imported %d points as Editable Points", job->total_points);
-            return true;
+                     "Parenting %d entities...", job->total_points);
         }
 
         return false;  // Not complete yet
+    }
+
+    //--------------------------------------------------------------------------
+    // State: PARENTING (batch-parent all entities to anchor)
+    //--------------------------------------------------------------------------
+    if (job->state == PLY_JOB_PARENTING) {
+        // Extract filename from path for anchor label
+        const char *fname = job->filepath;
+        const char *sep = strrchr(job->filepath, '/');
+#ifdef _WIN32
+        const char *sep_win = strrchr(job->filepath, '\\');
+        if (sep_win > sep) sep = sep_win;
+#endif
+        if (sep) fname = sep + 1;
+
+        // Create transform-only anchor
+        job->anchor_entity = scene_add_anchor(scene, fname, "PLY import");
+
+        // Batch-parent all entities + remove ImportPending in one defer block
+        ecs_world_state_t *w = scene->world;
+        ecs_defer_begin(w->world);
+        for (int i = 0; i < job->created_count; i++) {
+            ecs_add_pair(w->world, job->created_entities[i], EcsChildOf, job->anchor_entity);
+            ecs_remove_id(w->world, job->created_entities[i], w->ImportPending_tag);
+        }
+        ecs_defer_end(w->world);
+
+        // Mark all dirty (after flush)
+        for (int i = 0; i < job->created_count; i++) {
+            TransformComp *t = ecs_world_get_transform(w, job->created_entities[i]);
+            if (t) t->dirty = true;
+            RenderableComp *r = ecs_world_get_renderable(w, job->created_entities[i]);
+            if (r) r->instance_dirty = true;
+        }
+
+        // Free tracking array
+        free(job->created_entities);
+        job->created_entities = NULL;
+
+        job->progress = 1.0f;
+        job->state = PLY_JOB_COMPLETE;
+
+        // Record final 100% sample for the plot
+        if (job->timing_sample_count < PLY_JOB_MAX_TIMING_SAMPLES) {
+            job->iteration_times[job->timing_sample_count] = (float)job->last_iteration_time_ms;
+            job->iteration_progress[job->timing_sample_count] = 100.0f;
+            job->timing_sample_count++;
+        }
+
+        snprintf(job->status_message, sizeof(job->status_message),
+                 "Imported %d points as Editable Points", job->total_points);
+        return true;
     }
 
     return true;  // Unknown state, consider complete
@@ -465,8 +537,6 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
 //------------------------------------------------------------------------------
 
 static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *scene) {
-    (void)scene;  // No longer need to delete entities - they're top-level and stay
-
     if (job->state == PLY_JOB_IDLE ||
         job->state == PLY_JOB_COMPLETE ||
         job->state == PLY_JOB_CANCELLED ||
@@ -474,13 +544,24 @@ static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *sce
         return;  // Nothing to cancel
     }
 
+    // Remove ImportPending tags from any entities created so far
+    if (job->created_entities && scene) {
+        ecs_world_state_t *w = scene->world;
+        for (int i = 0; i < job->created_count; i++) {
+            if (ecs_is_alive(w->world, job->created_entities[i])) {
+                ecs_remove_id(w->world, job->created_entities[i], w->ImportPending_tag);
+            }
+        }
+    }
+
+    // Free tracking array
+    if (job->created_entities) {
+        free(job->created_entities);
+        job->created_entities = NULL;
+    }
+
     // Free parsed data
     ply_parse_state_free(&job->parse_state);
-
-    // Note: For Editable mode, created entities are top-level (no parent).
-    // On cancel, we leave them in the scene rather than trying to delete them,
-    // as tracking which ones were created adds complexity.
-    // Users can clear the scene if needed.
 
     job->state = PLY_JOB_CANCELLED;
     job->progress = 0.0f;
@@ -493,7 +574,8 @@ static inline void ply_import_job_cancel(ply_import_job_t *job, ecs_scene_t *sce
 
 static inline bool ply_import_job_is_running(const ply_import_job_t *job) {
     return job->state == PLY_JOB_PARSING_VERTICES ||
-           job->state == PLY_JOB_CREATING_ENTITIES;
+           job->state == PLY_JOB_CREATING_ENTITIES ||
+           job->state == PLY_JOB_PARENTING;
 }
 
 //------------------------------------------------------------------------------
@@ -504,6 +586,12 @@ static inline void ply_import_job_reset(ply_import_job_t *job) {
     if (ply_import_job_is_running(job)) {
         ply_parse_state_free(&job->parse_state);
     }
+    if (job->created_entities) {
+        free(job->created_entities);
+        job->created_entities = NULL;
+    }
+    job->created_capacity = 0;
+    job->anchor_entity = 0;
     job->state = PLY_JOB_IDLE;
     job->progress = 0.0f;
     job->status_message[0] = '\0';

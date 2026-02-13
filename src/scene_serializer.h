@@ -1691,15 +1691,29 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         entities[i].new_entity = scene_create_from_loaded(scene, &entities[i]);
     }
 
-    // Set up parent-child relationships (second pass)
-    for (int i = 0; i < entity_count; i++) {
-        if (entities[i].parent_old_id != 0 && entities[i].new_entity != 0) {
-            ecs_entity_t new_parent = scene_find_new_entity(entities, entity_count,
-                                                             entities[i].parent_old_id);
-            if (new_parent != 0) {
-                scene_set_parent(scene, entities[i].new_entity, new_parent);
+    // Set up parent-child relationships (second pass - batch for O(n) perf)
+    {
+        ecs_entity_t *load_children = (ecs_entity_t*)malloc(entity_count * sizeof(ecs_entity_t));
+        ecs_entity_t *load_parents = (ecs_entity_t*)malloc(entity_count * sizeof(ecs_entity_t));
+        int parent_count = 0;
+
+        for (int i = 0; i < entity_count; i++) {
+            if (entities[i].parent_old_id != 0 && entities[i].new_entity != 0) {
+                ecs_entity_t new_parent = scene_find_new_entity(entities, entity_count,
+                                                                 entities[i].parent_old_id);
+                if (new_parent != 0) {
+                    load_children[parent_count] = entities[i].new_entity;
+                    load_parents[parent_count] = new_parent;
+                    parent_count++;
+                }
             }
         }
+
+        if (parent_count > 0) {
+            scene_set_parents_batch(scene, load_children, load_parents, parent_count);
+        }
+        free(load_children);
+        free(load_parents);
     }
 
     // Free loaded entity data

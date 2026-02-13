@@ -31,6 +31,7 @@ typedef struct {
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
     ecs_entity_t Hovered_tag;       // Entity is under cursor
+    ecs_entity_t ImportPending_tag; // Entity being imported (excluded from update)
 
     // Pick ID allocator
     uint32_t next_pick_id;          // Start at 1 (0 = no entity)
@@ -114,6 +115,7 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
     // Register tag components (zero-size)
     s->Selected_tag = ecs_entity(s->world, { .name = "Selected" });
     s->Hovered_tag = ecs_entity(s->world, { .name = "Hovered" });
+    s->ImportPending_tag = ecs_entity(s->world, { .name = "ImportPending" });
 
     // Initialize pick ID allocator
     s->next_pick_id = 1;  // 0 is reserved for "no entity"
@@ -359,6 +361,74 @@ static inline void ecs_world_set_descendants_visible(ecs_world_state_t *s, ecs_e
             }
             ecs_world_set_descendants_visible(s, child, visible);
         }
+    }
+}
+
+// Create a lightweight anchor entity with only TransformComp (no geometry, no GPU slot)
+static inline ecs_entity_t ecs_world_create_anchor_entity(ecs_world_state_t *s) {
+    ecs_entity_t e = ecs_new(s->world);
+    TransformComp t = transform_comp_default();
+    ecs_set_id(s->world, e, s->TransformComp_id, sizeof(TransformComp), &t);
+    return e;
+}
+
+// Batch-parent all children to a single parent (deferred for O(n) perf)
+static inline void ecs_world_set_parent_batch(
+    ecs_world_state_t *s,
+    ecs_entity_t *children, int count,
+    ecs_entity_t parent)
+{
+    if (count <= 0 || parent == 0 || !ecs_is_alive(s->world, parent)) return;
+
+    // Phase 1: Batch structural changes (deferred)
+    ecs_defer_begin(s->world);
+    for (int i = 0; i < count; i++) {
+        if (!ecs_is_alive(s->world, children[i])) continue;
+        ecs_entity_t current = ecs_get_parent(s->world, children[i]);
+        if (current != 0) {
+            ecs_remove_pair(s->world, children[i], EcsChildOf, current);
+        }
+        ecs_add_pair(s->world, children[i], EcsChildOf, parent);
+    }
+    ecs_defer_end(s->world);
+
+    // Phase 2: Mark dirty (after flush - pointers are valid now)
+    for (int i = 0; i < count; i++) {
+        if (!ecs_is_alive(s->world, children[i])) continue;
+        TransformComp *t = ecs_world_get_transform(s, children[i]);
+        if (t) t->dirty = true;
+        RenderableComp *r = ecs_world_get_renderable(s, children[i]);
+        if (r) r->instance_dirty = true;
+    }
+}
+
+// Batch-parent each child to its own parent (deferred for O(n) perf)
+static inline void ecs_world_set_parents_batch(
+    ecs_world_state_t *s,
+    ecs_entity_t *children, ecs_entity_t *parents, int count)
+{
+    if (count <= 0) return;
+
+    // Phase 1: Batch structural changes
+    ecs_defer_begin(s->world);
+    for (int i = 0; i < count; i++) {
+        if (!ecs_is_alive(s->world, children[i])) continue;
+        if (parents[i] == 0 || !ecs_is_alive(s->world, parents[i])) continue;
+        ecs_entity_t current = ecs_get_parent(s->world, children[i]);
+        if (current != 0) {
+            ecs_remove_pair(s->world, children[i], EcsChildOf, current);
+        }
+        ecs_add_pair(s->world, children[i], EcsChildOf, parents[i]);
+    }
+    ecs_defer_end(s->world);
+
+    // Phase 2: Mark dirty
+    for (int i = 0; i < count; i++) {
+        if (!ecs_is_alive(s->world, children[i])) continue;
+        TransformComp *t = ecs_world_get_transform(s, children[i]);
+        if (t) t->dirty = true;
+        RenderableComp *r = ecs_world_get_renderable(s, children[i]);
+        if (r) r->instance_dirty = true;
     }
 }
 

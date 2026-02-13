@@ -227,6 +227,9 @@ static inline const char* geometry_type_name(geometry_type_t type) {
     if (type >= 0 && type < GEOM_TYPE_COUNT) {
         return names[type];
     }
+    if (type == GEOM_TYPE_COUNT) {
+        return "Anchor";
+    }
     return "Unknown";
 }
 

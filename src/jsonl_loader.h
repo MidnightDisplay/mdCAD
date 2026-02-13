@@ -219,8 +219,13 @@ static inline vec4_t jsonl_parse_colour(const char *str) {
 
     // Check for named colours first (case-insensitive comparison)
     // Common .NET System.Drawing.Color names
+    #ifdef _WIN32
     #define COLOR_MATCH(name, r, g, b) \
         if (_stricmp(str, name) == 0) { return vec4_make(r/255.0f, g/255.0f, b/255.0f, 1.0f); }
+    #else
+    #define COLOR_MATCH(name, r, g, b) \
+        if (strcasecmp(str, name) == 0) { return vec4_make(r/255.0f, g/255.0f, b/255.0f, 1.0f); }
+    #endif
 
     COLOR_MATCH("White",       255, 255, 255)
     COLOR_MATCH("Black",       0,   0,   0)

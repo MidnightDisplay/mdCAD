@@ -417,7 +417,7 @@ static inline bool ui_hierarchy_is_descendant(ecs_world_state_t *w,
 static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *state) {
     ecs_world_state_t *w = state->scene->world;
 
-    // First pass: count entities
+    // First pass: count geometry entities
     int total_count = 0;
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
@@ -431,6 +431,21 @@ static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *
     }
     ecs_query_fini(q);
 
+    // Also count anchor entities (LabelComp + TransformComp, no GeometryComp)
+    ecs_query_t *aq = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LabelComp_id },
+            { .id = w->TransformComp_id },
+            { .id = w->GeometryComp_id, .oper = EcsNot }
+        }
+    });
+
+    ecs_iter_t ait = ecs_query_iter(w->world, aq);
+    while (ecs_query_next(&ait)) {
+        total_count += ait.count;
+    }
+    ecs_query_fini(aq);
+
     // Ensure cache has enough capacity
     if (total_count > state->cache_capacity) {
         int new_capacity = state->cache_capacity ? state->cache_capacity * 2 : 64;
@@ -442,7 +457,7 @@ static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *
         state->cache_capacity = new_capacity;
     }
 
-    // Second pass: collect entities with parent info
+    // Second pass: collect geometry entities with parent info
     state->cache_count = 0;
     q = ecs_query(w->world, {
         .terms = {
@@ -464,6 +479,28 @@ static inline void ui_scene_hierarchy_rebuild_cache(ui_scene_hierarchy_state_t *
         }
     }
     ecs_query_fini(q);
+
+    // Also collect anchor entities (LabelComp + TransformComp, no GeometryComp)
+    aq = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LabelComp_id },
+            { .id = w->TransformComp_id },
+            { .id = w->GeometryComp_id, .oper = EcsNot }
+        }
+    });
+
+    ait = ecs_query_iter(w->world, aq);
+    while (ecs_query_next(&ait)) {
+        for (int i = 0; i < ait.count; i++) {
+            ecs_entity_t e = ait.entities[i];
+            state->cache[state->cache_count].entity = e;
+            state->cache[state->cache_count].type = GEOM_TYPE_COUNT;  // Sentinel for anchor
+            state->cache[state->cache_count].parent = ecs_get_parent(w->world, e);
+            state->cache[state->cache_count].depth = ui_hierarchy_compute_depth(w, e);
+            state->cache_count++;
+        }
+    }
+    ecs_query_fini(aq);
 
     // Sort by entity ID
     if (state->cache_count > 1) {
@@ -1407,7 +1444,9 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         bool show_timing = (state->import_job.state == PLY_JOB_CREATING_ENTITIES) &&
                           state->import_job.last_iteration_time_ms > 0;
 
-        if (show_timing) {
+        if (state->import_job.state == PLY_JOB_PARENTING) {
+            igText("%.0f%% - Parenting...", state->import_job.progress * 100.0f);
+        } else if (show_timing) {
             // Show time per iteration (s/it) for entity creation phase
             // Each iteration is PLY_ENTITY_CHUNK_SIZE points (500)
             float seconds_per_iteration = (float)state->import_job.last_iteration_time_ms / 1000.0f;
