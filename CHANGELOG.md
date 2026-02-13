@@ -2,6 +2,74 @@
 
 This file contains changes archived from CHECKPOINT.md and can be referred to if necessary.
 
+## Session (2026-02-12)
+
+### ECS Batch Parenting and other fixes (IMPLEMENTED)
+
+  **Sprint 1: Infrastructure**
+
+  - ecs_world.h: Added ImportPending_tag (zero-size tag), ecs_world_create_anchor_entity() (TransformComp-only), ecs_world_set_parent_batch()
+  (all children → one parent, deferred), ecs_world_set_parents_batch() (each child → own parent, deferred)
+  - ecs_scene.h: Added scene_add_anchor(), scene_set_parent_batch(), scene_set_parents_batch() wrappers. Updated both
+  ecs_scene_update_transforms() and ecs_scene_update() queries to skip ImportPending entities
+
+  **Sprint 2: PLY Import**
+
+  - ply_import_job.h: Added PLY_JOB_PARENTING state, created_entities[] tracking array, anchor_entity field. Entity creation now tags with
+  ImportPending and tracks IDs. After creation completes, transitions to PLY_JOB_PARENTING which creates a transform-only anchor and
+  batch-parents all entities in one deferred block (removing ImportPending simultaneously). Updated cancel/reset/is_running handlers.
+  - ui_scene_hierarchy.h: Progress UI shows "Parenting..." during PLY_JOB_PARENTING state
+
+  **Sprint 3: JSONL Import**
+
+  - jsonl_import_job.h: Replaced scene_add_point() invisible anchors with scene_add_anchor() (no GPU slot waste). Entity creation tags with
+  ImportPending. Replaced chunked scene_set_parent() loop with single deferred batch (all parenting + ImportPending removal in one
+  ecs_defer_begin/end block). Updated cancel handler to remove ImportPending tags.
+
+  **Sprint 4: Scene Serializer**
+
+  - scene_serializer.h: Replaced per-entity scene_set_parent() loop with scene_set_parents_batch() for O(n) batched parenting
+
+  **Additional fixes**
+
+  - geometry_comp.h: geometry_type_name() returns "Anchor" for GEOM_TYPE_COUNT sentinel
+  - ui_scene_hierarchy.h: Hierarchy cache now includes anchor entities (LabelComp + TransformComp, no GeometryComp)
+  - jsonl_loader.h: Fixed pre-existing _stricmp build error on non-Windows platforms (uses strcasecmp)
+
+### JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
+
+Extended the JSONL geometry log loader to support `MeshBody` elements from .NET geometry exports. Meshes can be imported in two modes matching the PLY mesh import pattern.
+
+**Features:**
+- **Parser Extension:** Added `JSONL_GEOM_MESH` type with `jsonl_mesh_data_t` struct to parse `_Points`, `_Normals`, and `_Indices` arrays from MeshBody JSON
+- **Two Import Modes:**
+  - **Single Mesh Entity (efficient):** Indexed mesh rendered as one entity, single pick selection
+  - **Individual Triangles (selectable):** Each face as separate entity for per-triangle selection/editing
+- **Enhanced Colour Parsing:** Now supports named colours (White, Red, Blue, etc.), RGB format "R, G, B", and ARGB format "A, R, G, B"
+- **UI Integration:** Import options dialog shows mesh vertex/face counts and mode selection radio buttons when MeshBody elements detected
+- **Transform Support:** Mesh vertices participate in CoM shift, rotation, and scale transforms
+
+**Modified Files:**
+- `src/jsonl_loader.h` - Added `JSONL_GEOM_MESH` to `jsonl_geom_type_t`; added `jsonl_mesh_data_t` struct; implemented `jsonl_parse_mesh_body()` function; enhanced `jsonl_parse_colour()` with named colours and ARGB support; added `jsonl_quick_scan_mesh()` and mesh detection helpers
+- `src/jsonl_import_job.h` - Added `mesh_import_mode` field; extended `jsonl_import_job_apply_transforms()` for mesh vertices/normals; added mesh entity creation in both modes with chunked triangle creation for Individual Triangles mode; added `jsonl_import_job_set_mesh_mode()` setter
+- `src/ui/ui_scene_hierarchy.h` - Added mesh UI state fields (`jsonl_has_mesh_data`, `jsonl_mesh_import_mode`, vertex/face counts); updated quick scan to use `jsonl_quick_scan_mesh()`; added mesh import mode radio buttons to JSONL import options dialog
+
+**Plan File:** `.plans/PLAN_JSONL_MESH_SUPPORT.md`
+
+### Bug Fix: Light Entity Jumping in Scene Hierarchy (FIXED)
+
+Fixed light entities jumping to the end of the list when selected in the Scene Hierarchy. Root cause: `selection_set_single()` calls `ecs_world_select()` which adds a `Selected` tag via `ecs_add_id()`, changing the entity's archetype in Flecs. This caused the ECS query iteration order to change on the next frame, making the selected light appear at a different position. Fix: collect light entities into a local array sorted by entity ID before rendering, matching the approach used by the geometry entity cache. Same underlying issue was previously solved for geometry entities by the cached/sorted entity list.
+
+**Modified Files:**
+- `src/ui/ui_scene_hierarchy.h` - Rewrote `ui_scene_hierarchy_draw_lights_section()`: replaced two-pass query (count + render) with single-pass collect into local `light_entities[16]` array; added `qsort` by entity ID via new `ui_hierarchy_compare_light_entries()` comparator; render from sorted array using `ecs_world_get_light()` per-entity lookup
+
+### Enhancement: Triangles Tab in Slot Buffer Debug Window (IMPLEMENTED)
+
+Added a "Triangles" tab to the Slot Buffer Debug window (alongside existing Lines and Points/Joins tabs). Displays the triangle instance buffer grid with color-coded cells for Triangle (orange) and Mesh Face (purple) slot types. Tooltip on hover shows vertex positions (A/B/C), face normal, and color at vertex A. Supports the same cell size controls, pagination, and color legend as existing tabs.
+
+**Modified Files:**
+- `src/ui/ui_slot_buffer_debug.h` - Added `SLOT_TYPE_TRIANGLE` and `SLOT_TYPE_MESH_FACE` to `slot_type_t` enum with orange/purple colors; added `slot_debug_geom_to_slot_type_triangle()` mapping function; added `slot_buffer_type_t` enum replacing `is_point_buffer` bool parameter in `ui_slot_buffer_debug_draw_buffer()`; added `page_triangles` state field; added "Triangles" tab rendering `scene->batches.triangles.instances`; triangle tooltip shows `geom_triangle_instance_t` vertex/normal/color data
+
 ## Session (2026-02-11)
 
 ### Mesh Features - Sprint 6: OBJ to PLY Conversion Script (IMPLEMENTED)

@@ -25,77 +25,9 @@ A C/C++ cross-platform graphics application using:
 
 ## Project Structure
 
-```
-src/
-├── app.c                   # Main app - Sokol callbacks, orchestrator
-├── platform.h              # Backend detection (SOKOL_METAL/WGPU/D3D11/GLCORE)
-├── math3d.h                # 3D math (vec3_t, mat4_t, transforms)
-├── imgui_storage.h         # ImGui settings persistence
-├── render_target.h         # Offscreen render target management
-├── orbit_camera.h          # Orbital camera with inertia
-├── selection.h             # Entity selection buffer management
-├── scene_serializer.h      # JSON scene save/load
-├── undo_redo.h             # Undo/redo core data structures
-├── undo_redo_exec.h        # Undo/redo command execution logic
-├── ecs/
-│   ├── ecs_world.h         # ECS world init/shutdown, component registration
-│   └── ecs_scene.h         # High-level scene API (entity creation, rendering)
-├── gpu/
-│   ├── instance_buffer.h   # Dynamic GPU buffer with slot allocation
-│   ├── geometry_batch.h    # Batch manager for geometry types (lines, points)
-│   ├── pick_buffer.h       # GPU picking system (20x20 offscreen buffer)
-│   ├── pick_readback.h     # Cross-platform readback interface
-│   ├── pick_readback_metal.m   # Metal CPU readback
-│   ├── pick_readback_d3d11.c   # D3D11 CPU readback
-│   └── pick_readback_vulkan.c  # Vulkan CPU readback
-├── components/
-│   ├── component_types.h   # Common types (vec4_t)
-│   ├── transform_comp.h    # Transform component (position, rotation, scale)
-│   ├── geometry_comp.h     # Geometry component (point, line, polyline, arc, etc.)
-│   ├── renderable_comp.h   # Renderable component (visibility, batch, instance)
-│   ├── selectable_comp.h   # Selectable component (pick ID for GPU picking)
-│   └── label_comp.h        # Stores human readable entity data (name and description)
-├── ui/
-│   ├── ui_theme.h          # Theme system
-│   ├── ui_controls.h       # Controls window
-│   ├── ui_viewport.h       # 3D Viewport window
-│   ├── ui_camera_debug.h   # Camera Debug window
-│   ├── ui_visibility.h     # Visibility controls
-│   ├── ui_pick_debug.h     # Pick buffer debug visualization
-│   ├── ui_entity_inspector.h   # Entity property inspector
-│   ├── ui_scene_hierarchy.h    # Scene hierarchy with entity list
-│   ├── ui_about.h              # Help -> About window with license info
-│   ├── ui_slot_buffer_debug.h  # Slot buffer debug viewer
-│   ├── ui_fps_debug.h          # FPS counter with rolling plot
-│   └── ui_file_browser.h       # Cross-platform file browser
-├── gizmo/
-│   ├── gizmo.h              # Main gizmo state machine + interaction
-│   ├── gizmo_rendering.h    # Own GPU pipelines + stream instance buffers
-│   └── gizmo_vertex_mode.h  # Geometry mode vertex editing
-└── shaders/
-    ├── instanced_line_shaders.h     # Thick line shaders (all backends)
-    ├── instanced_triangle_shaders.h # Triangle shaders (all backends)
-    ├── join_shaders.h               # Circle join shaders
-    ├── pick_shaders.h               # GPU picking shaders
-    └── spirv/                       # Vulkan SPIR-V shaders
-        ├── *.vert, *.frag           # GLSL 450 source files
-        ├── *.spv                    # Compiled SPIR-V bytecode
-        └── spirv_bytecode.h         # Generated C byte arrays
-
-scripts/
-├── gather_licenses.py   # Regenerate THIRD_PARTY_LICENSES.md from vendor LICENSE files
-└── vulkan-win/          # Vulkan shader build scripts (Windows)
-    ├── compile-spirv.ps1
-    ├── generate-bytecode-header.ps1
-    └── build-all.ps1
-
-vendors/
-├── cjson/              # JSON parser
-├── flecs/              # Flecs ECS library
-├── libcimgui/          # Dear ImGui C bindings
-└── libsokol/           # Sokol cross-platform library
-
-```
+The project file tree has grown extremely big. 
+To get up to date tree structure use `tree` command with relevant flags. 
+Available via both, bash and powershell.
 
 ## Build Commands
 
@@ -139,7 +71,8 @@ open build-web/bin/mdCAD.html
 - **GeometryComp** - type (point, line, polyline, arc, polygon, bezier, helix), color, dimensions
 - **RenderableComp** - visible, layer, batch/instance slot tracking
 - **SelectableComp** - pick_id for GPU picking (RGB encoded)
-- **LableComp** - human readable entity data (name and description), currently only applies to *.jsonl imports
+- **LabelComp** - human readable entity data (name and description), currently only applies to *.jsonl imports
+- **LightComp** - represents a light illuminating the scene, affecting materials that support lighting model
 
 ### Scene API
 ```c
@@ -207,73 +140,34 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
-## Most Recent Changes (2026-02-12)
+## Most Recent Changes (2026-02-13)
 
-### ECS Batch Parenting and other fixes (IMPLEMENTED)
+### Pick Buffer Octree Spatial Index (IMPLEMENTED)
 
-  **Sprint 1: Infrastructure**
+Replaced O(N) entity iteration in `ecs_scene_populate_pick_buffer()` with an O(log N + K) loose octree frustum query, where K is the number of entities whose world-space AABBs overlap the pick frustum (~10-100 entities instead of all N). For 1M point entities with a moving cursor, this reduces pick buffer population from ~3ms (1M matrix-vector multiplies) to ~0.01ms (traverse ~30 nodes, test ~100 entities).
 
-  - ecs_world.h: Added ImportPending_tag (zero-size tag), ecs_world_create_anchor_entity() (TransformComp-only), ecs_world_set_parent_batch()
-  (all children → one parent, deferred), ecs_world_set_parents_batch() (each child → own parent, deferred)                                     
-  - ecs_scene.h: Added scene_add_anchor(), scene_set_parent_batch(), scene_set_parents_batch() wrappers. Updated both                        
-  ecs_scene_update_transforms() and ecs_scene_update() queries to skip ImportPending entities
+**Architecture:**
+- **Loose octree:** Each node's effective bounds are 2x the tight bounds, guaranteeing every entity maps to exactly ONE node (no multi-node insertions). Array-based node pool with linked-list entries per node.
+- **Gribb-Hartmann frustum extraction:** 6 clip planes extracted from the pick MVP matrix, normalized for correct distance.
+- **AABB-frustum test:** Positive vertex method — for each of 6 planes, compute the AABB corner most aligned with plane normal; if signed distance < 0, AABB is entirely outside.
+- **Stack-based query:** Iterative traversal pushes children onto a fixed-size stack, tests each node's loose AABB against frustum, and collects matching entity IDs into a reusable result buffer.
+- **Per-type AABB computation:** Exact bounds for point/line/triangle/polyline/polygon/mesh; conservative sphere bounds for arc; convex hull bounds for bezier; axis ± radius for helix.
 
-  **Sprint 2: PLY Import**
+**Integration Points:**
+- `ecs_scene_t` gains `pick_octree_t pick_octree` field, initialized with root bounds ±100km
+- All 12 `scene_add_*` functions insert entities into octree via `scene_octree_insert_entity()` helper
+- `scene_remove_entity()` removes from octree before ECS deletion (pick_id still valid)
+- `ecs_scene_update_transform_recursive()` updates octree AABB when world_matrix changes (only fires for dirty entities)
+- `ecs_scene_populate_pick_buffer()` rewritten: extracts frustum → queries octree → processes only matching entities with per-type geometry submission (no NDC projection culling needed)
+- Removed unused NDC culling helpers (`pick_ndc_aabb_overlaps`, `pick_ndc_aabb_expand`)
 
-  - ply_import_job.h: Added PLY_JOB_PARENTING state, created_entities[] tracking array, anchor_entity field. Entity creation now tags with
-  ImportPending and tracks IDs. After creation completes, transitions to PLY_JOB_PARENTING which creates a transform-only anchor and
-  batch-parents all entities in one deferred block (removing ImportPending simultaneously). Updated cancel/reset/is_running handlers.
-  - ui_scene_hierarchy.h: Progress UI shows "Parenting..." during PLY_JOB_PARENTING state
+**New File:**
+- `src/gpu/pick_octree.h` - Complete loose octree implementation: types (`pick_aabb_t`, `pick_octree_entry_t`, `pick_octree_node_t`, `pick_frustum_t`, `pick_octree_t`); pool management with free lists; `pick_id → entry` O(1) lookup map; AABB computation for all 10 geometry types; insert/remove/move/split; Gribb-Hartmann frustum extraction; AABB-frustum test; stack-based frustum query
 
-  **Sprint 3: JSONL Import**
+**Modified File:**
+- `src/ecs/ecs_scene.h` - Added `#include "../gpu/pick_octree.h"`; added `pick_octree_t` to `ecs_scene_t`; init/shutdown hooks; `scene_octree_insert_entity()` helper called from 12 `scene_add_*` functions; remove hook in `scene_remove_entity()`; move hook in `ecs_scene_update_transform_recursive()`; rewrote `ecs_scene_populate_pick_buffer()` to use octree query
 
-  - jsonl_import_job.h: Replaced scene_add_point() invisible anchors with scene_add_anchor() (no GPU slot waste). Entity creation tags with
-  ImportPending. Replaced chunked scene_set_parent() loop with single deferred batch (all parenting + ImportPending removal in one
-  ecs_defer_begin/end block). Updated cancel handler to remove ImportPending tags.
-
-  Sprint 4: Scene Serializer
-
-  - scene_serializer.h: Replaced per-entity scene_set_parent() loop with scene_set_parents_batch() for O(n) batched parenting
-
-  Additional fixes
-
-  - geometry_comp.h: geometry_type_name() returns "Anchor" for GEOM_TYPE_COUNT sentinel
-  - ui_scene_hierarchy.h: Hierarchy cache now includes anchor entities (LabelComp + TransformComp, no GeometryComp)
-  - jsonl_loader.h: Fixed pre-existing _stricmp build error on non-Windows platforms (uses strcasecmp)
-
-### JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
-
-Extended the JSONL geometry log loader to support `MeshBody` elements from .NET geometry exports. Meshes can be imported in two modes matching the PLY mesh import pattern.
-
-**Features:**
-- **Parser Extension:** Added `JSONL_GEOM_MESH` type with `jsonl_mesh_data_t` struct to parse `_Points`, `_Normals`, and `_Indices` arrays from MeshBody JSON
-- **Two Import Modes:**
-  - **Single Mesh Entity (efficient):** Indexed mesh rendered as one entity, single pick selection
-  - **Individual Triangles (selectable):** Each face as separate entity for per-triangle selection/editing
-- **Enhanced Colour Parsing:** Now supports named colours (White, Red, Blue, etc.), RGB format "R, G, B", and ARGB format "A, R, G, B"
-- **UI Integration:** Import options dialog shows mesh vertex/face counts and mode selection radio buttons when MeshBody elements detected
-- **Transform Support:** Mesh vertices participate in CoM shift, rotation, and scale transforms
-
-**Modified Files:**
-- `src/jsonl_loader.h` - Added `JSONL_GEOM_MESH` to `jsonl_geom_type_t`; added `jsonl_mesh_data_t` struct; implemented `jsonl_parse_mesh_body()` function; enhanced `jsonl_parse_colour()` with named colours and ARGB support; added `jsonl_quick_scan_mesh()` and mesh detection helpers
-- `src/jsonl_import_job.h` - Added `mesh_import_mode` field; extended `jsonl_import_job_apply_transforms()` for mesh vertices/normals; added mesh entity creation in both modes with chunked triangle creation for Individual Triangles mode; added `jsonl_import_job_set_mesh_mode()` setter
-- `src/ui/ui_scene_hierarchy.h` - Added mesh UI state fields (`jsonl_has_mesh_data`, `jsonl_mesh_import_mode`, vertex/face counts); updated quick scan to use `jsonl_quick_scan_mesh()`; added mesh import mode radio buttons to JSONL import options dialog
-
-**Plan File:** `.plans/PLAN_JSONL_MESH_SUPPORT.md`
-
-### Bug Fix: Light Entity Jumping in Scene Hierarchy (FIXED)
-
-Fixed light entities jumping to the end of the list when selected in the Scene Hierarchy. Root cause: `selection_set_single()` calls `ecs_world_select()` which adds a `Selected` tag via `ecs_add_id()`, changing the entity's archetype in Flecs. This caused the ECS query iteration order to change on the next frame, making the selected light appear at a different position. Fix: collect light entities into a local array sorted by entity ID before rendering, matching the approach used by the geometry entity cache. Same underlying issue was previously solved for geometry entities by the cached/sorted entity list.
-
-**Modified Files:**
-- `src/ui/ui_scene_hierarchy.h` - Rewrote `ui_scene_hierarchy_draw_lights_section()`: replaced two-pass query (count + render) with single-pass collect into local `light_entities[16]` array; added `qsort` by entity ID via new `ui_hierarchy_compare_light_entries()` comparator; render from sorted array using `ecs_world_get_light()` per-entity lookup
-
-### Enhancement: Triangles Tab in Slot Buffer Debug Window (IMPLEMENTED)
-
-Added a "Triangles" tab to the Slot Buffer Debug window (alongside existing Lines and Points/Joins tabs). Displays the triangle instance buffer grid with color-coded cells for Triangle (orange) and Mesh Face (purple) slot types. Tooltip on hover shows vertex positions (A/B/C), face normal, and color at vertex A. Supports the same cell size controls, pagination, and color legend as existing tabs.
-
-**Modified Files:**
-- `src/ui/ui_slot_buffer_debug.h` - Added `SLOT_TYPE_TRIANGLE` and `SLOT_TYPE_MESH_FACE` to `slot_type_t` enum with orange/purple colors; added `slot_debug_geom_to_slot_type_triangle()` mapping function; added `slot_buffer_type_t` enum replacing `is_point_buffer` bool parameter in `ui_slot_buffer_debug_draw_buffer()`; added `page_triangles` state field; added "Triangles" tab rendering `scene->batches.triangles.instances`; triangle tooltip shows `geom_triangle_instance_t` vertex/normal/color data
+**Plan File:** `.plans/PLAN_PICK_BUFFER_OCTREE.md`
 
 ## Older Changes
 
@@ -281,6 +175,7 @@ For older changes please refer to `CHANGELOG.md`. Keep the index up to date with
 
 ### `CHANGELOG.md` Index:
 - Session (2026-02-12):
+  - ECS Batch Parenting and other fixes (IMPLEMENTED)
   - JSONL Mesh Support - MeshBody Import (IMPLEMENTED)
   - Bug Fix: Light Entity Jumping in Scene Hierarchy (FIXED)
   - Enhancement: Triangles Tab in Slot Buffer Debug Window (IMPLEMENTED)
