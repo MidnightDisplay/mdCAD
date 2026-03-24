@@ -91,12 +91,13 @@ static mdcad_cglm_mat4_mul_ctx_t mdcad_cglm_mat4_mul_ctx;
 static mdcad_cglm_mat4_inv_ctx_t mdcad_cglm_mat4_inv_ctx;
 static mdcad_cglm_screen_ray_ctx_t mdcad_cglm_screen_ray_ctx;
 
+/* Keep the Phase 3 migration hotspots at the front of the default compare run. */
 static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "orbit-camera-view", mdcad_harness_compare_orbit_camera_view },
     { "view-projection-roundtrip", mdcad_harness_compare_view_projection_roundtrip },
-    { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
     { "transform-compose", mdcad_harness_compare_transform_compose },
     { "hierarchy-world-transform", mdcad_harness_compare_hierarchy_world_transform },
+    { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
