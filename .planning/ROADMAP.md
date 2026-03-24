@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Reconcile roadmap, requirements, and repo docs with the locked `cglm` decision
+- [x] 01-01: Reconcile roadmap, requirements, and repo docs with the locked `cglm` decision
 - [ ] 01-02: Vendor the chosen library and wire the minimal include/build path
 - [ ] 01-03: Define mdCAD convention and alignment policy for the migration
 
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Selection and Conventions | 0/3 | Not started | - |
+| 1. Selection and Conventions | 1/3 | In Progress|  |
 | 2. Direct Adoption Tooling and Validation Harness | 0/3 | Not started | - |
 | 3. macOS Core Transform Migration | 0/3 | Not started | - |
 | 4. Interaction Math and API Expansion | 0/3 | Not started | - |
