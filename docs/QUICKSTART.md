@@ -75,6 +75,25 @@ Run the full native validation workflow:
 cmake --build build-vulkan --config Release --target math-validation
 ```
 
+## Phase 3 macOS parity smoke
+
+The harness-driven validation remains the primary automated gate for this phase. Launching `mdCAD` afterward is a manual smoke step to confirm the migrated camera and transform paths still look stable in the live viewport.
+
+Run the Phase 3 macOS workflow in this order:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-validation
+./build/bin/mdcad_math_harness --mode compare --strict
+./build/bin/mdCAD
+```
+
+Manual smoke checklist:
+
+- orbit with left-drag
+- pan with shift+left or middle-drag
+- zoom with the wheel
+- confirm visible geometry remains stable while moving the camera
+- if parented entities are present in the current scene, confirm child geometry continues following the parent without visible drift
+
 ## Windows build (MinGW or MSVC)
 
 ### MinGW Vulkan Build (Default MinGW)
