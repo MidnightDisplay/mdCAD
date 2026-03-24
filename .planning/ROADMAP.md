@@ -49,7 +49,7 @@ Plans:
 
 Plans:
 - [x] 02-01: Expand the `src/math/` thin project-owned math entrypoint for direct cglm adoption
-- [ ] 02-02: Add old/new comparison utilities and benchmark scaffolding for hotspot math
+- [x] 02-02: Add old/new comparison utilities and benchmark scaffolding for hotspot math
 - [ ] 02-03: Wire regression hooks or smoke scenes into the native validation workflow for direct cglm adoption
 
 ### Phase 3: macOS Core Transform Migration

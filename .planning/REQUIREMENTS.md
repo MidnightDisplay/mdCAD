@@ -22,7 +22,7 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Performance & Validation
 
-- [ ] **PERF-01**: mdCAD includes repeatable regression and benchmark checks for migrated math hotspots
+- [x] **PERF-01**: mdCAD includes repeatable regression and benchmark checks for migrated math hotspots
 - [ ] **PERF-02**: Migrated hot paths show no native performance regression on macOS Metal
 - [ ] **PERF-03**: Migrated hot paths show no native performance regression on Windows Vulkan
 
@@ -69,7 +69,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOT-02 | Phase 3 | Pending |
 | HOT-03 | Phase 4 | Pending |
 | HOT-04 | Phase 5 | Pending |
-| PERF-01 | Phase 2 | Pending |
+| PERF-01 | Phase 2 | Complete |
 | PERF-02 | Phase 5 | Pending |
 | PERF-03 | Phase 5 | Pending |
 | EXP-01 | Phase 4 | Pending |

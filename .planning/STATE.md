@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 02
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-24T15:47:59.869Z"
+last_updated: "2026-03-24T15:55:32.404Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -51,6 +51,7 @@ Plan: 1 of 3
 | Phase 01 P01 | 2 min | 2 tasks | 5 files |
 | Phase 01 P02 | 2 min | 2 tasks | 192 files |
 | Phase 01 P03 | 1 min | 2 tasks | 3 files |
+| Phase 02 P02 | 4 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Migrated math semantics are now column-major, right-handed, with 0..1 clip depth — Phase 1 now has one compiled contract that future migration slices must honor
 - [Phase 01]: The cglm entrypoint enforces layout compatibility with compile-time assertions — mat4 and mat4s assumptions now fail loudly if the vendor layout changes
 - [Phase 02]: Comparison, validation, and benchmark helpers live in adjacent headers and accept raw float buffers so struct and array cglm call sites can share one migration surface. — This supports mixed API-family rollout without rebuilding a compatibility facade around vendor math types.
+- [Phase 02]: Projection-sensitive comparison cases validate behavior-level NDC X/Y or ray outputs instead of demanding raw projection-matrix equality across clip-depth conventions. — The migration intentionally changes clip-depth semantics, so behavior-level checks are the trustworthy parity signal.
 
 ### Pending Todos
 
