@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-24T18:13:44.038Z"
+status: Phase complete — ready for verification
+stopped_at: Phase 03 executed; awaiting human macOS smoke approval
+last_updated: "2026-03-24T18:17:54.639Z"
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -57,6 +57,7 @@ Plan: 3 of 3
 | Phase 02 P03 | 1 min | 2 tasks | 2 files |
 | Phase 03 P01 | 1 min | 2 tasks | 3 files |
 | Phase 03 P02 | 35 min | 2 tasks | 4 files |
+| Phase 03 P03 | 1 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,8 @@ Recent decisions affecting current work:
 - [Phase 03]: The app assembles view/projection/VP/MVP once through cglm and then copies those matrices into legacy storage for unchanged pick, gizmo, and render consumers. — Explicit bridge copies prevent hidden fallback math3d recomputation while keeping current subsystem boundaries stable.
 - [Phase 03]: TransformComp keeps vec3_t and mat4_t cached storage in Phase 3 while local and parented matrix composition moves to cglm raw matrices through memcpy bridge helpers. — This preserves existing render-facing storage and keeps the migration focused on compute hot paths instead of a broader ABI rewrite.
 - [Phase 03]: World-point application in ecs_scene.h now flows through one cglm-backed helper instead of leaving mat4_transform_point(t->world_matrix, ...) scattered across creation, update, render, and pick paths. — One shared helper keeps semantics aligned across the dense ECS hot path and gives the harness one real production helper to validate.
+- [Phase 03]: The default compare suite now leads with the four Phase 3 hotspot cases so routine harness runs surface the migrated camera and transform parity checks first. — This keeps the current rollout-critical paths visible in strict compare runs and makes parity regressions fail fast.
+- [Phase 03]: Quickstart documents Phase 3 as a harness-first macOS workflow with app launch kept explicitly as a manual smoke confirmation step. — Another agent can now rerun the automated gate and the remaining human smoke checklist directly from checked-in docs.
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T18:13:44.034Z
-Stopped at: Completed 03-02-PLAN.md
-Resume file: None
+Last session: 2026-03-24T18:17:54.636Z
+Stopped at: Phase 03 executed; awaiting human macOS smoke approval
+Resume file: .planning/phases/03-macos-core-transform-migration/03-HUMAN-UAT.md
