@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-03-24T15:57:09.232Z"
+status: Ready to plan
+stopped_at: Phase 2 verified complete; ready to plan Phase 3
+last_updated: "2026-03-24T15:59:09Z"
 progress:
   total_phases: 5
   completed_phases: 2
@@ -19,39 +19,42 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 02 — direct-adoption-tooling-and-validation-harness
+**Current focus:** Phase 03 — macos-core-transform-migration
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 **Fallback posture:** no active fallback candidate
 
 ## Current Position
 
-Phase: 02 (direct-adoption-tooling-and-validation-harness) — EXECUTING
-Plan: 2 of 3
+Phase: 3
+Plan: Not started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0.0 hours
+- Total plans completed: 6
+- Average duration: 1.8 min
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| Phase 01 | 3 | 5 min | 1.7 min |
+| Phase 02 | 3 | 6 min | 2.0 min |
 
 **Recent Trend:**
 
-- Last 5 plans: -
+- Last 5 plans: 2 min, 1 min, 1 min, 4 min, 1 min
 - Trend: Stable
 
 | Phase 01 P01 | 2 min | 2 tasks | 5 files |
 | Phase 01 P02 | 2 min | 2 tasks | 192 files |
 | Phase 01 P03 | 1 min | 2 tasks | 3 files |
+| Phase 02 P01 | 1 min | 2 tasks | 4 files |
 | Phase 02 P02 | 4 min | 2 tasks | 3 files |
+| Phase 02 P03 | 1 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -79,11 +82,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 2 still needs to choose the first comparison harness and the most sensible struct-vs-array adoption points for the upcoming hotspot slices
-- Performance claims must be validated in real app workflows, not only microbenchmarks
+- Phase 3 still needs to preserve orbit camera and render-matrix parity while active hotspots move onto the new math foundation
+- Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
 
 ## Session Continuity
 
-Last session: 2026-03-24T15:57:03.535Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-03-24T15:59:09Z
+Stopped at: Phase 2 verified complete; ready to plan Phase 3
 Resume file: None
