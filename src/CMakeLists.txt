@@ -67,6 +67,22 @@ if(MDCAD_NATIVE_DESKTOP)
     if(UNIX AND NOT APPLE)
         target_link_libraries(mdcad_math_harness PRIVATE m)
     endif()
+
+    add_custom_target(math-regression
+        COMMAND $<TARGET_FILE:mdcad_math_harness> --mode compare --strict
+        DEPENDS mdcad_math_harness
+        USES_TERMINAL
+    )
+
+    add_custom_target(math-bench
+        COMMAND $<TARGET_FILE:mdcad_math_harness> --mode bench --iterations 20000
+        DEPENDS mdcad_math_harness
+        USES_TERMINAL
+    )
+
+    add_custom_target(math-validation
+        DEPENDS math-regression math-bench ${PROJECT_NAME}
+    )
 endif()
 
 # Emscripten-specific linker options
