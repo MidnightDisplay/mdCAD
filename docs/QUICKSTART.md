@@ -17,6 +17,64 @@ Quick build & run:
 ninja -C build -d stats && ./build/bin/mdCAD
 ```
 
+## Native Math Validation (Phase 2 pilot)
+
+The standalone harness is the primary regression and benchmark surface for this phase. Launching `mdCAD` afterward is an optional manual smoke pass that remains secondary.
+
+### macOS / Ninja
+
+Build the standalone harness:
+``` bash
+cmake -B build -G Ninja && ninja -C build mdcad_math_harness
+```
+
+Run the strict compare suite:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-regression
+```
+
+Run the primitive benchmark suite:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-bench
+```
+
+Run the full native validation workflow:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-validation
+```
+
+Optional manual smoke pass:
+``` bash
+./build/bin/mdCAD
+```
+
+### Windows Vulkan
+
+Configure the Visual Studio Vulkan build:
+```powershell
+cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
+```
+
+Build the standalone harness:
+```powershell
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+```
+
+Run the strict compare suite:
+```powershell
+cmake --build build-vulkan --config Release --target math-regression
+```
+
+Run the primitive benchmark suite:
+```powershell
+cmake --build build-vulkan --config Release --target math-bench
+```
+
+Run the full native validation workflow:
+```powershell
+cmake --build build-vulkan --config Release --target math-validation
+```
+
 ## Windows build (MinGW or MSVC)
 
 ### MinGW Vulkan Build (Default MinGW)
