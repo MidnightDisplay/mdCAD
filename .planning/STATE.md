@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-24T17:34:59.297Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-24T18:13:44.038Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 03 (macos-core-transform-migration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Plan: 2 of 3
 | Phase 02 P02 | 4 min | 2 tasks | 3 files |
 | Phase 02 P03 | 1 min | 2 tasks | 2 files |
 | Phase 03 P01 | 1 min | 2 tasks | 3 files |
+| Phase 03 P02 | 35 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Quickstart now treats the harness workflow as primary and app launch as a secondary smoke step for this migration slice. — This keeps operational guidance aligned with the harness-first validation posture introduced in the phase.
 - [Phase 03]: Orbit camera eye/view math now originates from cglm helpers while legacy vec3_t and mat4_t return paths remain as explicit temporary bridges. — This keeps the visible camera path migrated without widening Phase 3 into a larger caller storage rewrite.
 - [Phase 03]: The app assembles view/projection/VP/MVP once through cglm and then copies those matrices into legacy storage for unchanged pick, gizmo, and render consumers. — Explicit bridge copies prevent hidden fallback math3d recomputation while keeping current subsystem boundaries stable.
+- [Phase 03]: TransformComp keeps vec3_t and mat4_t cached storage in Phase 3 while local and parented matrix composition moves to cglm raw matrices through memcpy bridge helpers. — This preserves existing render-facing storage and keeps the migration focused on compute hot paths instead of a broader ABI rewrite.
+- [Phase 03]: World-point application in ecs_scene.h now flows through one cglm-backed helper instead of leaving mat4_transform_point(t->world_matrix, ...) scattered across creation, update, render, and pick paths. — One shared helper keeps semantics aligned across the dense ECS hot path and gives the harness one real production helper to validate.
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T17:34:59.294Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-03-24T18:13:44.034Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None

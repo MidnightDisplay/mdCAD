@@ -65,7 +65,7 @@ Plans:
 
 Plans:
 - [x] 03-01: Migrate orbit camera and viewport matrix construction
-- [ ] 03-02: Migrate ECS transform composition and render-matrix usage
+- [x] 03-02: Migrate ECS transform composition and render-matrix usage
 - [ ] 03-03: Validate render and navigation parity on the active macOS workflow
 
 ### Phase 4: Interaction Math and API Expansion
