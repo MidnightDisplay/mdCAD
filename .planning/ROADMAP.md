@@ -12,7 +12,7 @@ This roadmap modernizes mdCAD’s math foundation without destabilizing the nati
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Selection and Conventions** - Lock `cglm` `0.9.6`, vendor it lightly, and define mdCAD’s math conventions
+- [x] **Phase 1: Selection and Conventions** - Lock `cglm` `0.9.6`, vendor it lightly, and define mdCAD’s math conventions (completed 2026-03-24)
 - [ ] **Phase 2: Direct Adoption Tooling and Validation Harness** - Build the thin project-owned math entrypoint and comparison tooling for direct cglm adoption
 - [ ] **Phase 3: macOS Core Transform Migration** - Migrate camera, transforms, and render-matrix hotspots on the primary native path
 - [ ] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage
@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01: Reconcile roadmap, requirements, and repo docs with the locked `cglm` decision
 - [x] 01-02: Vendor the chosen library and wire the minimal include/build path
-- [ ] 01-03: Define mdCAD convention and alignment policy for the migration
+- [x] 01-03: Define mdCAD convention and alignment policy for the migration
 
 ### Phase 2: Direct Adoption Tooling and Validation Harness
 **Goal**: Create a thin project-owned math entrypoint and the validation tools needed to compare old and new behavior safely during direct cglm adoption
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Selection and Conventions | 2/3 | In Progress|  |
+| 1. Selection and Conventions | 3/3 | Complete   | 2026-03-24 |
 | 2. Direct Adoption Tooling and Validation Harness | 0/3 | Not started | - |
 | 3. macOS Core Transform Migration | 0/3 | Not started | - |
 | 4. Interaction Math and API Expansion | 0/3 | Not started | - |

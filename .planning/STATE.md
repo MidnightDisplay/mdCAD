@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-24T14:41:31.679Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-03-24T14:43:51.984Z"
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -50,6 +50,7 @@ Plan: 3 of 3
 
 | Phase 01 P01 | 2 min | 2 tasks | 5 files |
 | Phase 01 P02 | 2 min | 2 tasks | 192 files |
+| Phase 01 P03 | 1 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Phase 2 is renamed around a thin project-owned math entrypoint instead of a compatibility facade — This keeps roadmap and requirement language aligned with direct cglm adoption
 - [Phase 01]: cglm 0.9.6 is vendored locally as the first integration slice — Phase 1 keeps the dependency pinned, local, and header-only without introducing build-time fetches
 - [Phase 01]: The native mdCAD target compiles vendored cglm through src/math/cglm_entry.h — A compile anchor in src/app.c proves the integration is real before convention work starts
+- [Phase 01]: Migrated math semantics are now column-major, right-handed, with 0..1 clip depth — Phase 1 now has one compiled contract that future migration slices must honor
+- [Phase 01]: The cglm entrypoint enforces layout compatibility with compile-time assertions — mat4 and mat4s assumptions now fail loudly if the vendor layout changes
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T14:41:31.676Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-03-24T14:43:51.980Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
