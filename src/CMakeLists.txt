@@ -49,6 +49,10 @@ else()
     add_executable(${PROJECT_NAME} ${SOURCES})
 endif()
 
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+)
+
 target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static cjson)
 
 # Emscripten-specific linker options

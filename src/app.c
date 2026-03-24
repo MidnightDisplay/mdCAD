@@ -16,6 +16,7 @@
 
 // Project modules
 #include "math3d.h"
+#include "math/cglm_entry.h"
 #include "imgui_storage.h"
 #include "render_target.h"
 #include "orbit_camera.h"
@@ -104,6 +105,7 @@ static struct {
 static void init(void) {
     stm_setup();
     state.last_time = stm_now();
+    mdcad_cglm_compile_anchor();
 
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
