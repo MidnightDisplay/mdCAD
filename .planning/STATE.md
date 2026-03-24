@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 2 verified complete; ready to plan Phase 3
-last_updated: "2026-03-24T15:59:09Z"
+status: Ready to execute
+stopped_at: Phase 3 planned; ready to execute macOS core transform migration
+last_updated: "2026-03-24T17:05:00Z"
 progress:
   total_phases: 5
   completed_phases: 2
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 3
-Plan: Not started
+Plan: Planned (03-01..03-03 ready)
 
 ## Performance Metrics
 
@@ -82,11 +82,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 3 still needs to preserve orbit camera and render-matrix parity while active hotspots move onto the new math foundation
+- Phase 3 execution still needs to keep pick/gizmo bridge inputs stable while camera and transform compute moves onto `cglm`
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
 
 ## Session Continuity
 
-Last session: 2026-03-24T15:59:09Z
-Stopped at: Phase 2 verified complete; ready to plan Phase 3
+Last session: 2026-03-24T17:05:00Z
+Stopped at: Phase 3 planned; ready to execute macOS core transform migration
 Resume file: None
