@@ -4,6 +4,11 @@ set(SOURCES
     app.c
 )
 
+set(MDCAD_NATIVE_DESKTOP OFF)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(MDCAD_NATIVE_DESKTOP ON)
+endif()
+
 # Add platform-specific pick buffer readback implementations
 if(APPLE)
     list(APPEND SOURCES gpu/pick_readback_metal.m)
@@ -55,6 +60,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static cjson)
 
+if(MDCAD_NATIVE_DESKTOP)
+    add_executable(mdcad_math_harness math_harness.c)
+    target_compile_features(mdcad_math_harness PRIVATE c_std_11)
+    target_include_directories(mdcad_math_harness PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include)
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(mdcad_math_harness PRIVATE m)
+    endif()
+endif()
+
 # Emscripten-specific linker options
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
@@ -74,6 +88,10 @@ endif()
 # this hack removes the xxx-CMakeForceLinker.cxx dummy file
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
+endif()
+
+if(MDCAD_NATIVE_DESKTOP)
+    set_target_properties(mdcad_math_harness PROPERTIES LINKER_LANGUAGE C)
 endif()
 
 #set(CMAKE_CXX_FLAGS "-O3")
