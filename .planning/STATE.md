@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 1 verified complete; ready to plan Phase 2
-last_updated: "2026-03-24T14:46:21.455Z"
+status: Executing Phase 02
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-24T15:47:59.869Z"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (direct-adoption-tooling-and-validation-harness) — EXECUTING
+Plan: 1 of 3
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Recent decisions affecting current work:
 - [Phase 01]: The native mdCAD target compiles vendored cglm through src/math/cglm_entry.h — A compile anchor in src/app.c proves the integration is real before convention work starts
 - [Phase 01]: Migrated math semantics are now column-major, right-handed, with 0..1 clip depth — Phase 1 now has one compiled contract that future migration slices must honor
 - [Phase 01]: The cglm entrypoint enforces layout compatibility with compile-time assertions — mat4 and mat4s assumptions now fail loudly if the vendor layout changes
+- [Phase 02]: Comparison, validation, and benchmark helpers live in adjacent headers and accept raw float buffers so struct and array cglm call sites can share one migration surface. — This supports mixed API-family rollout without rebuilding a compatibility facade around vendor math types.
 
 ### Pending Todos
 
@@ -80,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T14:46:21.451Z
-Stopped at: Phase 1 verified complete; ready to plan Phase 2
+Last session: 2026-03-24T15:47:33.113Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
