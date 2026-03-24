@@ -15,7 +15,7 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Hot-Path Migration
 
-- [ ] **HOT-01**: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions
+- [x] **HOT-01**: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions
 - [ ] **HOT-02**: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions
 - [ ] **HOT-03**: mdCAD migrates pick/unproject/ray and translation gizmo drag math to the new foundation on the macOS Metal build without user-visible regressions
 - [ ] **HOT-04**: The same migrated hot paths build and behave correctly on the Windows Vulkan path
@@ -65,7 +65,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 2 | Complete |
 | FOUND-03 | Phase 1 | Complete |
-| HOT-01 | Phase 3 | Pending |
+| HOT-01 | Phase 3 | Complete |
 | HOT-02 | Phase 3 | Pending |
 | HOT-03 | Phase 4 | Pending |
 | HOT-04 | Phase 5 | Pending |
