@@ -5,7 +5,9 @@
 #define ORBIT_CAMERA_H
 
 #include "math3d.h"
+#include "math/cglm_entry.h"
 #include <math.h>
+#include <string.h>
 
 //------------------------------------------------------------------------------
 // Constants
@@ -82,19 +84,31 @@ static inline void orbit_camera_reset(orbit_camera_t* cam) {
 }
 
 // Calculate eye position from spherical coordinates
+static inline vec3s orbit_camera_get_eye_position_cglm(const orbit_camera_t* cam) {
+    return (vec3s){ {
+        cam->target.x + cam->distance * cosf(cam->elevation) * sinf(cam->azimuth),
+        cam->target.y + cam->distance * sinf(cam->elevation),
+        cam->target.z + cam->distance * cosf(cam->elevation) * cosf(cam->azimuth)
+    } };
+}
+
 static inline vec3_t orbit_camera_get_eye_position(const orbit_camera_t* cam) {
-    vec3_t eye;
-    eye.x = cam->target.x + cam->distance * cosf(cam->elevation) * sinf(cam->azimuth);
-    eye.y = cam->target.y + cam->distance * sinf(cam->elevation);
-    eye.z = cam->target.z + cam->distance * cosf(cam->elevation) * cosf(cam->azimuth);
-    return eye;
+    vec3s eye = orbit_camera_get_eye_position_cglm(cam);
+    return (vec3_t){ eye.raw[0], eye.raw[1], eye.raw[2] };
 }
 
 // Get the view matrix for rendering
+static inline mat4s orbit_camera_get_view_matrix_cglm(const orbit_camera_t* cam) {
+    return glms_lookat_rh_zo(orbit_camera_get_eye_position_cglm(cam),
+                             (vec3s){ { cam->target.x, cam->target.y, cam->target.z } },
+                             GLMS_YUP);
+}
+
 static inline mat4_t orbit_camera_get_view_matrix(const orbit_camera_t* cam) {
-    vec3_t eye = orbit_camera_get_eye_position(cam);
-    vec3_t up = {0.0f, 1.0f, 0.0f};
-    return mat4_lookat(eye, cam->target, up);
+    mat4_t view;
+    mat4s view_cglm = orbit_camera_get_view_matrix_cglm(cam);
+    memcpy(view.m, view_cglm.raw, sizeof(view.m));
+    return view;
 }
 
 // Call at the beginning of frame to reset drag state when buttons released
