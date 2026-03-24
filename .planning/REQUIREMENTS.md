@@ -9,9 +9,9 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Adoption Foundation
 
-- [ ] **FOUND-01**: mdCAD can vendor and build the selected MIT-licensed C math library within the current native build workflow without adding a C++ dependency
+- [x] **FOUND-01**: mdCAD can vendor and build the selected MIT-licensed C math library within the current native build workflow without adding a C++ dependency
 - [ ] **FOUND-02**: mdCAD exposes a thin project-owned math entrypoint for convention/config includes without re-wrapping vendor math types during the staged rollout
-- [ ] **FOUND-03**: mdCAD documents and enforces its matrix layout, handedness, clipspace, and alignment strategy in one place before hotspot migration begins
+- [x] **FOUND-03**: mdCAD documents and enforces its matrix layout, handedness, clipspace, and alignment strategy in one place before hotspot migration begins
 
 ### Hot-Path Migration
 
@@ -62,9 +62,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 2 | Pending |
-| FOUND-03 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Complete |
 | HOT-01 | Phase 3 | Pending |
 | HOT-02 | Phase 3 | Pending |
 | HOT-03 | Phase 4 | Pending |
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after roadmap creation*
+*Last updated: 2026-03-24 after Phase 1 completion*
