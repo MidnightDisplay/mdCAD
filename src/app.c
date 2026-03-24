@@ -40,6 +40,8 @@
 // Gizmo system
 #include "gizmo/gizmo.h"
 
+#include <string.h>
+
 //------------------------------------------------------------------------------
 // Application state
 //------------------------------------------------------------------------------
@@ -98,6 +100,13 @@ static struct {
     int *gizmo_drag_vertex_indices;
     int gizmo_drag_vertex_count;
 } state;
+
+static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
+    mat4_t bridge;
+
+    memcpy(bridge.m, matrix.raw, sizeof(bridge.m));
+    return bridge;
+}
 
 //------------------------------------------------------------------------------
 // Init
@@ -457,14 +466,17 @@ static void frame(void) {
     int vp_width = state.viewport_rt.width;
     int vp_height = state.viewport_rt.height;
 
-    // Get view matrix from orbital camera
-    mat4_t view = orbit_camera_get_view_matrix(&state.camera);
-    mat4_t proj = mat4_perspective(0.785398f, (float)vp_width / (float)vp_height, 0.1f, 100.0f);
-    mat4_t vp_mat = mat4_mul(proj, view);
-    mat4_t mvp = mat4_mul(vp_mat, mat4_identity());
-
     // Calculate aspect ratio for thick line rendering
     float aspect_ratio = (float)vp_width / (float)vp_height;
+    mat4s view = orbit_camera_get_view_matrix_cglm(&state.camera);
+    mat4s proj = glms_perspective_rh_zo(0.785398f, aspect_ratio, 0.1f, 100.0f);
+    mat4s vp = glms_mat4_mul(proj, view);
+    mat4s mvp = glms_mat4_mul(vp, GLMS_MAT4_IDENTITY);
+
+    mat4_t view_legacy = mdcad_mat4_bridge_from_cglm(view);
+    mat4_t proj_legacy = mdcad_mat4_bridge_from_cglm(proj);
+    mat4_t vp_legacy = mdcad_mat4_bridge_from_cglm(vp);
+    mat4_t mvp_legacy = mdcad_mat4_bridge_from_cglm(mvp);
 
     // Offscreen pass - render visible objects
     sg_begin_pass(&(sg_pass){
@@ -479,7 +491,7 @@ static void frame(void) {
     if (state.visibility.show_ecs_entities) {
         // Build triangle shader params with lighting data
         geom_triangle_params_t tri_params = {0};
-        tri_params.mvp = mvp;
+        tri_params.mvp = mvp_legacy;
         tri_params.lighting_enabled = state.lighting_enabled ? 1.0f : 0.0f;
 
         // Ambient light
@@ -513,7 +525,7 @@ static void frame(void) {
         float gizmo_line_width = state.ecs_scene.batches.lines.line_width * 1.5f;
         float gizmo_point_size = state.ecs_scene.batches.points.point_size * 2.0f;
         gizmo_rendering_upload(&state.gizmo.rendering);
-        gizmo_rendering_draw(&state.gizmo.rendering, mvp, aspect_ratio, gizmo_line_width, gizmo_point_size);
+        gizmo_rendering_draw(&state.gizmo.rendering, mvp_legacy, aspect_ratio, gizmo_line_width, gizmo_point_size);
     }
 
     sg_end_pass();
@@ -548,9 +560,9 @@ static void frame(void) {
             pick_buffer_set_center(&state.pick_buffer, vp_x, vp_y, (float)vp_width, (float)vp_height);
 
             // Cursor-gated rebuild: skip expensive pick buffer cycle when nothing changed
-            if (pick_buffer_needs_rebuild(&state.pick_buffer, view, proj)) {
+            if (pick_buffer_needs_rebuild(&state.pick_buffer, view_legacy, proj_legacy)) {
                 // Compute the pick MVP for frustum culling (same matrix used for rendering)
-                mat4_t pick_mvp = pick_buffer_compute_mvp(&state.pick_buffer, view, proj);
+                mat4_t pick_mvp = pick_buffer_compute_mvp(&state.pick_buffer, view_legacy, proj_legacy);
 
                 // Populate pick buffer with ECS entities (only if visible)
                 pick_buffer_begin_frame(&state.pick_buffer);
@@ -561,7 +573,7 @@ static void frame(void) {
                 gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
 
                 // Render pick pass
-                pick_buffer_render(&state.pick_buffer, view, proj);
+                pick_buffer_render(&state.pick_buffer, view_legacy, proj_legacy);
 
                 // Readback and update hover state
                 pick_buffer_readback(&state.pick_buffer);
@@ -592,7 +604,7 @@ static void frame(void) {
                         // Start gizmo drag — compute mouse ray
                         float ndc_x = vp_x * 2.0f - 1.0f;
                         float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
-                        mat4_t inv_vp = mat4_inverse(vp_mat);
+                        mat4_t inv_vp = mat4_inverse(vp_legacy);
                         ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
 
                         if (gizmo_begin_drag(&state.gizmo, mouse_ray)) {
@@ -655,7 +667,7 @@ static void frame(void) {
             if (state.gizmo_drag_active) {
                 float ndc_x = vp_x * 2.0f - 1.0f;
                 float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
-                mat4_t inv_vp = mat4_inverse(vp_mat);
+                mat4_t inv_vp = mat4_inverse(vp_legacy);
                 ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
 
                 vec3_t delta = gizmo_update_drag(&state.gizmo, mouse_ray);

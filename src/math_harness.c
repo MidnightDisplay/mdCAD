@@ -64,6 +64,8 @@ typedef struct {
 static volatile float mdcad_bench_sink = 0.0f;
 
 static orbit_camera_t mdcad_harness_make_camera(void);
+static vec3_t mdcad_harness_legacy_orbit_eye(const orbit_camera_t *camera);
+static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera);
 static mat4_t mdcad_harness_legacy_projection(void);
 static mat4s mdcad_harness_cglm_projection(void);
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report);
@@ -220,6 +222,21 @@ static orbit_camera_t mdcad_harness_make_camera(void) {
     return camera;
 }
 
+static vec3_t mdcad_harness_legacy_orbit_eye(const orbit_camera_t *camera) {
+    vec3_t eye;
+
+    eye.x = camera->target.x + camera->distance * cosf(camera->elevation) * sinf(camera->azimuth);
+    eye.y = camera->target.y + camera->distance * sinf(camera->elevation);
+    eye.z = camera->target.z + camera->distance * cosf(camera->elevation) * cosf(camera->azimuth);
+    return eye;
+}
+
+static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera) {
+    return mat4_lookat(mdcad_harness_legacy_orbit_eye(camera),
+                       camera->target,
+                       vec3_make(0.0f, 1.0f, 0.0f));
+}
+
 static mat4_t mdcad_harness_legacy_projection(void) {
     return mat4_perspective(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
@@ -256,11 +273,8 @@ static mat4s mdcad_harness_cglm_transform(void) {
 
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    vec3_t eye = orbit_camera_get_eye_position(&camera);
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(eye),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
 
     return mdcad_harness_compare_mat4_to_cglm(report,
                                               "orbit-camera-view matrix",
@@ -276,12 +290,10 @@ static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_rep
         { 0.45f, -1.0f, 3.25f },
     };
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_vp = mat4_mul(legacy_proj, legacy_view);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
     mat4s cglm_proj = mdcad_harness_cglm_projection();
     mat4s cglm_vp = glms_mat4_mul(cglm_proj, cglm_view);
     size_t i;
@@ -312,12 +324,10 @@ static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_rep
 
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_inv_vp = mat4_inverse(mat4_mul(legacy_proj, legacy_view));
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
     mat4s cglm_proj = mdcad_harness_cglm_projection();
     mat4s cglm_inv_vp = glms_mat4_inv(glms_mat4_mul(cglm_proj, cglm_view));
     vec4s viewport = mdcad_harness_vec4s(0.0f, 0.0f, 1280.0f, 720.0f);
@@ -379,12 +389,10 @@ static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *r
 
 static void mdcad_harness_reset_bench_contexts(void) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_vp = mat4_mul(legacy_proj, legacy_view);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
     mat4s cglm_proj = mdcad_harness_cglm_projection();
     mat4s cglm_vp = glms_mat4_mul(cglm_proj, cglm_view);
     float screen_x;
