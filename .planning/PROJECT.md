@@ -18,6 +18,8 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Import/export workflows for scene JSON, JSONL geometry logs, point clouds, and PLY mesh data — existing
 - ✓ Native macOS Metal build path and Windows Vulkan build path for active development — existing
 - ✓ Header-only subsystem pattern across most of `src/` with a minimal CMake/Ninja workflow — existing
+- ✓ `cglm` `0.9.6` selected, vendored, and build-proven in the native workflow — Validated in Phase 1: selection-and-conventions
+- ✓ Project-owned math convention contract established in `src/math/math_conventions.h` and `docs/MATH_CONVENTIONS.md` — Validated in Phase 1: selection-and-conventions
 
 ### Active
 
@@ -42,6 +44,8 @@ The immediate success order is clear: first no regressions on the currently stab
 
 The current codebase map also highlights migration-sensitive areas: backend picking paths are fragile, serializer/import code is manual and allocation-heavy, and the math layer touches many hot rendering and interaction paths. That makes staged replacement and explicit regression testing mandatory rather than optional.
 
+Phase 1 is complete. mdCAD now vendors `cglm` `0.9.6` under `vendors/cglm`, compiles it through `src/math/cglm_entry.h`, and carries a project-owned convention contract in `src/math/math_conventions.h`. The next phase focuses on expanding the thin entrypoint and adding validation tooling before hotspot migration starts.
+
 ## Constraints
 
 - **License**: MIT-licensed C library only — reduces legal and maintenance friction and matches the project's current dependency posture
@@ -55,11 +59,12 @@ The current codebase map also highlights migration-sensitive areas: backend pick
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Treat this as a staged migration instead of a single-step swap | `src/math3d.h` is used across many runtime-critical systems and staged rollout is easier to validate | — Pending |
-| Prioritize native stability on macOS and Windows Vulkan before other targets | These are the currently stable build paths and the safest regression gates | — Pending |
-| Expand math capability during migration when it helps the foundation | The user wants to gain more than a 1:1 swap if the rollout remains safe | — Pending |
-| Keep the replacement C-only and MIT-licensed | This preserves compatibility with mdCAD's architecture and dependency expectations | — Pending |
-| Accept non-header-only integration if build simplicity and performance still hold | Header-only is preferred, but not at the cost of choosing an inferior library | — Pending |
+| Treat this as a staged migration instead of a single-step swap | `src/math3d.h` is used across many runtime-critical systems and staged rollout is easier to validate | Confirmed in Phase 1 |
+| Prioritize native stability on macOS and Windows Vulkan before other targets | These are the currently stable build paths and the safest regression gates | Confirmed in Phase 1 |
+| Expand math capability during migration when it helps the foundation | The user wants to gain more than a 1:1 swap if the rollout remains safe | Convention contract established in Phase 1; broader helper rollout deferred |
+| Keep the replacement C-only and MIT-licensed | This preserves compatibility with mdCAD's architecture and dependency expectations | `cglm` `0.9.6` selected and vendored in Phase 1 |
+| Accept non-header-only integration if build simplicity and performance still hold | Header-only is preferred, but not at the cost of choosing an inferior library | Still open; Phase 1 stayed header-only |
+| Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
 
 ## Evolution
 
@@ -79,4 +84,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after initialization*
+*Last updated: 2026-03-24 after Phase 1 completion*
