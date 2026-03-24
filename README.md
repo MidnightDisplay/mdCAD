@@ -1,6 +1,6 @@
 # mdCAD
 
-A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; the current milestone is modernizing the math foundation by replacing `src/math3d.h` with vendored `cglm`.
+A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; the current milestone is modernizing the math foundation by replacing `src/math3d.h` with vendored `cglm`, and the repo now includes a standalone native math validation harness for that staged migration.
 
 ![image](mdCAD.png)
 

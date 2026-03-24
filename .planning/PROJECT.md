@@ -20,6 +20,8 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Header-only subsystem pattern across most of `src/` with a minimal CMake/Ninja workflow — existing
 - ✓ `cglm` `0.9.6` selected, vendored, and build-proven in the native workflow — Validated in Phase 1: selection-and-conventions
 - ✓ Project-owned math convention contract established in `src/math/math_conventions.h` and `docs/MATH_CONVENTIONS.md` — Validated in Phase 1: selection-and-conventions
+- ✓ Thin project-owned `cglm` entrypoint now owns clip-depth config and compile-time policy checks without wrapping vendor math types — Validated in Phase 2: direct-adoption-tooling-and-validation-harness
+- ✓ Standalone native math validation harness and named regression/benchmark targets now exist for staged hotspot migration — Validated in Phase 2: direct-adoption-tooling-and-validation-harness
 
 ### Active
 
@@ -44,7 +46,7 @@ The immediate success order is clear: first no regressions on the currently stab
 
 The current codebase map also highlights migration-sensitive areas: backend picking paths are fragile, serializer/import code is manual and allocation-heavy, and the math layer touches many hot rendering and interaction paths. That makes staged replacement and explicit regression testing mandatory rather than optional.
 
-Phase 1 is complete. mdCAD now vendors `cglm` `0.9.6` under `vendors/cglm`, compiles it through `src/math/cglm_entry.h`, and carries a project-owned convention contract in `src/math/math_conventions.h`. The next phase focuses on expanding the thin entrypoint and adding validation tooling before hotspot migration starts.
+Phase 2 is complete. mdCAD now has a configured thin `cglm` entrypoint, adjacent compare/validate/bench helpers under `src/math/`, a standalone `mdcad_math_harness` executable, named `math-regression` / `math-bench` / `math-validation` targets, and Quickstart coverage for the native pilot workflow. The next phase focuses on migrating macOS camera and transform hotspots against those harness-first regression gates.
 
 ## Constraints
 
@@ -65,6 +67,7 @@ Phase 1 is complete. mdCAD now vendors `cglm` `0.9.6` under `vendors/cglm`, comp
 | Keep the replacement C-only and MIT-licensed | This preserves compatibility with mdCAD's architecture and dependency expectations | `cglm` `0.9.6` selected and vendored in Phase 1 |
 | Accept non-header-only integration if build simplicity and performance still hold | Header-only is preferred, but not at the cost of choosing an inferior library | Still open; Phase 1 stayed header-only |
 | Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
+| Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
 
 ## Evolution
 
@@ -84,4 +87,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 1 completion*
+*Last updated: 2026-03-24 after Phase 2 completion*
