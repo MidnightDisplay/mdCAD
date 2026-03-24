@@ -10,7 +10,7 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 ### Adoption Foundation
 
 - [ ] **FOUND-01**: mdCAD can vendor and build the selected MIT-licensed C math library within the current native build workflow without adding a C++ dependency
-- [ ] **FOUND-02**: mdCAD exposes a project-owned compatibility layer that isolates vendor math headers and types from the rest of the codebase during the staged rollout
+- [ ] **FOUND-02**: mdCAD exposes a thin project-owned math entrypoint for convention/config includes without re-wrapping vendor math types during the staged rollout
 - [ ] **FOUND-03**: mdCAD documents and enforces its matrix layout, handedness, clipspace, and alignment strategy in one place before hotspot migration begins
 
 ### Hot-Path Migration
@@ -38,7 +38,7 @@ Deferred until the first native migration milestone is proven.
 ### Long-Tail Migration
 
 - **TAIL-01**: mdCAD migrates lower-priority math consumers such as serializer, importers, undo/redo helpers, and editor utility code to the new foundation
-- **TAIL-02**: mdCAD removes or substantially shrinks the compatibility layer once staged migration is complete and safe
+- **TAIL-02**: mdCAD removes or substantially shrinks temporary thin entrypoint glue once staged migration is complete and safe
 
 ### Platform Expansion
 
