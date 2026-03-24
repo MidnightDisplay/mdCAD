@@ -2,13 +2,14 @@
 #define MDCAD_MATH_VALIDATE_H
 
 #include <stdbool.h>
-#include <stdio.h>
 
 typedef struct { int checks_run; int checks_failed; } mdcad_validation_report_t;
 
 static inline void mdcad_validation_expect(mdcad_validation_report_t *report,
                                            bool condition,
                                            const char *label) {
+    (void)label;
+
     if (!report) {
         return;
     }
@@ -16,9 +17,6 @@ static inline void mdcad_validation_expect(mdcad_validation_report_t *report,
     report->checks_run++;
     if (!condition) {
         report->checks_failed++;
-        if (label && label[0] != '\0') {
-            fprintf(stderr, "VALIDATION FAIL %s\n", label);
-        }
     }
 }
 
