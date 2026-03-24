@@ -1,6 +1,8 @@
 #include "math/math_bench.h"
 #include "math/math_compare.h"
 #include "math/math_validate.h"
+#include "components/transform_comp.h"
+#include "ecs/ecs_scene.h"
 #include "orbit_camera.h"
 
 #include <math.h>
@@ -66,12 +68,15 @@ static volatile float mdcad_bench_sink = 0.0f;
 static orbit_camera_t mdcad_harness_make_camera(void);
 static vec3_t mdcad_harness_legacy_orbit_eye(const orbit_camera_t *camera);
 static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera);
+static TransformComp mdcad_harness_make_transform(vec3_t position, vec3_t rotation, vec3_t scale);
+static mat4_t mdcad_harness_legacy_transform_from_components(vec3_t position, vec3_t rotation, vec3_t scale);
 static mat4_t mdcad_harness_legacy_projection(void);
 static mat4s mdcad_harness_cglm_projection(void);
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx);
 static void mdcad_harness_bench_cglm_mat4_mul(void *ctx);
 static void mdcad_harness_bench_legacy_mat4_inverse(void *ctx);
@@ -91,6 +96,7 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "view-projection-roundtrip", mdcad_harness_compare_view_projection_roundtrip },
     { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
     { "transform-compose", mdcad_harness_compare_transform_compose },
+    { "hierarchy-world-transform", mdcad_harness_compare_hierarchy_world_transform },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -245,30 +251,32 @@ static mat4s mdcad_harness_cglm_projection(void) {
     return glms_perspective_rh_zo(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
 
-static mat4_t mdcad_harness_legacy_transform(void) {
-    mat4_t translate = mat4_translate(1.5f, -2.0f, 0.75f);
-    mat4_t rotate_x = mat4_rotate_x(0.3f);
-    mat4_t rotate_y = mat4_rotate_y(-0.7f);
-    mat4_t rotate_z = mat4_rotate_z(1.2f);
-    mat4_t scale = mat4_scale(2.0f, 0.5f, 1.25f);
+static TransformComp mdcad_harness_make_transform(vec3_t position, vec3_t rotation, vec3_t scale) {
+    TransformComp transform = transform_comp_default();
 
-    return mat4_mul(translate,
-                    mat4_mul(rotate_z,
-                             mat4_mul(rotate_y,
-                                      mat4_mul(rotate_x, scale))));
+    transform.position = position;
+    transform.rotation = rotation;
+    transform.scale = scale;
+    return transform;
 }
 
-static mat4s mdcad_harness_cglm_transform(void) {
-    mat4s translate = glms_translate_make(mdcad_harness_vec3s(vec3_make(1.5f, -2.0f, 0.75f)));
-    mat4s rotate_x = glms_rotate_x(GLMS_MAT4_IDENTITY, 0.3f);
-    mat4s rotate_y = glms_rotate_y(GLMS_MAT4_IDENTITY, -0.7f);
-    mat4s rotate_z = glms_rotate_z(GLMS_MAT4_IDENTITY, 1.2f);
-    mat4s scale = glms_scale_make(mdcad_harness_vec3s(vec3_make(2.0f, 0.5f, 1.25f)));
+static mat4_t mdcad_harness_legacy_transform_from_components(vec3_t position, vec3_t rotation, vec3_t scale) {
+    mat4_t translation = mat4_translate(position.x, position.y, position.z);
+    mat4_t rotate_x = mat4_rotate_x(rotation.x);
+    mat4_t rotate_y = mat4_rotate_y(rotation.y);
+    mat4_t rotate_z = mat4_rotate_z(rotation.z);
+    mat4_t scale_mat = mat4_scale(scale.x, scale.y, scale.z);
 
-    return glms_mat4_mul(translate,
-                         glms_mat4_mul(rotate_z,
-                                       glms_mat4_mul(rotate_y,
-                                                     glms_mat4_mul(rotate_x, scale))));
+    return mat4_mul(translation,
+                    mat4_mul(rotate_z,
+                             mat4_mul(rotate_y,
+                                      mat4_mul(rotate_x, scale_mat))));
+}
+
+static mat4_t mdcad_harness_legacy_transform(void) {
+    return mdcad_harness_legacy_transform_from_components(vec3_make(1.5f, -2.0f, 0.75f),
+                                                          vec3_make(0.3f, -0.7f, 1.2f),
+                                                          vec3_make(2.0f, 0.5f, 1.25f));
 }
 
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report) {
@@ -366,22 +374,66 @@ static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *r
         { -0.75f, 0.25f, 2.0f },
     };
     mat4_t legacy_transform = mdcad_harness_legacy_transform();
-    mat4s cglm_transform = mdcad_harness_cglm_transform();
+    TransformComp production_transform = mdcad_harness_make_transform(vec3_make(1.5f, -2.0f, 0.75f),
+                                                                      vec3_make(0.3f, -0.7f, 1.2f),
+                                                                      vec3_make(2.0f, 0.5f, 1.25f));
+    mat4_t candidate_transform = transform_comp_compute_local(&production_transform);
     size_t i;
 
-    mdcad_harness_compare_mat4_to_cglm(report,
-                                       "transform-compose matrix",
-                                       legacy_transform,
-                                       cglm_transform,
-                                       1e-4f);
+    mdcad_harness_expect(report,
+                         "transform-compose matrix",
+                         mdcad_compare_mat4_close(legacy_transform, candidate_transform.m, 1e-4f));
 
     for (i = 0; i < (sizeof(sample_points) / sizeof(sample_points[0])); ++i) {
-        vec3_t legacy_point = mat4_mul_point(legacy_transform, sample_points[i]);
-        vec3s cglm_point = glms_mat4_mulv3(cglm_transform, mdcad_harness_vec3s(sample_points[i]), 1.0f);
+        vec3_t legacy_point = mat4_transform_point(legacy_transform, sample_points[i]);
+        vec3_t candidate_point = ecs_scene_transform_point_world(&candidate_transform, sample_points[i]);
         char label[96];
 
         snprintf(label, sizeof(label), "transform-compose point-%zu", i + 1);
-        mdcad_harness_compare_vec3_to_cglm(report, label, legacy_point, cglm_point, 1e-4f);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_point, &candidate_point.x, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report) {
+    static const vec3_t sample_points[] = {
+        { 0.0f, 0.0f, 0.0f },
+        { 0.5f, -0.25f, 1.0f },
+        { -1.25f, 0.75f, -0.5f },
+    };
+    TransformComp parent = mdcad_harness_make_transform(vec3_make(3.0f, -1.0f, 0.5f),
+                                                        vec3_make(0.2f, 0.35f, -0.4f),
+                                                        vec3_make(1.2f, 0.9f, 1.1f));
+    TransformComp child = mdcad_harness_make_transform(vec3_make(-0.75f, 1.5f, 0.25f),
+                                                       vec3_make(-0.15f, 0.4f, 0.9f),
+                                                       vec3_make(0.6f, 1.4f, 0.8f));
+    mat4_t legacy_parent = mdcad_harness_legacy_transform_from_components(parent.position, parent.rotation, parent.scale);
+    mat4_t legacy_child_local = mdcad_harness_legacy_transform_from_components(child.position, child.rotation, child.scale);
+    mat4_t legacy_child_world = mat4_mul(legacy_parent, legacy_child_local);
+    size_t i;
+
+    transform_comp_update(&parent);
+    transform_comp_update_with_parent(&child, &parent.world_matrix);
+
+    mdcad_harness_expect(report,
+                         "hierarchy-world-transform parent matrix",
+                         mdcad_compare_mat4_close(legacy_parent, parent.world_matrix.m, 1e-4f));
+    mdcad_harness_expect(report,
+                         "hierarchy-world-transform child matrix",
+                         mdcad_compare_mat4_close(legacy_child_world, child.world_matrix.m, 1e-4f));
+
+    for (i = 0; i < (sizeof(sample_points) / sizeof(sample_points[0])); ++i) {
+        vec3_t legacy_point = mat4_transform_point(legacy_child_world, sample_points[i]);
+        vec3_t candidate_point = ecs_scene_transform_point_world(&child.world_matrix, sample_points[i]);
+        char label[96];
+
+        snprintf(label, sizeof(label), "hierarchy-world-transform point-%zu", i + 1);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_point, &candidate_point.x, 1e-4f));
     }
 
     return report->checks_failed == 0;
