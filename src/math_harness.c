@@ -1,3 +1,5 @@
+#define MDCAD_MATH3D_ALLOW_INTERACTION_DEPRECATED_USAGE
+
 #include "math/math_bench.h"
 #include "math/math_compare.h"
 #include "math/math_interaction.h"
@@ -66,6 +68,31 @@ typedef struct {
 } mdcad_cglm_screen_ray_ctx_t;
 
 typedef struct {
+    float viewport_x;
+    float viewport_y;
+    float viewport_step_x;
+    float viewport_step_y;
+    mat4_t view;
+    mat4_t proj;
+} mdcad_interaction_ray_bench_ctx_t;
+
+typedef struct {
+    ray_t ray;
+    vec3_t axis_origin;
+    vec3_t axis_dir;
+    vec3_t plane_point;
+    vec3_t plane_normal;
+    float direction_step;
+} mdcad_interaction_drag_bench_ctx_t;
+
+typedef struct {
+    mdcad_quat_t lhs;
+    mdcad_quat_t rhs;
+    vec3_t vector;
+    float angle_step;
+} mdcad_quat_ops_bench_ctx_t;
+
+typedef struct {
     float x;
     float y;
     float z;
@@ -112,6 +139,9 @@ static void mdcad_harness_bench_legacy_mat4_inverse(void *ctx);
 static void mdcad_harness_bench_cglm_mat4_inv(void *ctx);
 static void mdcad_harness_bench_legacy_screen_ray(void *ctx);
 static void mdcad_harness_bench_cglm_screen_ray(void *ctx);
+static void mdcad_harness_bench_interaction_ray(void *ctx);
+static void mdcad_harness_bench_interaction_drag(void *ctx);
+static void mdcad_harness_bench_quat_ops(void *ctx);
 
 static mdcad_legacy_mat4_mul_ctx_t mdcad_legacy_mat4_mul_ctx;
 static mdcad_legacy_mat4_inv_ctx_t mdcad_legacy_mat4_inv_ctx;
@@ -119,6 +149,9 @@ static mdcad_legacy_screen_ray_ctx_t mdcad_legacy_screen_ray_ctx;
 static mdcad_cglm_mat4_mul_ctx_t mdcad_cglm_mat4_mul_ctx;
 static mdcad_cglm_mat4_inv_ctx_t mdcad_cglm_mat4_inv_ctx;
 static mdcad_cglm_screen_ray_ctx_t mdcad_cglm_screen_ray_ctx;
+static mdcad_interaction_ray_bench_ctx_t mdcad_interaction_ray_bench_ctx;
+static mdcad_interaction_drag_bench_ctx_t mdcad_interaction_drag_bench_ctx;
+static mdcad_quat_ops_bench_ctx_t mdcad_quat_ops_bench_ctx;
 
 /* Keep the Phase 3 migration hotspots at the front of the default compare run. */
 static const mdcad_compare_case_t mdcad_compare_cases[] = {
@@ -142,6 +175,9 @@ static mdcad_bench_case_t mdcad_bench_cases[] = {
     { "cglm-mat4-inv", mdcad_harness_bench_cglm_mat4_inv, &mdcad_cglm_mat4_inv_ctx },
     { "legacy-screen-ray", mdcad_harness_bench_legacy_screen_ray, &mdcad_legacy_screen_ray_ctx },
     { "cglm-screen-ray", mdcad_harness_bench_cglm_screen_ray, &mdcad_cglm_screen_ray_ctx },
+    { "bench-interaction-ray", mdcad_harness_bench_interaction_ray, &mdcad_interaction_ray_bench_ctx },
+    { "bench-interaction-drag", mdcad_harness_bench_interaction_drag, &mdcad_interaction_drag_bench_ctx },
+    { "bench-quat-ops", mdcad_harness_bench_quat_ops, &mdcad_quat_ops_bench_ctx },
 };
 
 static vec3s mdcad_harness_vec3s(vec3_t value) {
@@ -873,6 +909,26 @@ static void mdcad_harness_reset_bench_contexts(void) {
     mdcad_cglm_screen_ray_ctx.x_step = 0.25f;
     mdcad_cglm_screen_ray_ctx.inv_vp = glms_mat4_inv(cglm_vp);
 
+    mdcad_interaction_ray_bench_ctx.viewport_x = 0.62f;
+    mdcad_interaction_ray_bench_ctx.viewport_y = 0.35f;
+    mdcad_interaction_ray_bench_ctx.viewport_step_x = 0.0007f;
+    mdcad_interaction_ray_bench_ctx.viewport_step_y = 0.0005f;
+    mdcad_interaction_ray_bench_ctx.view = legacy_view;
+    mdcad_interaction_ray_bench_ctx.proj = legacy_proj;
+
+    mdcad_interaction_drag_bench_ctx.ray.origin = vec3_make(-2.0f, 2.5f, 3.0f);
+    mdcad_interaction_drag_bench_ctx.ray.direction = vec3_normalize(vec3_make(0.8f, -0.45f, -0.22f));
+    mdcad_interaction_drag_bench_ctx.axis_origin = vec3_make(1.0f, -0.5f, 2.0f);
+    mdcad_interaction_drag_bench_ctx.axis_dir = vec3_make(1.0f, 0.0f, 0.0f);
+    mdcad_interaction_drag_bench_ctx.plane_point = vec3_make(1.0f, -0.5f, 2.0f);
+    mdcad_interaction_drag_bench_ctx.plane_normal = vec3_make(0.0f, 1.0f, 0.0f);
+    mdcad_interaction_drag_bench_ctx.direction_step = 0.0009f;
+
+    mdcad_quat_ops_bench_ctx.lhs = mdcad_quat_from_axis_angle(vec3_make(1.0f, 0.0f, 0.0f), 0.32f);
+    mdcad_quat_ops_bench_ctx.rhs = mdcad_quat_from_axis_angle(vec3_make(0.0f, 1.0f, 0.0f), -0.47f);
+    mdcad_quat_ops_bench_ctx.vector = vec3_make(0.35f, -0.18f, 0.9f);
+    mdcad_quat_ops_bench_ctx.angle_step = 0.0006f;
+
 }
 
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx_ptr) {
@@ -931,6 +987,56 @@ static void mdcad_harness_bench_cglm_screen_ray(void *ctx_ptr) {
         ctx->near_pos.raw[0] = 640.0f;
         ctx->far_pos.raw[0] = 640.0f;
     }
+}
+
+static void mdcad_harness_bench_interaction_ray(void *ctx_ptr) {
+    mdcad_interaction_ray_bench_ctx_t *ctx = (mdcad_interaction_ray_bench_ctx_t *)ctx_ptr;
+    ray_t ray = mdcad_interaction_screen_ray_from_viewport(ctx->viewport_x,
+                                                            ctx->viewport_y,
+                                                            1280.0f,
+                                                            720.0f,
+                                                            ctx->view,
+                                                            ctx->proj);
+
+    mdcad_bench_sink += ray.origin.x + ray.direction.z;
+    ctx->viewport_x += ctx->viewport_step_x;
+    ctx->viewport_y += ctx->viewport_step_y;
+    if (ctx->viewport_x > 0.95f) {
+        ctx->viewport_x = 0.05f;
+    }
+    if (ctx->viewport_y > 0.95f) {
+        ctx->viewport_y = 0.05f;
+    }
+}
+
+static void mdcad_harness_bench_interaction_drag(void *ctx_ptr) {
+    mdcad_interaction_drag_bench_ctx_t *ctx = (mdcad_interaction_drag_bench_ctx_t *)ctx_ptr;
+    vec3_t hit = vec3_make(0.0f, 0.0f, 0.0f);
+    float plane_t = 0.0f;
+    float axis_t = mdcad_interaction_ray_axis_closest_t(ctx->ray, ctx->axis_origin, ctx->axis_dir);
+    bool plane_hit = mdcad_interaction_ray_plane_intersect(ctx->ray,
+                                                            ctx->plane_point,
+                                                            ctx->plane_normal,
+                                                            &hit,
+                                                            &plane_t);
+
+    mdcad_bench_sink += axis_t + (plane_hit ? plane_t : 0.0f) + hit.x;
+    ctx->ray.origin.x += 0.0004f;
+    ctx->ray.direction = vec3_normalize(vec3_add(ctx->ray.direction,
+                                                 vec3_make(ctx->direction_step, -ctx->direction_step * 0.5f, 0.0f)));
+}
+
+static void mdcad_harness_bench_quat_ops(void *ctx_ptr) {
+    mdcad_quat_ops_bench_ctx_t *ctx = (mdcad_quat_ops_bench_ctx_t *)ctx_ptr;
+    mdcad_quat_t lhs = mdcad_quat_normalize(ctx->lhs);
+    mdcad_quat_t rhs = mdcad_quat_normalize(ctx->rhs);
+    mdcad_quat_t composed = mdcad_quat_mul(lhs, rhs);
+    vec3_t rotated = mdcad_quat_rotate_vec3(composed, ctx->vector);
+    mdcad_quat_t step = mdcad_quat_from_axis_angle(vec3_make(0.0f, 0.0f, 1.0f), ctx->angle_step);
+
+    mdcad_bench_sink += rotated.x + rotated.y;
+    ctx->rhs = mdcad_quat_mul(step, rhs);
+    ctx->vector = vec3_normalize(vec3_add(ctx->vector, vec3_make(0.0003f, -0.0002f, 0.0004f)));
 }
 
 static void mdcad_harness_print_usage(const char *argv0) {

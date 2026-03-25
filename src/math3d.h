@@ -6,6 +6,16 @@
 
 #include <math.h>
 
+#if defined(MDCAD_MATH3D_ALLOW_INTERACTION_DEPRECATED_USAGE)
+#define MDCAD_MATH3D_INTERACTION_DEPRECATED
+#elif defined(_MSC_VER)
+#define MDCAD_MATH3D_INTERACTION_DEPRECATED __declspec(deprecated)
+#elif defined(__clang__) || defined(__GNUC__)
+#define MDCAD_MATH3D_INTERACTION_DEPRECATED __attribute__((deprecated))
+#else
+#define MDCAD_MATH3D_INTERACTION_DEPRECATED
+#endif
+
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
@@ -232,6 +242,8 @@ static inline mat4_t mat4_inverse(mat4_t m) {
 }
 
 // Unproject screen NDC (-1..+1) to world-space ray
+/* Deprecated for migrated interaction slices: use mdcad_interaction_screen_ray_from_viewport(). */
+MDCAD_MATH3D_INTERACTION_DEPRECATED
 static inline ray_t ray_from_screen(float ndc_x, float ndc_y, mat4_t inv_vp) {
     vec3_t near_pt = mat4_mul_point(inv_vp, vec3_make(ndc_x, ndc_y, -1.0f));
     vec3_t far_pt  = mat4_mul_point(inv_vp, vec3_make(ndc_x, ndc_y,  1.0f));
@@ -252,6 +264,8 @@ static inline ray_t ray_from_screen(float ndc_x, float ndc_y, mat4_t inv_vp) {
 
 // Closest parameter t on an axis line to a ray (for axis-constrained dragging)
 // Returns t such that axis_origin + t * axis_dir is closest to ray
+/* Deprecated for migrated interaction slices: use mdcad_interaction_ray_axis_closest_t(). */
+MDCAD_MATH3D_INTERACTION_DEPRECATED
 static inline float ray_axis_closest_t(ray_t ray, vec3_t axis_origin, vec3_t axis_dir) {
     // w = axis_origin - ray.origin (standard convention: w0 = P1 - P2)
     vec3_t w = vec3_sub(axis_origin, ray.origin);
@@ -267,6 +281,8 @@ static inline float ray_axis_closest_t(ray_t ray, vec3_t axis_origin, vec3_t axi
 
 // Ray-plane intersection. Returns distance t, writes hit point.
 // Returns -1.0 if no intersection (ray parallel to plane).
+/* Deprecated for migrated interaction slices: use mdcad_interaction_ray_plane_intersect(). */
+MDCAD_MATH3D_INTERACTION_DEPRECATED
 static inline float ray_plane_intersect(ray_t ray, vec3_t plane_pt, vec3_t plane_n, vec3_t *hit) {
     float denom = vec3_dot(plane_n, ray.direction);
     if (fabsf(denom) < 1e-6f) return -1.0f;

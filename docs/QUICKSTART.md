@@ -94,6 +94,23 @@ Manual smoke checklist:
 - confirm visible geometry remains stable while moving the camera
 - if parented entities are present in the current scene, confirm child geometry continues following the parent without visible drift
 
+## Phase 4 interaction parity smoke
+
+Run the Phase 4 interaction workflow in this order:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-validation
+./build/bin/mdcad_math_harness --mode compare --strict
+./build/bin/mdcad_math_harness --mode bench
+./build/bin/mdCAD
+```
+
+Manual smoke checklist:
+
+- hover and click around thin lines/points to confirm pick parity
+- drag each gizmo axis and plane handle to confirm stable interaction with no start jump
+- in geometry mode, drag selected vertices on transformed entities and confirm local-space edits remain correct
+- run undo/redo after drag operations and confirm positions/vertices restore exactly
+
 ## Windows build (MinGW or MSVC)
 
 ### MinGW Vulkan Build (Default MinGW)
