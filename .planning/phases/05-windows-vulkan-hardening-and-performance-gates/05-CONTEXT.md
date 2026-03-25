@@ -105,7 +105,14 @@ Prove the migrated math hotspot set is stable on Windows Vulkan, close native pe
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within phase scope.
+| priority | area | issue | evidence | impact | recommended phase |
+|---|---|---|---|---|---|
+| P1 must-next | windows-msvc-vulkan-hot-gate | HOT-04 checklist execution is blocked on current host and needs real Windows MSVC rerun closure | .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/compare.txt | Leaves Phase 5 runtime gate unresolved and milestone cannot close safely | 06-01 |
+| P2 should-next | windows-msvc-vulkan-perf-gate | PERF-03 uses host-blocked placeholder provenance and must be replaced with native Windows benchmark capture | .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt | Performance gate confidence remains reduced and rollback risk is under-measured | 06-01 |
+| P2 should-next | long-tail-migration | TAIL-01 migrate remaining serializer and importer math consumers still on legacy helpers | .planning/REQUIREMENTS.md | Legacy math surface remains broad and increases long-term maintenance drag | 06-02 |
+| P3 future | long-tail-migration | TAIL-02 shrink temporary thin-entrypoint migration glue after staged cutover stabilizes | .planning/PROJECT.md | Migration scaffolding persists longer than needed and obscures steady-state architecture | 06-03 |
+| P3 future | platform-expansion | PLAT-01 validate cglm-backed path on iOS native runtime with parity smoke and harness evidence | .planning/REQUIREMENTS.md | Mobile parity risk remains unknown beyond desktop-first rollout | 07-01 |
+| P3 future | platform-expansion | PLAT-02 validate web or wasm math behavior and alignment assumptions under webgpu path | .planning/REQUIREMENTS.md | Web target may drift from native conventions without explicit gate evidence | 07-02 |
 
 </deferred>
 

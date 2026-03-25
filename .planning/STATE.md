@@ -103,7 +103,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+### Phase 05 backlog handoff
+
+- P1: Rerun HOT-04 strict compare and manual smoke on a Windows MSVC Vulkan host using `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/compare.txt` as the current blocked evidence anchor.
+- P2: Replace placeholder PERF-03 benchmark provenance with native Windows capture and reevaluate gate output referenced at `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt`.
+- P2: Scope and schedule TAIL-01 long-tail migration workstream from `.planning/REQUIREMENTS.md` after Windows gate closure work is complete.
 
 ### Blockers/Concerns
 
