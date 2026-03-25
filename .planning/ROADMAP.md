@@ -81,7 +81,7 @@ Plans:
 
 Plans:
 - [x] 04-01: Migrate pick/unproject/ray math to the new foundation
-- [ ] 04-02: Migrate gizmo drag/intersection math and validate interaction feel
+- [x] 04-02: Migrate gizmo drag/intersection math and validate interaction feel
 - [ ] 04-03: Add expanded helper coverage and retire redundant local helpers in migrated areas
 
 ### Phase 5: Windows Vulkan Hardening and Performance Gates
@@ -110,6 +110,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Selection and Conventions | 3/3 | Complete    | 2026-03-24 |
 | 2. Direct Adoption Tooling and Validation Harness | 3/3 | Complete | 2026-03-24 |
-| 3. macOS Core Transform Migration | 0/3 | Not started | - |
-| 4. Interaction Math and API Expansion | 0/3 | Not started | - |
+| 3. macOS Core Transform Migration | 2/3 | In Progress | - |
+| 4. Interaction Math and API Expansion | 2/3 | In Progress | - |
 | 5. Windows Vulkan Hardening and Performance Gates | 0/3 | Not started | - |

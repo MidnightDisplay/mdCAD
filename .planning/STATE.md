@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 04
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-25T13:13:25.131Z"
+status: Ready to execute
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-25T13:43:14.442Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 04 (interaction-math-and-api-expansion) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: 2 of 3
 | Phase 03 P02 | 35 min | 2 tasks | 4 files |
 | Phase 03 P03 | 1 min | 2 tasks | 2 files |
 | Phase 04 P01 | 5min | 2 tasks | 4 files |
+| Phase 04 P02 | 3 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Quickstart documents Phase 3 as a harness-first macOS workflow with app launch kept explicitly as a manual smoke confirmation step. — Another agent can now rerun the automated gate and the remaining human smoke checklist directly from checked-in docs.
 - [Phase 04]: Interaction pick and screen-ray runtime paths now consume one shared helper boundary in src/math/math_interaction.h. — Unifies drag begin/update and pick MVP math behind one cglm-backed implementation surface to reduce drift.
 - [Phase 04]: screen-ray helper keeps legacy NDC ray semantics while using cglm matrix inversion/multiplication internals. — Preserved behavior-level parity against frozen pre-migration formulas in strict compare checks.
+- [Phase 04]: Axis and plane drag calculations now call one shared helper boundary instead of direct math3d intersection helpers in gizmo runtime paths. — Centralizes gizmo drag math under cglm-backed interaction helpers to reduce runtime drift.
+- [Phase 04]: Vertex-mode world/local delta conversion now uses one shared helper with explicit singular-matrix zero fallback. — Ensures deterministic degenerate handling while removing open-coded inverse logic from vertex mode.
+- [Phase 04]: Gizmo drag migration is gated by dedicated strict-compare harness cases for axis, plane, and vertex local-delta behavior. — Keeps parity regressions visible and fail-fast in automated harness compare runs.
 
 ### Pending Todos
 
@@ -99,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T13:12:58.508Z
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-interaction-math-and-api-expansion/04-02-PLAN.md
+Last session: 2026-03-25T13:43:14.439Z
+Stopped at: Completed 04-02-PLAN.md
+Resume file: None
