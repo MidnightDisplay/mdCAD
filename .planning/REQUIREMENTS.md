@@ -28,8 +28,8 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Foundation Expansion
 
-- [ ] **EXP-01**: The adopted math foundation exposes quaternion and broader transform/helper capabilities for future mdCAD work
-- [ ] **EXP-02**: Migrated subsystems can retire equivalent `src/math3d.h` helpers without losing required runtime functionality
+- [x] **EXP-01**: The adopted math foundation exposes quaternion and broader transform/helper capabilities for future mdCAD work
+- [x] **EXP-02**: Migrated subsystems can retire equivalent `src/math3d.h` helpers without losing required runtime functionality
 
 ## v2 Requirements
 
@@ -72,8 +72,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERF-01 | Phase 2 | Complete |
 | PERF-02 | Phase 5 | Pending |
 | PERF-03 | Phase 5 | Pending |
-| EXP-01 | Phase 4 | Pending |
-| EXP-02 | Phase 4 | Pending |
+| EXP-01 | Phase 4 | Complete |
+| EXP-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total

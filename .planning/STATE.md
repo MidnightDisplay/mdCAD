@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-25T13:43:14.442Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-03-25T13:57:10.133Z"
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -60,6 +60,7 @@ Plan: 3 of 3
 | Phase 03 P03 | 1 min | 2 tasks | 2 files |
 | Phase 04 P01 | 5min | 2 tasks | 4 files |
 | Phase 04 P02 | 3 min | 2 tasks | 4 files |
+| Phase 04 P03 | 3 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Axis and plane drag calculations now call one shared helper boundary instead of direct math3d intersection helpers in gizmo runtime paths. — Centralizes gizmo drag math under cglm-backed interaction helpers to reduce runtime drift.
 - [Phase 04]: Vertex-mode world/local delta conversion now uses one shared helper with explicit singular-matrix zero fallback. — Ensures deterministic degenerate handling while removing open-coded inverse logic from vertex mode.
 - [Phase 04]: Gizmo drag migration is gated by dedicated strict-compare harness cases for axis, plane, and vertex local-delta behavior. — Keeps parity regressions visible and fail-fast in automated harness compare runs.
+- [Phase 04]: Quaternion helpers expose project-owned args/struct while delegating operations to cglm glms_quat APIs — Keeps helper surface thin and future-proof without vendor type aliases
+- [Phase 04]: Legacy interaction helpers in math3d are now scoped as deprecated in migrated slices — Prevents reintroduction of ray_from_screen/ray_axis_closest_t/ray_plane_intersect into migrated app/pick/gizmo paths
 
 ### Pending Todos
 
@@ -100,9 +103,10 @@ None yet.
 
 - Phase 3 execution still needs to keep pick/gizmo bridge inputs stable while camera and transform compute moves onto `cglm`
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
+- HOT-03 macOS manual interaction smoke is still pending for 04-03 (not executed in headless run).
 
 ## Session Continuity
 
-Last session: 2026-03-25T13:43:14.439Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-25T13:57:10.129Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
