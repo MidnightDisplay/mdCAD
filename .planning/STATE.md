@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-stopped_at: Phase 4 planned
-last_updated: "2026-03-25T11:54:59.886Z"
+status: Executing Phase 04
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-25T13:13:25.131Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,15 +19,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 03 — macos-core-transform-migration
+**Current focus:** Phase 04 — interaction-math-and-api-expansion
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 **Fallback posture:** no active fallback candidate
 
 ## Current Position
 
-Phase: 03 (macos-core-transform-migration) — EXECUTING
-Plan: 3 of 3
+Phase: 04 (interaction-math-and-api-expansion) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Plan: 3 of 3
 | Phase 03 P01 | 1 min | 2 tasks | 3 files |
 | Phase 03 P02 | 35 min | 2 tasks | 4 files |
 | Phase 03 P03 | 1 min | 2 tasks | 2 files |
+| Phase 04 P01 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 03]: World-point application in ecs_scene.h now flows through one cglm-backed helper instead of leaving mat4_transform_point(t->world_matrix, ...) scattered across creation, update, render, and pick paths. — One shared helper keeps semantics aligned across the dense ECS hot path and gives the harness one real production helper to validate.
 - [Phase 03]: The default compare suite now leads with the four Phase 3 hotspot cases so routine harness runs surface the migrated camera and transform parity checks first. — This keeps the current rollout-critical paths visible in strict compare runs and makes parity regressions fail fast.
 - [Phase 03]: Quickstart documents Phase 3 as a harness-first macOS workflow with app launch kept explicitly as a manual smoke confirmation step. — Another agent can now rerun the automated gate and the remaining human smoke checklist directly from checked-in docs.
+- [Phase 04]: Interaction pick and screen-ray runtime paths now consume one shared helper boundary in src/math/math_interaction.h. — Unifies drag begin/update and pick MVP math behind one cglm-backed implementation surface to reduce drift.
+- [Phase 04]: screen-ray helper keeps legacy NDC ray semantics while using cglm matrix inversion/multiplication internals. — Preserved behavior-level parity against frozen pre-migration formulas in strict compare checks.
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T11:54:59.874Z
-Stopped at: Phase 4 planned
-Resume file: .planning/phases/04-interaction-math-and-api-expansion/04-01-PLAN.md
+Last session: 2026-03-25T13:12:58.508Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-interaction-math-and-api-expansion/04-02-PLAN.md

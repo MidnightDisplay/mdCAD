@@ -80,7 +80,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Migrate pick/unproject/ray math to the new foundation
+- [x] 04-01: Migrate pick/unproject/ray math to the new foundation
 - [ ] 04-02: Migrate gizmo drag/intersection math and validate interaction feel
 - [ ] 04-03: Add expanded helper coverage and retire redundant local helpers in migrated areas
 
