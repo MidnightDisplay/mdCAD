@@ -80,11 +80,15 @@ static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
                                                    float *out_zoom_factor,
                                                    mat4_t view,
                                                    mat4_t proj);
+static vec3_t mdcad_harness_legacy_world_delta_to_local(mat4_t world_matrix, vec3_t world_delta);
 static mat4s mdcad_harness_cglm_projection(void);
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_axis_drag(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_plane_drag(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx);
@@ -109,6 +113,9 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "hierarchy-world-transform", mdcad_harness_compare_hierarchy_world_transform },
     { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
     { "pick-mvp-window", mdcad_harness_compare_pick_mvp_window },
+    { "gizmo-axis-drag", mdcad_harness_compare_gizmo_axis_drag },
+    { "gizmo-plane-drag", mdcad_harness_compare_gizmo_plane_drag },
+    { "gizmo-vertex-local-delta", mdcad_harness_compare_gizmo_vertex_local_delta },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -302,6 +309,16 @@ static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
     }
 }
 
+static vec3_t mdcad_harness_legacy_world_delta_to_local(mat4_t world_matrix, vec3_t world_delta) {
+    mat4_t inv = mat4_inverse(world_matrix);
+
+    return vec3_make(
+        inv.m[0] * world_delta.x + inv.m[4] * world_delta.y + inv.m[8]  * world_delta.z,
+        inv.m[1] * world_delta.x + inv.m[5] * world_delta.y + inv.m[9]  * world_delta.z,
+        inv.m[2] * world_delta.x + inv.m[6] * world_delta.y + inv.m[10] * world_delta.z
+    );
+}
+
 static mat4s mdcad_harness_cglm_projection(void) {
     return glms_perspective_rh_zo(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
@@ -473,6 +490,152 @@ static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *rep
                              "pick-mvp-window sample ndc-y",
                              mdcad_compare_float_close(legacy_ndc_y, candidate_ndc_y, 1e-4f));
     }
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_axis_drag(mdcad_validation_report_t *report) {
+    vec3_t axis_origin = vec3_make(1.2f, -0.3f, 2.4f);
+    vec3_t axis = vec3_make(1.0f, 0.0f, 0.0f);
+    ray_t start_ray = {
+        vec3_make(-3.0f, 2.0f, 4.0f),
+        vec3_normalize(vec3_make(0.85f, -0.42f, -0.31f)),
+    };
+    ray_t update_ray = {
+        vec3_make(-2.2f, 1.8f, 3.6f),
+        vec3_normalize(vec3_make(0.91f, -0.37f, -0.18f)),
+    };
+    ray_t parallel_ray = {
+        vec3_make(0.0f, 3.0f, -1.0f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+    };
+    float legacy_start_t = ray_axis_closest_t(start_ray, axis_origin, axis);
+    float legacy_update_t = ray_axis_closest_t(update_ray, axis_origin, axis);
+    float candidate_start_t = mdcad_interaction_ray_axis_closest_t(start_ray, axis_origin, axis);
+    float candidate_update_t = mdcad_interaction_ray_axis_closest_t(update_ray, axis_origin, axis);
+    float legacy_parallel_t = ray_axis_closest_t(parallel_ray, axis_origin, axis);
+    float candidate_parallel_t = mdcad_interaction_ray_axis_closest_t(parallel_ray, axis_origin, axis);
+    vec3_t legacy_total = vec3_scale(axis, legacy_update_t - legacy_start_t);
+    vec3_t candidate_total = vec3_scale(axis, candidate_update_t - candidate_start_t);
+    vec3_t legacy_increment = vec3_sub(legacy_total, vec3_make(0.0f, 0.0f, 0.0f));
+    vec3_t candidate_increment = vec3_sub(candidate_total, vec3_make(0.0f, 0.0f, 0.0f));
+
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag start-t",
+                         mdcad_compare_float_close(legacy_start_t, candidate_start_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag update-t",
+                         mdcad_compare_float_close(legacy_update_t, candidate_update_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag total-delta",
+                         mdcad_compare_vec3_close(legacy_total, &candidate_total.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag incremental-delta",
+                         mdcad_compare_vec3_close(legacy_increment, &candidate_increment.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag parallel-legacy-fallback",
+                         mdcad_compare_float_close(legacy_parallel_t, 0.0f, 1e-6f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag parallel-candidate-fallback",
+                         mdcad_compare_float_close(candidate_parallel_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_plane_drag(mdcad_validation_report_t *report) {
+    vec3_t plane_point = vec3_make(1.2f, -0.3f, 2.4f);
+    vec3_t plane_normal = vec3_make(0.0f, 1.0f, 0.0f);
+    ray_t start_ray = {
+        vec3_make(0.4f, 3.0f, 2.8f),
+        vec3_normalize(vec3_make(0.2f, -1.0f, -0.1f)),
+    };
+    ray_t update_ray = {
+        vec3_make(0.9f, 2.7f, 3.1f),
+        vec3_normalize(vec3_make(0.1f, -1.0f, -0.3f)),
+    };
+    ray_t parallel_ray = {
+        vec3_make(-1.0f, 0.0f, 0.5f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+    };
+    vec3_t legacy_start_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t legacy_update_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t candidate_start_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t candidate_update_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    float legacy_start_t = ray_plane_intersect(start_ray, plane_point, plane_normal, &legacy_start_hit);
+    float legacy_update_t = ray_plane_intersect(update_ray, plane_point, plane_normal, &legacy_update_hit);
+    float legacy_parallel_t = ray_plane_intersect(parallel_ray, plane_point, plane_normal, NULL);
+    float candidate_start_t = 0.0f;
+    float candidate_update_t = 0.0f;
+    float candidate_parallel_t = 0.0f;
+    bool candidate_start_ok = mdcad_interaction_ray_plane_intersect(start_ray,
+                                                                     plane_point,
+                                                                     plane_normal,
+                                                                     &candidate_start_hit,
+                                                                     &candidate_start_t);
+    bool candidate_update_ok = mdcad_interaction_ray_plane_intersect(update_ray,
+                                                                      plane_point,
+                                                                      plane_normal,
+                                                                      &candidate_update_hit,
+                                                                      &candidate_update_t);
+    bool candidate_parallel_ok = mdcad_interaction_ray_plane_intersect(parallel_ray,
+                                                                        plane_point,
+                                                                        plane_normal,
+                                                                        NULL,
+                                                                        &candidate_parallel_t);
+    vec3_t legacy_total = vec3_sub(legacy_update_hit, legacy_start_hit);
+    vec3_t candidate_total = vec3_sub(candidate_update_hit, candidate_start_hit);
+    vec3_t legacy_increment = vec3_sub(legacy_total, vec3_make(0.0f, 0.0f, 0.0f));
+    vec3_t candidate_increment = vec3_sub(candidate_total, vec3_make(0.0f, 0.0f, 0.0f));
+
+    mdcad_harness_expect(report, "gizmo-plane-drag legacy-start-hit", legacy_start_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag legacy-update-hit", legacy_update_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag candidate-start-hit", candidate_start_ok && candidate_start_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag candidate-update-hit", candidate_update_ok && candidate_update_t >= 0.0f);
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag start-t",
+                         mdcad_compare_float_close(legacy_start_t, candidate_start_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag update-t",
+                         mdcad_compare_float_close(legacy_update_t, candidate_update_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag start-hit",
+                         mdcad_compare_vec3_close(legacy_start_hit, &candidate_start_hit.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag update-hit",
+                         mdcad_compare_vec3_close(legacy_update_hit, &candidate_update_hit.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag total-delta",
+                         mdcad_compare_vec3_close(legacy_total, &candidate_total.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag incremental-delta",
+                         mdcad_compare_vec3_close(legacy_increment, &candidate_increment.x, 1e-5f));
+    mdcad_harness_expect(report, "gizmo-plane-drag parallel-legacy", legacy_parallel_t < 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag parallel-candidate", !candidate_parallel_ok);
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag parallel-candidate-t-fallback",
+                         mdcad_compare_float_close(candidate_parallel_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_report_t *report) {
+    mat4_t world_matrix = mdcad_harness_legacy_transform_from_components(vec3_make(1.5f, -2.0f, 0.75f),
+                                                                         vec3_make(0.3f, -0.7f, 1.2f),
+                                                                         vec3_make(2.0f, 0.5f, 1.25f));
+    vec3_t world_delta = vec3_make(0.45f, -1.2f, 0.33f);
+    vec3_t legacy_local_delta = mdcad_harness_legacy_world_delta_to_local(world_matrix, world_delta);
+    vec3_t candidate_local_delta = mdcad_interaction_world_delta_to_local(world_matrix, world_delta);
+    mat4_t singular_world_matrix = mdcad_harness_legacy_transform_from_components(vec3_make(0.0f, 0.0f, 0.0f),
+                                                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                                                   vec3_make(0.0f, 1.0f, 1.0f));
+    vec3_t singular_local_delta = mdcad_interaction_world_delta_to_local(singular_world_matrix, world_delta);
+
+    mdcad_harness_expect(report,
+                         "gizmo-vertex-local-delta converted",
+                         mdcad_compare_vec3_close(legacy_local_delta, &candidate_local_delta.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-vertex-local-delta singular-fallback",
+                         mdcad_compare_vec3_close(vec3_make(0.0f, 0.0f, 0.0f), &singular_local_delta.x, 1e-6f));
 
     return report->checks_failed == 0;
 }
