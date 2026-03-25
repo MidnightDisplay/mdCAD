@@ -75,6 +75,25 @@ Run the full native validation workflow:
 cmake --build build-vulkan --config Release --target math-validation
 ```
 
+## Phase 5 Windows Vulkan hard gate
+
+Run this exact sequence for the HOT-04 hard gate on Windows MSVC Vulkan:
+```powershell
+cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode compare --strict
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000
+cmake --build build-vulkan --config Release --target math-validation
+.\build-vulkan\bin\Release\mdCAD.exe
+```
+
+MinGW is smoke-only for this phase:
+```powershell
+cmake -B build-mingw -G "MinGW Makefiles"
+cmake --build build-mingw
+.\build-mingw\bin\mdCAD.exe
+```
+
 ## Phase 3 macOS parity smoke
 
 The harness-driven validation remains the primary automated gate for this phase. Launching `mdCAD` afterward is a manual smoke step to confirm the migrated camera and transform paths still look stable in the live viewport.
