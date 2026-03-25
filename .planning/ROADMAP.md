@@ -99,7 +99,7 @@ Plans:
 Plans:
 - [x] 05-01: Validate the migrated hotspot set on Windows Vulkan
 - [x] 05-02: Run and interpret native benchmark results on macOS and Windows
-- [ ] 05-03: Resolve rollout issues and capture the next-wave migration backlog
+- [ ] 05-03: Resolve rollout issues and capture the next-wave migration backlog (executed 2026-03-25, gate decision HOLD pending Windows MSVC Vulkan reruns)
 
 ## Progress
 
@@ -112,4 +112,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Direct Adoption Tooling and Validation Harness | 3/3 | Complete | 2026-03-24 |
 | 3. macOS Core Transform Migration | 2/3 | In Progress | - |
 | 4. Interaction Math and API Expansion | 3/3 | Complete    | 2026-03-25 |
-| 5. Windows Vulkan Hardening and Performance Gates | 2/3 | In Progress | - |
+| 5. Windows Vulkan Hardening and Performance Gates | 2/3 | On Hold | - |
