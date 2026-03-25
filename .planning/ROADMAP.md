@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Selection and Conventions** - Lock `cglm` `0.9.6`, vendor it lightly, and define mdCAD’s math conventions (completed 2026-03-24)
 - [x] **Phase 2: Direct Adoption Tooling and Validation Harness** - Build the thin project-owned math entrypoint and comparison tooling for direct cglm adoption (completed 2026-03-24)
 - [ ] **Phase 3: macOS Core Transform Migration** - Migrate camera, transforms, and render-matrix hotspots on the primary native path
-- [ ] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage
+- [x] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage (completed 2026-03-25)
 - [ ] **Phase 5: Windows Vulkan Hardening and Performance Gates** - Validate the migrated hotspot set on Windows and close native performance gates
 
 ## Phase Details
@@ -111,5 +111,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Selection and Conventions | 3/3 | Complete    | 2026-03-24 |
 | 2. Direct Adoption Tooling and Validation Harness | 3/3 | Complete | 2026-03-24 |
 | 3. macOS Core Transform Migration | 2/3 | In Progress | - |
-| 4. Interaction Math and API Expansion | 2/3 | In Progress | - |
+| 4. Interaction Math and API Expansion | 3/3 | Complete    | 2026-03-25 |
 | 5. Windows Vulkan Hardening and Performance Gates | 0/3 | Not started | - |
