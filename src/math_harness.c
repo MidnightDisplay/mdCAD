@@ -1,6 +1,7 @@
 #include "math/math_bench.h"
 #include "math/math_compare.h"
 #include "math/math_interaction.h"
+#include "math/math_quat.h"
 #include "math/math_validate.h"
 #include "components/transform_comp.h"
 #include "ecs/ecs_scene.h"
@@ -64,6 +65,13 @@ typedef struct {
     vec4s viewport;
 } mdcad_cglm_screen_ray_ctx_t;
 
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float w;
+} mdcad_harness_baseline_quat_t;
+
 static volatile float mdcad_bench_sink = 0.0f;
 
 static orbit_camera_t mdcad_harness_make_camera(void);
@@ -89,8 +97,15 @@ static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *rep
 static bool mdcad_harness_compare_gizmo_axis_drag(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_gizmo_plane_drag(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_quat_rotate_vector(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_quat_compose_order(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
+                                                                      mdcad_harness_baseline_quat_t rhs);
+static vec3_t mdcad_harness_baseline_quat_rotate_vec3(mdcad_harness_baseline_quat_t quat, vec3_t vector);
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx);
 static void mdcad_harness_bench_cglm_mat4_mul(void *ctx);
 static void mdcad_harness_bench_legacy_mat4_inverse(void *ctx);
@@ -116,6 +131,8 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "gizmo-axis-drag", mdcad_harness_compare_gizmo_axis_drag },
     { "gizmo-plane-drag", mdcad_harness_compare_gizmo_plane_drag },
     { "gizmo-vertex-local-delta", mdcad_harness_compare_gizmo_vertex_local_delta },
+    { "quat-rotate-vector", mdcad_harness_compare_quat_rotate_vector },
+    { "quat-compose-order", mdcad_harness_compare_quat_compose_order },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -349,6 +366,66 @@ static mat4_t mdcad_harness_legacy_transform(void) {
     return mdcad_harness_legacy_transform_from_components(vec3_make(1.5f, -2.0f, 0.75f),
                                                           vec3_make(0.3f, -0.7f, 1.2f),
                                                           vec3_make(2.0f, 0.5f, 1.25f));
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians) {
+    float axis_len = vec3_length(axis);
+    float half_angle;
+    float sin_half;
+    float cos_half;
+    vec3_t axis_normalized;
+
+    if (!isfinite(radians) || !isfinite(axis_len) || axis_len <= 1e-8f) {
+        return (mdcad_harness_baseline_quat_t){ 0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    axis_normalized = vec3_scale(axis, 1.0f / axis_len);
+    half_angle = radians * 0.5f;
+    sin_half = sinf(half_angle);
+    cos_half = cosf(half_angle);
+    return (mdcad_harness_baseline_quat_t){
+        axis_normalized.x * sin_half,
+        axis_normalized.y * sin_half,
+        axis_normalized.z * sin_half,
+        cos_half,
+    };
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat) {
+    float norm = sqrtf(quat.x * quat.x + quat.y * quat.y + quat.z * quat.z + quat.w * quat.w);
+
+    if (!isfinite(norm) || norm <= 1e-8f) {
+        return (mdcad_harness_baseline_quat_t){ 0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    return (mdcad_harness_baseline_quat_t){
+        quat.x / norm,
+        quat.y / norm,
+        quat.z / norm,
+        quat.w / norm,
+    };
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
+                                                                      mdcad_harness_baseline_quat_t rhs) {
+    return (mdcad_harness_baseline_quat_t){
+        lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+        lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+        lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+        lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z,
+    };
+}
+
+static vec3_t mdcad_harness_baseline_quat_rotate_vec3(mdcad_harness_baseline_quat_t quat, vec3_t vector) {
+    mdcad_harness_baseline_quat_t q = mdcad_harness_baseline_quat_normalize(quat);
+    vec3_t imag = vec3_make(q.x, q.y, q.z);
+    float imag_dot_vec = vec3_dot(imag, vector);
+    float imag_dot_imag = vec3_dot(imag, imag);
+    vec3_t term_u = vec3_scale(imag, 2.0f * imag_dot_vec);
+    vec3_t term_v = vec3_scale(vector, q.w * q.w - imag_dot_imag);
+    vec3_t term_cross = vec3_scale(vec3_cross(imag, vector), 2.0f * q.w);
+
+    return vec3_add(vec3_add(term_u, term_v), term_cross);
 }
 
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report) {
@@ -640,6 +717,57 @@ static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_repo
     return report->checks_failed == 0;
 }
 
+static bool mdcad_harness_compare_quat_rotate_vector(mdcad_validation_report_t *report) {
+    vec3_t axis = vec3_make(0.35f, 0.8f, -0.2f);
+    float angle = 0.63f;
+    vec3_t input = vec3_make(1.2f, -0.45f, 2.3f);
+    mdcad_harness_baseline_quat_t baseline_q = mdcad_harness_baseline_quat_from_axis_angle(axis, angle);
+    vec3_t baseline_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_q, input);
+    mdcad_quat_t candidate_q = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis, angle));
+    vec3_t candidate_rotated = mdcad_quat_rotate_vec3(candidate_q, input);
+
+    mdcad_harness_expect(report,
+                         "quat-rotate-vector rotated",
+                         mdcad_compare_vec3_close(baseline_rotated, &candidate_rotated.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "quat-rotate-vector normalized",
+                         mdcad_compare_float_close(1.0f,
+                                                   sqrtf(candidate_q.x * candidate_q.x +
+                                                         candidate_q.y * candidate_q.y +
+                                                         candidate_q.z * candidate_q.z +
+                                                         candidate_q.w * candidate_q.w),
+                                                   1e-5f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_quat_compose_order(mdcad_validation_report_t *report) {
+    vec3_t input = vec3_make(-0.3f, 1.1f, 0.6f);
+    vec3_t axis_x = vec3_make(1.0f, 0.0f, 0.0f);
+    vec3_t axis_y = vec3_make(0.0f, 1.0f, 0.0f);
+    float angle_x = 0.41f;
+    float angle_y = -0.72f;
+    mdcad_harness_baseline_quat_t baseline_qx = mdcad_harness_baseline_quat_from_axis_angle(axis_x, angle_x);
+    mdcad_harness_baseline_quat_t baseline_qy = mdcad_harness_baseline_quat_from_axis_angle(axis_y, angle_y);
+    mdcad_harness_baseline_quat_t baseline_composed = mdcad_harness_baseline_quat_mul(baseline_qy, baseline_qx);
+    mdcad_harness_baseline_quat_t baseline_reverse = mdcad_harness_baseline_quat_mul(baseline_qx, baseline_qy);
+    vec3_t baseline_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_composed, input);
+    vec3_t baseline_reverse_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_reverse, input);
+    mdcad_quat_t qx = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis_x, angle_x));
+    mdcad_quat_t qy = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis_y, angle_y));
+    mdcad_quat_t composed = mdcad_quat_mul(qy, qx);
+    vec3_t candidate_rotated = mdcad_quat_rotate_vec3(composed, input);
+
+    mdcad_harness_expect(report,
+                         "quat-compose-order composed",
+                         mdcad_compare_vec3_close(baseline_rotated, &candidate_rotated.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "quat-compose-order order-sensitive",
+                         !mdcad_compare_vec3_close(baseline_reverse_rotated, &candidate_rotated.x, 1e-3f));
+
+    return report->checks_failed == 0;
+}
+
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report) {
     static const vec3_t sample_points[] = {
         { 0.0f, 0.0f, 0.0f },
@@ -744,6 +872,7 @@ static void mdcad_harness_reset_bench_contexts(void) {
     mdcad_cglm_screen_ray_ctx.far_pos = mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 1.0f));
     mdcad_cglm_screen_ray_ctx.x_step = 0.25f;
     mdcad_cglm_screen_ray_ctx.inv_vp = glms_mat4_inv(cglm_vp);
+
 }
 
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx_ptr) {
