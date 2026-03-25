@@ -14,6 +14,10 @@ static inline bool mdcad_interaction_isfinite_vec3s(vec3s value) {
     return isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2]);
 }
 
+static inline vec3s mdcad_interaction_vec3s_from_legacy(vec3_t legacy) {
+    return (vec3s){ { legacy.x, legacy.y, legacy.z } };
+}
+
 static inline mat4s mdcad_interaction_mat4s_from_legacy(mat4_t legacy) {
     mat4s result;
 
@@ -162,6 +166,110 @@ static inline ray_t mdcad_interaction_screen_ray_from_viewport(float viewport_x,
     ray.origin = near_point;
     ray.direction = vec3_scale(delta, 1.0f / delta_len);
     return ray;
+}
+
+static inline float mdcad_interaction_ray_axis_closest_t(ray_t ray,
+                                                          vec3_t axis_origin,
+                                                          vec3_t axis_dir) {
+    vec3s ray_origin_s = mdcad_interaction_vec3s_from_legacy(ray.origin);
+    vec3s ray_direction_s = mdcad_interaction_vec3s_from_legacy(ray.direction);
+    vec3s axis_origin_s = mdcad_interaction_vec3s_from_legacy(axis_origin);
+    vec3s axis_dir_s = mdcad_interaction_vec3s_from_legacy(axis_dir);
+    vec3s w = glms_vec3_sub(axis_origin_s, ray_origin_s);
+    float a = glms_vec3_dot(axis_dir_s, axis_dir_s);
+    float b = glms_vec3_dot(axis_dir_s, ray_direction_s);
+    float c = glms_vec3_dot(ray_direction_s, ray_direction_s);
+    float d = glms_vec3_dot(axis_dir_s, w);
+    float e = glms_vec3_dot(ray_direction_s, w);
+    float denom = a * c - b * b;
+
+    if (!isfinite(denom) || fabsf(denom) < 1e-6f) {
+        return 0.0f;
+    }
+
+    {
+        float t = (b * e - c * d) / denom;
+        if (!isfinite(t)) {
+            return 0.0f;
+        }
+        return t;
+    }
+}
+
+static inline bool mdcad_interaction_ray_plane_intersect(ray_t ray,
+                                                          vec3_t plane_point,
+                                                          vec3_t plane_normal,
+                                                          vec3_t *out_hit,
+                                                          float *out_t) {
+    vec3s ray_origin_s = mdcad_interaction_vec3s_from_legacy(ray.origin);
+    vec3s ray_direction_s = mdcad_interaction_vec3s_from_legacy(ray.direction);
+    vec3s plane_point_s = mdcad_interaction_vec3s_from_legacy(plane_point);
+    vec3s plane_normal_s = mdcad_interaction_vec3s_from_legacy(plane_normal);
+    float denom = glms_vec3_dot(plane_normal_s, ray_direction_s);
+
+    if (out_t) {
+        *out_t = 0.0f;
+    }
+    if (out_hit) {
+        *out_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    if (!isfinite(denom) || fabsf(denom) < 1e-6f) {
+        return false;
+    }
+
+    {
+        vec3s point_delta = glms_vec3_sub(plane_point_s, ray_origin_s);
+        float t = glms_vec3_dot(point_delta, plane_normal_s) / denom;
+
+        if (!isfinite(t)) {
+            return false;
+        }
+
+        if (out_t) {
+            *out_t = t;
+        }
+        if (out_hit) {
+            vec3s hit_s = glms_vec3_add(ray_origin_s, glms_vec3_scale(ray_direction_s, t));
+            if (!mdcad_interaction_isfinite_vec3s(hit_s)) {
+                return false;
+            }
+
+            *out_hit = vec3_make(hit_s.raw[0], hit_s.raw[1], hit_s.raw[2]);
+        }
+    }
+
+    return true;
+}
+
+static inline vec3_t mdcad_interaction_world_delta_to_local(mat4_t world_matrix,
+                                                             vec3_t world_delta) {
+    mat4s world_matrix_s = mdcad_interaction_mat4s_from_legacy(world_matrix);
+    mat4 world_matrix_raw;
+    mat4 inv_world_raw;
+    mat4s inv_world_s;
+    vec4s world_delta4;
+    vec4s local_delta4;
+
+    if (!isfinite(world_delta.x) || !isfinite(world_delta.y) || !isfinite(world_delta.z)) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    if (!mdcad_interaction_is_invertible(world_matrix_s)) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    memcpy(world_matrix_raw, world_matrix_s.raw, sizeof(world_matrix_raw));
+    glm_mat4_inv(world_matrix_raw, inv_world_raw);
+    memcpy(inv_world_s.raw, inv_world_raw, sizeof(inv_world_raw));
+
+    world_delta4 = (vec4s){ { world_delta.x, world_delta.y, world_delta.z, 0.0f } };
+    local_delta4 = glms_mat4_mulv(inv_world_s, world_delta4);
+    if (!isfinite(local_delta4.raw[0]) || !isfinite(local_delta4.raw[1]) || !isfinite(local_delta4.raw[2])) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    return vec3_make(local_delta4.raw[0], local_delta4.raw[1], local_delta4.raw[2]);
 }
 
 static inline mat4_t mdcad_interaction_compute_pick_mvp(float center_x,
