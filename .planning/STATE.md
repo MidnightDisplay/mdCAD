@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-25T16:33:26.361Z"
+status: Ready to execute
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-25T17:30:20.494Z"
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (windows-vulkan-hardening-and-performance-gates) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: Not started
 | Phase 04 P01 | 5min | 2 tasks | 4 files |
 | Phase 04 P02 | 3 min | 2 tasks | 4 files |
 | Phase 04 P03 | 3 min | 2 tasks | 4 files |
+| Phase 05 P01 | 4 min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Gizmo drag migration is gated by dedicated strict-compare harness cases for axis, plane, and vertex local-delta behavior. — Keeps parity regressions visible and fail-fast in automated harness compare runs.
 - [Phase 04]: Quaternion helpers expose project-owned args/struct while delegating operations to cglm glms_quat APIs — Keeps helper surface thin and future-proof without vendor type aliases
 - [Phase 04]: Legacy interaction helpers in math3d are now scoped as deprecated in migrated slices — Prevents reintroduction of ray_from_screen/ray_axis_closest_t/ray_plane_intersect into migrated app/pick/gizmo paths
+- [Phase 05]: Use persistent Vulkan transfer resources and fence waits for pick readback synchronization in Phase 05 plan 01. — Avoids queue-wide stalls from vkQueueWaitIdle while preserving synchronous hover semantics and existing layout transitions.
+- [Phase 05]: Record host-blocked Windows commands as explicit FAIL evidence artifacts rather than omitting required logs/checklists. — Keeps HOT-04 artifact tree complete and auditable even when execution host cannot run Windows toolchains.
 
 ### Pending Todos
 
@@ -104,9 +107,10 @@ None yet.
 - Phase 3 execution still needs to keep pick/gizmo bridge inputs stable while camera and transform compute moves onto `cglm`
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
 - HOT-03 macOS manual interaction smoke is still pending for 04-03 (not executed in headless run).
+- HOT-04 runtime acceptance remains blocked on this host; rerun 05-01 command workflow on Windows MSVC Vulkan machine to close gate.
 
 ## Session Continuity
 
-Last session: 2026-03-25T16:33:26.349Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-CONTEXT.md
+Last session: 2026-03-25T17:30:00.859Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-02-PLAN.md
