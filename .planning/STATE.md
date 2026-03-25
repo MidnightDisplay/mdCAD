@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-25T17:30:20.494Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-25T17:41:56Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 05 (windows-vulkan-hardening-and-performance-gates) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 14
 - Average duration: 1.8 min
 - Total execution time: 0.2 hours
 
@@ -46,7 +46,7 @@ Plan: 2 of 3
 
 **Recent Trend:**
 
-- Last 5 plans: 2 min, 1 min, 1 min, 4 min, 1 min
+- Last 5 plans: 1 min, 1 min, 4 min, 1 min, 4 min
 - Trend: Stable
 
 | Phase 01 P01 | 2 min | 2 tasks | 5 files |
@@ -62,6 +62,7 @@ Plan: 2 of 3
 | Phase 04 P02 | 3 min | 2 tasks | 4 files |
 | Phase 04 P03 | 3 min | 2 tasks | 4 files |
 | Phase 05 P01 | 4 min | 2 tasks | 8 files |
+| Phase 05 P02 | 4 min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Legacy interaction helpers in math3d are now scoped as deprecated in migrated slices — Prevents reintroduction of ray_from_screen/ray_axis_closest_t/ray_plane_intersect into migrated app/pick/gizmo paths
 - [Phase 05]: Use persistent Vulkan transfer resources and fence waits for pick readback synchronization in Phase 05 plan 01. — Avoids queue-wide stalls from vkQueueWaitIdle while preserving synchronous hover semantics and existing layout transitions.
 - [Phase 05]: Record host-blocked Windows commands as explicit FAIL evidence artifacts rather than omitting required logs/checklists. — Keeps HOT-04 artifact tree complete and auditable even when execution host cannot run Windows toolchains.
+- [Phase 05]: Benchmark gate evaluation now runs through `scripts/eval_math_bench.py` with required bench ID enforcement and deterministic `OVERALL` output. — Keeps PERF gate math auditable and reproducible from raw `BENCH ... avg_ns` artifacts.
+- [Phase 05]: When Windows MSVC benchmark commands are blocked on this host, capture complete evidence files with provenance notes instead of leaving missing artifacts. — Preserves artifact completeness while explicitly documenting reduced confidence for PERF-03 on non-Windows execution hosts.
 
 ### Pending Todos
 
@@ -108,9 +111,10 @@ None yet.
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
 - HOT-03 macOS manual interaction smoke is still pending for 04-03 (not executed in headless run).
 - HOT-04 runtime acceptance remains blocked on this host; rerun 05-01 command workflow on Windows MSVC Vulkan machine to close gate.
+- PERF-03 evidence for 05-02 uses host-blocked placeholder benchmark captures; rerun benchmark capture/eval commands on a Windows MSVC Vulkan host for final sign-off confidence.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:30:00.859Z
-Stopped at: Completed 05-01-PLAN.md
-Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-02-PLAN.md
+Last session: 2026-03-25T17:41:56Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-03-PLAN.md
