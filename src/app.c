@@ -17,6 +17,7 @@
 // Project modules
 #include "math3d.h"
 #include "math/cglm_entry.h"
+#include "math/math_interaction.h"
 #include "imgui_storage.h"
 #include "render_target.h"
 #include "orbit_camera.h"
@@ -602,10 +603,8 @@ static void frame(void) {
                 if (state.viewport.hovered && io->MouseDown[0] && igIsMouseClicked_Bool(0, false)) {
                     if (state.gizmo.hovered_handle != GIZMO_HANDLE_NONE) {
                         // Start gizmo drag — compute mouse ray
-                        float ndc_x = vp_x * 2.0f - 1.0f;
-                        float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
-                        mat4_t inv_vp = mat4_inverse(vp_legacy);
-                        ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
+                        ray_t mouse_ray = mdcad_interaction_screen_ray_from_viewport(
+                            vp_x, vp_y, (float)vp_width, (float)vp_height, view_legacy, proj_legacy);
 
                         if (gizmo_begin_drag(&state.gizmo, mouse_ray)) {
                             state.gizmo_drag_active = true;
@@ -665,10 +664,8 @@ static void frame(void) {
 
             // Update active drag
             if (state.gizmo_drag_active) {
-                float ndc_x = vp_x * 2.0f - 1.0f;
-                float ndc_y = (1.0f - vp_y) * 2.0f - 1.0f;
-                mat4_t inv_vp = mat4_inverse(vp_legacy);
-                ray_t mouse_ray = ray_from_screen(ndc_x, ndc_y, inv_vp);
+                ray_t mouse_ray = mdcad_interaction_screen_ray_from_viewport(
+                    vp_x, vp_y, (float)vp_width, (float)vp_height, view_legacy, proj_legacy);
 
                 vec3_t delta = gizmo_update_drag(&state.gizmo, mouse_ray);
                 float delta_len = vec3_length(delta);

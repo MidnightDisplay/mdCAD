@@ -1,5 +1,6 @@
 #include "math/math_bench.h"
 #include "math/math_compare.h"
+#include "math/math_interaction.h"
 #include "math/math_validate.h"
 #include "components/transform_comp.h"
 #include "ecs/ecs_scene.h"
@@ -71,10 +72,19 @@ static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera);
 static TransformComp mdcad_harness_make_transform(vec3_t position, vec3_t rotation, vec3_t scale);
 static mat4_t mdcad_harness_legacy_transform_from_components(vec3_t position, vec3_t rotation, vec3_t scale);
 static mat4_t mdcad_harness_legacy_projection(void);
+static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
+                                                   float center_y,
+                                                   float viewport_width,
+                                                   float viewport_height,
+                                                   float pick_buffer_size,
+                                                   float *out_zoom_factor,
+                                                   mat4_t view,
+                                                   mat4_t proj);
 static mat4s mdcad_harness_cglm_projection(void);
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx);
@@ -98,6 +108,7 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "transform-compose", mdcad_harness_compare_transform_compose },
     { "hierarchy-world-transform", mdcad_harness_compare_hierarchy_world_transform },
     { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
+    { "pick-mvp-window", mdcad_harness_compare_pick_mvp_window },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -248,6 +259,49 @@ static mat4_t mdcad_harness_legacy_projection(void) {
     return mat4_perspective(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
 
+static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
+                                                   float center_y,
+                                                   float viewport_width,
+                                                   float viewport_height,
+                                                   float pick_buffer_size,
+                                                   float *out_zoom_factor,
+                                                   mat4_t view,
+                                                   mat4_t proj) {
+    mat4_t vp = mat4_mul(proj, view);
+    float zoom = 1.0f;
+
+    if (out_zoom_factor) {
+        *out_zoom_factor = 1.0f;
+    }
+
+    if (viewport_width <= 0.0f || viewport_height <= 0.0f || pick_buffer_size <= 0.0f) {
+        return vp;
+    }
+
+    {
+        float zoom_x = viewport_width / pick_buffer_size;
+        float zoom_y = viewport_height / pick_buffer_size;
+        float ndc_x = center_x * 2.0f - 1.0f;
+        float ndc_y = (1.0f - center_y) * 2.0f - 1.0f;
+        mat4_t pick_proj = mat4_identity();
+
+        zoom = (zoom_x < zoom_y) ? zoom_x : zoom_y;
+        if (zoom < 1.0f) {
+            zoom = 1.0f;
+        }
+
+        if (out_zoom_factor) {
+            *out_zoom_factor = zoom;
+        }
+
+        pick_proj.m[0] = zoom;
+        pick_proj.m[5] = zoom;
+        pick_proj.m[12] = -ndc_x * zoom;
+        pick_proj.m[13] = -ndc_y * zoom;
+        return mat4_mul(pick_proj, vp);
+    }
+}
+
 static mat4s mdcad_harness_cglm_projection(void) {
     return glms_perspective_rh_zo(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
@@ -336,36 +390,91 @@ static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t
     mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_inv_vp = mat4_inverse(mat4_mul(legacy_proj, legacy_view));
-    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
-    mat4s cglm_proj = mdcad_harness_cglm_projection();
-    mat4s cglm_inv_vp = glms_mat4_inv(glms_mat4_mul(cglm_proj, cglm_view));
-    vec4s viewport = mdcad_harness_vec4s(0.0f, 0.0f, 1280.0f, 720.0f);
     float screen_x;
     float screen_y_top;
     float screen_y_bottom;
     float ndc_x;
     float ndc_y;
+    float vp_x;
+    float vp_y;
     ray_t legacy_ray;
-    vec3s near_world;
-    vec3s far_world;
-    vec3s direction;
+    ray_t candidate_ray;
 
     mdcad_harness_screen_sample(&screen_x, &screen_y_top, &screen_y_bottom, &ndc_x, &ndc_y);
+    (void)screen_y_bottom;
+    vp_x = screen_x / 1280.0f;
+    vp_y = screen_y_top / 720.0f;
     legacy_ray = ray_from_screen(ndc_x, ndc_y, legacy_inv_vp);
-    near_world = glms_unprojecti_zo(mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 0.0f)),
-                                    cglm_inv_vp,
-                                    viewport);
-    far_world = glms_unprojecti_zo(mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 1.0f)),
-                                   cglm_inv_vp,
-                                   viewport);
-    direction = glms_vec3_normalize(glms_vec3_sub(far_world, near_world));
+    candidate_ray = mdcad_interaction_screen_ray_from_viewport(vp_x,
+                                                                vp_y,
+                                                                1280.0f,
+                                                                720.0f,
+                                                                legacy_view,
+                                                                legacy_proj);
 
     return mdcad_harness_compare_ray_to_cglm(report,
                                              "screen-ray-unproject ray",
                                              legacy_ray,
-                                             near_world,
-                                             direction,
+                                             mdcad_harness_vec3s(candidate_ray.origin),
+                                             mdcad_harness_vec3s(candidate_ray.direction),
                                              1e-4f);
+}
+
+static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *report) {
+    static const vec3_t sample_point = { 1.75f, -0.1f, 2.5f };
+    orbit_camera_t camera = mdcad_harness_make_camera();
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
+    mat4_t legacy_proj = mdcad_harness_legacy_projection();
+    float legacy_zoom = 1.0f;
+    float candidate_zoom = 1.0f;
+    float legacy_ndc_x;
+    float legacy_ndc_y;
+    float candidate_ndc_x;
+    float candidate_ndc_y;
+    mat4_t legacy_mvp = mdcad_harness_legacy_pick_mvp_window(0.62f,
+                                                              0.35f,
+                                                              1280.0f,
+                                                              720.0f,
+                                                              20.0f,
+                                                              &legacy_zoom,
+                                                              legacy_view,
+                                                              legacy_proj);
+    mat4_t candidate_mvp = mdcad_interaction_compute_pick_mvp(0.62f,
+                                                              0.35f,
+                                                              1280.0f,
+                                                              720.0f,
+                                                              20.0f,
+                                                              &candidate_zoom,
+                                                              legacy_view,
+                                                              legacy_proj);
+    bool legacy_projected = mdcad_harness_project_ndc_xy_legacy(legacy_mvp,
+                                                                 sample_point,
+                                                                 &legacy_ndc_x,
+                                                                 &legacy_ndc_y);
+    bool candidate_projected = mdcad_harness_project_ndc_xy_legacy(candidate_mvp,
+                                                                    sample_point,
+                                                                    &candidate_ndc_x,
+                                                                    &candidate_ndc_y);
+
+    mdcad_harness_expect(report,
+                         "pick-mvp-window zoom",
+                         mdcad_compare_float_close(legacy_zoom, candidate_zoom, 1e-6f));
+    mdcad_harness_expect(report,
+                         "pick-mvp-window matrix",
+                         mdcad_compare_mat4_close(legacy_mvp, candidate_mvp.m, 1e-4f));
+    mdcad_harness_expect(report,
+                         "pick-mvp-window sample projects",
+                         legacy_projected && candidate_projected);
+    if (legacy_projected && candidate_projected) {
+        mdcad_harness_expect(report,
+                             "pick-mvp-window sample ndc-x",
+                             mdcad_compare_float_close(legacy_ndc_x, candidate_ndc_x, 1e-4f));
+        mdcad_harness_expect(report,
+                             "pick-mvp-window sample ndc-y",
+                             mdcad_compare_float_close(legacy_ndc_y, candidate_ndc_y, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
 }
 
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report) {

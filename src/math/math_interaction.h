@@ -87,10 +87,20 @@ static inline ray_t mdcad_interaction_screen_ray_from_viewport(float viewport_x,
                                                                 mat4_t view,
                                                                 mat4_t proj) {
     ray_t ray;
+    mat4s view_s;
+    mat4s proj_s;
+    mat4s vp_s;
+    mat4s inv_vp_s;
+    vec4s near_clip;
+    vec4s far_clip;
+    vec4s near_world;
+    vec4s far_world;
     vec3_t near_point;
     vec3_t far_point;
     vec3_t delta;
     float delta_len;
+    float near_w;
+    float far_w;
 
     ray.origin = vec3_make(0.0f, 0.0f, 0.0f);
     ray.direction = vec3_make(0.0f, 0.0f, -1.0f);
@@ -103,20 +113,45 @@ static inline ray_t mdcad_interaction_screen_ray_from_viewport(float viewport_x,
         return ray;
     }
 
-    near_point = mdcad_interaction_unproject_point(viewport_x * viewport_width,
-                                                    viewport_y * viewport_height,
-                                                    0.0f,
-                                                    viewport_width,
-                                                    viewport_height,
-                                                    view,
-                                                    proj);
-    far_point = mdcad_interaction_unproject_point(viewport_x * viewport_width,
-                                                   viewport_y * viewport_height,
-                                                   1.0f,
-                                                   viewport_width,
-                                                   viewport_height,
-                                                   view,
-                                                   proj);
+    view_s = mdcad_interaction_mat4s_from_legacy(view);
+    proj_s = mdcad_interaction_mat4s_from_legacy(proj);
+    vp_s = glms_mat4_mul(proj_s, view_s);
+    if (!mdcad_interaction_is_invertible(vp_s)) {
+        return ray;
+    }
+
+    inv_vp_s = glms_mat4_inv(vp_s);
+    near_clip = (vec4s){
+        {
+            viewport_x * 2.0f - 1.0f,
+            (1.0f - viewport_y) * 2.0f - 1.0f,
+            -1.0f,
+            1.0f,
+        }
+    };
+    far_clip = (vec4s){
+        {
+            near_clip.raw[0],
+            near_clip.raw[1],
+            1.0f,
+            1.0f,
+        }
+    };
+
+    near_world = glms_mat4_mulv(inv_vp_s, near_clip);
+    far_world = glms_mat4_mulv(inv_vp_s, far_clip);
+    near_w = near_world.raw[3];
+    far_w = far_world.raw[3];
+    if (!isfinite(near_w) || !isfinite(far_w) || fabsf(near_w) <= 1e-6f || fabsf(far_w) <= 1e-6f) {
+        return ray;
+    }
+
+    near_point = vec3_make(near_world.raw[0] / near_w,
+                           near_world.raw[1] / near_w,
+                           near_world.raw[2] / near_w);
+    far_point = vec3_make(far_world.raw[0] / far_w,
+                          far_world.raw[1] / far_w,
+                          far_world.raw[2] / far_w);
 
     delta = vec3_sub(far_point, near_point);
     delta_len = vec3_length(delta);
