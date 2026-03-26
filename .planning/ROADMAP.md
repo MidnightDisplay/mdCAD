@@ -36,7 +36,7 @@ v1.1 executes the deferred long-tail migration and thin-entrypoint reduction wor
 Plans:
 - [x] 06-01: Map and migrate serializer math touchpoints to cglm-backed helpers
 - [x] 06-02: Add/extend harness or targeted checks for serializer parity-sensitive cases
-- [ ] 06-03: Validate native save/load workflows and document evidence
+- [x] 06-03: Validate native save/load workflows and document evidence
 
 ### Phase 7: Import Pipeline Long-Tail Migration
 **Goal**: Migrate importer math paths (JSONL/PLY) to cglm-backed helpers while preserving user-visible import behavior.
