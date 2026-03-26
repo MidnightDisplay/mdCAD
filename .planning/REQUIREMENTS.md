@@ -9,7 +9,7 @@ Requirements for the long-tail migration milestone. Each maps to Phase 6+ roadma
 
 ### Long-Tail Migration
 
-- [ ] **TAIL-01**: User can save and reload scene data through cglm-backed serializer math paths without reintroducing migrated `math3d` helper dependencies.
+- [x] **TAIL-01**: User can save and reload scene data through cglm-backed serializer math paths without reintroducing migrated `math3d` helper dependencies.
 - [ ] **TAIL-02**: User can import JSONL/PLY geometry through cglm-backed importer math paths without reintroducing migrated `math3d` helper dependencies.
 - [ ] **TAIL-03**: User can perform undo/redo and editor utility transform workflows with cglm-backed math and behavior parity to the pre-migration user experience.
 
@@ -47,7 +47,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TAIL-01 | Phase 6 | Pending |
+| TAIL-01 | Phase 6 | Complete |
 | TAIL-02 | Phase 7 | Pending |
 | TAIL-03 | Phase 8 | Pending |
 | TRED-01 | Phase 8 | Pending |
