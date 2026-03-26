@@ -12,6 +12,7 @@
 #include "components/geometry_comp.h"
 #include "components/transform_comp.h"
 #include "components/renderable_comp.h"
+#include "math/cglm_entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +97,16 @@ static inline void json_write_vec3(json_builder_t *b, vec3_t v) {
 
 static inline void json_write_vec4(json_builder_t *b, vec4_t v) {
     json_builder_appendf(b, "[%.6g, %.6g, %.6g, %.6g]", v.x, v.y, v.z, v.w);
+}
+
+static inline vec3_t scene_ser_vec3(float x, float y, float z) {
+    vec3s value = (vec3s){ { x, y, z } };
+    return (vec3_t){ value.x, value.y, value.z };
+}
+
+static inline vec4_t scene_ser_vec4(float x, float y, float z, float w) {
+    vec4s value = (vec4s){ { x, y, z, w } };
+    return (vec4_t){ value.x, value.y, value.z, value.w };
 }
 
 static inline void json_write_indent(json_builder_t *b, int depth) {
@@ -1052,9 +1063,9 @@ static inline bool json_parse_transform(json_parser_t *p, loaded_entity_t *ent) 
     if (p->token != JSON_TOK_LBRACE) return false;
 
     // Set defaults
-    ent->position = vec3_make(0, 0, 0);
-    ent->rotation = vec3_make(0, 0, 0);
-    ent->scale = vec3_make(1, 1, 1);
+    ent->position = scene_ser_vec3(0.0f, 0.0f, 0.0f);
+    ent->rotation = scene_ser_vec3(0.0f, 0.0f, 0.0f);
+    ent->scale = scene_ser_vec3(1.0f, 1.0f, 1.0f);
 
     if (!json_next_token(p)) return false;
 
@@ -1095,7 +1106,7 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
 
     // Set defaults
     ent->geom_type = GEOM_POINT;
-    ent->color = vec4_make(1, 1, 1, 1);
+    ent->color = scene_ser_vec4(1.0f, 1.0f, 1.0f, 1.0f);
     ent->line_width = 0.005f;
     ent->point_size = 0.006f;
 
@@ -1285,7 +1296,7 @@ static inline bool json_parse_light(json_parser_t *p, loaded_entity_t *ent) {
 
     ent->is_light = true;
     ent->light_type = LIGHT_DIRECTIONAL;
-    ent->light_color = vec4_make(1, 1, 1, 1);
+    ent->light_color = scene_ser_vec4(1.0f, 1.0f, 1.0f, 1.0f);
     ent->light_intensity = 1.0f;
 
     if (!json_next_token(p)) return false;
@@ -1334,7 +1345,7 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
 
     // Initialize
     memset(ent, 0, sizeof(*ent));
-    ent->scale = vec3_make(1, 1, 1);
+    ent->scale = scene_ser_vec3(1.0f, 1.0f, 1.0f);
     ent->visible = true;
 
     if (!json_next_token(p)) return false;
