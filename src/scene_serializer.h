@@ -2,7 +2,7 @@
 // scene_serializer.h - JSON scene serialization (header-only)
 //
 // Provides save/load functionality for ECS scenes.
-// JSON format version 1.
+// JSON format version 2.
 //------------------------------------------------------------------------------
 #ifndef SCENE_SERIALIZER_H
 #define SCENE_SERIALIZER_H
@@ -22,7 +22,8 @@
 //------------------------------------------------------------------------------
 // JSON Format Version
 //------------------------------------------------------------------------------
-#define SCENE_JSON_VERSION 1
+#define SCENE_JSON_VERSION 2
+#define SCENE_JSON_FORMAT "mdcad-scene"
 
 //------------------------------------------------------------------------------
 // String Builder for JSON Output
@@ -469,6 +470,7 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
 
     // Start JSON object
     json_builder_append(&b, "{\n");
+    json_builder_appendf(&b, "  \"format\": \"%s\",\n", SCENE_JSON_FORMAT);
     json_builder_appendf(&b, "  \"version\": %d,\n", SCENE_JSON_VERSION);
     json_builder_append(&b, "  \"entities\": [\n");
 
@@ -1564,6 +1566,8 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
     if (!json_next_token(&p)) return -1;
 
     // Parse top-level object
+    bool has_format = false;
+    bool has_version = false;
     int version = 0;
     loaded_entity_t *entities = NULL;
     int entity_count = 0;
@@ -1583,9 +1587,15 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         if (p.token != JSON_TOK_COLON) { free(entities); return -1; }
         if (!json_next_token(&p)) { free(entities); return -1; }
 
-        if (strcmp(key, "version") == 0) {
+        if (strcmp(key, "format") == 0) {
+            if (p.token != JSON_TOK_STRING) { free(entities); return -1; }
+            if (strcmp(p.str_value, SCENE_JSON_FORMAT) != 0) { free(entities); return -1; }
+            has_format = true;
+            if (!json_next_token(&p)) { free(entities); return -1; }
+        } else if (strcmp(key, "version") == 0) {
             if (p.token != JSON_TOK_NUMBER) { free(entities); return -1; }
             version = (int)p.num_value;
+            has_version = true;
             if (!json_next_token(&p)) { free(entities); return -1; }
         } else if (strcmp(key, "entities") == 0) {
             if (p.token != JSON_TOK_LBRACKET) { free(entities); return -1; }
@@ -1635,8 +1645,9 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
     }
 
     // Check version
-    if (version != SCENE_JSON_VERSION) {
-        // Could add version migration here in the future
+    if (!has_format || !has_version || version != SCENE_JSON_VERSION) {
+        free(entities);
+        return -1;
     }
 
     // Clear existing scene if requested
