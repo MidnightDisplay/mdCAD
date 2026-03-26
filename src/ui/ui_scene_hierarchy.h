@@ -1192,11 +1192,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             // Save scene
             if (scene_save_to_file(state->scene, path)) {
                 snprintf(state->last_status, sizeof(state->last_status),
-                         "Saved %d entities", state->cache_count);
+                         "Saved %d entities (scene format v2)", state->cache_count);
                 success = true;
             } else {
                 snprintf(state->last_status, sizeof(state->last_status),
-                         "Failed to save");
+                         "Failed to save scene (format v2)");
             }
         } else {
             // Load scene
@@ -1204,12 +1204,12 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             int count = scene_load_from_file(state->scene, path, state->clear_on_load);
             if (count >= 0) {
                 snprintf(state->last_status, sizeof(state->last_status),
-                         "Loaded %d entities", count);
+                         "Loaded %d entities (scene format v2)", count);
                 state->cache_dirty = true;
                 success = true;
             } else {
                 snprintf(state->last_status, sizeof(state->last_status),
-                         "Failed to load");
+                         "Failed to load scene (use scene_format_convert.py for old files)");
             }
         }
 
