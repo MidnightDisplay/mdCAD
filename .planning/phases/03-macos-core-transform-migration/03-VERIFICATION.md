@@ -1,15 +1,15 @@
 ---
 phase: 03-macos-core-transform-migration
-verified: 2026-03-24T18:17:01Z
-status: human_needed
-score: 3/3 automated truths verified; 2 human checks pending
+verified: 2026-03-26T16:52:20Z
+status: passed
+score: 3/3 truths verified (including human smoke)
 ---
 
 # Phase 3: macOS Core Transform Migration Verification Report
 
 **Phase Goal:** Move the core camera and transform/render-matrix math to the new foundation on the primary native path
-**Verified:** 2026-03-24T18:17:01Z
-**Status:** human_needed
+**Verified:** 2026-03-26T16:52:20Z
+**Status:** passed
 
 ## Goal Achievement
 
@@ -53,36 +53,34 @@ score: 3/3 automated truths verified; 2 human checks pending
 
 | Requirement | Status | Blocking Issue |
 |-------------|--------|----------------|
-| `HOT-01`: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions | ⚠ Automated coverage passed; human smoke still required | Final visual orbit/pan/zoom confirmation still needs a person in the live app |
-| `HOT-02`: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions | ⚠ Automated coverage passed; human smoke still required | Parented-geometry visual drift check still needs a person in the live app |
+| `HOT-01`: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions | ✓ SATISFIED | - |
+| `HOT-02`: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions | ✓ SATISFIED | - |
 
-**Coverage:** Automated verification passed; human macOS smoke approval still required before final sign-off
+**Coverage:** 2/2 requirements satisfied
 
 ## Anti-Patterns Found
 
 None found in the Phase 3 modified files. The migration kept explicit bridge boundaries rather than hiding new `math3d.h` recomputation in the migrated path.
 
-## Human Verification Required
+## Human Verification Outcome
 
-Automated validation is green, but the final macOS viewport smoke still needs a human:
+Human smoke verification is complete and approved in `03-HUMAN-UAT.md`:
 
-1. Launch `./build/bin/mdCAD`, orbit with left-drag, pan with shift+left or middle-drag, and zoom with the wheel. Expected: visible geometry remains stable while moving the camera.
-2. If parented entities are present in the current scene, confirm child geometry continues following the parent without visible drift.
-
-These items are persisted in `03-HUMAN-UAT.md`.
+1. Camera navigation parity passed.
+2. Parented geometry follow-through passed.
 
 ## Gaps Summary
 
-**No automated gaps found.** The remaining work is manual macOS smoke approval, not additional code repair.
+No gaps found. Phase goal achieved.
 
 ## Verification Metadata
 
 **Verification approach:** Goal-backward using the Phase 3 roadmap success criteria plus artifact, wiring, and native harness checks  
 **Must-haves source:** ROADMAP Phase 3 success criteria, Phase 3 plan summaries, and the executed `math-validation` / strict compare commands  
 **Automated checks:** `cmake -B build -G Ninja && ninja -C build math-validation` passed; `./build/bin/mdcad_math_harness --mode compare --strict` passed; `./build/bin/mdcad_math_harness --list` includes the four Phase 3 hotspot cases; Quickstart parity workflow grep passed  
-**Human checks required:** 2  
+**Human checks required:** 0 (completed and approved)  
 **Total verification time:** 4 min
 
 ---
-*Verified: 2026-03-24T18:17:01Z*
+*Verified: 2026-03-26T16:52:20Z*
 *Verifier: the agent*

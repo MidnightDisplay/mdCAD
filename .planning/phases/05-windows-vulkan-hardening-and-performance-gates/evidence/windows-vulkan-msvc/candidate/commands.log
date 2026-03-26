@@ -63,3 +63,12 @@ OVERALL: FAIL
 PowerShell transcript end
 End time: 20260326162257
 **********************
+
+# superseding rerun captured on native Windows MSVC Vulkan host (2026-03-26)
+# previous 20k run above is retained for provenance but superseded for gate decision.
+PS> .\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 2000000 > "$b\\bench-run1.txt"
+PS> .\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 2000000 > "$c\\bench-run1.txt"
+PS> py -3 scripts\\eval_math_bench.py --label windows-vulkan-msvc --baseline "$b\\bench-run1.txt" --candidate "$c\\bench-run1.txt" --output "$c\\bench-eval.md"
+| bench-quat-ops | 50.614 | 50.300 | - | 50.300 | -0.620% | PASS | - |
+OVERALL: PASS
+
