@@ -2,7 +2,7 @@
 
 ## What This Is
 
-mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of Sokol, Dear ImGui, and Flecs. It already supports interactive scene editing, GPU-accelerated rendering, import/export, and multiple native and web targets; the current work is to modernize its math foundation by replacing the local `src/math3d.h` with a mature MIT-licensed C library that is safer to maintain and better optimized on native platforms.
+mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of Sokol, Dear ImGui, and Flecs. v1.0 shipped a staged migration of core runtime math from the local `src/math3d.h` toward a project-owned `cglm` foundation while preserving native workflow stability.
 
 ## Core Value
 
@@ -25,31 +25,37 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Core camera/transform/render-matrix hotspots are migrated to the cglm-backed path on macOS with parity checks — Validated in Phase 3: macos-core-transform-migration
 - ✓ Interaction math (pick/ray/gizmo) and quaternion helper expansion are migrated to the shared cglm-backed boundary with compare/bench coverage — Validated in Phase 4: interaction-math-and-api-expansion
 - ✓ Migrated interaction runtime slices no longer depend on equivalent legacy `src/math3d.h` helpers (now scoped as deprecated) — Validated in Phase 4: interaction-math-and-api-expansion
+- ✓ Windows Vulkan hardening and native performance gates closed with `Decision: GO` — Validated in Phase 5: windows-vulkan-hardening-and-performance-gates
 
 ### Active
 
-- [ ] Replace `src/math3d.h` with a mature MIT-licensed C math library that works with mdCAD's C-only codebase and current build setup
-- [ ] Migrate math usage in staged slices so macOS and Windows Vulkan remain regression-free throughout the rollout
-- [ ] Preserve or improve performance on native targets, especially in runtime-critical paths such as camera, transforms, picking, gizmo interaction, and rendering
-- [ ] Expand math capabilities during migration where it directly improves the engine foundation, including broader transform helpers and future-ready GPU/CPU-friendly data handling
+- [ ] Plan and execute long-tail migration of lower-priority math consumers (`TAIL-01`)
+- [ ] Decide and implement thin-entrypoint reduction strategy after staged migration proves safe (`TAIL-02`)
+- [ ] Validate migrated math foundation on iOS native builds (`PLAT-01`)
+- [ ] Validate migrated math foundation on the web/WASM build and resolve platform-specific math issues (`PLAT-02`)
 
 ### Out of Scope
 
 - Full repo-wide big-bang replacement in a single step — staged migration is easier to verify and safer for existing native builds
-- iOS and web parity as a gate for the first migration milestone — those targets are intentionally on hold until macOS and Windows Vulkan are stable
 - Adoption of a C++ math library — the codebase is intentionally C-first and the user explicitly rejected C++ for this work
 
 ## Context
 
-mdCAD already ships a custom header-only math layer in `src/math3d.h` that provides vectors, matrices, inverse/unprojection helpers, and ray math. That local layer is used widely across the runtime, including `src/app.c`, `src/orbit_camera.h`, `src/ecs/ecs_scene.h`, `src/gpu/geometry_batch.h`, `src/gpu/pick_buffer.h`, `src/gizmo/`, importers, serializer code, undo/redo, and multiple UI panels.
+v1.0 is now shipped and archived with all five planned phases complete, a passed milestone audit, and a tagged release boundary. The migration established a stable cglm-backed compute path for camera, transforms, and interaction math while preserving production behavior via compare harnesses and native smoke procedures.
 
-The motivation for this project is to reduce the amount of custom math code mdCAD has to own while gaining access to a more mature, better optimized foundation. The replacement library must be MIT-licensed, written for C consumption, compatible with the current minimal CMake setup, and should not materially inflate build times. Header-only is preferred, but not mandatory if the integration remains lightweight.
+The next milestone should prioritize long-tail subsystem migration and platform expansion (iOS/web) without regressing the now-stable macOS Metal and Windows Vulkan native gates.
 
-The immediate success order is clear: first no regressions on the currently stable native paths, then measurable performance gains or at least no losses, then a cleaner API surface, then additional math capabilities that unlock future work. The active native validation environments today are macOS on Apple Silicon using Ninja in `build/` and Windows Vulkan builds; those are the primary gates for the early migration stages.
+## Current State
 
-The current codebase map also highlights migration-sensitive areas: backend picking paths are fragile, serializer/import code is manual and allocation-heavy, and the math layer touches many hot rendering and interaction paths. That makes staged replacement and explicit regression testing mandatory rather than optional.
+- Milestone: `v1.0` archived on 2026-03-26
+- Gate status: HOT-04, PERF-02, PERF-03 all PASS (`Decision: GO`)
+- Planning state: between milestones
 
-Phases 2, 3, and 4 are complete. mdCAD now has a configured thin `cglm` entrypoint, compare/validate/bench harnesses, migrated macOS camera/transform/render-matrix hotspots, migrated interaction math (pick/ray/gizmo), and a project-owned quaternion helper surface under `src/math/` with validation runbooks in Quickstart. The next phase focuses on Windows Vulkan hardening and native performance gates for the migrated hotspot set.
+## Next Milestone Goals
+
+1. Define v-next requirements and roadmap slices for long-tail migration.
+2. Keep harness and benchmark evidence continuity as a release gate.
+3. Expand validation coverage to deferred native/web targets.
 
 ## Constraints
 
@@ -66,11 +72,11 @@ Phases 2, 3, and 4 are complete. mdCAD now has a configured thin `cglm` entrypoi
 |----------|-----------|---------|
 | Treat this as a staged migration instead of a single-step swap | `src/math3d.h` is used across many runtime-critical systems and staged rollout is easier to validate | Confirmed in Phase 1 |
 | Prioritize native stability on macOS and Windows Vulkan before other targets | These are the currently stable build paths and the safest regression gates | Confirmed in Phase 1 |
-| Expand math capability during migration when it helps the foundation | The user wants to gain more than a 1:1 swap if the rollout remains safe | Convention contract established in Phase 1; broader helper rollout deferred |
+| Expand math capability during migration when it helps the foundation | The user wants to gain more than a 1:1 swap if the rollout remains safe | Confirmed in Phases 1-4 |
 | Keep the replacement C-only and MIT-licensed | This preserves compatibility with mdCAD's architecture and dependency expectations | `cglm` `0.9.6` selected and vendored in Phase 1 |
-| Accept non-header-only integration if build simplicity and performance still hold | Header-only is preferred, but not at the cost of choosing an inferior library | Still open; Phase 1 stayed header-only |
 | Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
 | Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
+| Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
 
 ## Evolution
 
@@ -90,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after Phase 4 completion*
+*Last updated: 2026-03-26 after v1.0 milestone completion*
