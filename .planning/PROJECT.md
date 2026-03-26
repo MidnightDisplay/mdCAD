@@ -8,6 +8,16 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
+## Current Milestone: v1.1 Long-Tail Migration
+
+**Goal:** Complete long-tail math migration slices and finish thin-entrypoint reduction while preserving native gate stability.
+
+**Target features:**
+- Migrate lower-priority math consumers (serializer, importers, undo/redo helpers, editor utilities) to cglm-backed paths.
+- Complete `TAIL-02` by removing/reducing temporary thin-entrypoint migration glue where safe.
+- Keep macOS Metal and Windows Vulkan behavior/performance gates stable for expanded migrated surfaces.
+- Explicitly defer iOS/web validation work (`PLAT-01`, `PLAT-02`) to a follow-up milestone.
+
 ## Requirements
 
 ### Validated
@@ -29,33 +39,33 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Plan and execute long-tail migration of lower-priority math consumers (`TAIL-01`)
-- [ ] Decide and implement thin-entrypoint reduction strategy after staged migration proves safe (`TAIL-02`)
-- [ ] Validate migrated math foundation on iOS native builds (`PLAT-01`)
-- [ ] Validate migrated math foundation on the web/WASM build and resolve platform-specific math issues (`PLAT-02`)
+- [ ] Complete `TAIL-01` migration across serializer/importer/undo/editor utility math paths.
+- [ ] Complete `TAIL-02` thin-entrypoint reduction and retire safe temporary glue.
+- [ ] Preserve or improve behavior/performance on macOS Metal and Windows Vulkan for the expanded migrated slice.
 
 ### Out of Scope
 
 - Full repo-wide big-bang replacement in a single step — staged migration is easier to verify and safer for existing native builds
 - Adoption of a C++ math library — the codebase is intentionally C-first and the user explicitly rejected C++ for this work
+- Full iOS native and web/WASM validation in this milestone — intentionally deferred to keep v1.1 focused on long-tail migration execution
 
 ## Context
 
-v1.0 is now shipped and archived with all five planned phases complete, a passed milestone audit, and a tagged release boundary. The migration established a stable cglm-backed compute path for camera, transforms, and interaction math while preserving production behavior via compare harnesses and native smoke procedures.
+v1.0 is shipped and archived with all five planned phases complete, a passed milestone audit, and release tag `v1.0`. The next step is to finish long-tail migration work that was intentionally deferred after hotspot stabilization.
 
-The next milestone should prioritize long-tail subsystem migration and platform expansion (iOS/web) without regressing the now-stable macOS Metal and Windows Vulkan native gates.
+This milestone should reduce migration debt (temporary glue and remaining legacy helper dependence) while keeping existing native runtime confidence intact via compare/bench/manual gates.
 
 ## Current State
 
-- Milestone: `v1.0` archived on 2026-03-26
-- Gate status: HOT-04, PERF-02, PERF-03 all PASS (`Decision: GO`)
-- Planning state: between milestones
+- Milestone `v1.1` initialized (planning)
+- Scope set to `TAIL-01` + full `TAIL-02`
+- Platform expansion (`PLAT-01`, `PLAT-02`) deferred
 
 ## Next Milestone Goals
 
-1. Define v-next requirements and roadmap slices for long-tail migration.
-2. Keep harness and benchmark evidence continuity as a release gate.
-3. Expand validation coverage to deferred native/web targets.
+1. Deliver cglm-backed long-tail parity for serializer/importer/undo/editor utility flows.
+2. Remove or sharply reduce temporary migration glue in thin entrypoint boundaries.
+3. Reconfirm native behavior and performance confidence on macOS and Windows.
 
 ## Constraints
 
@@ -77,6 +87,7 @@ The next milestone should prioritize long-tail subsystem migration and platform 
 | Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
 | Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
+| Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Active for v1.1 |
 
 ## Evolution
 
@@ -96,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after v1.0 milestone completion*
+*Last updated: 2026-03-26 at v1.1 milestone initialization*
