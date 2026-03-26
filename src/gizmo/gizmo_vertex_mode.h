@@ -8,6 +8,7 @@
 #define GIZMO_VERTEX_MODE_H
 
 #include "../math3d.h"
+#include "../math/math_interaction.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
@@ -209,15 +210,7 @@ static inline void gizmo_vertex_mode_apply_delta(gizmo_vertex_mode_t *vm,
                                                    GeometryComp *geom,
                                                    mat4_t world_matrix,
                                                    vec3_t world_delta) {
-    // Inverse transform delta to local space
-    // For translation-only transforms, we can use inverse of upper-left 3x3
-    mat4_t inv = mat4_inverse(world_matrix);
-    // Transform delta direction (not point) - zero out translation
-    vec3_t local_delta = vec3_make(
-        inv.m[0] * world_delta.x + inv.m[4] * world_delta.y + inv.m[8]  * world_delta.z,
-        inv.m[1] * world_delta.x + inv.m[5] * world_delta.y + inv.m[9]  * world_delta.z,
-        inv.m[2] * world_delta.x + inv.m[6] * world_delta.y + inv.m[10] * world_delta.z
-    );
+    vec3_t local_delta = mdcad_interaction_world_delta_to_local(world_matrix, world_delta);
 
     for (int i = 0; i < vm->selected_count; i++) {
         int idx = vm->selected_vertices[i];

@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Selection and Conventions** - Lock `cglm` `0.9.6`, vendor it lightly, and define mdCAD’s math conventions (completed 2026-03-24)
 - [x] **Phase 2: Direct Adoption Tooling and Validation Harness** - Build the thin project-owned math entrypoint and comparison tooling for direct cglm adoption (completed 2026-03-24)
 - [ ] **Phase 3: macOS Core Transform Migration** - Migrate camera, transforms, and render-matrix hotspots on the primary native path
-- [ ] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage
+- [x] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage (completed 2026-03-25)
 - [ ] **Phase 5: Windows Vulkan Hardening and Performance Gates** - Validate the migrated hotspot set on Windows and close native performance gates
 
 ## Phase Details
@@ -64,8 +64,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Migrate orbit camera and viewport matrix construction
-- [ ] 03-02: Migrate ECS transform composition and render-matrix usage
+- [x] 03-01: Migrate orbit camera and viewport matrix construction
+- [x] 03-02: Migrate ECS transform composition and render-matrix usage
 - [ ] 03-03: Validate render and navigation parity on the active macOS workflow
 
 ### Phase 4: Interaction Math and API Expansion
@@ -80,9 +80,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Migrate pick/unproject/ray math to the new foundation
-- [ ] 04-02: Migrate gizmo drag/intersection math and validate interaction feel
-- [ ] 04-03: Add expanded helper coverage and retire redundant local helpers in migrated areas
+- [x] 04-01: Migrate pick/unproject/ray math to the new foundation
+- [x] 04-02: Migrate gizmo drag/intersection math and validate interaction feel
+- [x] 04-03: Add expanded helper coverage and retire redundant local helpers in migrated areas
 
 ### Phase 5: Windows Vulkan Hardening and Performance Gates
 **Goal**: Prove the migrated hotspot set is stable on Windows Vulkan and meets the native performance goals on both supported validation targets
@@ -97,9 +97,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Validate the migrated hotspot set on Windows Vulkan
-- [ ] 05-02: Run and interpret native benchmark results on macOS and Windows
-- [ ] 05-03: Resolve rollout issues and capture the next-wave migration backlog
+- [x] 05-01: Validate the migrated hotspot set on Windows Vulkan
+- [x] 05-02: Run and interpret native benchmark results on macOS and Windows
+- [ ] 05-03: Resolve rollout issues and capture the next-wave migration backlog (executed 2026-03-25, gate decision HOLD pending Windows MSVC Vulkan reruns)
 
 ## Progress
 
@@ -110,6 +110,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Selection and Conventions | 3/3 | Complete    | 2026-03-24 |
 | 2. Direct Adoption Tooling and Validation Harness | 3/3 | Complete | 2026-03-24 |
-| 3. macOS Core Transform Migration | 0/3 | Not started | - |
-| 4. Interaction Math and API Expansion | 0/3 | Not started | - |
-| 5. Windows Vulkan Hardening and Performance Gates | 0/3 | Not started | - |
+| 3. macOS Core Transform Migration | 2/3 | In Progress | - |
+| 4. Interaction Math and API Expansion | 3/3 | Complete    | 2026-03-25 |
+| 5. Windows Vulkan Hardening and Performance Gates | 2/3 | On Hold | - |

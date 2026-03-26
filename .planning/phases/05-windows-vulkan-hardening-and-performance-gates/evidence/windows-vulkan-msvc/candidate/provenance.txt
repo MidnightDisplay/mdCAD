@@ -1,0 +1,4 @@
+source_commit=1b2912901f8377efda66365165bc78cd7873cc30
+capture_cmd=.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000
+capture_host=Darwin-arm64
+capture_note=windows-msvc-command-blocked-on-this-host; used local harness output placeholder

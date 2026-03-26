@@ -8,7 +8,9 @@
 #define TRANSFORM_COMP_H
 
 #include "component_types.h"
+#include "../math/cglm_entry.h"
 #include <stdbool.h>
+#include <string.h>
 
 typedef struct {
     // Local transform (relative to parent, or world if no parent)
@@ -47,18 +49,42 @@ static inline void transform_comp_set_dirty(TransformComp *t) {
     t->dirty = true;
 }
 
+static inline void transform_comp_mat4_to_cglm(mat4 dest, const mat4_t *src) {
+    memcpy(dest, src->m, sizeof(src->m));
+}
+
+static inline mat4_t transform_comp_mat4_from_cglm(mat4 src) {
+    mat4_t dest;
+
+    memcpy(dest.m, src, sizeof(dest.m));
+    return dest;
+}
+
 // Compute the local matrix from position, rotation, scale
 static inline mat4_t transform_comp_compute_local(const TransformComp *t) {
-    // Build matrix: T * Rz * Ry * Rx * S
-    mat4_t translation = mat4_translate(t->position.x, t->position.y, t->position.z);
-    mat4_t rot_x = mat4_rotate_x(t->rotation.x);
-    mat4_t rot_y = mat4_rotate_y(t->rotation.y);
-    mat4_t rot_z = mat4_rotate_z(t->rotation.z);
-    mat4_t scale_mat = mat4_scale(t->scale.x, t->scale.y, t->scale.z);
+    mat4 translation;
+    mat4 rot_x;
+    mat4 rot_y;
+    mat4 rot_z;
+    mat4 scale_mat;
+    mat4 rotation_yx;
+    mat4 rotation_zyx;
+    mat4 rotated_scaled;
+    mat4 local;
+    vec3 position = { t->position.x, t->position.y, t->position.z };
+    vec3 scale = { t->scale.x, t->scale.y, t->scale.z };
 
-    // Combine: T * Rz * Ry * Rx * S
-    mat4_t rotation = mat4_mul(rot_z, mat4_mul(rot_y, rot_x));
-    return mat4_mul(translation, mat4_mul(rotation, scale_mat));
+    glm_translate_make(translation, position);
+    glm_rotate_x(GLM_MAT4_IDENTITY, t->rotation.x, rot_x);
+    glm_rotate_y(GLM_MAT4_IDENTITY, t->rotation.y, rot_y);
+    glm_rotate_z(GLM_MAT4_IDENTITY, t->rotation.z, rot_z);
+    glm_scale_make(scale_mat, scale);
+
+    glm_mat4_mul(rot_y, rot_x, rotation_yx);
+    glm_mat4_mul(rot_z, rotation_yx, rotation_zyx);
+    glm_mat4_mul(rotation_zyx, scale_mat, rotated_scaled);
+    glm_mat4_mul(translation, rotated_scaled, local);
+    return transform_comp_mat4_from_cglm(local);
 }
 
 // Update local matrix only (when entity has no parent)
@@ -79,7 +105,14 @@ static inline void transform_comp_update_with_parent(TransformComp *t, const mat
     t->local_matrix = transform_comp_compute_local(t);
 
     if (parent_world) {
-        t->world_matrix = mat4_mul(*parent_world, t->local_matrix);
+        mat4 parent_cglm;
+        mat4 local_cglm;
+        mat4 world_cglm;
+
+        transform_comp_mat4_to_cglm(parent_cglm, parent_world);
+        transform_comp_mat4_to_cglm(local_cglm, &t->local_matrix);
+        glm_mat4_mul(parent_cglm, local_cglm, world_cglm);
+        t->world_matrix = transform_comp_mat4_from_cglm(world_cglm);
     } else {
         t->world_matrix = t->local_matrix;
     }

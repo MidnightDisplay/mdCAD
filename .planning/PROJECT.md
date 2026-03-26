@@ -22,6 +22,9 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Project-owned math convention contract established in `src/math/math_conventions.h` and `docs/MATH_CONVENTIONS.md` — Validated in Phase 1: selection-and-conventions
 - ✓ Thin project-owned `cglm` entrypoint now owns clip-depth config and compile-time policy checks without wrapping vendor math types — Validated in Phase 2: direct-adoption-tooling-and-validation-harness
 - ✓ Standalone native math validation harness and named regression/benchmark targets now exist for staged hotspot migration — Validated in Phase 2: direct-adoption-tooling-and-validation-harness
+- ✓ Core camera/transform/render-matrix hotspots are migrated to the cglm-backed path on macOS with parity checks — Validated in Phase 3: macos-core-transform-migration
+- ✓ Interaction math (pick/ray/gizmo) and quaternion helper expansion are migrated to the shared cglm-backed boundary with compare/bench coverage — Validated in Phase 4: interaction-math-and-api-expansion
+- ✓ Migrated interaction runtime slices no longer depend on equivalent legacy `src/math3d.h` helpers (now scoped as deprecated) — Validated in Phase 4: interaction-math-and-api-expansion
 
 ### Active
 
@@ -46,7 +49,7 @@ The immediate success order is clear: first no regressions on the currently stab
 
 The current codebase map also highlights migration-sensitive areas: backend picking paths are fragile, serializer/import code is manual and allocation-heavy, and the math layer touches many hot rendering and interaction paths. That makes staged replacement and explicit regression testing mandatory rather than optional.
 
-Phase 2 is complete. mdCAD now has a configured thin `cglm` entrypoint, adjacent compare/validate/bench helpers under `src/math/`, a standalone `mdcad_math_harness` executable, named `math-regression` / `math-bench` / `math-validation` targets, and Quickstart coverage for the native pilot workflow. The next phase focuses on migrating macOS camera and transform hotspots against those harness-first regression gates.
+Phases 2, 3, and 4 are complete. mdCAD now has a configured thin `cglm` entrypoint, compare/validate/bench harnesses, migrated macOS camera/transform/render-matrix hotspots, migrated interaction math (pick/ray/gizmo), and a project-owned quaternion helper surface under `src/math/` with validation runbooks in Quickstart. The next phase focuses on Windows Vulkan hardening and native performance gates for the migrated hotspot set.
 
 ## Constraints
 
@@ -87,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 2 completion*
+*Last updated: 2026-03-25 after Phase 4 completion*

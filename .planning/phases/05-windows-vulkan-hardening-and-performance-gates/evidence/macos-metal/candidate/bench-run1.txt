@@ -1,0 +1,9 @@
+BENCH legacy-mat4-mul iterations=20000 elapsed_ms=0.149 avg_ns=7.458
+BENCH cglm-mat4-mul iterations=20000 elapsed_ms=0.143 avg_ns=7.153
+BENCH legacy-mat4-inverse iterations=20000 elapsed_ms=0.218 avg_ns=10.901
+BENCH cglm-mat4-inv iterations=20000 elapsed_ms=0.082 avg_ns=4.102
+BENCH legacy-screen-ray iterations=20000 elapsed_ms=0.130 avg_ns=6.494
+BENCH cglm-screen-ray iterations=20000 elapsed_ms=0.115 avg_ns=5.750
+BENCH bench-interaction-ray iterations=20000 elapsed_ms=0.439 avg_ns=21.948
+BENCH bench-interaction-drag iterations=20000 elapsed_ms=0.336 avg_ns=16.797
+BENCH bench-quat-ops iterations=20000 elapsed_ms=0.683 avg_ns=34.155

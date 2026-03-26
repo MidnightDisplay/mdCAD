@@ -8,6 +8,7 @@
 #define GIZMO_H
 
 #include "../math3d.h"
+#include "../math/math_interaction.h"
 #include "../components/selectable_comp.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
@@ -412,14 +413,17 @@ static inline bool gizmo_begin_drag(gizmo_t *g, ray_t mouse_ray) {
     if (g->active_handle <= GIZMO_HANDLE_Z) {
         // Axis constrained: record initial parameter t
         vec3_t axis = gizmo_axis_dir(g->active_handle);
-        g->drag_start_t = ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
+        g->drag_start_t = mdcad_interaction_ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
     } else {
         // Plane constrained: record initial hit point
         int plane_idx = g->active_handle - GIZMO_HANDLE_XY;
         vec3_t normal = gizmo_plane_normal(plane_idx);
         vec3_t hit;
-        float t = ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit);
-        if (t < 0.0f) return false;
+        float t = 0.0f;
+
+        if (!mdcad_interaction_ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit, &t) || t < 0.0f) {
+            return false;
+        }
         g->drag_start_hit = hit;
     }
 
@@ -435,7 +439,7 @@ static inline vec3_t gizmo_update_drag(gizmo_t *g, ray_t mouse_ray) {
     if (g->active_handle <= GIZMO_HANDLE_Z) {
         // Axis constrained — always use fixed drag_origin as axis reference
         vec3_t axis = gizmo_axis_dir(g->active_handle);
-        float t = ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
+        float t = mdcad_interaction_ray_axis_closest_t(mouse_ray, g->drag_origin, axis);
         float dt = t - g->drag_start_t;
         vec3_t total = vec3_scale(axis, dt);
         delta = vec3_sub(total, g->drag_accumulated);
@@ -445,8 +449,9 @@ static inline vec3_t gizmo_update_drag(gizmo_t *g, ray_t mouse_ray) {
         int plane_idx = g->active_handle - GIZMO_HANDLE_XY;
         vec3_t normal = gizmo_plane_normal(plane_idx);
         vec3_t hit;
-        float t = ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit);
-        if (t >= 0.0f) {
+        float t = 0.0f;
+
+        if (mdcad_interaction_ray_plane_intersect(mouse_ray, g->drag_origin, normal, &hit, &t) && t >= 0.0f) {
             vec3_t total = vec3_sub(hit, g->drag_start_hit);
             delta = vec3_sub(total, g->drag_accumulated);
             g->drag_accumulated = total;

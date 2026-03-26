@@ -366,6 +366,17 @@ The readback implementation in `src/gpu/pick_readback_vulkan.c`:
 
 **Note:** This depends on Sokol internals. If you update Sokol and picking breaks, check if `_sg_image_t` struct layout changed.
 
+## Phase 5 pick readback hardening
+
+Phase 5 hardens the Vulkan pick readback path by replacing queue-wide idle waits with fence-scoped submit synchronization (`vkQueueSubmit(..., submit_fence)` + `vkWaitForFences`). The readback path now reuses persistent transfer resources (staging buffer/memory, command pool, command buffer, and submit fence) and only recreates them when device/queue-family context changes or the required transfer size grows.
+
+To close `HOT-04`, run the Phase 5 Windows Vulkan hard gate from `docs/QUICKSTART.md` and capture evidence for:
+- compare strict pass
+- bench run output
+- manual smoke checklist: camera navigation, pick hover/click, gizmo axis drag, gizmo plane drag, vertex drag, undo/redo, import/save/reload
+
+MinGW Vulkan remains smoke-only in this phase and does not replace the MSVC Vulkan hard gate.
+
 ### Staging Buffer Size
 
 Vulkan uses a per-frame staging buffer for dynamic buffer updates. The default is 16MB, which may be insufficient for large point clouds:

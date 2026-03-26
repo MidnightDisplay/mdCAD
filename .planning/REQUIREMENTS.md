@@ -15,9 +15,9 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Hot-Path Migration
 
-- [ ] **HOT-01**: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions
-- [ ] **HOT-02**: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions
-- [ ] **HOT-03**: mdCAD migrates pick/unproject/ray and translation gizmo drag math to the new foundation on the macOS Metal build without user-visible regressions
+- [x] **HOT-01**: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions
+- [x] **HOT-02**: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions
+- [x] **HOT-03**: mdCAD migrates pick/unproject/ray and translation gizmo drag math to the new foundation on the macOS Metal build without user-visible regressions
 - [ ] **HOT-04**: The same migrated hot paths build and behave correctly on the Windows Vulkan path
 
 ### Performance & Validation
@@ -28,8 +28,8 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 
 ### Foundation Expansion
 
-- [ ] **EXP-01**: The adopted math foundation exposes quaternion and broader transform/helper capabilities for future mdCAD work
-- [ ] **EXP-02**: Migrated subsystems can retire equivalent `src/math3d.h` helpers without losing required runtime functionality
+- [x] **EXP-01**: The adopted math foundation exposes quaternion and broader transform/helper capabilities for future mdCAD work
+- [x] **EXP-02**: Migrated subsystems can retire equivalent `src/math3d.h` helpers without losing required runtime functionality
 
 ## v2 Requirements
 
@@ -65,15 +65,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 2 | Complete |
 | FOUND-03 | Phase 1 | Complete |
-| HOT-01 | Phase 3 | Pending |
-| HOT-02 | Phase 3 | Pending |
-| HOT-03 | Phase 4 | Pending |
+| HOT-01 | Phase 3 | Complete |
+| HOT-02 | Phase 3 | Complete |
+| HOT-03 | Phase 4 | Complete |
 | HOT-04 | Phase 5 | Pending |
 | PERF-01 | Phase 2 | Complete |
 | PERF-02 | Phase 5 | Pending |
 | PERF-03 | Phase 5 | Pending |
-| EXP-01 | Phase 4 | Pending |
-| EXP-02 | Phase 4 | Pending |
+| EXP-01 | Phase 4 | Complete |
+| EXP-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after Phase 2 completion*
+*Last updated: 2026-03-25 after Phase 05 Plan 03 gate synchronization (Decision: HOLD)*

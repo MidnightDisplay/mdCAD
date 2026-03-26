@@ -1,0 +1,2 @@
+source_commit=1b2912901f8377efda66365165bc78cd7873cc30
+capture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 20000

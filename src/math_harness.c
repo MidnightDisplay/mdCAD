@@ -1,6 +1,12 @@
+#define MDCAD_MATH3D_ALLOW_INTERACTION_DEPRECATED_USAGE
+
 #include "math/math_bench.h"
 #include "math/math_compare.h"
+#include "math/math_interaction.h"
+#include "math/math_quat.h"
 #include "math/math_validate.h"
+#include "components/transform_comp.h"
+#include "ecs/ecs_scene.h"
 #include "orbit_camera.h"
 
 #include <math.h>
@@ -61,21 +67,81 @@ typedef struct {
     vec4s viewport;
 } mdcad_cglm_screen_ray_ctx_t;
 
+typedef struct {
+    float viewport_x;
+    float viewport_y;
+    float viewport_step_x;
+    float viewport_step_y;
+    mat4_t view;
+    mat4_t proj;
+} mdcad_interaction_ray_bench_ctx_t;
+
+typedef struct {
+    ray_t ray;
+    vec3_t axis_origin;
+    vec3_t axis_dir;
+    vec3_t plane_point;
+    vec3_t plane_normal;
+    float direction_step;
+} mdcad_interaction_drag_bench_ctx_t;
+
+typedef struct {
+    mdcad_quat_t lhs;
+    mdcad_quat_t rhs;
+    vec3_t vector;
+    float angle_step;
+} mdcad_quat_ops_bench_ctx_t;
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float w;
+} mdcad_harness_baseline_quat_t;
+
 static volatile float mdcad_bench_sink = 0.0f;
 
 static orbit_camera_t mdcad_harness_make_camera(void);
+static vec3_t mdcad_harness_legacy_orbit_eye(const orbit_camera_t *camera);
+static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera);
+static TransformComp mdcad_harness_make_transform(vec3_t position, vec3_t rotation, vec3_t scale);
+static mat4_t mdcad_harness_legacy_transform_from_components(vec3_t position, vec3_t rotation, vec3_t scale);
 static mat4_t mdcad_harness_legacy_projection(void);
+static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
+                                                   float center_y,
+                                                   float viewport_width,
+                                                   float viewport_height,
+                                                   float pick_buffer_size,
+                                                   float *out_zoom_factor,
+                                                   mat4_t view,
+                                                   mat4_t proj);
+static vec3_t mdcad_harness_legacy_world_delta_to_local(mat4_t world_matrix, vec3_t world_delta);
 static mat4s mdcad_harness_cglm_projection(void);
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_axis_drag(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_plane_drag(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_quat_rotate_vector(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_quat_compose_order(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat);
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
+                                                                      mdcad_harness_baseline_quat_t rhs);
+static vec3_t mdcad_harness_baseline_quat_rotate_vec3(mdcad_harness_baseline_quat_t quat, vec3_t vector);
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx);
 static void mdcad_harness_bench_cglm_mat4_mul(void *ctx);
 static void mdcad_harness_bench_legacy_mat4_inverse(void *ctx);
 static void mdcad_harness_bench_cglm_mat4_inv(void *ctx);
 static void mdcad_harness_bench_legacy_screen_ray(void *ctx);
 static void mdcad_harness_bench_cglm_screen_ray(void *ctx);
+static void mdcad_harness_bench_interaction_ray(void *ctx);
+static void mdcad_harness_bench_interaction_drag(void *ctx);
+static void mdcad_harness_bench_quat_ops(void *ctx);
 
 static mdcad_legacy_mat4_mul_ctx_t mdcad_legacy_mat4_mul_ctx;
 static mdcad_legacy_mat4_inv_ctx_t mdcad_legacy_mat4_inv_ctx;
@@ -83,12 +149,23 @@ static mdcad_legacy_screen_ray_ctx_t mdcad_legacy_screen_ray_ctx;
 static mdcad_cglm_mat4_mul_ctx_t mdcad_cglm_mat4_mul_ctx;
 static mdcad_cglm_mat4_inv_ctx_t mdcad_cglm_mat4_inv_ctx;
 static mdcad_cglm_screen_ray_ctx_t mdcad_cglm_screen_ray_ctx;
+static mdcad_interaction_ray_bench_ctx_t mdcad_interaction_ray_bench_ctx;
+static mdcad_interaction_drag_bench_ctx_t mdcad_interaction_drag_bench_ctx;
+static mdcad_quat_ops_bench_ctx_t mdcad_quat_ops_bench_ctx;
 
+/* Keep the Phase 3 migration hotspots at the front of the default compare run. */
 static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "orbit-camera-view", mdcad_harness_compare_orbit_camera_view },
     { "view-projection-roundtrip", mdcad_harness_compare_view_projection_roundtrip },
-    { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
     { "transform-compose", mdcad_harness_compare_transform_compose },
+    { "hierarchy-world-transform", mdcad_harness_compare_hierarchy_world_transform },
+    { "screen-ray-unproject", mdcad_harness_compare_screen_ray_unproject },
+    { "pick-mvp-window", mdcad_harness_compare_pick_mvp_window },
+    { "gizmo-axis-drag", mdcad_harness_compare_gizmo_axis_drag },
+    { "gizmo-plane-drag", mdcad_harness_compare_gizmo_plane_drag },
+    { "gizmo-vertex-local-delta", mdcad_harness_compare_gizmo_vertex_local_delta },
+    { "quat-rotate-vector", mdcad_harness_compare_quat_rotate_vector },
+    { "quat-compose-order", mdcad_harness_compare_quat_compose_order },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -98,6 +175,9 @@ static mdcad_bench_case_t mdcad_bench_cases[] = {
     { "cglm-mat4-inv", mdcad_harness_bench_cglm_mat4_inv, &mdcad_cglm_mat4_inv_ctx },
     { "legacy-screen-ray", mdcad_harness_bench_legacy_screen_ray, &mdcad_legacy_screen_ray_ctx },
     { "cglm-screen-ray", mdcad_harness_bench_cglm_screen_ray, &mdcad_cglm_screen_ray_ctx },
+    { "bench-interaction-ray", mdcad_harness_bench_interaction_ray, &mdcad_interaction_ray_bench_ctx },
+    { "bench-interaction-drag", mdcad_harness_bench_interaction_drag, &mdcad_interaction_drag_bench_ctx },
+    { "bench-quat-ops", mdcad_harness_bench_quat_ops, &mdcad_quat_ops_bench_ctx },
 };
 
 static vec3s mdcad_harness_vec3s(vec3_t value) {
@@ -220,47 +300,174 @@ static orbit_camera_t mdcad_harness_make_camera(void) {
     return camera;
 }
 
+static vec3_t mdcad_harness_legacy_orbit_eye(const orbit_camera_t *camera) {
+    vec3_t eye;
+
+    eye.x = camera->target.x + camera->distance * cosf(camera->elevation) * sinf(camera->azimuth);
+    eye.y = camera->target.y + camera->distance * sinf(camera->elevation);
+    eye.z = camera->target.z + camera->distance * cosf(camera->elevation) * cosf(camera->azimuth);
+    return eye;
+}
+
+static mat4_t mdcad_harness_legacy_orbit_view(const orbit_camera_t *camera) {
+    return mat4_lookat(mdcad_harness_legacy_orbit_eye(camera),
+                       camera->target,
+                       vec3_make(0.0f, 1.0f, 0.0f));
+}
+
 static mat4_t mdcad_harness_legacy_projection(void) {
     return mat4_perspective(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
+}
+
+static mat4_t mdcad_harness_legacy_pick_mvp_window(float center_x,
+                                                   float center_y,
+                                                   float viewport_width,
+                                                   float viewport_height,
+                                                   float pick_buffer_size,
+                                                   float *out_zoom_factor,
+                                                   mat4_t view,
+                                                   mat4_t proj) {
+    mat4_t vp = mat4_mul(proj, view);
+    float zoom = 1.0f;
+
+    if (out_zoom_factor) {
+        *out_zoom_factor = 1.0f;
+    }
+
+    if (viewport_width <= 0.0f || viewport_height <= 0.0f || pick_buffer_size <= 0.0f) {
+        return vp;
+    }
+
+    {
+        float zoom_x = viewport_width / pick_buffer_size;
+        float zoom_y = viewport_height / pick_buffer_size;
+        float ndc_x = center_x * 2.0f - 1.0f;
+        float ndc_y = (1.0f - center_y) * 2.0f - 1.0f;
+        mat4_t pick_proj = mat4_identity();
+
+        zoom = (zoom_x < zoom_y) ? zoom_x : zoom_y;
+        if (zoom < 1.0f) {
+            zoom = 1.0f;
+        }
+
+        if (out_zoom_factor) {
+            *out_zoom_factor = zoom;
+        }
+
+        pick_proj.m[0] = zoom;
+        pick_proj.m[5] = zoom;
+        pick_proj.m[12] = -ndc_x * zoom;
+        pick_proj.m[13] = -ndc_y * zoom;
+        return mat4_mul(pick_proj, vp);
+    }
+}
+
+static vec3_t mdcad_harness_legacy_world_delta_to_local(mat4_t world_matrix, vec3_t world_delta) {
+    mat4_t inv = mat4_inverse(world_matrix);
+
+    return vec3_make(
+        inv.m[0] * world_delta.x + inv.m[4] * world_delta.y + inv.m[8]  * world_delta.z,
+        inv.m[1] * world_delta.x + inv.m[5] * world_delta.y + inv.m[9]  * world_delta.z,
+        inv.m[2] * world_delta.x + inv.m[6] * world_delta.y + inv.m[10] * world_delta.z
+    );
 }
 
 static mat4s mdcad_harness_cglm_projection(void) {
     return glms_perspective_rh_zo(0.785398f, 1280.0f / 720.0f, 0.1f, 100.0f);
 }
 
-static mat4_t mdcad_harness_legacy_transform(void) {
-    mat4_t translate = mat4_translate(1.5f, -2.0f, 0.75f);
-    mat4_t rotate_x = mat4_rotate_x(0.3f);
-    mat4_t rotate_y = mat4_rotate_y(-0.7f);
-    mat4_t rotate_z = mat4_rotate_z(1.2f);
-    mat4_t scale = mat4_scale(2.0f, 0.5f, 1.25f);
+static TransformComp mdcad_harness_make_transform(vec3_t position, vec3_t rotation, vec3_t scale) {
+    TransformComp transform = transform_comp_default();
 
-    return mat4_mul(translate,
-                    mat4_mul(rotate_z,
-                             mat4_mul(rotate_y,
-                                      mat4_mul(rotate_x, scale))));
+    transform.position = position;
+    transform.rotation = rotation;
+    transform.scale = scale;
+    return transform;
 }
 
-static mat4s mdcad_harness_cglm_transform(void) {
-    mat4s translate = glms_translate_make(mdcad_harness_vec3s(vec3_make(1.5f, -2.0f, 0.75f)));
-    mat4s rotate_x = glms_rotate_x(GLMS_MAT4_IDENTITY, 0.3f);
-    mat4s rotate_y = glms_rotate_y(GLMS_MAT4_IDENTITY, -0.7f);
-    mat4s rotate_z = glms_rotate_z(GLMS_MAT4_IDENTITY, 1.2f);
-    mat4s scale = glms_scale_make(mdcad_harness_vec3s(vec3_make(2.0f, 0.5f, 1.25f)));
+static mat4_t mdcad_harness_legacy_transform_from_components(vec3_t position, vec3_t rotation, vec3_t scale) {
+    mat4_t translation = mat4_translate(position.x, position.y, position.z);
+    mat4_t rotate_x = mat4_rotate_x(rotation.x);
+    mat4_t rotate_y = mat4_rotate_y(rotation.y);
+    mat4_t rotate_z = mat4_rotate_z(rotation.z);
+    mat4_t scale_mat = mat4_scale(scale.x, scale.y, scale.z);
 
-    return glms_mat4_mul(translate,
-                         glms_mat4_mul(rotate_z,
-                                       glms_mat4_mul(rotate_y,
-                                                     glms_mat4_mul(rotate_x, scale))));
+    return mat4_mul(translation,
+                    mat4_mul(rotate_z,
+                             mat4_mul(rotate_y,
+                                      mat4_mul(rotate_x, scale_mat))));
+}
+
+static mat4_t mdcad_harness_legacy_transform(void) {
+    return mdcad_harness_legacy_transform_from_components(vec3_make(1.5f, -2.0f, 0.75f),
+                                                          vec3_make(0.3f, -0.7f, 1.2f),
+                                                          vec3_make(2.0f, 0.5f, 1.25f));
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians) {
+    float axis_len = vec3_length(axis);
+    float half_angle;
+    float sin_half;
+    float cos_half;
+    vec3_t axis_normalized;
+
+    if (!isfinite(radians) || !isfinite(axis_len) || axis_len <= 1e-8f) {
+        return (mdcad_harness_baseline_quat_t){ 0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    axis_normalized = vec3_scale(axis, 1.0f / axis_len);
+    half_angle = radians * 0.5f;
+    sin_half = sinf(half_angle);
+    cos_half = cosf(half_angle);
+    return (mdcad_harness_baseline_quat_t){
+        axis_normalized.x * sin_half,
+        axis_normalized.y * sin_half,
+        axis_normalized.z * sin_half,
+        cos_half,
+    };
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat) {
+    float norm = sqrtf(quat.x * quat.x + quat.y * quat.y + quat.z * quat.z + quat.w * quat.w);
+
+    if (!isfinite(norm) || norm <= 1e-8f) {
+        return (mdcad_harness_baseline_quat_t){ 0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    return (mdcad_harness_baseline_quat_t){
+        quat.x / norm,
+        quat.y / norm,
+        quat.z / norm,
+        quat.w / norm,
+    };
+}
+
+static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
+                                                                      mdcad_harness_baseline_quat_t rhs) {
+    return (mdcad_harness_baseline_quat_t){
+        lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+        lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+        lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+        lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z,
+    };
+}
+
+static vec3_t mdcad_harness_baseline_quat_rotate_vec3(mdcad_harness_baseline_quat_t quat, vec3_t vector) {
+    mdcad_harness_baseline_quat_t q = mdcad_harness_baseline_quat_normalize(quat);
+    vec3_t imag = vec3_make(q.x, q.y, q.z);
+    float imag_dot_vec = vec3_dot(imag, vector);
+    float imag_dot_imag = vec3_dot(imag, imag);
+    vec3_t term_u = vec3_scale(imag, 2.0f * imag_dot_vec);
+    vec3_t term_v = vec3_scale(vector, q.w * q.w - imag_dot_imag);
+    vec3_t term_cross = vec3_scale(vec3_cross(imag, vector), 2.0f * q.w);
+
+    return vec3_add(vec3_add(term_u, term_v), term_cross);
 }
 
 static bool mdcad_harness_compare_orbit_camera_view(mdcad_validation_report_t *report) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    vec3_t eye = orbit_camera_get_eye_position(&camera);
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(eye),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
 
     return mdcad_harness_compare_mat4_to_cglm(report,
                                               "orbit-camera-view matrix",
@@ -276,12 +483,10 @@ static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_rep
         { 0.45f, -1.0f, 3.25f },
     };
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_vp = mat4_mul(legacy_proj, legacy_view);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
     mat4s cglm_proj = mdcad_harness_cglm_projection();
     mat4s cglm_vp = glms_mat4_mul(cglm_proj, cglm_view);
     size_t i;
@@ -312,41 +517,291 @@ static bool mdcad_harness_compare_view_projection_roundtrip(mdcad_validation_rep
 
 static bool mdcad_harness_compare_screen_ray_unproject(mdcad_validation_report_t *report) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_inv_vp = mat4_inverse(mat4_mul(legacy_proj, legacy_view));
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
-    mat4s cglm_proj = mdcad_harness_cglm_projection();
-    mat4s cglm_inv_vp = glms_mat4_inv(glms_mat4_mul(cglm_proj, cglm_view));
-    vec4s viewport = mdcad_harness_vec4s(0.0f, 0.0f, 1280.0f, 720.0f);
     float screen_x;
     float screen_y_top;
     float screen_y_bottom;
     float ndc_x;
     float ndc_y;
+    float vp_x;
+    float vp_y;
     ray_t legacy_ray;
-    vec3s near_world;
-    vec3s far_world;
-    vec3s direction;
+    ray_t candidate_ray;
 
     mdcad_harness_screen_sample(&screen_x, &screen_y_top, &screen_y_bottom, &ndc_x, &ndc_y);
+    (void)screen_y_bottom;
+    vp_x = screen_x / 1280.0f;
+    vp_y = screen_y_top / 720.0f;
     legacy_ray = ray_from_screen(ndc_x, ndc_y, legacy_inv_vp);
-    near_world = glms_unprojecti_zo(mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 0.0f)),
-                                    cglm_inv_vp,
-                                    viewport);
-    far_world = glms_unprojecti_zo(mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 1.0f)),
-                                   cglm_inv_vp,
-                                   viewport);
-    direction = glms_vec3_normalize(glms_vec3_sub(far_world, near_world));
+    candidate_ray = mdcad_interaction_screen_ray_from_viewport(vp_x,
+                                                                vp_y,
+                                                                1280.0f,
+                                                                720.0f,
+                                                                legacy_view,
+                                                                legacy_proj);
 
     return mdcad_harness_compare_ray_to_cglm(report,
                                              "screen-ray-unproject ray",
                                              legacy_ray,
-                                             near_world,
-                                             direction,
+                                             mdcad_harness_vec3s(candidate_ray.origin),
+                                             mdcad_harness_vec3s(candidate_ray.direction),
                                              1e-4f);
+}
+
+static bool mdcad_harness_compare_pick_mvp_window(mdcad_validation_report_t *report) {
+    static const vec3_t sample_point = { 1.75f, -0.1f, 2.5f };
+    orbit_camera_t camera = mdcad_harness_make_camera();
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
+    mat4_t legacy_proj = mdcad_harness_legacy_projection();
+    float legacy_zoom = 1.0f;
+    float candidate_zoom = 1.0f;
+    float legacy_ndc_x;
+    float legacy_ndc_y;
+    float candidate_ndc_x;
+    float candidate_ndc_y;
+    mat4_t legacy_mvp = mdcad_harness_legacy_pick_mvp_window(0.62f,
+                                                              0.35f,
+                                                              1280.0f,
+                                                              720.0f,
+                                                              20.0f,
+                                                              &legacy_zoom,
+                                                              legacy_view,
+                                                              legacy_proj);
+    mat4_t candidate_mvp = mdcad_interaction_compute_pick_mvp(0.62f,
+                                                              0.35f,
+                                                              1280.0f,
+                                                              720.0f,
+                                                              20.0f,
+                                                              &candidate_zoom,
+                                                              legacy_view,
+                                                              legacy_proj);
+    bool legacy_projected = mdcad_harness_project_ndc_xy_legacy(legacy_mvp,
+                                                                 sample_point,
+                                                                 &legacy_ndc_x,
+                                                                 &legacy_ndc_y);
+    bool candidate_projected = mdcad_harness_project_ndc_xy_legacy(candidate_mvp,
+                                                                    sample_point,
+                                                                    &candidate_ndc_x,
+                                                                    &candidate_ndc_y);
+
+    mdcad_harness_expect(report,
+                         "pick-mvp-window zoom",
+                         mdcad_compare_float_close(legacy_zoom, candidate_zoom, 1e-6f));
+    mdcad_harness_expect(report,
+                         "pick-mvp-window matrix",
+                         mdcad_compare_mat4_close(legacy_mvp, candidate_mvp.m, 1e-4f));
+    mdcad_harness_expect(report,
+                         "pick-mvp-window sample projects",
+                         legacy_projected && candidate_projected);
+    if (legacy_projected && candidate_projected) {
+        mdcad_harness_expect(report,
+                             "pick-mvp-window sample ndc-x",
+                             mdcad_compare_float_close(legacy_ndc_x, candidate_ndc_x, 1e-4f));
+        mdcad_harness_expect(report,
+                             "pick-mvp-window sample ndc-y",
+                             mdcad_compare_float_close(legacy_ndc_y, candidate_ndc_y, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_axis_drag(mdcad_validation_report_t *report) {
+    vec3_t axis_origin = vec3_make(1.2f, -0.3f, 2.4f);
+    vec3_t axis = vec3_make(1.0f, 0.0f, 0.0f);
+    ray_t start_ray = {
+        vec3_make(-3.0f, 2.0f, 4.0f),
+        vec3_normalize(vec3_make(0.85f, -0.42f, -0.31f)),
+    };
+    ray_t update_ray = {
+        vec3_make(-2.2f, 1.8f, 3.6f),
+        vec3_normalize(vec3_make(0.91f, -0.37f, -0.18f)),
+    };
+    ray_t parallel_ray = {
+        vec3_make(0.0f, 3.0f, -1.0f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+    };
+    float legacy_start_t = ray_axis_closest_t(start_ray, axis_origin, axis);
+    float legacy_update_t = ray_axis_closest_t(update_ray, axis_origin, axis);
+    float candidate_start_t = mdcad_interaction_ray_axis_closest_t(start_ray, axis_origin, axis);
+    float candidate_update_t = mdcad_interaction_ray_axis_closest_t(update_ray, axis_origin, axis);
+    float legacy_parallel_t = ray_axis_closest_t(parallel_ray, axis_origin, axis);
+    float candidate_parallel_t = mdcad_interaction_ray_axis_closest_t(parallel_ray, axis_origin, axis);
+    vec3_t legacy_total = vec3_scale(axis, legacy_update_t - legacy_start_t);
+    vec3_t candidate_total = vec3_scale(axis, candidate_update_t - candidate_start_t);
+    vec3_t legacy_increment = vec3_sub(legacy_total, vec3_make(0.0f, 0.0f, 0.0f));
+    vec3_t candidate_increment = vec3_sub(candidate_total, vec3_make(0.0f, 0.0f, 0.0f));
+
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag start-t",
+                         mdcad_compare_float_close(legacy_start_t, candidate_start_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag update-t",
+                         mdcad_compare_float_close(legacy_update_t, candidate_update_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag total-delta",
+                         mdcad_compare_vec3_close(legacy_total, &candidate_total.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag incremental-delta",
+                         mdcad_compare_vec3_close(legacy_increment, &candidate_increment.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag parallel-legacy-fallback",
+                         mdcad_compare_float_close(legacy_parallel_t, 0.0f, 1e-6f));
+    mdcad_harness_expect(report,
+                         "gizmo-axis-drag parallel-candidate-fallback",
+                         mdcad_compare_float_close(candidate_parallel_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_plane_drag(mdcad_validation_report_t *report) {
+    vec3_t plane_point = vec3_make(1.2f, -0.3f, 2.4f);
+    vec3_t plane_normal = vec3_make(0.0f, 1.0f, 0.0f);
+    ray_t start_ray = {
+        vec3_make(0.4f, 3.0f, 2.8f),
+        vec3_normalize(vec3_make(0.2f, -1.0f, -0.1f)),
+    };
+    ray_t update_ray = {
+        vec3_make(0.9f, 2.7f, 3.1f),
+        vec3_normalize(vec3_make(0.1f, -1.0f, -0.3f)),
+    };
+    ray_t parallel_ray = {
+        vec3_make(-1.0f, 0.0f, 0.5f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+    };
+    vec3_t legacy_start_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t legacy_update_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t candidate_start_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t candidate_update_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    float legacy_start_t = ray_plane_intersect(start_ray, plane_point, plane_normal, &legacy_start_hit);
+    float legacy_update_t = ray_plane_intersect(update_ray, plane_point, plane_normal, &legacy_update_hit);
+    float legacy_parallel_t = ray_plane_intersect(parallel_ray, plane_point, plane_normal, NULL);
+    float candidate_start_t = 0.0f;
+    float candidate_update_t = 0.0f;
+    float candidate_parallel_t = 0.0f;
+    bool candidate_start_ok = mdcad_interaction_ray_plane_intersect(start_ray,
+                                                                     plane_point,
+                                                                     plane_normal,
+                                                                     &candidate_start_hit,
+                                                                     &candidate_start_t);
+    bool candidate_update_ok = mdcad_interaction_ray_plane_intersect(update_ray,
+                                                                      plane_point,
+                                                                      plane_normal,
+                                                                      &candidate_update_hit,
+                                                                      &candidate_update_t);
+    bool candidate_parallel_ok = mdcad_interaction_ray_plane_intersect(parallel_ray,
+                                                                        plane_point,
+                                                                        plane_normal,
+                                                                        NULL,
+                                                                        &candidate_parallel_t);
+    vec3_t legacy_total = vec3_sub(legacy_update_hit, legacy_start_hit);
+    vec3_t candidate_total = vec3_sub(candidate_update_hit, candidate_start_hit);
+    vec3_t legacy_increment = vec3_sub(legacy_total, vec3_make(0.0f, 0.0f, 0.0f));
+    vec3_t candidate_increment = vec3_sub(candidate_total, vec3_make(0.0f, 0.0f, 0.0f));
+
+    mdcad_harness_expect(report, "gizmo-plane-drag legacy-start-hit", legacy_start_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag legacy-update-hit", legacy_update_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag candidate-start-hit", candidate_start_ok && candidate_start_t >= 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag candidate-update-hit", candidate_update_ok && candidate_update_t >= 0.0f);
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag start-t",
+                         mdcad_compare_float_close(legacy_start_t, candidate_start_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag update-t",
+                         mdcad_compare_float_close(legacy_update_t, candidate_update_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag start-hit",
+                         mdcad_compare_vec3_close(legacy_start_hit, &candidate_start_hit.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag update-hit",
+                         mdcad_compare_vec3_close(legacy_update_hit, &candidate_update_hit.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag total-delta",
+                         mdcad_compare_vec3_close(legacy_total, &candidate_total.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag incremental-delta",
+                         mdcad_compare_vec3_close(legacy_increment, &candidate_increment.x, 1e-5f));
+    mdcad_harness_expect(report, "gizmo-plane-drag parallel-legacy", legacy_parallel_t < 0.0f);
+    mdcad_harness_expect(report, "gizmo-plane-drag parallel-candidate", !candidate_parallel_ok);
+    mdcad_harness_expect(report,
+                         "gizmo-plane-drag parallel-candidate-t-fallback",
+                         mdcad_compare_float_close(candidate_parallel_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_gizmo_vertex_local_delta(mdcad_validation_report_t *report) {
+    mat4_t world_matrix = mdcad_harness_legacy_transform_from_components(vec3_make(1.5f, -2.0f, 0.75f),
+                                                                         vec3_make(0.3f, -0.7f, 1.2f),
+                                                                         vec3_make(2.0f, 0.5f, 1.25f));
+    vec3_t world_delta = vec3_make(0.45f, -1.2f, 0.33f);
+    vec3_t legacy_local_delta = mdcad_harness_legacy_world_delta_to_local(world_matrix, world_delta);
+    vec3_t candidate_local_delta = mdcad_interaction_world_delta_to_local(world_matrix, world_delta);
+    mat4_t singular_world_matrix = mdcad_harness_legacy_transform_from_components(vec3_make(0.0f, 0.0f, 0.0f),
+                                                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                                                   vec3_make(0.0f, 1.0f, 1.0f));
+    vec3_t singular_local_delta = mdcad_interaction_world_delta_to_local(singular_world_matrix, world_delta);
+
+    mdcad_harness_expect(report,
+                         "gizmo-vertex-local-delta converted",
+                         mdcad_compare_vec3_close(legacy_local_delta, &candidate_local_delta.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "gizmo-vertex-local-delta singular-fallback",
+                         mdcad_compare_vec3_close(vec3_make(0.0f, 0.0f, 0.0f), &singular_local_delta.x, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_quat_rotate_vector(mdcad_validation_report_t *report) {
+    vec3_t axis = vec3_make(0.35f, 0.8f, -0.2f);
+    float angle = 0.63f;
+    vec3_t input = vec3_make(1.2f, -0.45f, 2.3f);
+    mdcad_harness_baseline_quat_t baseline_q = mdcad_harness_baseline_quat_from_axis_angle(axis, angle);
+    vec3_t baseline_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_q, input);
+    mdcad_quat_t candidate_q = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis, angle));
+    vec3_t candidate_rotated = mdcad_quat_rotate_vec3(candidate_q, input);
+
+    mdcad_harness_expect(report,
+                         "quat-rotate-vector rotated",
+                         mdcad_compare_vec3_close(baseline_rotated, &candidate_rotated.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "quat-rotate-vector normalized",
+                         mdcad_compare_float_close(1.0f,
+                                                   sqrtf(candidate_q.x * candidate_q.x +
+                                                         candidate_q.y * candidate_q.y +
+                                                         candidate_q.z * candidate_q.z +
+                                                         candidate_q.w * candidate_q.w),
+                                                   1e-5f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_quat_compose_order(mdcad_validation_report_t *report) {
+    vec3_t input = vec3_make(-0.3f, 1.1f, 0.6f);
+    vec3_t axis_x = vec3_make(1.0f, 0.0f, 0.0f);
+    vec3_t axis_y = vec3_make(0.0f, 1.0f, 0.0f);
+    float angle_x = 0.41f;
+    float angle_y = -0.72f;
+    mdcad_harness_baseline_quat_t baseline_qx = mdcad_harness_baseline_quat_from_axis_angle(axis_x, angle_x);
+    mdcad_harness_baseline_quat_t baseline_qy = mdcad_harness_baseline_quat_from_axis_angle(axis_y, angle_y);
+    mdcad_harness_baseline_quat_t baseline_composed = mdcad_harness_baseline_quat_mul(baseline_qy, baseline_qx);
+    mdcad_harness_baseline_quat_t baseline_reverse = mdcad_harness_baseline_quat_mul(baseline_qx, baseline_qy);
+    vec3_t baseline_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_composed, input);
+    vec3_t baseline_reverse_rotated = mdcad_harness_baseline_quat_rotate_vec3(baseline_reverse, input);
+    mdcad_quat_t qx = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis_x, angle_x));
+    mdcad_quat_t qy = mdcad_quat_normalize(mdcad_quat_from_axis_angle(axis_y, angle_y));
+    mdcad_quat_t composed = mdcad_quat_mul(qy, qx);
+    vec3_t candidate_rotated = mdcad_quat_rotate_vec3(composed, input);
+
+    mdcad_harness_expect(report,
+                         "quat-compose-order composed",
+                         mdcad_compare_vec3_close(baseline_rotated, &candidate_rotated.x, 1e-5f));
+    mdcad_harness_expect(report,
+                         "quat-compose-order order-sensitive",
+                         !mdcad_compare_vec3_close(baseline_reverse_rotated, &candidate_rotated.x, 1e-3f));
+
+    return report->checks_failed == 0;
 }
 
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report) {
@@ -356,22 +811,66 @@ static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *r
         { -0.75f, 0.25f, 2.0f },
     };
     mat4_t legacy_transform = mdcad_harness_legacy_transform();
-    mat4s cglm_transform = mdcad_harness_cglm_transform();
+    TransformComp production_transform = mdcad_harness_make_transform(vec3_make(1.5f, -2.0f, 0.75f),
+                                                                      vec3_make(0.3f, -0.7f, 1.2f),
+                                                                      vec3_make(2.0f, 0.5f, 1.25f));
+    mat4_t candidate_transform = transform_comp_compute_local(&production_transform);
     size_t i;
 
-    mdcad_harness_compare_mat4_to_cglm(report,
-                                       "transform-compose matrix",
-                                       legacy_transform,
-                                       cglm_transform,
-                                       1e-4f);
+    mdcad_harness_expect(report,
+                         "transform-compose matrix",
+                         mdcad_compare_mat4_close(legacy_transform, candidate_transform.m, 1e-4f));
 
     for (i = 0; i < (sizeof(sample_points) / sizeof(sample_points[0])); ++i) {
-        vec3_t legacy_point = mat4_mul_point(legacy_transform, sample_points[i]);
-        vec3s cglm_point = glms_mat4_mulv3(cglm_transform, mdcad_harness_vec3s(sample_points[i]), 1.0f);
+        vec3_t legacy_point = mat4_transform_point(legacy_transform, sample_points[i]);
+        vec3_t candidate_point = ecs_scene_transform_point_world(&candidate_transform, sample_points[i]);
         char label[96];
 
         snprintf(label, sizeof(label), "transform-compose point-%zu", i + 1);
-        mdcad_harness_compare_vec3_to_cglm(report, label, legacy_point, cglm_point, 1e-4f);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_point, &candidate_point.x, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report) {
+    static const vec3_t sample_points[] = {
+        { 0.0f, 0.0f, 0.0f },
+        { 0.5f, -0.25f, 1.0f },
+        { -1.25f, 0.75f, -0.5f },
+    };
+    TransformComp parent = mdcad_harness_make_transform(vec3_make(3.0f, -1.0f, 0.5f),
+                                                        vec3_make(0.2f, 0.35f, -0.4f),
+                                                        vec3_make(1.2f, 0.9f, 1.1f));
+    TransformComp child = mdcad_harness_make_transform(vec3_make(-0.75f, 1.5f, 0.25f),
+                                                       vec3_make(-0.15f, 0.4f, 0.9f),
+                                                       vec3_make(0.6f, 1.4f, 0.8f));
+    mat4_t legacy_parent = mdcad_harness_legacy_transform_from_components(parent.position, parent.rotation, parent.scale);
+    mat4_t legacy_child_local = mdcad_harness_legacy_transform_from_components(child.position, child.rotation, child.scale);
+    mat4_t legacy_child_world = mat4_mul(legacy_parent, legacy_child_local);
+    size_t i;
+
+    transform_comp_update(&parent);
+    transform_comp_update_with_parent(&child, &parent.world_matrix);
+
+    mdcad_harness_expect(report,
+                         "hierarchy-world-transform parent matrix",
+                         mdcad_compare_mat4_close(legacy_parent, parent.world_matrix.m, 1e-4f));
+    mdcad_harness_expect(report,
+                         "hierarchy-world-transform child matrix",
+                         mdcad_compare_mat4_close(legacy_child_world, child.world_matrix.m, 1e-4f));
+
+    for (i = 0; i < (sizeof(sample_points) / sizeof(sample_points[0])); ++i) {
+        vec3_t legacy_point = mat4_transform_point(legacy_child_world, sample_points[i]);
+        vec3_t candidate_point = ecs_scene_transform_point_world(&child.world_matrix, sample_points[i]);
+        char label[96];
+
+        snprintf(label, sizeof(label), "hierarchy-world-transform point-%zu", i + 1);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_point, &candidate_point.x, 1e-4f));
     }
 
     return report->checks_failed == 0;
@@ -379,12 +878,10 @@ static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *r
 
 static void mdcad_harness_reset_bench_contexts(void) {
     orbit_camera_t camera = mdcad_harness_make_camera();
-    mat4_t legacy_view = orbit_camera_get_view_matrix(&camera);
+    mat4_t legacy_view = mdcad_harness_legacy_orbit_view(&camera);
     mat4_t legacy_proj = mdcad_harness_legacy_projection();
     mat4_t legacy_vp = mat4_mul(legacy_proj, legacy_view);
-    mat4s cglm_view = glms_lookat_rh_zo(mdcad_harness_vec3s(orbit_camera_get_eye_position(&camera)),
-                                        mdcad_harness_vec3s(camera.target),
-                                        GLMS_YUP);
+    mat4s cglm_view = orbit_camera_get_view_matrix_cglm(&camera);
     mat4s cglm_proj = mdcad_harness_cglm_projection();
     mat4s cglm_vp = glms_mat4_mul(cglm_proj, cglm_view);
     float screen_x;
@@ -411,6 +908,27 @@ static void mdcad_harness_reset_bench_contexts(void) {
     mdcad_cglm_screen_ray_ctx.far_pos = mdcad_harness_vec3s(vec3_make(screen_x, screen_y_bottom, 1.0f));
     mdcad_cglm_screen_ray_ctx.x_step = 0.25f;
     mdcad_cglm_screen_ray_ctx.inv_vp = glms_mat4_inv(cglm_vp);
+
+    mdcad_interaction_ray_bench_ctx.viewport_x = 0.62f;
+    mdcad_interaction_ray_bench_ctx.viewport_y = 0.35f;
+    mdcad_interaction_ray_bench_ctx.viewport_step_x = 0.0007f;
+    mdcad_interaction_ray_bench_ctx.viewport_step_y = 0.0005f;
+    mdcad_interaction_ray_bench_ctx.view = legacy_view;
+    mdcad_interaction_ray_bench_ctx.proj = legacy_proj;
+
+    mdcad_interaction_drag_bench_ctx.ray.origin = vec3_make(-2.0f, 2.5f, 3.0f);
+    mdcad_interaction_drag_bench_ctx.ray.direction = vec3_normalize(vec3_make(0.8f, -0.45f, -0.22f));
+    mdcad_interaction_drag_bench_ctx.axis_origin = vec3_make(1.0f, -0.5f, 2.0f);
+    mdcad_interaction_drag_bench_ctx.axis_dir = vec3_make(1.0f, 0.0f, 0.0f);
+    mdcad_interaction_drag_bench_ctx.plane_point = vec3_make(1.0f, -0.5f, 2.0f);
+    mdcad_interaction_drag_bench_ctx.plane_normal = vec3_make(0.0f, 1.0f, 0.0f);
+    mdcad_interaction_drag_bench_ctx.direction_step = 0.0009f;
+
+    mdcad_quat_ops_bench_ctx.lhs = mdcad_quat_from_axis_angle(vec3_make(1.0f, 0.0f, 0.0f), 0.32f);
+    mdcad_quat_ops_bench_ctx.rhs = mdcad_quat_from_axis_angle(vec3_make(0.0f, 1.0f, 0.0f), -0.47f);
+    mdcad_quat_ops_bench_ctx.vector = vec3_make(0.35f, -0.18f, 0.9f);
+    mdcad_quat_ops_bench_ctx.angle_step = 0.0006f;
+
 }
 
 static void mdcad_harness_bench_legacy_mat4_mul(void *ctx_ptr) {
@@ -469,6 +987,56 @@ static void mdcad_harness_bench_cglm_screen_ray(void *ctx_ptr) {
         ctx->near_pos.raw[0] = 640.0f;
         ctx->far_pos.raw[0] = 640.0f;
     }
+}
+
+static void mdcad_harness_bench_interaction_ray(void *ctx_ptr) {
+    mdcad_interaction_ray_bench_ctx_t *ctx = (mdcad_interaction_ray_bench_ctx_t *)ctx_ptr;
+    ray_t ray = mdcad_interaction_screen_ray_from_viewport(ctx->viewport_x,
+                                                            ctx->viewport_y,
+                                                            1280.0f,
+                                                            720.0f,
+                                                            ctx->view,
+                                                            ctx->proj);
+
+    mdcad_bench_sink += ray.origin.x + ray.direction.z;
+    ctx->viewport_x += ctx->viewport_step_x;
+    ctx->viewport_y += ctx->viewport_step_y;
+    if (ctx->viewport_x > 0.95f) {
+        ctx->viewport_x = 0.05f;
+    }
+    if (ctx->viewport_y > 0.95f) {
+        ctx->viewport_y = 0.05f;
+    }
+}
+
+static void mdcad_harness_bench_interaction_drag(void *ctx_ptr) {
+    mdcad_interaction_drag_bench_ctx_t *ctx = (mdcad_interaction_drag_bench_ctx_t *)ctx_ptr;
+    vec3_t hit = vec3_make(0.0f, 0.0f, 0.0f);
+    float plane_t = 0.0f;
+    float axis_t = mdcad_interaction_ray_axis_closest_t(ctx->ray, ctx->axis_origin, ctx->axis_dir);
+    bool plane_hit = mdcad_interaction_ray_plane_intersect(ctx->ray,
+                                                            ctx->plane_point,
+                                                            ctx->plane_normal,
+                                                            &hit,
+                                                            &plane_t);
+
+    mdcad_bench_sink += axis_t + (plane_hit ? plane_t : 0.0f) + hit.x;
+    ctx->ray.origin.x += 0.0004f;
+    ctx->ray.direction = vec3_normalize(vec3_add(ctx->ray.direction,
+                                                 vec3_make(ctx->direction_step, -ctx->direction_step * 0.5f, 0.0f)));
+}
+
+static void mdcad_harness_bench_quat_ops(void *ctx_ptr) {
+    mdcad_quat_ops_bench_ctx_t *ctx = (mdcad_quat_ops_bench_ctx_t *)ctx_ptr;
+    mdcad_quat_t lhs = mdcad_quat_normalize(ctx->lhs);
+    mdcad_quat_t rhs = mdcad_quat_normalize(ctx->rhs);
+    mdcad_quat_t composed = mdcad_quat_mul(lhs, rhs);
+    vec3_t rotated = mdcad_quat_rotate_vec3(composed, ctx->vector);
+    mdcad_quat_t step = mdcad_quat_from_axis_angle(vec3_make(0.0f, 0.0f, 1.0f), ctx->angle_step);
+
+    mdcad_bench_sink += rotated.x + rotated.y;
+    ctx->rhs = mdcad_quat_mul(step, rhs);
+    ctx->vector = vec3_normalize(vec3_add(ctx->vector, vec3_make(0.0003f, -0.0002f, 0.0004f)));
 }
 
 static void mdcad_harness_print_usage(const char *argv0) {

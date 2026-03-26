@@ -8,12 +8,14 @@
 #define ECS_SCENE_H
 
 #include "ecs_world.h"
+#include "../math/cglm_entry.h"
 #include "../gpu/geometry_batch.h"
 #include "../gpu/pick_buffer.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include <string.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -174,6 +176,20 @@ static inline void ecs_scene_shutdown(ecs_scene_t *scene) {
 }
 
 //------------------------------------------------------------------------------
+// Transform Helpers
+//------------------------------------------------------------------------------
+
+static inline vec3_t ecs_scene_transform_point_world(const mat4_t *world_matrix, vec3_t local_point) {
+    mat4 world_cglm;
+    vec3 local = { local_point.x, local_point.y, local_point.z };
+    vec3 world;
+
+    memcpy(world_cglm, world_matrix->m, sizeof(*world_matrix));
+    glm_mat4_mulv3(world_cglm, local, 1.0f, world);
+    return (vec3_t){ world[0], world[1], world[2] };
+}
+
+//------------------------------------------------------------------------------
 // Entity Creation API
 //------------------------------------------------------------------------------
 
@@ -193,8 +209,8 @@ static inline ecs_entity_t scene_add_line(ecs_scene_t *scene,
     if (slot >= 0) {
         // Get transform for position (identity for now)
         TransformComp *t = ecs_world_get_transform(scene->world, e);
-        vec3_t world_a = mat4_transform_point(t->world_matrix, a);
-        vec3_t world_b = mat4_transform_point(t->world_matrix, b);
+        vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, a);
+        vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, b);
 
         // Set instance data
         geom_line_batch_set(&scene->batches.lines, slot, world_a, world_b, color);
@@ -235,8 +251,8 @@ static inline ecs_entity_t scene_add_polyline(ecs_scene_t *scene,
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (geom && t) {
             for (int i = 0; i < num_segments; i++) {
-                vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i]);
-                vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
+                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polyline.points[i]);
+                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polyline.points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
                 // Set entity mapping for debug viewer
                 geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYLINE);
@@ -256,7 +272,7 @@ static inline ecs_entity_t scene_add_polyline(ecs_scene_t *scene,
             if (geom && t) {
                 for (int i = 0; i < num_joins; i++) {
                     // Join is at interior vertex i+1 (vertices 1 to N-2)
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polyline.points[i + 1]);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polyline.points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
                     // Set entity mapping for debug viewer
                     geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYLINE);
@@ -301,8 +317,8 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
         if (geom && t) {
             for (int i = 0; i < num_segments; i++) {
                 int next = (i + 1) % point_count;
-                vec3_t world_a = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
-                vec3_t world_b = mat4_transform_point(t->world_matrix, geom->data.polygon.points[next]);
+                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polygon.points[i]);
+                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polygon.points[next]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
                 // Set entity mapping for debug viewer
                 geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYGON);
@@ -319,7 +335,7 @@ static inline ecs_entity_t scene_add_polygon(ecs_scene_t *scene,
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (geom && t) {
             for (int i = 0; i < num_joins; i++) {
-                vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.polygon.points[i]);
+                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, geom->data.polygon.points[i]);
                 geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
                 // Set entity mapping for debug viewer
                 geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_POLYGON);
@@ -359,7 +375,7 @@ static inline ecs_entity_t scene_add_point(ecs_scene_t *scene,
     ecs_world_set_geometry(scene->world, e, &g);
 
     TransformComp *t = ecs_world_get_transform(scene->world, e);
-    vec3_t world_pos = mat4_transform_point(t->world_matrix, pos);
+    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, pos);
 
     geom_point_batch_set(&scene->batches.points, slot, world_pos, color);
 
@@ -403,8 +419,8 @@ static inline ecs_entity_t scene_add_arc(ecs_scene_t *scene,
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
             for (int i = 0; i < num_segments; i++) {
-                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, points[i]);
+                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
                 // Set entity mapping for debug viewer
                 geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_ARC);
@@ -422,7 +438,7 @@ static inline ecs_entity_t scene_add_arc(ecs_scene_t *scene,
             TransformComp *t = ecs_world_get_transform(scene->world, e);
             if (t) {
                 for (int i = 0; i < num_joins; i++) {
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
                     // Set entity mapping for debug viewer
                     geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_ARC);
@@ -474,8 +490,8 @@ static inline ecs_entity_t scene_add_bezier(ecs_scene_t *scene,
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
             for (int i = 0; i < num_segments; i++) {
-                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, points[i]);
+                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
                 // Set entity mapping for debug viewer
                 geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_BEZIER);
@@ -493,7 +509,7 @@ static inline ecs_entity_t scene_add_bezier(ecs_scene_t *scene,
             TransformComp *t = ecs_world_get_transform(scene->world, e);
             if (t) {
                 for (int i = 0; i < num_joins; i++) {
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
                     // Set entity mapping for debug viewer
                     geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_BEZIER);
@@ -545,8 +561,8 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
         TransformComp *t = ecs_world_get_transform(scene->world, e);
         if (t) {
             for (int i = 0; i < num_segments; i++) {
-                vec3_t world_a = mat4_transform_point(t->world_matrix, points[i]);
-                vec3_t world_b = mat4_transform_point(t->world_matrix, points[i + 1]);
+                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, points[i]);
+                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                 geom_line_batch_set(&scene->batches.lines, first_segment_slot + i, world_a, world_b, color);
                 // Set entity mapping for debug viewer
                 geom_line_batch_set_entity(&scene->batches.lines, first_segment_slot + i, (uint64_t)e, (uint8_t)GEOM_HELIX);
@@ -564,7 +580,7 @@ static inline ecs_entity_t scene_add_helix(ecs_scene_t *scene,
             TransformComp *t = ecs_world_get_transform(scene->world, e);
             if (t) {
                 for (int i = 0; i < num_joins; i++) {
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, points[i + 1]);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, points[i + 1]);
                     geom_point_batch_set(&scene->batches.points, first_join_slot + i, world_pos, color);
                     // Set entity mapping for debug viewer
                     geom_point_batch_set_entity(&scene->batches.points, first_join_slot + i, (uint64_t)e, (uint8_t)GEOM_HELIX);
@@ -614,7 +630,7 @@ static inline ecs_entity_t scene_add_point_cloud(ecs_scene_t *scene,
     if (t && geom) {
         // Set instance data for each point
         for (int i = 0; i < count; i++) {
-            vec3_t world_pos = mat4_transform_point(t->world_matrix, geom->data.point_cloud.points[i]);
+            vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, geom->data.point_cloud.points[i]);
             vec4_t color = geom->data.point_cloud.colors ? geom->data.point_cloud.colors[i] : uniform_color;
             geom_point_batch_set(&scene->batches.points, first_slot + i, world_pos, color);
         }
@@ -650,9 +666,9 @@ static inline ecs_entity_t scene_add_triangle(ecs_scene_t *scene,
     ecs_world_set_geometry(scene->world, e, &g);
 
     TransformComp *t = ecs_world_get_transform(scene->world, e);
-    vec3_t world_a = mat4_transform_point(t->world_matrix, a);
-    vec3_t world_b = mat4_transform_point(t->world_matrix, b);
-    vec3_t world_c = mat4_transform_point(t->world_matrix, c);
+    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, a);
+    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, b);
+    vec3_t world_c = ecs_scene_transform_point_world(&t->world_matrix, c);
     vec3_t normal = geom_triangle_compute_normal(world_a, world_b, world_c);
 
     geom_triangle_batch_set(&scene->batches.triangles, slot,
@@ -684,9 +700,9 @@ static inline ecs_entity_t scene_add_triangle_colored(ecs_scene_t *scene,
     ecs_world_set_geometry(scene->world, e, &g);
 
     TransformComp *t = ecs_world_get_transform(scene->world, e);
-    vec3_t world_a = mat4_transform_point(t->world_matrix, a);
-    vec3_t world_b = mat4_transform_point(t->world_matrix, b);
-    vec3_t world_c = mat4_transform_point(t->world_matrix, c);
+    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, a);
+    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, b);
+    vec3_t world_c = ecs_scene_transform_point_world(&t->world_matrix, c);
     vec3_t normal = geom_triangle_compute_normal(world_a, world_b, world_c);
 
     geom_triangle_batch_set_colored(&scene->batches.triangles, slot,
@@ -732,9 +748,9 @@ static inline ecs_entity_t scene_add_mesh(ecs_scene_t *scene,
             uint32_t i1 = geom->data.mesh.indices[f * 3 + 1];
             uint32_t i2 = geom->data.mesh.indices[f * 3 + 2];
 
-            vec3_t wa = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i0]);
-            vec3_t wb = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i1]);
-            vec3_t wc = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i2]);
+            vec3_t wa = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i0]);
+            vec3_t wb = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i1]);
+            vec3_t wc = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i2]);
             vec3_t normal = geom_triangle_compute_normal(wa, wb, wc);
 
             geom_triangle_batch_set(&scene->batches.triangles, first_slot + f,
@@ -782,9 +798,9 @@ static inline ecs_entity_t scene_add_mesh_colored(ecs_scene_t *scene,
             uint32_t i1 = geom->data.mesh.indices[f * 3 + 1];
             uint32_t i2 = geom->data.mesh.indices[f * 3 + 2];
 
-            vec3_t wa = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i0]);
-            vec3_t wb = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i1]);
-            vec3_t wc = mat4_transform_point(t->world_matrix, geom->data.mesh.vertices[i2]);
+            vec3_t wa = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i0]);
+            vec3_t wb = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i1]);
+            vec3_t wc = ecs_scene_transform_point_world(&t->world_matrix, geom->data.mesh.vertices[i2]);
             vec3_t normal = geom_triangle_compute_normal(wa, wb, wc);
 
             geom_triangle_batch_set_colored(&scene->batches.triangles, first_slot + f,
@@ -1338,14 +1354,14 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
             // Update instance data based on geometry type
             switch (g->type) {
                 case GEOM_LINE: {
-                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.line.a);
-                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.line.b);
+                    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.line.a);
+                    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.line.b);
                     geom_line_batch_set(&scene->batches.lines, (int)r->instance_slot,
                                         world_a, world_b, render_color);
                     break;
                 }
                 case GEOM_POINT: {
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point.point);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.point.point);
                     geom_point_batch_set(&scene->batches.points, (int)r->instance_slot,
                                          world_pos, render_color);
                     break;
@@ -1354,8 +1370,8 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     // Update all segment slots
                     int point_count = g->data.polyline.count;
                     for (int s = 0; s < point_count - 1 && s < (int)r->segment_count; s++) {
-                        vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polyline.points[s]);
-                        vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polyline.points[s + 1]);
+                        vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[s]);
+                        vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[s + 1]);
                         geom_line_batch_set(&scene->batches.lines,
                                             (int)(r->instance_slot + (uint32_t)s),
                                             world_a, world_b, render_color);
@@ -1363,7 +1379,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     // Update all join slots (at interior vertices)
                     if (r->join_slot_start != 0xFFFFFFFF) {
                         for (int j = 0; j < point_count - 2 && j < (int)r->join_count; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polyline.points[j + 1]);
+                            vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[j + 1]);
                             geom_point_batch_set(&scene->batches.points,
                                                  (int)(r->join_slot_start + (uint32_t)j),
                                                  world_pos, render_color);
@@ -1382,8 +1398,8 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     if (arc_points && arc_point_count >= 2) {
                         // Update segment slots
                         for (int s = 0; s < arc_point_count - 1 && s < (int)r->segment_count; s++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, arc_points[s]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, arc_points[s + 1]);
+                            vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, arc_points[s]);
+                            vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, arc_points[s + 1]);
                             geom_line_batch_set(&scene->batches.lines,
                                                 (int)(r->instance_slot + (uint32_t)s),
                                                 world_a, world_b, render_color);
@@ -1391,7 +1407,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                         // Update join slots
                         if (r->join_slot_start != 0xFFFFFFFF) {
                             for (int j = 0; j < arc_point_count - 2 && j < (int)r->join_count; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, arc_points[j + 1]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, arc_points[j + 1]);
                                 geom_point_batch_set(&scene->batches.points,
                                                      (int)(r->join_slot_start + (uint32_t)j),
                                                      world_pos, render_color);
@@ -1406,8 +1422,8 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     int point_count = g->data.polygon.count;
                     for (int s = 0; s < point_count && s < (int)r->segment_count; s++) {
                         int next = (s + 1) % point_count;
-                        vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polygon.points[s]);
-                        vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polygon.points[next]);
+                        vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[s]);
+                        vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[next]);
                         geom_line_batch_set(&scene->batches.lines,
                                             (int)(r->instance_slot + (uint32_t)s),
                                             world_a, world_b, render_color);
@@ -1415,7 +1431,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     // Update all join slots (all vertices in closed polygon)
                     if (r->join_slot_start != 0xFFFFFFFF) {
                         for (int j = 0; j < point_count && j < (int)r->join_count; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
+                            vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[j]);
                             geom_point_batch_set(&scene->batches.points,
                                                  (int)(r->join_slot_start + (uint32_t)j),
                                                  world_pos, render_color);
@@ -1433,15 +1449,15 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     );
                     if (bezier_points && bezier_point_count >= 2) {
                         for (int s = 0; s < bezier_point_count - 1 && s < (int)r->segment_count; s++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, bezier_points[s]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, bezier_points[s + 1]);
+                            vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[s]);
+                            vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[s + 1]);
                             geom_line_batch_set(&scene->batches.lines,
                                                 (int)(r->instance_slot + (uint32_t)s),
                                                 world_a, world_b, render_color);
                         }
                         if (r->join_slot_start != 0xFFFFFFFF) {
                             for (int j = 0; j < bezier_point_count - 2 && j < (int)r->join_count; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, bezier_points[j + 1]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[j + 1]);
                                 geom_point_batch_set(&scene->batches.points,
                                                      (int)(r->join_slot_start + (uint32_t)j),
                                                      world_pos, render_color);
@@ -1461,15 +1477,15 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     );
                     if (helix_points && helix_point_count >= 2) {
                         for (int s = 0; s < helix_point_count - 1 && s < (int)r->segment_count; s++) {
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, helix_points[s]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, helix_points[s + 1]);
+                            vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, helix_points[s]);
+                            vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, helix_points[s + 1]);
                             geom_line_batch_set(&scene->batches.lines,
                                                 (int)(r->instance_slot + (uint32_t)s),
                                                 world_a, world_b, render_color);
                         }
                         if (r->join_slot_start != 0xFFFFFFFF) {
                             for (int j = 0; j < helix_point_count - 2 && j < (int)r->join_count; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, helix_points[j + 1]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, helix_points[j + 1]);
                                 geom_point_batch_set(&scene->batches.points,
                                                      (int)(r->join_slot_start + (uint32_t)j),
                                                      world_pos, render_color);
@@ -1480,9 +1496,9 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     break;
                 }
                 case GEOM_TRIANGLE: {
-                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.triangle.a);
-                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
-                    vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
+                    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.a);
+                    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.b);
+                    vec3_t world_c = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.c);
                     vec3_t normal = geom_triangle_compute_normal(world_a, world_b, world_c);
                     // Use per-vertex colors if available and not overridden by hover/selection
                     bool is_highlighted = ecs_has_id(w->world, e, w->Selected_tag) ||
@@ -1509,9 +1525,9 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                         uint32_t i1 = g->data.mesh.indices[f * 3 + 1];
                         uint32_t i2 = g->data.mesh.indices[f * 3 + 2];
 
-                        vec3_t wa = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i0]);
-                        vec3_t wb = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i1]);
-                        vec3_t wc = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i2]);
+                        vec3_t wa = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i0]);
+                        vec3_t wb = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i1]);
+                        vec3_t wc = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i2]);
                         vec3_t fn = geom_triangle_compute_normal(wa, wb, wc);
 
                         if (g->data.mesh.vertex_colors && !mesh_highlighted) {
@@ -1533,7 +1549,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     // Update all point cloud slots (segment_count holds point count)
                     int pc_count = g->data.point_cloud.count;
                     for (int p = 0; p < pc_count && p < (int)r->segment_count; p++) {
-                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[p]);
+                        vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.point_cloud.points[p]);
                         // Use per-point color if available, otherwise use render_color (which may be hover/selection color)
                         vec4_t pc_color;
                         if (g->data.point_cloud.colors) {
@@ -1663,8 +1679,8 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
             // Add to pick buffer based on geometry type, with screen-space frustum culling
             switch (g->type) {
                 case GEOM_LINE: {
-                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.line.a);
-                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.line.b);
+                    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.line.a);
+                    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.line.b);
                     // Frustum cull: project both endpoints
                     float na_x, na_y, nb_x, nb_y;
                     bool va = clip_space_project(pick_mvp, world_a, &na_x, &na_y);
@@ -1679,7 +1695,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     break;
                 }
                 case GEOM_POINT: {
-                    vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point.point);
+                    vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.point.point);
                     float ndc_x, ndc_y;
                     if (!clip_space_project(pick_mvp, world_pos, &ndc_x, &ndc_y)) break;
                     if (ndc_x > POINT_MARGIN || ndc_x < -POINT_MARGIN ||
@@ -1693,7 +1709,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
                     bool any_behind = false, any_visible = false;
                     for (int j = 0; j < point_count; j++) {
-                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.polyline.points[j]);
+                        vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[j]);
                         float nx, ny;
                         if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                             pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1707,12 +1723,12 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) break;
                     // Passed culling — add all segments
                     for (int seg = 0; seg < point_count - 1; seg++) {
-                        vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polyline.points[seg]);
-                        vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polyline.points[seg + 1]);
+                        vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[seg]);
+                        vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[seg + 1]);
                         pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                     }
                     for (int j = 1; j < point_count - 1; j++) {
-                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polyline.points[j]);
+                        vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.polyline.points[j]);
                         pick_buffer_add_point(pb, world_pos, s->pick_id);
                     }
                     break;
@@ -1729,7 +1745,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
                         bool any_behind = false, any_visible = false;
                         for (int j = 0; j < arc_point_count; j++) {
-                            vec3_t wp = mat4_transform_point(t->world_matrix, arc_points[j]);
+                            vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, arc_points[j]);
                             float nx, ny;
                             if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                                 pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1742,12 +1758,12 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         if ((any_visible || any_behind) &&
                             pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
                             for (int seg = 0; seg < arc_point_count - 1; seg++) {
-                                vec3_t world_a = mat4_transform_point(t->world_matrix, arc_points[seg]);
-                                vec3_t world_b = mat4_transform_point(t->world_matrix, arc_points[seg + 1]);
+                                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg]);
+                                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg + 1]);
                                 pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                             }
                             for (int j = 1; j < arc_point_count - 1; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, arc_points[j]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, arc_points[j]);
                                 pick_buffer_add_point(pb, world_pos, s->pick_id);
                             }
                         }
@@ -1760,7 +1776,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
                     bool any_behind = false, any_visible = false;
                     for (int j = 0; j < point_count; j++) {
-                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
+                        vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[j]);
                         float nx, ny;
                         if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                             pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1774,12 +1790,12 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
                         for (int seg = 0; seg < point_count; seg++) {
                             int next = (seg + 1) % point_count;
-                            vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.polygon.points[seg]);
-                            vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.polygon.points[next]);
+                            vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[seg]);
+                            vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[next]);
                             pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                         }
                         for (int j = 0; j < point_count; j++) {
-                            vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.polygon.points[j]);
+                            vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.polygon.points[j]);
                             pick_buffer_add_point(pb, world_pos, s->pick_id);
                         }
                     }
@@ -1796,7 +1812,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
                         bool any_behind = false, any_visible = false;
                         for (int j = 0; j < bezier_point_count; j++) {
-                            vec3_t wp = mat4_transform_point(t->world_matrix, bezier_points[j]);
+                            vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[j]);
                             float nx, ny;
                             if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                                 pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1809,12 +1825,12 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         if ((any_visible || any_behind) &&
                             pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
                             for (int seg = 0; seg < bezier_point_count - 1; seg++) {
-                                vec3_t world_a = mat4_transform_point(t->world_matrix, bezier_points[seg]);
-                                vec3_t world_b = mat4_transform_point(t->world_matrix, bezier_points[seg + 1]);
+                                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[seg]);
+                                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[seg + 1]);
                                 pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                             }
                             for (int j = 1; j < bezier_point_count - 1; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, bezier_points[j]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, bezier_points[j]);
                                 pick_buffer_add_point(pb, world_pos, s->pick_id);
                             }
                         }
@@ -1833,7 +1849,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         float min_x = 1e30f, max_x = -1e30f, min_y = 1e30f, max_y = -1e30f;
                         bool any_behind = false, any_visible = false;
                         for (int j = 0; j < helix_point_count; j++) {
-                            vec3_t wp = mat4_transform_point(t->world_matrix, helix_points[j]);
+                            vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, helix_points[j]);
                             float nx, ny;
                             if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                                 pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1846,12 +1862,12 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         if ((any_visible || any_behind) &&
                             pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) {
                             for (int seg = 0; seg < helix_point_count - 1; seg++) {
-                                vec3_t world_a = mat4_transform_point(t->world_matrix, helix_points[seg]);
-                                vec3_t world_b = mat4_transform_point(t->world_matrix, helix_points[seg + 1]);
+                                vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, helix_points[seg]);
+                                vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, helix_points[seg + 1]);
                                 pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
                             }
                             for (int j = 1; j < helix_point_count - 1; j++) {
-                                vec3_t world_pos = mat4_transform_point(t->world_matrix, helix_points[j]);
+                                vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, helix_points[j]);
                                 pick_buffer_add_point(pb, world_pos, s->pick_id);
                             }
                         }
@@ -1861,7 +1877,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                 }
                 case GEOM_POINT_CLOUD: {
                     // Pre-cull with center point
-                    vec3_t center = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[0]);
+                    vec3_t center = ecs_scene_transform_point_world(&t->world_matrix, g->data.point_cloud.points[0]);
                     float ndc_cx, ndc_cy;
                     bool center_visible = clip_space_project(pick_mvp, center, &ndc_cx, &ndc_cy);
                     // For point clouds, use a generous margin since points are spread out
@@ -1874,15 +1890,15 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     int step = (pc_count > max_pick_points) ? (pc_count / max_pick_points) : 1;
 
                     for (int p = 0; p < pc_count; p += step) {
-                        vec3_t world_pos = mat4_transform_point(t->world_matrix, g->data.point_cloud.points[p]);
+                        vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.point_cloud.points[p]);
                         pick_buffer_add_point(pb, world_pos, s->pick_id);
                     }
                     break;
                 }
                 case GEOM_TRIANGLE: {
-                    vec3_t world_a = mat4_transform_point(t->world_matrix, g->data.triangle.a);
-                    vec3_t world_b = mat4_transform_point(t->world_matrix, g->data.triangle.b);
-                    vec3_t world_c = mat4_transform_point(t->world_matrix, g->data.triangle.c);
+                    vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.a);
+                    vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.b);
+                    vec3_t world_c = ecs_scene_transform_point_world(&t->world_matrix, g->data.triangle.c);
                     // Frustum cull triangle
                     float na_x, na_y, nb_x, nb_y, nc_x, nc_y;
                     bool va = clip_space_project(pick_mvp, world_a, &na_x, &na_y);
@@ -1909,7 +1925,7 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     bool any_behind = false, any_visible = false;
                     int sample_step = (vert_count > 8) ? (vert_count / 8) : 1;
                     for (int sv = 0; sv < vert_count; sv += sample_step) {
-                        vec3_t wp = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[sv]);
+                        vec3_t wp = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[sv]);
                         float nx, ny;
                         if (clip_space_project(pick_mvp, wp, &nx, &ny)) {
                             pick_ndc_aabb_expand(nx, ny, &min_x, &max_x, &min_y, &max_y);
@@ -1926,9 +1942,9 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                         uint32_t i0 = g->data.mesh.indices[f * 3 + 0];
                         uint32_t i1 = g->data.mesh.indices[f * 3 + 1];
                         uint32_t i2 = g->data.mesh.indices[f * 3 + 2];
-                        vec3_t wa = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i0]);
-                        vec3_t wb = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i1]);
-                        vec3_t wc = mat4_transform_point(t->world_matrix, g->data.mesh.vertices[i2]);
+                        vec3_t wa = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i0]);
+                        vec3_t wb = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i1]);
+                        vec3_t wc = ecs_scene_transform_point_world(&t->world_matrix, g->data.mesh.vertices[i2]);
                         pick_buffer_add_triangle(pb, wa, wb, wc, s->pick_id);
                     }
                     break;

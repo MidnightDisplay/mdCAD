@@ -2,38 +2,38 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 2 verified complete; ready to plan Phase 3
-last_updated: "2026-03-24T15:59:09Z"
+status: On hold (Windows MSVC Vulkan reruns required)
+stopped_at: Completed 05-03-PLAN.md (Decision: HOLD)
+last_updated: "2026-03-25T18:15:34Z"
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 4
+  total_plans: 15
+  completed_plans: 15
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-24)
+See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 03 — macos-core-transform-migration
+**Current focus:** Phase 05 — windows-vulkan-hardening-and-performance-gates
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 **Fallback posture:** no active fallback candidate
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 05 (windows-vulkan-hardening-and-performance-gates) — ON HOLD
+Plan: 3 of 3 (executed, Decision: HOLD)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 15
 - Average duration: 1.8 min
 - Total execution time: 0.2 hours
 
@@ -46,7 +46,7 @@ Plan: Not started
 
 **Recent Trend:**
 
-- Last 5 plans: 2 min, 1 min, 1 min, 4 min, 1 min
+- Last 5 plans: 1 min, 4 min, 1 min, 4 min, 15 min
 - Trend: Stable
 
 | Phase 01 P01 | 2 min | 2 tasks | 5 files |
@@ -55,6 +55,15 @@ Plan: Not started
 | Phase 02 P01 | 1 min | 2 tasks | 4 files |
 | Phase 02 P02 | 4 min | 2 tasks | 3 files |
 | Phase 02 P03 | 1 min | 2 tasks | 2 files |
+| Phase 03 P01 | 1 min | 2 tasks | 3 files |
+| Phase 03 P02 | 35 min | 2 tasks | 4 files |
+| Phase 03 P03 | 1 min | 2 tasks | 2 files |
+| Phase 04 P01 | 5min | 2 tasks | 4 files |
+| Phase 04 P02 | 3 min | 2 tasks | 4 files |
+| Phase 04 P03 | 3 min | 2 tasks | 4 files |
+| Phase 05 P01 | 4 min | 2 tasks | 8 files |
+| Phase 05 P02 | 4 min | 2 tasks | 12 files |
+| Phase 05 P03 | 15 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -75,18 +84,45 @@ Recent decisions affecting current work:
 - [Phase 02]: Comparison, validation, and benchmark helpers live in adjacent headers and accept raw float buffers so struct and array cglm call sites can share one migration surface. — This supports mixed API-family rollout without rebuilding a compatibility facade around vendor math types.
 - [Phase 02]: Projection-sensitive comparison cases validate behavior-level NDC X/Y or ray outputs instead of demanding raw projection-matrix equality across clip-depth conventions. — The migration intentionally changes clip-depth semantics, so behavior-level checks are the trustworthy parity signal.
 - [Phase 02]: Quickstart now treats the harness workflow as primary and app launch as a secondary smoke step for this migration slice. — This keeps operational guidance aligned with the harness-first validation posture introduced in the phase.
+- [Phase 03]: Orbit camera eye/view math now originates from cglm helpers while legacy vec3_t and mat4_t return paths remain as explicit temporary bridges. — This keeps the visible camera path migrated without widening Phase 3 into a larger caller storage rewrite.
+- [Phase 03]: The app assembles view/projection/VP/MVP once through cglm and then copies those matrices into legacy storage for unchanged pick, gizmo, and render consumers. — Explicit bridge copies prevent hidden fallback math3d recomputation while keeping current subsystem boundaries stable.
+- [Phase 03]: TransformComp keeps vec3_t and mat4_t cached storage in Phase 3 while local and parented matrix composition moves to cglm raw matrices through memcpy bridge helpers. — This preserves existing render-facing storage and keeps the migration focused on compute hot paths instead of a broader ABI rewrite.
+- [Phase 03]: World-point application in ecs_scene.h now flows through one cglm-backed helper instead of leaving mat4_transform_point(t->world_matrix, ...) scattered across creation, update, render, and pick paths. — One shared helper keeps semantics aligned across the dense ECS hot path and gives the harness one real production helper to validate.
+- [Phase 03]: The default compare suite now leads with the four Phase 3 hotspot cases so routine harness runs surface the migrated camera and transform parity checks first. — This keeps the current rollout-critical paths visible in strict compare runs and makes parity regressions fail fast.
+- [Phase 03]: Quickstart documents Phase 3 as a harness-first macOS workflow with app launch kept explicitly as a manual smoke confirmation step. — Another agent can now rerun the automated gate and the remaining human smoke checklist directly from checked-in docs.
+- [Phase 04]: Interaction pick and screen-ray runtime paths now consume one shared helper boundary in src/math/math_interaction.h. — Unifies drag begin/update and pick MVP math behind one cglm-backed implementation surface to reduce drift.
+- [Phase 04]: screen-ray helper keeps legacy NDC ray semantics while using cglm matrix inversion/multiplication internals. — Preserved behavior-level parity against frozen pre-migration formulas in strict compare checks.
+- [Phase 04]: Axis and plane drag calculations now call one shared helper boundary instead of direct math3d intersection helpers in gizmo runtime paths. — Centralizes gizmo drag math under cglm-backed interaction helpers to reduce runtime drift.
+- [Phase 04]: Vertex-mode world/local delta conversion now uses one shared helper with explicit singular-matrix zero fallback. — Ensures deterministic degenerate handling while removing open-coded inverse logic from vertex mode.
+- [Phase 04]: Gizmo drag migration is gated by dedicated strict-compare harness cases for axis, plane, and vertex local-delta behavior. — Keeps parity regressions visible and fail-fast in automated harness compare runs.
+- [Phase 04]: Quaternion helpers expose project-owned args/struct while delegating operations to cglm glms_quat APIs — Keeps helper surface thin and future-proof without vendor type aliases
+- [Phase 04]: Legacy interaction helpers in math3d are now scoped as deprecated in migrated slices — Prevents reintroduction of ray_from_screen/ray_axis_closest_t/ray_plane_intersect into migrated app/pick/gizmo paths
+- [Phase 05]: Use persistent Vulkan transfer resources and fence waits for pick readback synchronization in Phase 05 plan 01. — Avoids queue-wide stalls from vkQueueWaitIdle while preserving synchronous hover semantics and existing layout transitions.
+- [Phase 05]: Record host-blocked Windows commands as explicit FAIL evidence artifacts rather than omitting required logs/checklists. — Keeps HOT-04 artifact tree complete and auditable even when execution host cannot run Windows toolchains.
+- [Phase 05]: Benchmark gate evaluation now runs through `scripts/eval_math_bench.py` with required bench ID enforcement and deterministic `OVERALL` output. — Keeps PERF gate math auditable and reproducible from raw `BENCH ... avg_ns` artifacts.
+- [Phase 05]: When Windows MSVC benchmark commands are blocked on this host, capture complete evidence files with provenance notes instead of leaving missing artifacts. — Preserves artifact completeness while explicitly documenting reduced confidence for PERF-03 on non-Windows execution hosts.
+- [Phase 05]: Gate closure for 05-03 is now recorded in `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-03-GATE-STATUS.md` with explicit HOT-04, PERF-02, PERF-03 determinations and final `Decision: GO|HOLD`. — Keeps requirement/roadmap synchronization tied to one auditable source of truth.
+- [Phase 05]: PERF-03 is treated as not sign-off ready when evidence provenance indicates host-blocked placeholder capture, even if bench-eval markdown reports `OVERALL: PASS`. — Prevents false closure on non-native Windows evidence.
 
 ### Pending Todos
 
-None yet.
+### Phase 05 backlog handoff
+
+- P1: Rerun HOT-04 strict compare and manual smoke on a Windows MSVC Vulkan host using `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/compare.txt` as the current blocked evidence anchor.
+- P2: Replace placeholder PERF-03 benchmark provenance with native Windows capture and reevaluate gate output referenced at `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt`.
+- P2: Scope and schedule TAIL-01 long-tail migration workstream from `.planning/REQUIREMENTS.md` after Windows gate closure work is complete.
 
 ### Blockers/Concerns
 
-- Phase 3 still needs to preserve orbit camera and render-matrix parity while active hotspots move onto the new math foundation
+- Phase 3 execution still needs to keep pick/gizmo bridge inputs stable while camera and transform compute moves onto `cglm`
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
+- HOT-03 macOS manual interaction smoke is still pending for 04-03 (not executed in headless run).
+- HOT-04 runtime acceptance remains blocked on this host; rerun 05-01 command workflow on Windows MSVC Vulkan machine to close gate.
+- PERF-03 evidence for 05-02 uses host-blocked placeholder benchmark captures; rerun benchmark capture/eval commands on a Windows MSVC Vulkan host for final sign-off confidence.
+- Phase 05 plan execution is complete but disposition is HOLD (`05-03-GATE-STATUS.md`); milestone closure is blocked until Windows MSVC Vulkan reruns clear HOT-04 and PERF-03.
 
 ## Session Continuity
 
-Last session: 2026-03-24T15:59:09Z
-Stopped at: Phase 2 verified complete; ready to plan Phase 3
-Resume file: None
+Last session: 2026-03-25T18:15:34Z
+Stopped at: Completed 05-03-PLAN.md (Decision: HOLD)
+Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-03-GATE-STATUS.md

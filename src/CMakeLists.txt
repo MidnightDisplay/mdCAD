@@ -63,7 +63,15 @@ target_link_libraries(${PROJECT_NAME} libsokol libcimgui flecs_static cjson)
 if(MDCAD_NATIVE_DESKTOP)
     add_executable(mdcad_math_harness math_harness.c)
     target_compile_features(mdcad_math_harness PRIVATE c_std_11)
-    target_include_directories(mdcad_math_harness PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include)
+    get_target_property(MDCAD_LIBSOKOL_INCLUDE_DIRS libsokol INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(MDCAD_LIBCIMGUI_INCLUDE_DIRS libcimgui INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(mdcad_math_harness PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
     if(UNIX AND NOT APPLE)
         target_link_libraries(mdcad_math_harness PRIVATE m)
     endif()

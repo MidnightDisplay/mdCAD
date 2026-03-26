@@ -75,6 +75,98 @@ Run the full native validation workflow:
 cmake --build build-vulkan --config Release --target math-validation
 ```
 
+## Phase 5 Windows Vulkan hard gate
+
+Run this exact sequence for the HOT-04 hard gate on Windows MSVC Vulkan:
+```powershell
+cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode compare --strict
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000
+cmake --build build-vulkan --config Release --target math-validation
+.\build-vulkan\bin\Release\mdCAD.exe
+```
+
+MinGW is smoke-only for this phase:
+```powershell
+cmake -B build-mingw -G "MinGW Makefiles"
+cmake --build build-mingw
+.\build-mingw\bin\mdCAD.exe
+```
+
+## Phase 5 native performance gate evaluation
+
+Build the harness, capture baseline/candidate artifacts, and write provenance on macOS:
+```bash
+cmake -B build -G Ninja && ninja -C build mdcad_math_harness
+./build/bin/mdcad_math_harness --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/provenance.txt
+./build/bin/mdcad_math_harness --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/provenance.txt
+```
+
+Capture baseline/candidate artifacts and provenance on Windows MSVC Vulkan:
+```powershell
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/provenance.txt
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt
+```
+
+Evaluate both targets:
+```bash
+python3 scripts/eval_math_bench.py \
+  --label macos-metal \
+  --baseline .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/bench-run1.txt \
+  --candidate .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/bench-run1.txt \
+  --output .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/bench-eval.md
+
+python3 scripts/eval_math_bench.py \
+  --label windows-vulkan-msvc \
+  --baseline .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/bench-run1.txt \
+  --candidate .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-run1.txt \
+  --output .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-eval.md
+```
+
+If a case is marginal (`5.0% < slowdown <= 8.0%`), capture one rerun (`bench-run2.txt`) and re-run evaluator with `--rerun`.
+
+## Phase 3 macOS parity smoke
+
+The harness-driven validation remains the primary automated gate for this phase. Launching `mdCAD` afterward is a manual smoke step to confirm the migrated camera and transform paths still look stable in the live viewport.
+
+Run the Phase 3 macOS workflow in this order:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-validation
+./build/bin/mdcad_math_harness --mode compare --strict
+./build/bin/mdCAD
+```
+
+Manual smoke checklist:
+
+- orbit with left-drag
+- pan with shift+left or middle-drag
+- zoom with the wheel
+- confirm visible geometry remains stable while moving the camera
+- if parented entities are present in the current scene, confirm child geometry continues following the parent without visible drift
+
+## Phase 4 interaction parity smoke
+
+Run the Phase 4 interaction workflow in this order:
+``` bash
+cmake -B build -G Ninja && ninja -C build math-validation
+./build/bin/mdcad_math_harness --mode compare --strict
+./build/bin/mdcad_math_harness --mode bench
+./build/bin/mdCAD
+```
+
+Manual smoke checklist:
+
+- hover and click around thin lines/points to confirm pick parity
+- drag each gizmo axis and plane handle to confirm stable interaction with no start jump
+- in geometry mode, drag selected vertices on transformed entities and confirm local-space edits remain correct
+- run undo/redo after drag operations and confirm positions/vertices restore exactly
+
 ## Windows build (MinGW or MSVC)
 
 ### MinGW Vulkan Build (Default MinGW)

@@ -11,6 +11,7 @@
 #include "../platform.h"
 #include "sokol_gfx.h"
 #include "../math3d.h"
+#include "../math/math_interaction.h"
 #include "../shaders/pick_shaders.h"
 #include "../components/selectable_comp.h"
 #include "instance_buffer.h"
@@ -850,43 +851,14 @@ static inline void pick_buffer_add_overlay_point(pick_buffer_t *pb,
 // This creates a view that zooms in on the area around the cursor
 //------------------------------------------------------------------------------
 static inline mat4_t pick_buffer_compute_mvp(pick_buffer_t *pb, mat4_t view, mat4_t proj) {
-    // The pick buffer renders a small region around the cursor
-    // We need to modify the projection matrix to zoom into that region
-
-    // Convert center from 0-1 to -1 to 1 NDC space
-    float ndc_x = pb->center_x * 2.0f - 1.0f;
-    float ndc_y = (1.0f - pb->center_y) * 2.0f - 1.0f;  // Flip Y
-
-    // Calculate the zoom factor: use uniform zoom to avoid distortion
-    // Use the smaller dimension to ensure we capture enough area
-    float zoom_x = pb->viewport_width / (float)PICK_BUFFER_SIZE;
-    float zoom_y = pb->viewport_height / (float)PICK_BUFFER_SIZE;
-
-    // Use uniform zoom (minimum of the two to capture a larger area and avoid distortion)
-    // Ensure minimum zoom of 1.0 to avoid issues with very small viewports
-    float zoom = (zoom_x < zoom_y) ? zoom_x : zoom_y;
-    if (zoom < 1.0f) zoom = 1.0f;
-    pb->zoom_factor = zoom;  // Store for line width scaling
-
-    // Create a modified projection that:
-    // 1. Scales to zoom into the region (uniform)
-    // 2. Translates so the cursor is at the center
-
-    // Start with identity
-    mat4_t pick_proj = mat4_identity();
-
-    // Scale (zoom in) - column-major: m[col*4 + row]
-    // Use uniform zoom to preserve aspect ratio
-    pick_proj.m[0] = zoom;    // m[0][0]
-    pick_proj.m[5] = zoom;    // m[1][1]
-
-    // Translate to center on cursor (in NDC space)
-    pick_proj.m[12] = -ndc_x * zoom;   // m[3][0]
-    pick_proj.m[13] = -ndc_y * zoom;   // m[3][1]
-
-    // Combine: pick_proj * proj * view
-    mat4_t vp = mat4_mul(proj, view);
-    return mat4_mul(pick_proj, vp);
+    return mdcad_interaction_compute_pick_mvp(pb->center_x,
+                                               pb->center_y,
+                                               pb->viewport_width,
+                                               pb->viewport_height,
+                                               (float)PICK_BUFFER_SIZE,
+                                               &pb->zoom_factor,
+                                               view,
+                                               proj);
 }
 
 //------------------------------------------------------------------------------

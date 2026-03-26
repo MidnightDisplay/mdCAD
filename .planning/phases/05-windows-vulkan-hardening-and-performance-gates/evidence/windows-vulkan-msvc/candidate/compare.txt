@@ -1,0 +1,5 @@
+# Phase 5 HOT-04 compare artifact (candidate)
+status: BLOCKED
+reason: strict compare executable command requires Windows MSVC Vulkan runtime
+command: .\build-vulkan\bin\Release\mdcad_math_harness.exe --mode compare --strict
+host: macOS

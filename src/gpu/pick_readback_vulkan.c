@@ -32,6 +32,22 @@ extern sg_vk_image_info_ext sg_vk_query_image_info_ext(sg_image img_id);
 // Vulkan pick readback implementation
 //------------------------------------------------------------------------------
 
+typedef struct pick_vk_readback_cache_t {
+    VkDevice device;
+    VkPhysicalDevice physical_device;
+    uint32_t queue_family;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    VkDeviceSize staging_capacity;
+
+    VkCommandPool command_pool;
+    VkCommandBuffer command_buffer;
+    VkFence submit_fence;
+} pick_vk_readback_cache_t;
+
+static pick_vk_readback_cache_t pick_vk_readback_cache = {0};
+
 // Find memory type index that supports the given properties
 static uint32_t vk_find_memory_type(VkPhysicalDevice phys_dev, uint32_t type_filter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -44,6 +60,152 @@ static uint32_t vk_find_memory_type(VkPhysicalDevice phys_dev, uint32_t type_fil
         }
     }
     return UINT32_MAX;
+}
+
+static void pick_vk_readback_cache_dispose(pick_vk_readback_cache_t* cache) {
+    if (!cache || !cache->device) {
+        if (cache) {
+            memset(cache, 0, sizeof(*cache));
+        }
+        return;
+    }
+
+    if (cache->submit_fence) {
+        vkDestroyFence(cache->device, cache->submit_fence, NULL);
+    }
+    if (cache->command_pool) {
+        vkDestroyCommandPool(cache->device, cache->command_pool, NULL);
+    }
+    if (cache->staging_buffer) {
+        vkDestroyBuffer(cache->device, cache->staging_buffer, NULL);
+    }
+    if (cache->staging_memory) {
+        vkFreeMemory(cache->device, cache->staging_memory, NULL);
+    }
+
+    memset(cache, 0, sizeof(*cache));
+}
+
+static bool pick_vk_readback_cache_prepare(pick_vk_readback_cache_t* cache,
+                                           VkDevice device,
+                                           VkPhysicalDevice phys_dev,
+                                           uint32_t queue_family,
+                                           VkDeviceSize required_size) {
+    if (!cache || !device || !phys_dev || required_size == 0) {
+        return false;
+    }
+
+    if (cache->device &&
+        (cache->device != device ||
+         cache->physical_device != phys_dev ||
+         cache->queue_family != queue_family)) {
+        pick_vk_readback_cache_dispose(cache);
+    }
+
+    if (!cache->device) {
+        cache->device = device;
+        cache->physical_device = phys_dev;
+        cache->queue_family = queue_family;
+    }
+
+    VkResult result;
+
+    if (!cache->command_pool) {
+        VkCommandPoolCreateInfo pool_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .queueFamilyIndex = queue_family,
+        };
+        result = vkCreateCommandPool(device, &pool_info, NULL, &cache->command_pool);
+        if (result != VK_SUCCESS) {
+            pick_vk_readback_cache_dispose(cache);
+            return false;
+        }
+    }
+
+    if (!cache->command_buffer) {
+        VkCommandBufferAllocateInfo cmd_alloc_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = cache->command_pool,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1,
+        };
+        result = vkAllocateCommandBuffers(device, &cmd_alloc_info, &cache->command_buffer);
+        if (result != VK_SUCCESS) {
+            pick_vk_readback_cache_dispose(cache);
+            return false;
+        }
+    }
+
+    if (!cache->submit_fence) {
+        VkFenceCreateInfo fence_info = {
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .flags = 0,
+        };
+        result = vkCreateFence(device, &fence_info, NULL, &cache->submit_fence);
+        if (result != VK_SUCCESS) {
+            pick_vk_readback_cache_dispose(cache);
+            return false;
+        }
+    }
+
+    if (cache->staging_buffer && required_size <= cache->staging_capacity) {
+        return true;
+    }
+
+    if (cache->staging_buffer) {
+        vkDestroyBuffer(device, cache->staging_buffer, NULL);
+        cache->staging_buffer = VK_NULL_HANDLE;
+    }
+    if (cache->staging_memory) {
+        vkFreeMemory(device, cache->staging_memory, NULL);
+        cache->staging_memory = VK_NULL_HANDLE;
+    }
+    cache->staging_capacity = 0;
+
+    VkBufferCreateInfo buffer_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = required_size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+
+    result = vkCreateBuffer(device, &buffer_info, NULL, &cache->staging_buffer);
+    if (result != VK_SUCCESS) {
+        pick_vk_readback_cache_dispose(cache);
+        return false;
+    }
+
+    VkMemoryRequirements mem_reqs;
+    vkGetBufferMemoryRequirements(device, cache->staging_buffer, &mem_reqs);
+
+    uint32_t mem_type = vk_find_memory_type(phys_dev, mem_reqs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (mem_type == UINT32_MAX) {
+        pick_vk_readback_cache_dispose(cache);
+        return false;
+    }
+
+    VkMemoryAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = mem_reqs.size,
+        .memoryTypeIndex = mem_type,
+    };
+
+    result = vkAllocateMemory(device, &alloc_info, NULL, &cache->staging_memory);
+    if (result != VK_SUCCESS) {
+        pick_vk_readback_cache_dispose(cache);
+        return false;
+    }
+
+    result = vkBindBufferMemory(device, cache->staging_buffer, cache->staging_memory, 0);
+    if (result != VK_SUCCESS) {
+        pick_vk_readback_cache_dispose(cache);
+        return false;
+    }
+
+    cache->staging_capacity = mem_reqs.size;
+    return true;
 }
 
 bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_data) {
@@ -77,75 +239,23 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
     
     // Calculate buffer size (RGBA8 = 4 bytes per pixel)
     VkDeviceSize buffer_size = (VkDeviceSize)width * (VkDeviceSize)height * 4;
-    
-    // Create staging buffer
-    VkBuffer staging_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
-    
-    VkBufferCreateInfo buffer_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = buffer_size,
-        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
-    
-    result = vkCreateBuffer(device, &buffer_info, NULL, &staging_buffer);
+
+    if (!pick_vk_readback_cache_prepare(&pick_vk_readback_cache, device, phys_dev, queue_family, buffer_size)) {
+        goto cleanup;
+    }
+
+    VkCommandBuffer cmd_buf = pick_vk_readback_cache.command_buffer;
+    VkBuffer staging_buffer = pick_vk_readback_cache.staging_buffer;
+    VkDeviceMemory staging_memory = pick_vk_readback_cache.staging_memory;
+
+    result = vkResetFences(device, 1, &pick_vk_readback_cache.submit_fence);
     if (result != VK_SUCCESS) {
         goto cleanup;
     }
-    
-    // Get memory requirements and allocate
-    VkMemoryRequirements mem_reqs;
-    vkGetBufferMemoryRequirements(device, staging_buffer, &mem_reqs);
-    
-    uint32_t mem_type = vk_find_memory_type(phys_dev, mem_reqs.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    
-    if (mem_type == UINT32_MAX) {
-        goto cleanup;
-    }
-    
-    VkMemoryAllocateInfo alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = mem_reqs.size,
-        .memoryTypeIndex = mem_type,
-    };
-    
-    result = vkAllocateMemory(device, &alloc_info, NULL, &staging_memory);
+
+    result = vkResetCommandBuffer(cmd_buf, 0);
     if (result != VK_SUCCESS) {
         goto cleanup;
-    }
-    
-    result = vkBindBufferMemory(device, staging_buffer, staging_memory, 0);
-    if (result != VK_SUCCESS) {
-        goto cleanup;
-    }
-    
-    // Create command pool and buffer
-    VkCommandPool cmd_pool = VK_NULL_HANDLE;
-    VkCommandBuffer cmd_buf = VK_NULL_HANDLE;
-    
-    VkCommandPoolCreateInfo pool_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-        .queueFamilyIndex = queue_family,
-    };
-    
-    result = vkCreateCommandPool(device, &pool_info, NULL, &cmd_pool);
-    if (result != VK_SUCCESS) {
-        goto cleanup;
-    }
-    
-    VkCommandBufferAllocateInfo cmd_alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmd_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    
-    result = vkAllocateCommandBuffers(device, &cmd_alloc_info, &cmd_buf);
-    if (result != VK_SUCCESS) {
-        goto cleanup_pool;
     }
     
     // Begin command buffer
@@ -225,15 +335,15 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
         .pCommandBuffers = &cmd_buf,
     };
     
-    result = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+    result = vkQueueSubmit(queue, 1, &submit_info, pick_vk_readback_cache.submit_fence);
     if (result != VK_SUCCESS) {
-        goto cleanup_pool;
+        goto cleanup;
     }
     
     // Wait for transfer to complete
-    result = vkQueueWaitIdle(queue);
+    result = vkWaitForFences(device, 1, &pick_vk_readback_cache.submit_fence, VK_TRUE, 1000000000ULL);
     if (result != VK_SUCCESS) {
-        goto cleanup_pool;
+        goto cleanup;
     }
     
     // Map staging buffer and copy to output
@@ -244,20 +354,8 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
         vkUnmapMemory(device, staging_memory);
         success = true;
     }
-    
-cleanup_pool:
-    if (cmd_pool) {
-        vkDestroyCommandPool(device, cmd_pool, NULL);
-    }
-    
+
 cleanup:
-    if (staging_buffer) {
-        vkDestroyBuffer(device, staging_buffer, NULL);
-    }
-    if (staging_memory) {
-        vkFreeMemory(device, staging_memory, NULL);
-    }
-    
     if (!success) {
         memset(pixel_data, 0, (size_t)width * (size_t)height * 4);
     }
