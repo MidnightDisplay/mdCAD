@@ -211,6 +211,37 @@ cmake -B build-msvc -G "Visual Studio 18"; cmake --build build-msvc --config Rel
 
 Optionally, open the .slnx solution with Visual Studio and build+run mdCAD project using F5
 
+## Phase 6 serializer workflow (converter + targeted checks)
+
+Use this when validating the serializer/save-load long-tail migration with the light gate.
+
+### 1) Compile gate (Windows Vulkan)
+
+```powershell
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+```
+
+### 2) Convert old scene files to schema v2
+
+```powershell
+python scripts/scene_format_convert.py --input <legacy-scene.json> --output <converted-scene.json>
+```
+
+### 3) Run targeted serializer validation checklist
+
+Checklist artifact:
+
+```text
+.planning/phases/06-serializer-and-save-load-long-tail-migration/evidence/serializer-roundtrip-checklist.md
+```
+
+Required targeted fields to record:
+
+- entity count
+- parent links
+- transform fields (`position`, `rotation`, `scale`)
+- geometry type preservation
+
 ## iOS build using Xcode
 
 **NOTE** No conventional file system, loaders and savers will not work. Hotkeys untested, should work, requires a keyboard. 
