@@ -99,19 +99,19 @@ cmake --build build-mingw
 Build the harness, capture baseline/candidate artifacts, and write provenance on macOS:
 ```bash
 cmake -B build -G Ninja && ninja -C build mdcad_math_harness
-./build/bin/mdcad_math_harness --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/bench-run1.txt
-printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/provenance.txt
-./build/bin/mdcad_math_harness --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/bench-run1.txt
-printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/provenance.txt
+./build/bin/mdcad_math_harness --mode bench --iterations 2000000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 2000000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/baseline/provenance.txt
+./build/bin/mdcad_math_harness --mode bench --iterations 2000000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 2000000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/macos-metal/candidate/provenance.txt
 ```
 
 Capture baseline/candidate artifacts and provenance on Windows MSVC Vulkan:
 ```powershell
 cmake --build build-vulkan --config Release --target mdcad_math_harness
-.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/bench-run1.txt
-printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/provenance.txt
-.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-run1.txt
-printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 20000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 2000000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 2000000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/baseline/provenance.txt
+.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 2000000 > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-run1.txt
+printf "source_commit=%s\ncapture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 2000000\n" "$(git rev-parse HEAD)" > .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt
 ```
 
 Evaluate both targets:
@@ -129,7 +129,7 @@ python3 scripts/eval_math_bench.py \
   --output .planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-eval.md
 ```
 
-If a case is marginal (`5.0% < slowdown <= 8.0%`), capture one rerun (`bench-run2.txt`) and re-run evaluator with `--rerun`.
+Use high-iteration captures (`--iterations 2000000`) for Phase 5 perf evidence to reduce timer-noise outliers in short-running bench cases. If a case is marginal (`5.0% < slowdown <= 8.0%`), capture one rerun (`bench-run2.txt`) and re-run evaluator with `--rerun`.
 
 ## Phase 3 macOS parity smoke
 

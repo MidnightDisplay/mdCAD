@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Direct Adoption Tooling and Validation Harness** - Build the thin project-owned math entrypoint and comparison tooling for direct cglm adoption (completed 2026-03-24)
 - [ ] **Phase 3: macOS Core Transform Migration** - Migrate camera, transforms, and render-matrix hotspots on the primary native path
 - [x] **Phase 4: Interaction Math and API Expansion** - Migrate picking/gizmo math and introduce richer helper coverage (completed 2026-03-25)
-- [ ] **Phase 5: Windows Vulkan Hardening and Performance Gates** - Validate the migrated hotspot set on Windows and close native performance gates
+- [x] **Phase 5: Windows Vulkan Hardening and Performance Gates** - Validate the migrated hotspot set on Windows and close native performance gates (completed 2026-03-26)
 
 ## Phase Details
 
@@ -99,7 +99,7 @@ Plans:
 Plans:
 - [x] 05-01: Validate the migrated hotspot set on Windows Vulkan
 - [x] 05-02: Run and interpret native benchmark results on macOS and Windows
-- [ ] 05-03: Resolve rollout issues and capture the next-wave migration backlog (executed 2026-03-25, gate decision HOLD pending Windows MSVC Vulkan reruns)
+- [x] 05-03: Resolve rollout issues and capture the next-wave migration backlog (executed 2026-03-25, gate decision GO after native Windows reruns on 2026-03-26)
 
 ## Progress
 
@@ -112,4 +112,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Direct Adoption Tooling and Validation Harness | 3/3 | Complete | 2026-03-24 |
 | 3. macOS Core Transform Migration | 2/3 | In Progress | - |
 | 4. Interaction Math and API Expansion | 3/3 | Complete    | 2026-03-25 |
-| 5. Windows Vulkan Hardening and Performance Gates | 2/3 | On Hold | - |
+| 5. Windows Vulkan Hardening and Performance Gates | 3/3 | Complete | 2026-03-26 |
+

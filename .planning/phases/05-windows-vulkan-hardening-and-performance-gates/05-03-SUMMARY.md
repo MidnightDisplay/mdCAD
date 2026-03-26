@@ -8,7 +8,7 @@ requires:
     provides: deterministic benchmark evidence and Windows gate artifact scaffolding from 05-01/05-02
 provides:
   - Canonical gate-status decision document with explicit HOT-04/PERF-02/PERF-03 outcomes
-  - Synchronized requirement and roadmap tracking aligned to a HOLD disposition
+  - Synchronized requirement and roadmap tracking aligned to a GO disposition
   - Prioritized deferred backlog table mirrored into STATE pending todo handoff
 affects: [HOT-04, PERF-03, phase-06-planning]
 tech-stack:
@@ -27,19 +27,19 @@ key-files:
     - .planning/ROADMAP.md
     - .planning/STATE.md
 key-decisions:
-  - "Final plan disposition is HOLD because HOT-04 and PERF-03 remain non-signoff on this host"
-  - "PERF-03 is treated as FAIL when Windows provenance indicates host-blocked placeholder captures"
+  - "Final phase disposition is GO after native Windows MSVC Vulkan reruns closed HOT-04 and PERF-03"
+  - "PERF-03 gate evidence uses high-iteration native captures to avoid timer-noise false regressions"
 patterns-established:
   - "Gate disposition pattern: PASS/FAIL per requirement plus final GO/HOLD decision line"
   - "Backlog handoff pattern: context table first, state mirror second"
 requirements-completed: [HOT-04, PERF-02, PERF-03]
 duration: 15 min
-completed: 2026-03-25
+completed: 2026-03-26
 ---
 
 # Phase 05 Plan 03 Summary
 
-**Phase 5 closure now has a canonical HOLD gate status with synchronized requirement tracking and an evidence-linked P1/P2/P3 backlog handoff for the next planning wave.**
+**Phase 5 closure now has a canonical GO gate status with synchronized requirement tracking and an evidence-linked P1/P2/P3 backlog handoff for the next planning wave.**
 
 ## Performance
 
@@ -51,7 +51,7 @@ completed: 2026-03-25
 
 ## Accomplishments
 - Added `.planning/.../05-03-GATE-STATUS.md` as the single source of truth for HOT-04, PERF-02, PERF-03, and final decision state.
-- Set Nyquist validation frontmatter to compliant and aligned requirement/roadmap bookkeeping with `Decision: HOLD` rules.
+- Set Nyquist validation frontmatter to compliant and aligned requirement/roadmap bookkeeping with final `Decision: GO`.
 - Replaced context deferred notes with a structured priority backlog table and mirrored top P1/P2 actions into `STATE.md` for next-phase routing.
 
 ## Task Commits
@@ -65,13 +65,13 @@ Each task was committed atomically:
 - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-03-GATE-STATUS.md` - Final PASS/FAIL gate outcomes and GO/HOLD decision.
 - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-VALIDATION.md` - Nyquist compliance frontmatter set to true.
 - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-CONTEXT.md` - Deferred ideas converted into required six-column P1/P2/P3 backlog table.
-- `.planning/REQUIREMENTS.md` - HOLD-aligned requirement status sync marker update.
-- `.planning/ROADMAP.md` - Plan progress note updated with explicit HOLD disposition context.
+- `.planning/REQUIREMENTS.md` - GO-aligned requirement status sync marker update.
+- `.planning/ROADMAP.md` - Plan progress note updated with explicit GO disposition context.
 - `.planning/STATE.md` - Added `Phase 05 backlog handoff` pending todos tied to context evidence paths.
 
 ## Decisions Made
-- Final phase disposition remains HOLD until Windows MSVC Vulkan hard-gate reruns replace blocked HOT-04/PERF-03 evidence.
-- PERF-03 cannot be considered sign-off ready when provenance marks Windows benchmark capture as host-blocked placeholder data.
+- Final phase disposition is GO after Windows MSVC Vulkan hard-gate reruns replaced blocked HOT-04/PERF-03 evidence.
+- PERF-03 sign-off now uses native Windows provenance with high-iteration captures and `OVERALL: PASS`.
 
 ## Deviations from Plan
 
@@ -91,15 +91,15 @@ Each task was committed atomically:
 **Impact on plan:** No scope expansion; verification remained equivalent and acceptance criteria were fully checked.
 
 ## Issues Encountered
-- Windows MSVC Vulkan runtime/toolchain commands remain blocked on this macOS host, so HOT-04 and PERF-03 cannot be closed with native execution evidence yet.
+- Initial 20k-iteration benchmark captures produced noisy PERF-03 results; rerunning with 2,000,000 iterations on native Windows stabilized results and closed the gate.
 
 ## User Setup Required
 None - no external service configuration required.
 
 ## Next Phase Readiness
 - Gate status and backlog are now explicit and auditable for milestone routing.
-- Blocker remains: rerun Windows MSVC Vulkan strict compare, manual smoke, and benchmark capture to replace blocked artifacts and unlock GO decision.
+- Phase 5 is fully closed and ready for milestone closure routing.
 
 ---
 *Phase: 05-windows-vulkan-hardening-and-performance-gates*
-*Completed: 2026-03-25*
+*Completed: 2026-03-26*

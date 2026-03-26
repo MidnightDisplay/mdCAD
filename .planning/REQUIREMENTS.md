@@ -18,13 +18,13 @@ Requirements for the first math-foundation migration milestone. Each maps to roa
 - [x] **HOT-01**: mdCAD migrates orbit camera and viewport matrix construction to the new math foundation on the macOS Metal build without user-visible regressions
 - [x] **HOT-02**: mdCAD migrates ECS transform composition and world-matrix-dependent rendering math to the new foundation on the macOS Metal build without user-visible regressions
 - [x] **HOT-03**: mdCAD migrates pick/unproject/ray and translation gizmo drag math to the new foundation on the macOS Metal build without user-visible regressions
-- [ ] **HOT-04**: The same migrated hot paths build and behave correctly on the Windows Vulkan path
+- [x] **HOT-04**: The same migrated hot paths build and behave correctly on the Windows Vulkan path
 
 ### Performance & Validation
 
 - [x] **PERF-01**: mdCAD includes repeatable regression and benchmark checks for migrated math hotspots
-- [ ] **PERF-02**: Migrated hot paths show no native performance regression on macOS Metal
-- [ ] **PERF-03**: Migrated hot paths show no native performance regression on Windows Vulkan
+- [x] **PERF-02**: Migrated hot paths show no native performance regression on macOS Metal
+- [x] **PERF-03**: Migrated hot paths show no native performance regression on Windows Vulkan
 
 ### Foundation Expansion
 
@@ -68,10 +68,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOT-01 | Phase 3 | Complete |
 | HOT-02 | Phase 3 | Complete |
 | HOT-03 | Phase 4 | Complete |
-| HOT-04 | Phase 5 | Pending |
+| HOT-04 | Phase 5 | Complete |
 | PERF-01 | Phase 2 | Complete |
-| PERF-02 | Phase 5 | Pending |
-| PERF-03 | Phase 5 | Pending |
+| PERF-02 | Phase 5 | Complete |
+| PERF-03 | Phase 5 | Complete |
 | EXP-01 | Phase 4 | Complete |
 | EXP-02 | Phase 4 | Complete |
 
@@ -82,4 +82,5 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-25 after Phase 05 Plan 03 gate synchronization (Decision: HOLD)*
+*Last updated: 2026-03-26 after Phase 05 gate closure (Decision: GO)*
+

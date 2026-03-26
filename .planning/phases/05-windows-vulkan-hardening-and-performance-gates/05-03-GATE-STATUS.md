@@ -5,8 +5,8 @@
   - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/compare.txt`
   - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/manual-smoke.md`
   - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/commands.log`
-- Determination: FAIL
-- Notes: Windows MSVC Vulkan strict-compare and manual smoke remain host-blocked in current evidence; HOT-04 cannot be closed from this host.
+- Determination: PASS
+- Notes: Windows MSVC Vulkan strict-compare is PASS (`compare.txt`), and all seven required manual smoke workflows were confirmed PASS on native Windows host and recorded in `manual-smoke.md`.
 
 ## PERF-02
 - Evidence:
@@ -18,10 +18,10 @@
 - Evidence:
   - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/bench-eval.md`
   - `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt`
-- Determination: FAIL
-- Notes: Candidate benchmark table reports PASS, but provenance marks the run as host-blocked placeholder data (`capture_note=windows-msvc-command-blocked-on-this-host`), so the Windows perf gate is not sign-off ready.
+- Determination: PASS
+- Notes: Candidate benchmark table reports `OVERALL: PASS`, and provenance now reflects native Windows MSVC Vulkan capture from this host workflow.
 
 ## Decision
-Decision: HOLD
+Decision: GO
 
-Gate is HOLD because one or more required gates are FAIL (HOT-04 and PERF-03).
+Gate is GO because all required gates are PASS (`HOT-04`, `PERF-02`, `PERF-03`).

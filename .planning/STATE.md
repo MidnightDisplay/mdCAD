@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: On hold (Windows MSVC Vulkan reruns required)
-stopped_at: Completed 05-03-PLAN.md (Decision: HOLD)
-last_updated: "2026-03-25T18:15:34Z"
+status: Ready for milestone closure (Phase 05 GO)
+stopped_at: Completed 05-03-PLAN.md (Decision: GO)
+last_updated: "2026-03-26T16:52:20Z"
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
   completed_plans: 15
 ---
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 05 (windows-vulkan-hardening-and-performance-gates) — ON HOLD
-Plan: 3 of 3 (executed, Decision: HOLD)
+Phase: 05 (windows-vulkan-hardening-and-performance-gates) — COMPLETE
+Plan: 3 of 3 (executed, Decision: GO)
 
 ## Performance Metrics
 
@@ -108,21 +108,18 @@ Recent decisions affecting current work:
 
 ### Phase 05 backlog handoff
 
-- P1: Rerun HOT-04 strict compare and manual smoke on a Windows MSVC Vulkan host using `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/compare.txt` as the current blocked evidence anchor.
-- P2: Replace placeholder PERF-03 benchmark provenance with native Windows capture and reevaluate gate output referenced at `.planning/phases/05-windows-vulkan-hardening-and-performance-gates/evidence/windows-vulkan-msvc/candidate/provenance.txt`.
-- P2: Scope and schedule TAIL-01 long-tail migration workstream from `.planning/REQUIREMENTS.md` after Windows gate closure work is complete.
+- P2: Scope and schedule TAIL-01 long-tail migration workstream from `.planning/REQUIREMENTS.md` after milestone closure work begins.
 
 ### Blockers/Concerns
 
 - Phase 3 execution still needs to keep pick/gizmo bridge inputs stable while camera and transform compute moves onto `cglm`
 - Performance claims still need real app-workflow validation on macOS first and Windows Vulkan afterward
 - HOT-03 macOS manual interaction smoke is still pending for 04-03 (not executed in headless run).
-- HOT-04 runtime acceptance remains blocked on this host; rerun 05-01 command workflow on Windows MSVC Vulkan machine to close gate.
-- PERF-03 evidence for 05-02 uses host-blocked placeholder benchmark captures; rerun benchmark capture/eval commands on a Windows MSVC Vulkan host for final sign-off confidence.
-- Phase 05 plan execution is complete but disposition is HOLD (`05-03-GATE-STATUS.md`); milestone closure is blocked until Windows MSVC Vulkan reruns clear HOT-04 and PERF-03.
+- Phase 05 gates are now closed with `Decision: GO` in `05-03-GATE-STATUS.md`; milestone can proceed to closure.
 
 ## Session Continuity
 
 Last session: 2026-03-25T18:15:34Z
-Stopped at: Completed 05-03-PLAN.md (Decision: HOLD)
+Stopped at: Completed 05-03-PLAN.md (Decision: GO)
 Resume file: .planning/phases/05-windows-vulkan-hardening-and-performance-gates/05-03-GATE-STATUS.md
+

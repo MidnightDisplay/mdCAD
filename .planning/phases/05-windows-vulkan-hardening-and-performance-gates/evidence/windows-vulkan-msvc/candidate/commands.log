@@ -1,56 +1,65 @@
-# Phase 5 HOT-04 MSVC Vulkan candidate commands.log
-# host: Darwin
-# timestamp_utc: 2026-03-25T17:27:10Z
+**********************
+PowerShell transcript start
+Start time: 20260326161627
+Username: AzureAD\RodionRadchenko
+RunAs User: AzureAD\RodionRadchenko
+Configuration Name: 
+Machine: UK-LT-T12-G068 (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll -noexit -command try { . "c:\Users\RodionRadchenko\AppData\Local\Programs\Microsoft VS Code\cfbea10c5f\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1" } catch {}
+Process ID: 48792
+PSVersion: 7.5.5
+PSEdition: Core
+GitCommitId: 7.5.5
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+Transcript started, output file is .planning\phases\05-windows-vulkan-hardening-and-performance-gates\evidence\windows-vulkan-msvc\candidate\commands.log
+  Performing update step for 'libsokol-populate'
+  -- Fetching latest from the remote origin
+  From https://github.com/floooh/sokol
+     9c8853a..cb7dcf8  master             -> origin/master
+   * [new branch]      issue1457/sapp-dxgi-timing -> origin/issue1457/sapp-dxgi-timing
+   * [new branch]      sapp-dxgi-timing-2 -> origin/sapp-dxgi-timing-2
+  Building Custom Rule C:/dev/mdCAD/build-vulkan/_deps/libsokol-subbuild/CMakeLists.txt
+  No patch step for 'libsokol-populate'
+  No configure step for 'libsokol-populate'
+  No build step for 'libsokol-populate'
+  No install step for 'libsokol-populate'
+  No test step for 'libsokol-populate'
+  Completed 'libsokol-populate'
+  Building Custom Rule C:/dev/mdCAD/build-vulkan/_deps/libsokol-subbuild/CMakeLists.txt
+-- Found Vulkan SDK: C:\VulkanSDK\1.4.341.1
+-- Using Vulkan backend
+-- Configuring done (13.5s)
+-- Generating done (1.7s)
+-- Build files have been written to: C:/dev/mdCAD/build-vulkan
 
-$ cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON
-CMake Error: Could not create named generator Visual Studio 18
+COMPARE PASS orbit-camera-view checks=1
+COMPARE PASS view-projection-roundtrip checks=9
+COMPARE PASS transform-compose checks=4
+COMPARE PASS hierarchy-world-transform checks=5
+COMPARE PASS screen-ray-unproject checks=1
+COMPARE PASS pick-mvp-window checks=5
+COMPARE PASS gizmo-axis-drag checks=6
+COMPARE PASS gizmo-plane-drag checks=13
+COMPARE PASS gizmo-vertex-local-delta checks=2
+COMPARE PASS quat-rotate-vector checks=2
+COMPARE PASS quat-compose-order checks=2
 
-Generators
-* Unix Makefiles               = Generates standard UNIX makefiles.
-  Ninja                        = Generates build.ninja files.
-  Ninja Multi-Config           = Generates build-<Config>.ninja files.
-  FASTBuild                    = Generates fbuild.bff files.
-  Watcom WMake                 = Generates Watcom WMake makefiles.
-  Xcode                        = Generate Xcode project files.
-  CodeBlocks - Ninja           = Generates CodeBlocks project files
-                                 (deprecated).
-  CodeBlocks - Unix Makefiles  = Generates CodeBlocks project files
-                                 (deprecated).
-  CodeLite - Ninja             = Generates CodeLite project files
-                                 (deprecated).
-  CodeLite - Unix Makefiles    = Generates CodeLite project files
-                                 (deprecated).
-  Eclipse CDT4 - Ninja         = Generates Eclipse CDT 4.0 project files
-                                 (deprecated).
-  Eclipse CDT4 - Unix Makefiles= Generates Eclipse CDT 4.0 project files
-                                 (deprecated).
-  Kate - Ninja                 = Generates Kate project files (deprecated).
-  Kate - Ninja Multi-Config    = Generates Kate project files (deprecated).
-  Kate - Unix Makefiles        = Generates Kate project files (deprecated).
-  Sublime Text 2 - Ninja       = Generates Sublime Text 2 project files
-                                 (deprecated).
-  Sublime Text 2 - Unix Makefiles
-                               = Generates Sublime Text 2 project files
-                                 (deprecated).
-
-[exit_code=1]
-
-$ cmake --build build-vulkan --config Release --target mdcad_math_harness
-Error: /Users/rodionradchenko/Documents/repos/mdCAD/build-vulkan is not a directory
-[exit_code=1]
-
-$ .\build-vulkan\bin\Release\mdcad_math_harness.exe --mode compare --strict
-BLOCKED: Windows executable command cannot run on host Darwin.
-[exit_code=127]
-
-$ .\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000
-BLOCKED: Windows executable command cannot run on host Darwin.
-[exit_code=127]
-
-$ cmake --build build-vulkan --config Release --target math-validation
-Error: /Users/rodionradchenko/Documents/repos/mdCAD/build-vulkan is not a directory
-[exit_code=1]
-
-$ .\build-vulkan\bin\Release\mdCAD.exe
-BLOCKED: Windows executable command cannot run on host Darwin.
-[exit_code=127]
+]633;D;0]633;A]633;P;Cwd=C:\x5cdev\x5cmdCAD16:16:50 ❯ [K[0J  ]633;B
+]133;C
+PS> .\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > "$b\bench-run1.txt"
+ "source_commit=$(git rev-parse HEAD)`ncapture_cmd=.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000" | Set-Content "$b\provenance.txt"
+ .\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000 > "$c\bench-run1.txt"
+ "source_commit=$(git rev-parse HEAD)`ncapture_cmd=.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 20000" | Set-Content "$c\provenance.txt"
+ py -3 scripts\eval_math_bench.py --label windows-vulkan-msvc --baseline "$b\bench-run1.txt" --candidate "$c\bench-run1.txt" --output "$c\bench-eval.md"
+ Stop-Transcript
+OVERALL: FAIL
+**********************
+PowerShell transcript end
+End time: 20260326162257
+**********************

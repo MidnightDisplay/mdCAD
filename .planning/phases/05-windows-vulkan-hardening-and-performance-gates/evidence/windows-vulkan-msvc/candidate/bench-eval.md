@@ -5,14 +5,14 @@
 
 | bench_id | baseline_avg_ns | candidate_avg_ns | rerun_avg_ns | effective_candidate_avg_ns | slowdown_pct | decision | note |
 |---|---:|---:|---:|---:|---:|---|---|
-| legacy-mat4-mul | 7.397 | 7.397 | - | 7.397 | 0.000% | PASS | - |
-| cglm-mat4-mul | 7.202 | 7.190 | - | 7.190 | -0.167% | PASS | - |
-| legacy-mat4-inverse | 10.950 | 10.950 | - | 10.950 | 0.000% | PASS | - |
-| cglm-mat4-inv | 4.089 | 4.150 | - | 4.150 | 1.492% | PASS | - |
-| legacy-screen-ray | 6.506 | 6.506 | - | 6.506 | 0.000% | PASS | - |
-| cglm-screen-ray | 5.798 | 5.750 | - | 5.750 | -0.828% | PASS | - |
-| bench-interaction-ray | 21.997 | 21.948 | - | 21.948 | -0.223% | PASS | - |
-| bench-interaction-drag | 16.406 | 16.296 | - | 16.296 | -0.670% | PASS | - |
-| bench-quat-ops | 34.302 | 33.447 | - | 33.447 | -2.493% | PASS | - |
+| legacy-mat4-mul | 3.945 | 3.856 | - | 3.856 | -2.256% | PASS | - |
+| cglm-mat4-mul | 3.840 | 3.745 | - | 3.745 | -2.474% | PASS | - |
+| legacy-mat4-inverse | 13.982 | 13.883 | - | 13.883 | -0.708% | PASS | - |
+| cglm-mat4-inv | 4.769 | 4.817 | - | 4.817 | 1.007% | PASS | - |
+| legacy-screen-ray | 6.731 | 6.773 | - | 6.773 | 0.624% | PASS | - |
+| cglm-screen-ray | 29.512 | 29.564 | - | 29.564 | 0.176% | PASS | - |
+| bench-interaction-ray | 25.396 | 26.459 | - | 26.459 | 4.186% | PASS | - |
+| bench-interaction-drag | 100.857 | 98.947 | - | 98.947 | -1.894% | PASS | - |
+| bench-quat-ops | 50.614 | 50.300 | - | 50.300 | -0.620% | PASS | - |
 
 OVERALL: PASS
