@@ -12,6 +12,7 @@
 #define PLY_MESH_IMPORT_JOB_H
 
 #include "ply_loader.h"
+#include "math/math_import.h"
 #include "ecs/ecs_scene.h"
 #include "sokol_time.h"
 #include <string.h>
@@ -156,8 +157,8 @@ static inline bool ply_mesh_import_job_start(ply_mesh_import_job_t *job,
     job->total_vertices = 0;
     job->total_faces = 0;
     job->transforms_applied = false;
-    job->com = vec3_make(0, 0, 0);
-    job->transform_matrix = mat4_identity();
+    job->com = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
+    job->transform_matrix = mdcad_import_mat4_identity();
 
     // Reset timing data
     job->last_iteration_time_ms = 0.0;
@@ -221,14 +222,14 @@ static inline void ply_mesh_import_job_apply_transforms(ply_mesh_import_job_t *j
 
     // Step 1: Calculate and apply Centre of Mass shift
     if (job->shift_to_com && count > 0) {
-        vec3_t sum = vec3_make(0, 0, 0);
+        vec3_t sum = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
         for (int i = 0; i < count; i++) {
-            sum = vec3_add(sum, points[i]);
+            sum = mdcad_import_vec3_add(sum, points[i]);
         }
-        job->com = vec3_scale(sum, 1.0f / (float)count);
+        job->com = mdcad_import_vec3_average(sum, count);
 
         for (int i = 0; i < count; i++) {
-            points[i] = vec3_sub(points[i], job->com);
+            points[i] = mdcad_import_vec3_sub(points[i], job->com);
         }
     }
 
@@ -238,21 +239,17 @@ static inline void ply_mesh_import_job_apply_transforms(ply_mesh_import_job_t *j
                          job->rotation_z != 0.0f);
 
     if (has_rotation) {
-        mat4_t rot_x = mat4_rotate_x(job->rotation_x);
-        mat4_t rot_y = mat4_rotate_y(job->rotation_y);
-        mat4_t rot_z = mat4_rotate_z(job->rotation_z);
-        mat4_t rot_xy = mat4_mul(rot_y, rot_x);
-        job->transform_matrix = mat4_mul(rot_z, rot_xy);
+        job->transform_matrix = mdcad_import_rotation_xyz(job->rotation_x, job->rotation_y, job->rotation_z);
 
         for (int i = 0; i < count; i++) {
-            points[i] = mat4_mul_point(job->transform_matrix, points[i]);
+            points[i] = mdcad_import_mat4_mul_point(job->transform_matrix, points[i]);
         }
     }
 
     // Step 3: Apply scale to all points
     if (job->scale != 1.0f) {
         for (int i = 0; i < count; i++) {
-            points[i] = vec3_scale(points[i], job->scale);
+            points[i] = mdcad_import_vec3_scale(points[i], job->scale);
         }
     }
 

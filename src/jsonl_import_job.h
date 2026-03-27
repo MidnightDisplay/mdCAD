@@ -13,6 +13,7 @@
 #define JSONL_IMPORT_JOB_H
 
 #include "jsonl_loader.h"
+#include "math/math_import.h"
 #include "ecs/ecs_scene.h"
 #include "sokol_time.h"
 #include <string.h>
@@ -171,8 +172,8 @@ static inline bool jsonl_import_job_start(jsonl_import_job_t *job,
     job->error = JSONL_OK;
     job->total_elements = 0;
     job->transforms_applied = false;
-    job->com = vec3_make(0, 0, 0);
-    job->transform_matrix = mat4_identity();
+    job->com = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
+    job->transform_matrix = mdcad_import_mat4_identity();
 
     // Reset timing data
     job->last_iteration_time_ms = 0.0;
@@ -222,7 +223,7 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
 
     // Step 1: Collect all characteristic points for CoM calculation
     if (job->shift_to_com) {
-        vec3_t sum = vec3_make(0, 0, 0);
+        vec3_t sum = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
         int point_count = 0;
 
         for (int e = 0; e < data->entry_count; e++) {
@@ -231,29 +232,29 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                 jsonl_element_t *elem = &entry->elements[i];
                 switch (elem->type) {
                     case JSONL_GEOM_POINT:
-                        sum = vec3_add(sum, elem->data.point.point);
+                        sum = mdcad_import_vec3_add(sum, elem->data.point.point);
                         point_count++;
                         break;
                     case JSONL_GEOM_LINE:
-                        sum = vec3_add(sum, elem->data.line.start);
-                        sum = vec3_add(sum, elem->data.line.end);
+                        sum = mdcad_import_vec3_add(sum, elem->data.line.start);
+                        sum = mdcad_import_vec3_add(sum, elem->data.line.end);
                         point_count += 2;
                         break;
                     case JSONL_GEOM_ARC:
-                        sum = vec3_add(sum, elem->data.arc.center);
+                        sum = mdcad_import_vec3_add(sum, elem->data.arc.center);
                         point_count++;
                         break;
                     case JSONL_GEOM_POLYLINE:
                     case JSONL_GEOM_POLYGON:
                         for (int p = 0; p < elem->data.polyline.count; p++) {
-                            sum = vec3_add(sum, elem->data.polyline.points[p]);
+                            sum = mdcad_import_vec3_add(sum, elem->data.polyline.points[p]);
                             point_count++;
                         }
                         break;
                     case JSONL_GEOM_MESH: {
                         jsonl_mesh_data_t *mesh = &elem->data.mesh.mesh;
                         for (int v = 0; v < mesh->vertex_count; v++) {
-                            sum = vec3_add(sum, mesh->vertices[v]);
+                            sum = mdcad_import_vec3_add(sum, mesh->vertices[v]);
                             point_count++;
                         }
                         break;
@@ -264,7 +265,7 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
         }
 
         if (point_count > 0) {
-            job->com = vec3_scale(sum, 1.0f / (float)point_count);
+            job->com = mdcad_import_vec3_average(sum, point_count);
         }
     }
 
@@ -273,13 +274,9 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                          job->rotation_y != 0.0f ||
                          job->rotation_z != 0.0f);
 
-    mat4_t rot_matrix = mat4_identity();
+    mat4_t rot_matrix = mdcad_import_mat4_identity();
     if (has_rotation) {
-        mat4_t rot_x = mat4_rotate_x(job->rotation_x);
-        mat4_t rot_y = mat4_rotate_y(job->rotation_y);
-        mat4_t rot_z = mat4_rotate_z(job->rotation_z);
-        mat4_t rot_xy = mat4_mul(rot_y, rot_x);
-        rot_matrix = mat4_mul(rot_z, rot_xy);
+        rot_matrix = mdcad_import_rotation_xyz(job->rotation_x, job->rotation_y, job->rotation_z);
         job->transform_matrix = rot_matrix;
     }
 
@@ -291,9 +288,7 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
 
             // Helper lambda-like: transform a single point
             #define JSONL_TRANSFORM_POINT(pt) do { \
-                if (job->shift_to_com) pt = vec3_sub(pt, job->com); \
-                if (has_rotation) pt = mat4_mul_point(rot_matrix, pt); \
-                if (job->scale != 1.0f) pt = vec3_scale(pt, job->scale); \
+                pt = mdcad_import_transform_point(pt, job->shift_to_com, job->com, has_rotation, rot_matrix, job->scale); \
             } while(0)
 
             switch (elem->type) {
@@ -310,8 +305,8 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                         elem->data.arc.radius *= job->scale;
                     }
                     if (has_rotation) {
-                        elem->data.arc.normal = mat4_mul_point(rot_matrix, elem->data.arc.normal);
-                        elem->data.arc.normal = vec3_normalize(elem->data.arc.normal);
+                        elem->data.arc.normal = mdcad_import_mat4_mul_point(rot_matrix, elem->data.arc.normal);
+                        elem->data.arc.normal = mdcad_import_vec3_normalize_safe(elem->data.arc.normal);
                     }
                     // Note: angles stay the same - they're relative to the local coordinate
                     // system which rotates with the normal
@@ -332,8 +327,8 @@ static inline void jsonl_import_job_apply_transforms(jsonl_import_job_t *job) {
                     // Rotate normals (but don't translate or scale)
                     if (has_rotation) {
                         for (int n = 0; n < mesh->normal_count; n++) {
-                            mesh->normals[n] = mat4_mul_point(rot_matrix, mesh->normals[n]);
-                            mesh->normals[n] = vec3_normalize(mesh->normals[n]);
+                            mesh->normals[n] = mdcad_import_mat4_mul_point(rot_matrix, mesh->normals[n]);
+                            mesh->normals[n] = mdcad_import_vec3_normalize_safe(mesh->normals[n]);
                         }
                     }
                     break;
