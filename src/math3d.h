@@ -197,6 +197,10 @@ static inline vec3_t mat4_mul_point(mat4_t m, vec3_t p) {
 //------------------------------------------------------------------------------
 typedef struct { vec3_t origin, direction; } ray_t;
 
+/* Phase8 deferred glue: legacy interaction helpers below remain intentionally retained for
+ * compare-harness coverage and non-Phase-8 consumers. Runtime/editor migration surfaces moved
+ * to mdcad_interaction_* and mdcad_undo_editor_* in Phase 8; final boundary reduction is Phase 9. */
+
 // General 4x4 matrix inverse (cofactor method)
 static inline mat4_t mat4_inverse(mat4_t m) {
     float *a = m.m;

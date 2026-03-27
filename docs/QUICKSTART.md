@@ -291,6 +291,48 @@ Chunk/progress safety rule:
 
 - treat any `Chunked Import / Progress Semantics` regression as a **blocker**
 
+## Phase 8 undo/editor workflow
+
+Use this when validating undo/editor utility migration and Phase 8 glue burn-down.
+
+### 1) Compile gate (Windows Vulkan)
+
+```powershell
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+```
+
+### 2) Full gate (wave/phase-level)
+
+```powershell
+cmake --build build-vulkan --config Release --target math-validation
+```
+
+### 3) Run targeted undo/editor checklist and report
+
+Checklist artifact:
+
+```text
+.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-checklist.md
+```
+
+Report artifact:
+
+```text
+.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-check-report.md
+```
+
+Glue inventory artifact:
+
+```text
+.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/glue-inventory.md
+```
+
+Mandatory workflow coverage:
+
+- undo/redo transform edits
+- gizmo vertex edit workflow
+- inspector edit workflow
+
 ## iOS build using Xcode
 
 **NOTE** No conventional file system, loaders and savers will not work. Hotkeys untested, should work, requires a keyboard. 
