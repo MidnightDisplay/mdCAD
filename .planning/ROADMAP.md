@@ -66,9 +66,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 08-01: Migrate undo/editor utility math touchpoints to cglm-backed helpers
-- [ ] 08-02: Remove safe thin-entrypoint glue and update call-site boundaries
-- [ ] 08-03: Validate edit/undo parity and document migration deltas
+- [x] 08-01: Migrate undo/editor utility math touchpoints to cglm-backed helpers
+- [x] 08-02: Remove safe thin-entrypoint glue and update call-site boundaries
+- [x] 08-03: Validate edit/undo parity and document migration deltas
 
 ### Phase 9: Long-Tail Validation, Performance Gates, and Boundary Finalization
 **Goal**: Close v1.1 with expanded parity/performance confidence and finalized minimal thin-entrypoint boundary documentation.
@@ -96,5 +96,5 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 |-------|----------------|--------|-----------|
 | 6. Serializer and Save/Load Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 7. Import Pipeline Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
-| 8. Undo/Editor Utility Migration and Glue Burn-Down | 0/3 | Not started | - |
+| 8. Undo/Editor Utility Migration and Glue Burn-Down | 3/3 | Executed (verification pending) | 2026-03-27 |
 | 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 0/3 | Not started | - |
