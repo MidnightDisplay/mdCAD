@@ -16,7 +16,7 @@ v1.1 executes the deferred long-tail migration and thin-entrypoint reduction wor
 - Decimal phases (e.g. 6.1) may be inserted for urgent work.
 
 - [x] **Phase 6: Serializer and Save/Load Long-Tail Migration** — Migrate scene serialization math paths to cglm-backed helpers and preserve behavior. (completed 2026-03-27)
-- [ ] **Phase 7: Import Pipeline Long-Tail Migration** — Migrate JSONL/PLY importer math paths to cglm-backed helpers and preserve behavior.
+- [x] **Phase 7: Import Pipeline Long-Tail Migration** — Migrate JSONL/PLY importer math paths to cglm-backed helpers and preserve behavior. (completed 2026-03-27)
 - [ ] **Phase 8: Undo/Editor Utility Migration and Glue Burn-Down** — Migrate undo/editor utility paths and remove safe temporary thin-entrypoint glue.
 - [ ] **Phase 9: Long-Tail Validation, Performance Gates, and Boundary Finalization** — Validate long-tail parity/perf and finalize minimal thin-entrypoint boundary docs.
 
@@ -50,9 +50,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Migrate importer math touchpoints and update boundaries
-- [ ] 07-02-PLAN.md — Add parity checks for importer geometry transforms and placement
-- [ ] 07-03-PLAN.md — Validate native import workflows and capture evidence
+- [x] 07-01-PLAN.md — Migrate importer math touchpoints and update boundaries
+- [x] 07-02-PLAN.md — Add parity checks for importer geometry transforms and placement
+- [x] 07-03-PLAN.md — Validate native import workflows and capture evidence
 
 ### Phase 8: Undo/Editor Utility Migration and Glue Burn-Down
 **Goal**: Complete undo/editor utility migration and remove temporary glue that is no longer required.
@@ -95,6 +95,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 6. Serializer and Save/Load Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
-| 7. Import Pipeline Long-Tail Migration | 0/3 | Not started | - |
+| 7. Import Pipeline Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 8. Undo/Editor Utility Migration and Glue Burn-Down | 0/3 | Not started | - |
 | 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 0/3 | Not started | - |
