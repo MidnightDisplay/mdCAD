@@ -39,8 +39,8 @@ created: 2026-03-27
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 07-01-01 | 01 | 1 | TAIL-02 | compile + source-audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
-| 07-02-01 | 02 | 2 | TAIL-02 | targeted importer checks | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
-| 07-03-01 | 03 | 3 | TAIL-02 | native workflow evidence (task-level quick gate) | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
+| 07-02-01 | 02 | 2 | TAIL-02 | targeted importer checks | `rg -n "PASS|FAIL|placement|orientation|scale|entity|triangle|parenting|Correctness Delta vs Previous Import Behavior|Chunked Import / Progress Semantics" .planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-check-report.md` | ✅ | ✅ green |
+| 07-03-01 | 03 | 3 | TAIL-02 | native workflow evidence (task-level quick gate + deferred full suite) | `cmake --build build-vulkan --config Release --target mdcad_math_harness && cmake --build build-vulkan --config Release --target math-validation` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -65,11 +65,11 @@ created: 2026-03-27
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
 - [x] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 180s
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** ready
+**Approval:** pass
