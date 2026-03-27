@@ -40,7 +40,7 @@ created: 2026-03-27
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 07-01-01 | 01 | 1 | TAIL-02 | compile + source-audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ⬜ pending |
 | 07-02-01 | 02 | 1 | TAIL-02 | targeted importer checks | `cmake --build build-vulkan --config Release --target math-validation` | ⚠️ W0 | ⬜ pending |
-| 07-03-01 | 03 | 2 | TAIL-02 | native workflow evidence | `cmake --build build-vulkan --config Release --target math-validation` | ⚠️ W0 | ⬜ pending |
+| 07-03-01 | 03 | 2 | TAIL-02 | native workflow evidence (task-level quick gate) | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ⚠️ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
