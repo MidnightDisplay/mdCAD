@@ -50,9 +50,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Migrate importer math touchpoints and update boundaries
-- [ ] 07-02: Add parity checks for importer geometry transforms and placement
-- [ ] 07-03: Validate native import workflows and capture evidence
+- [ ] 07-01-PLAN.md — Migrate importer math touchpoints and update boundaries
+- [ ] 07-02-PLAN.md — Add parity checks for importer geometry transforms and placement
+- [ ] 07-03-PLAN.md — Validate native import workflows and capture evidence
 
 ### Phase 8: Undo/Editor Utility Migration and Glue Burn-Down
 **Goal**: Complete undo/editor utility migration and remove temporary glue that is no longer required.
