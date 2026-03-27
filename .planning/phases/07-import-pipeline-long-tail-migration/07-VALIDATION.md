@@ -2,8 +2,8 @@
 phase: 07
 slug: import-pipeline-long-tail-migration
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-27
 ---
 
@@ -38,9 +38,9 @@ created: 2026-03-27
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 07-01-01 | 01 | 1 | TAIL-02 | compile + source-audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ⬜ pending |
-| 07-02-01 | 02 | 1 | TAIL-02 | targeted importer checks | `cmake --build build-vulkan --config Release --target math-validation` | ⚠️ W0 | ⬜ pending |
-| 07-03-01 | 03 | 2 | TAIL-02 | native workflow evidence (task-level quick gate) | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ⚠️ W0 | ⬜ pending |
+| 07-01-01 | 01 | 1 | TAIL-02 | compile + source-audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
+| 07-02-01 | 02 | 2 | TAIL-02 | targeted importer checks | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
+| 07-03-01 | 03 | 3 | TAIL-02 | native workflow evidence (task-level quick gate) | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,9 +48,9 @@ created: 2026-03-27
 
 ## Wave 0 Requirements
 
-- [ ] `.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-checklist.md` — checklist for JSONL/PLY placement/orientation/scale/count/parenting verification.
-- [ ] `.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-check-report.md` — executed report with pass/fail outcomes and delta notes.
-- [ ] `docs/QUICKSTART.md` update — Phase 7 importer migration workflow commands and evidence pointers.
+- [x] `.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-checklist.md` — checklist for JSONL/PLY placement/orientation/scale/count/parenting verification.
+- [x] `.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-check-report.md` — executed report with pass/fail outcomes and delta notes.
+- [x] `docs/QUICKSTART.md` update — Phase 7 importer migration workflow commands and evidence pointers.
 
 ---
 
@@ -67,9 +67,9 @@ created: 2026-03-27
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 180s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready

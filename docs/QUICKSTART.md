@@ -242,6 +242,55 @@ Required targeted fields to record:
 - transform fields (`position`, `rotation`, `scale`)
 - geometry type preservation
 
+## Phase 7 importer workflow
+
+Use this when validating the importer long-tail migration (JSONL/PLY math-path cutline).
+
+### 1) Compile gate (Windows Vulkan)
+
+```powershell
+cmake --build build-vulkan --config Release --target mdcad_math_harness
+```
+
+### 2) Full gate (wave/phase-level)
+
+```powershell
+cmake --build build-vulkan --config Release --target math-validation
+```
+
+### 3) Run targeted importer checklist and report
+
+Checklist artifact:
+
+```text
+.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-checklist.md
+```
+
+Report artifact:
+
+```text
+.planning/phases/07-import-pipeline-long-tail-migration/evidence/importer-targeted-check-report.md
+```
+
+Required targeted fields to record for representative and variant/converted samples:
+
+- placement
+- orientation
+- scale
+- entity count
+- triangle count (when applicable)
+- parenting structure
+
+Correctness-delta recording requirements:
+
+- `Correctness Delta vs Previous Import Behavior` must be explicitly filled
+- every visible delta must include an `Implementation Analysis Reference`
+- every visible delta must include a `Mathematical Justification`
+
+Chunk/progress safety rule:
+
+- treat any `Chunked Import / Progress Semantics` regression as a **blocker**
+
 ## iOS build using Xcode
 
 **NOTE** No conventional file system, loaders and savers will not work. Hotkeys untested, should work, requires a keyboard. 
