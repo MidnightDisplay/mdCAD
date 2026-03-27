@@ -11,7 +11,7 @@
 #ifndef PLY_LOADER_H
 #define PLY_LOADER_H
 
-#include "math3d.h"
+#include "math/math_import.h"
 #include "components/component_types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -494,8 +494,7 @@ static inline ply_error_t ply_parse_ascii_vertices(FILE *file, const ply_header_
     }
 
     // Initialize bounds
-    data->min_bounds = vec3_make(1e30f, 1e30f, 1e30f);
-    data->max_bounds = vec3_make(-1e30f, -1e30f, -1e30f);
+    mdcad_import_bounds_reset(&data->min_bounds, &data->max_bounds);
 
     // Parse each vertex
     for (int v = 0; v < header->vertex_count; v++) {
@@ -524,15 +523,10 @@ static inline ply_error_t ply_parse_ascii_vertices(FILE *file, const ply_header_
         float x = values[header->prop_x];
         float y = values[header->prop_y];
         float z = values[header->prop_z];
-        data->points[v] = vec3_make(x, y, z);
+        data->points[v] = mdcad_import_vec3_make(x, y, z);
 
         // Update bounds
-        if (x < data->min_bounds.x) data->min_bounds.x = x;
-        if (y < data->min_bounds.y) data->min_bounds.y = y;
-        if (z < data->min_bounds.z) data->min_bounds.z = z;
-        if (x > data->max_bounds.x) data->max_bounds.x = x;
-        if (y > data->max_bounds.y) data->max_bounds.y = y;
-        if (z > data->max_bounds.z) data->max_bounds.z = z;
+        mdcad_import_bounds_expand(&data->min_bounds, &data->max_bounds, data->points[v]);
 
         // Extract color if available
         if (has_colors) {
@@ -742,8 +736,7 @@ static inline ply_error_t ply_parse_binary_vertices(FILE *file, const ply_header
     }
 
     // Initialize bounds
-    data->min_bounds = vec3_make(1e30f, 1e30f, 1e30f);
-    data->max_bounds = vec3_make(-1e30f, -1e30f, -1e30f);
+    mdcad_import_bounds_reset(&data->min_bounds, &data->max_bounds);
 
     for (int v = 0; v < header->vertex_count; v++) {
         uint8_t *row = raw + (size_t)v * stride;
@@ -754,15 +747,10 @@ static inline ply_error_t ply_parse_binary_vertices(FILE *file, const ply_header
                                      header->properties[header->prop_y].type, need_swap);
         float z = ply_read_as_float(row + header->vertex_prop_offsets[header->prop_z],
                                      header->properties[header->prop_z].type, need_swap);
-        data->points[v] = vec3_make(x, y, z);
+        data->points[v] = mdcad_import_vec3_make(x, y, z);
 
         // Update bounds
-        if (x < data->min_bounds.x) data->min_bounds.x = x;
-        if (y < data->min_bounds.y) data->min_bounds.y = y;
-        if (z < data->min_bounds.z) data->min_bounds.z = z;
-        if (x > data->max_bounds.x) data->max_bounds.x = x;
-        if (y > data->max_bounds.y) data->max_bounds.y = y;
-        if (z > data->max_bounds.z) data->max_bounds.z = z;
+        mdcad_import_bounds_expand(&data->min_bounds, &data->max_bounds, data->points[v]);
 
         // Extract color if available
         if (has_colors) {
@@ -1212,8 +1200,7 @@ static inline ply_error_t ply_open(const char *filepath, ply_parse_state_t *stat
                          state->header.prop_blue >= 0);
 
     // Initialize bounds
-    state->min_bounds = vec3_make(1e30f, 1e30f, 1e30f);
-    state->max_bounds = vec3_make(-1e30f, -1e30f, -1e30f);
+    mdcad_import_bounds_reset(&state->min_bounds, &state->max_bounds);
 
     // Pre-allocate arrays for all vertices
     int total = state->header.vertex_count;
@@ -1323,15 +1310,10 @@ static inline int ply_parse_vertices_chunk(ply_parse_state_t *state, int max_ver
             float x = values[state->header.prop_x];
             float y = values[state->header.prop_y];
             float z = values[state->header.prop_z];
-            state->points[v] = vec3_make(x, y, z);
+            state->points[v] = mdcad_import_vec3_make(x, y, z);
 
             // Update bounds
-            if (x < state->min_bounds.x) state->min_bounds.x = x;
-            if (y < state->min_bounds.y) state->min_bounds.y = y;
-            if (z < state->min_bounds.z) state->min_bounds.z = z;
-            if (x > state->max_bounds.x) state->max_bounds.x = x;
-            if (y > state->max_bounds.y) state->max_bounds.y = y;
-            if (z > state->max_bounds.z) state->max_bounds.z = z;
+            mdcad_import_bounds_expand(&state->min_bounds, &state->max_bounds, state->points[v]);
 
             // Extract color if available
             if (state->has_colors) {
@@ -1390,15 +1372,10 @@ static inline int ply_parse_vertices_chunk(ply_parse_state_t *state, int max_ver
                                          state->header.properties[state->header.prop_y].type, need_swap);
             float z = ply_read_as_float(row + state->header.vertex_prop_offsets[state->header.prop_z],
                                          state->header.properties[state->header.prop_z].type, need_swap);
-            state->points[v] = vec3_make(x, y, z);
+            state->points[v] = mdcad_import_vec3_make(x, y, z);
 
             // Update bounds
-            if (x < state->min_bounds.x) state->min_bounds.x = x;
-            if (y < state->min_bounds.y) state->min_bounds.y = y;
-            if (z < state->min_bounds.z) state->min_bounds.z = z;
-            if (x > state->max_bounds.x) state->max_bounds.x = x;
-            if (y > state->max_bounds.y) state->max_bounds.y = y;
-            if (z > state->max_bounds.z) state->max_bounds.z = z;
+            mdcad_import_bounds_expand(&state->min_bounds, &state->max_bounds, state->points[v]);
 
             // Extract color if available
             if (state->has_colors) {

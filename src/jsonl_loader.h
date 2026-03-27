@@ -11,7 +11,7 @@
 #ifndef JSONL_LOADER_H
 #define JSONL_LOADER_H
 
-#include "math3d.h"
+#include "math/math_import.h"
 #include "components/component_types.h"
 #include "cJSON.h"
 #include <stdio.h>
@@ -315,7 +315,7 @@ static inline bool jsonl_parse_arc3d(const cJSON *json, jsonl_element_t *element
     vec3_t center = jsonl_parse_point3d(center_json);
     float radius = (float)radius_json->valuedouble;
     vec3_t axis = jsonl_parse_vector3d(axis_json);
-    vec3_t normal = vec3_normalize(axis);
+    vec3_t normal = mdcad_import_vec3_normalize_safe(axis);
 
     vec3_t sp = jsonl_parse_point3d(start_pt);
     vec3_t ep = jsonl_parse_point3d(end_pt);
@@ -323,16 +323,16 @@ static inline bool jsonl_parse_arc3d(const cJSON *json, jsonl_element_t *element
 
     // Build local coordinate system from normal (same method as ecs_scene_tessellate_arc)
     vec3_t up = normal;
-    vec3_t arbitrary = (fabsf(up.y) < 0.9f) ? vec3_make(0, 1, 0) : vec3_make(1, 0, 0);
-    vec3_t x_axis = vec3_normalize(vec3_cross(arbitrary, up));
-    vec3_t y_axis = vec3_cross(up, x_axis);
+    vec3_t arbitrary = mdcad_import_select_perpendicular_axis(up);
+    vec3_t x_axis = mdcad_import_vec3_normalize_safe(mdcad_import_vec3_cross(arbitrary, up));
+    vec3_t y_axis = mdcad_import_vec3_cross(up, x_axis);
 
     // Compute angles
-    vec3_t sp_rel = vec3_sub(sp, center);
-    vec3_t ep_rel = vec3_sub(ep, center);
+    vec3_t sp_rel = mdcad_import_vec3_sub(sp, center);
+    vec3_t ep_rel = mdcad_import_vec3_sub(ep, center);
 
-    float start_angle = atan2f(vec3_dot(sp_rel, y_axis), vec3_dot(sp_rel, x_axis));
-    float end_angle = atan2f(vec3_dot(ep_rel, y_axis), vec3_dot(ep_rel, x_axis));
+    float start_angle = atan2f(mdcad_import_vec3_dot(sp_rel, y_axis), mdcad_import_vec3_dot(sp_rel, x_axis));
+    float end_angle = atan2f(mdcad_import_vec3_dot(ep_rel, y_axis), mdcad_import_vec3_dot(ep_rel, x_axis));
 
     // Direction handling
     float pi2 = 2.0f * 3.14159265359f;
