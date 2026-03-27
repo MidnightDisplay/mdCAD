@@ -266,7 +266,7 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
     
     result = vkBeginCommandBuffer(cmd_buf, &begin_info);
     if (result != VK_SUCCESS) {
-        goto cleanup_pool;
+        goto cleanup;
     }
     
     // Transition image layout to TRANSFER_SRC_OPTIMAL
@@ -326,7 +326,7 @@ bool pick_readback_pixels(sg_image img, int width, int height, uint8_t *pixel_da
     // End and submit command buffer
     result = vkEndCommandBuffer(cmd_buf);
     if (result != VK_SUCCESS) {
-        goto cleanup_pool;
+        goto cleanup;
     }
     
     VkSubmitInfo submit_info = {
