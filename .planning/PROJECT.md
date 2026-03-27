@@ -36,10 +36,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Interaction math (pick/ray/gizmo) and quaternion helper expansion are migrated to the shared cglm-backed boundary with compare/bench coverage — Validated in Phase 4: interaction-math-and-api-expansion
 - ✓ Migrated interaction runtime slices no longer depend on equivalent legacy `src/math3d.h` helpers (now scoped as deprecated) — Validated in Phase 4: interaction-math-and-api-expansion
 - ✓ Windows Vulkan hardening and native performance gates closed with `Decision: GO` — Validated in Phase 5: windows-vulkan-hardening-and-performance-gates
+- ✓ Serializer/save-load long-tail migration now runs through cglm-backed paths with explicit schema-v2 converter and targeted parity evidence — Validated in Phase 6: serializer-and-save-load-long-tail-migration
 
 ### Active
 
-- [ ] Complete `TAIL-01` migration across serializer/importer/undo/editor utility math paths.
+- [ ] Complete remaining long-tail migration (`TAIL-02`, `TAIL-03`) across importer and undo/editor utility math paths.
 - [ ] Complete `TAIL-02` thin-entrypoint reduction and retire safe temporary glue.
 - [ ] Preserve or improve behavior/performance on macOS Metal and Windows Vulkan for the expanded migrated slice.
 
@@ -57,8 +58,8 @@ This milestone should reduce migration debt (temporary glue and remaining legacy
 
 ## Current State
 
-- Milestone `v1.1` initialized (planning)
-- Scope set to `TAIL-01` + full `TAIL-02`
+- Milestone `v1.1` active with Phase 6 complete and verified
+- Scope set to remaining `TAIL-02` + `TAIL-03` execution
 - Platform expansion (`PLAT-01`, `PLAT-02`) deferred
 
 ## Next Milestone Goals
@@ -87,7 +88,7 @@ This milestone should reduce migration debt (temporary glue and remaining legacy
 | Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
 | Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
-| Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Active for v1.1 |
+| Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Active for v1.1 (Phase 6 complete) |
 
 ## Evolution
 
@@ -107,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 at v1.1 milestone initialization*
+*Last updated: 2026-03-27 after Phase 6 completion*
