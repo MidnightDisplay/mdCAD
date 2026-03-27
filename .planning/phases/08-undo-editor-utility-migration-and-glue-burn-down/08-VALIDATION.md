@@ -38,9 +38,9 @@ created: 2026-03-27
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 08-01-01 | 01 | 1 | TAIL-03 | compile + migration-surface audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ⬜ pending |
-| 08-02-01 | 02 | 2 | TRED-01 | glue inventory + non-consumer proof + compile | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ⬜ pending |
-| 08-03-01 | 03 | 3 | TAIL-03, TRED-01 | targeted workflow validation + full suite | `cmake --build build-vulkan --config Release --target math-validation` | ✅ | ⬜ pending |
+| 08-01-01 | 01 | 1 | TAIL-03 | compile + migration-surface audit | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
+| 08-02-01 | 02 | 2 | TRED-01 | glue inventory + non-consumer proof + compile | `cmake --build build-vulkan --config Release --target mdcad_math_harness` | ✅ | ✅ green |
+| 08-03-01 | 03 | 3 | TAIL-03, TRED-01 | targeted workflow validation + full suite | `cmake --build build-vulkan --config Release --target math-validation` | ✅ | ⚠️ partial (build gates green; manual workflow execution pending) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,10 +48,10 @@ created: 2026-03-27
 
 ## Wave 0 Requirements
 
-- [ ] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-checklist.md` — focused manual checks for mandatory workflows.
-- [ ] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-check-report.md` — pass/fail report with correctness delta notes.
-- [ ] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/glue-inventory.md` — removed/retained/deferred glue ledger with rationale and carry-over notes.
-- [ ] `docs/QUICKSTART.md` update — Phase 8 execution and focused validation runbook.
+- [x] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-checklist.md` — focused manual checks for mandatory workflows.
+- [x] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/undo-editor-targeted-check-report.md` — pass/fail report with correctness delta notes.
+- [x] `.planning/phases/08-undo-editor-utility-migration-and-glue-burn-down/evidence/glue-inventory.md` — removed/retained/deferred glue ledger with rationale and carry-over notes.
+- [x] `docs/QUICKSTART.md` update — Phase 8 execution and focused validation runbook.
 
 ---
 
@@ -75,4 +75,4 @@ created: 2026-03-27
 - [x] Feedback latency < 300s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** pending manual workflow execution in `/gsd-verify-work 8`
