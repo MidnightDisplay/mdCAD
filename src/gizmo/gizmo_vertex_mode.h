@@ -7,8 +7,7 @@
 #ifndef GIZMO_VERTEX_MODE_H
 #define GIZMO_VERTEX_MODE_H
 
-#include "../math3d.h"
-#include "../math/math_interaction.h"
+#include "../math/math_undo_editor.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
@@ -194,13 +193,13 @@ static inline vec3_t gizmo_vertex_mode_get_center(const gizmo_vertex_mode_t *vm,
                                                     const GeometryComp *geom,
                                                     mat4_t world_matrix) {
     if (vm->selected_count == 0) return vec3_make(0, 0, 0);
-    vec3_t sum = vec3_make(0, 0, 0);
+    vec3_t sum = mdcad_undo_editor_vec3_make(0.0f, 0.0f, 0.0f);
     for (int i = 0; i < vm->selected_count; i++) {
         vec3_t local = gizmo_vertex_mode_get_local_pos(geom, vm->selected_vertices[i]);
-        vec3_t world = mat4_mul_point(world_matrix, local);
-        sum = vec3_add(sum, world);
+        vec3_t world = mdcad_undo_editor_world_point_from_local(world_matrix, local);
+        sum = mdcad_undo_editor_vec3_add(sum, world);
     }
-    return vec3_scale(sum, 1.0f / (float)vm->selected_count);
+    return mdcad_undo_editor_vec3_scale(sum, 1.0f / (float)vm->selected_count);
 }
 
 //------------------------------------------------------------------------------
@@ -210,12 +209,12 @@ static inline void gizmo_vertex_mode_apply_delta(gizmo_vertex_mode_t *vm,
                                                    GeometryComp *geom,
                                                    mat4_t world_matrix,
                                                    vec3_t world_delta) {
-    vec3_t local_delta = mdcad_interaction_world_delta_to_local(world_matrix, world_delta);
+    vec3_t local_delta = mdcad_undo_editor_world_delta_to_local(world_matrix, world_delta);
 
     for (int i = 0; i < vm->selected_count; i++) {
         int idx = vm->selected_vertices[i];
         vec3_t pos = gizmo_vertex_mode_get_local_pos(geom, idx);
-        gizmo_vertex_mode_set_local_pos(geom, idx, vec3_add(pos, local_delta));
+        gizmo_vertex_mode_set_local_pos(geom, idx, mdcad_undo_editor_vec3_add(pos, local_delta));
     }
 }
 
@@ -240,7 +239,7 @@ static inline void gizmo_vertex_mode_update(gizmo_vertex_mode_t *vm,
 
     for (int i = 0; i < vm->vertex_count; i++) {
         vec3_t local = gizmo_vertex_mode_get_local_pos(geom, i);
-        vec3_t world = mat4_mul_point(world_matrix, local);
+        vec3_t world = mdcad_undo_editor_world_point_from_local(world_matrix, local);
 
         float r, g, b;
         if (gizmo_vertex_mode_is_selected(vm, i)) {
@@ -265,7 +264,7 @@ static inline void gizmo_vertex_mode_populate_pick(const gizmo_vertex_mode_t *vm
 
     for (int i = 0; i < vm->vertex_count; i++) {
         vec3_t local = gizmo_vertex_mode_get_local_pos(geom, i);
-        vec3_t world = mat4_mul_point(world_matrix, local);
+        vec3_t world = mdcad_undo_editor_world_point_from_local(world_matrix, local);
         uint32_t pick_id = VERTEX_HANDLE_BASE + (uint32_t)i;
         pick_buffer_add_overlay_point(pb, world, pick_id);
     }

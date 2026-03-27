@@ -16,6 +16,7 @@
 
 #include "undo_redo.h"
 #include "ecs/ecs_scene.h"
+#include "math/math_undo_editor.h"
 #include "selection.h"
 
 // ============================================================================
@@ -150,7 +151,7 @@ static inline ecs_entity_t undo_create_from_snapshot(ecs_scene_t *scene, undo_en
     switch (snap->geom_type) {
         case UNDO_GEOM_POINT:
             e = scene_add_point(scene,
-                vec3_make(snap->data.point.x, snap->data.point.y, snap->data.point.z),
+                mdcad_undo_editor_vec3_make(snap->data.point.x, snap->data.point.y, snap->data.point.z),
                 snap->color, snap->point_size);
             break;
         case UNDO_GEOM_LINE:
@@ -542,7 +543,9 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->position = cmd->data.set_vec3.new_value;
+                t->position = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.new_value.x,
+                                                          cmd->data.set_vec3.new_value.y,
+                                                          cmd->data.set_vec3.new_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }
@@ -555,7 +558,9 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->rotation = cmd->data.set_vec3.new_value;
+                t->rotation = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.new_value.x,
+                                                          cmd->data.set_vec3.new_value.y,
+                                                          cmd->data.set_vec3.new_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }
@@ -568,7 +573,9 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->scale = cmd->data.set_vec3.new_value;
+                t->scale = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.new_value.x,
+                                                       cmd->data.set_vec3.new_value.y,
+                                                       cmd->data.set_vec3.new_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }
@@ -734,7 +741,9 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->position = cmd->data.set_vec3.old_value;
+                t->position = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.old_value.x,
+                                                          cmd->data.set_vec3.old_value.y,
+                                                          cmd->data.set_vec3.old_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }
@@ -747,7 +756,9 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->rotation = cmd->data.set_vec3.old_value;
+                t->rotation = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.old_value.x,
+                                                          cmd->data.set_vec3.old_value.y,
+                                                          cmd->data.set_vec3.old_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }
@@ -760,7 +771,9 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vec3.entity_id;
             TransformComp *t = ecs_world_get_transform(w, e);
             if (t) {
-                t->scale = cmd->data.set_vec3.old_value;
+                t->scale = mdcad_undo_editor_vec3_make(cmd->data.set_vec3.old_value.x,
+                                                       cmd->data.set_vec3.old_value.y,
+                                                       cmd->data.set_vec3.old_value.z);
                 t->dirty = true;
                 ecs_world_mark_descendants_dirty(w, e);
             }

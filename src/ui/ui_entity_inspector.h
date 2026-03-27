@@ -17,6 +17,7 @@
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include "../math/math_undo_editor.h"
 #include "../undo_redo_exec.h"
 #include <float.h>
 
@@ -117,14 +118,14 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
         // Rotation (in degrees for user friendliness)
         float rot_deg[3] = {
-            t->rotation.x * 57.29578f,  // rad to deg
-            t->rotation.y * 57.29578f,
-            t->rotation.z * 57.29578f
+            mdcad_undo_editor_rad_to_deg(t->rotation.x),  // rad to deg
+            mdcad_undo_editor_rad_to_deg(t->rotation.y),
+            mdcad_undo_editor_rad_to_deg(t->rotation.z)
         };
         if (igDragFloat3("Rotation", rot_deg, 1.0f, -360.0f, 360.0f, "%.1f", 0)) {
-            t->rotation.x = rot_deg[0] * 0.01745329f;  // deg to rad
-            t->rotation.y = rot_deg[1] * 0.01745329f;
-            t->rotation.z = rot_deg[2] * 0.01745329f;
+            t->rotation.x = mdcad_undo_editor_deg_to_rad(rot_deg[0]);  // deg to rad
+            t->rotation.y = mdcad_undo_editor_deg_to_rad(rot_deg[1]);
+            t->rotation.z = mdcad_undo_editor_deg_to_rad(rot_deg[2]);
             changed = true;
         }
         if (igIsItemActivated()) {
@@ -318,8 +319,8 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 // Arc parameters (read-only for now)
                 igTextDisabled("Radius: %.2f", g->data.arc.radius);
                 igTextDisabled("Angles: %.1f - %.1f deg",
-                    g->data.arc.start_angle * 57.29578f,
-                    g->data.arc.end_angle * 57.29578f);
+                    mdcad_undo_editor_rad_to_deg(g->data.arc.start_angle),
+                    mdcad_undo_editor_rad_to_deg(g->data.arc.end_angle));
                 break;
             }
             case GEOM_BEZIER: {
