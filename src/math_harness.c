@@ -128,6 +128,10 @@ static bool mdcad_harness_compare_quat_rotate_vector(mdcad_validation_report_t *
 static bool mdcad_harness_compare_quat_compose_order(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_transform_compose(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_serializer_transform_parity(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_import_hierarchy_parity(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_undo_axis_drag_parity(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_editor_plane_drag_parity(mdcad_validation_report_t *report);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
@@ -166,6 +170,10 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "gizmo-vertex-local-delta", mdcad_harness_compare_gizmo_vertex_local_delta },
     { "quat-rotate-vector", mdcad_harness_compare_quat_rotate_vector },
     { "quat-compose-order", mdcad_harness_compare_quat_compose_order },
+    { "serializer-transform-parity", mdcad_harness_compare_serializer_transform_parity },
+    { "import-hierarchy-parity", mdcad_harness_compare_import_hierarchy_parity },
+    { "undo-axis-drag-parity", mdcad_harness_compare_undo_axis_drag_parity },
+    { "editor-plane-drag-parity", mdcad_harness_compare_editor_plane_drag_parity },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -874,6 +882,26 @@ static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_rep
     }
 
     return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_serializer_transform_parity(mdcad_validation_report_t *report) {
+    (void)report;
+    return false;
+}
+
+static bool mdcad_harness_compare_import_hierarchy_parity(mdcad_validation_report_t *report) {
+    (void)report;
+    return false;
+}
+
+static bool mdcad_harness_compare_undo_axis_drag_parity(mdcad_validation_report_t *report) {
+    (void)report;
+    return false;
+}
+
+static bool mdcad_harness_compare_editor_plane_drag_parity(mdcad_validation_report_t *report) {
+    (void)report;
+    return false;
 }
 
 static void mdcad_harness_reset_bench_contexts(void) {
