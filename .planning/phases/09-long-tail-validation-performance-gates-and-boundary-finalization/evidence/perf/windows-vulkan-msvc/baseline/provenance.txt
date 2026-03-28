@@ -1,0 +1,2 @@
+source_commit=b761aba7811bb3280aafb3a2d9433ed981a7c925
+capture_cmd=.\build-vulkan\bin\Release\mdcad_math_harness.exe --mode bench --iterations 2000000

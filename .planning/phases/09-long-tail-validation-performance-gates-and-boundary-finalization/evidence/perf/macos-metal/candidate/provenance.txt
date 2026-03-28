@@ -1,0 +1,8 @@
+source_commit=1921aa94af75c27d3968e93416e19e3a7bd63d3c
+capture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 2000000
+host_name=UK-LT-T12-G068
+host_os=Microsoft Windows 10.0.26200
+host_arch=X64
+captured_at_utc=2026-03-28T13:08:09Z
+capture_status=blocked
+blocked_reason=Required macOS Metal host unavailable in current Windows execution environment

@@ -1,0 +1,3 @@
+# BLOCKED: macOS Metal benchmark capture unavailable on this Windows-only execution host.
+# Required host: macOS with native build output ./build/bin/mdcad_math_harness
+# capture_status=blocked
