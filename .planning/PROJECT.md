@@ -37,11 +37,12 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Migrated interaction runtime slices no longer depend on equivalent legacy `src/math3d.h` helpers (now scoped as deprecated) — Validated in Phase 4: interaction-math-and-api-expansion
 - ✓ Windows Vulkan hardening and native performance gates closed with `Decision: GO` — Validated in Phase 5: windows-vulkan-hardening-and-performance-gates
 - ✓ Serializer/save-load long-tail migration now runs through cglm-backed paths with explicit schema-v2 converter and targeted parity evidence — Validated in Phase 6: serializer-and-save-load-long-tail-migration
+- ✓ Import long-tail migration now runs through cglm-backed importer paths with targeted parity evidence — Validated in Phase 7: import-pipeline-long-tail-migration
+- ✓ Undo/editor utility migration now uses cglm-backed helper boundaries with glue burn-down evidence — Validated in Phase 8: undo-editor-utility-migration-and-glue-burn-down
 
 ### Active
 
-- [ ] Complete remaining long-tail migration (`TAIL-02`, `TAIL-03`) across importer and undo/editor utility math paths.
-- [ ] Complete `TAIL-02` thin-entrypoint reduction and retire safe temporary glue.
+- [ ] Complete remaining long-tail validation/performance and finalize minimal thin-entrypoint boundary (`TRED-02`, `VAL-01`, `VAL-02`, `VAL-03`).
 - [ ] Preserve or improve behavior/performance on macOS Metal and Windows Vulkan for the expanded migrated slice.
 
 ### Out of Scope
@@ -58,15 +59,15 @@ This milestone should reduce migration debt (temporary glue and remaining legacy
 
 ## Current State
 
-- Milestone `v1.1` active with Phase 6 complete and verified
-- Scope set to remaining `TAIL-02` + `TAIL-03` execution
+- Milestone `v1.1` active with Phases 6-8 complete and verified
+- Scope now focused on Phase 9 validation/performance + boundary finalization (`TRED-02`, `VAL-01`, `VAL-02`, `VAL-03`)
 - Platform expansion (`PLAT-01`, `PLAT-02`) deferred
 
 ## Next Milestone Goals
 
-1. Deliver cglm-backed long-tail parity for serializer/importer/undo/editor utility flows.
-2. Remove or sharply reduce temporary migration glue in thin entrypoint boundaries.
-3. Reconfirm native behavior and performance confidence on macOS and Windows.
+1. Expand/verify long-tail compare and harness coverage for migrated surfaces.
+2. Execute native benchmark/performance gates on macOS Metal and Windows Vulkan.
+3. Finalize intentionally retained thin-entrypoint boundary documentation.
 
 ## Constraints
 
@@ -108,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-27 after Phase 6 completion*
+*Last updated: 2026-03-28 after Phase 8 completion*

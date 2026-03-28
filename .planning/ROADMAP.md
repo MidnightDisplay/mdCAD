@@ -17,7 +17,7 @@ v1.1 executes the deferred long-tail migration and thin-entrypoint reduction wor
 
 - [x] **Phase 6: Serializer and Save/Load Long-Tail Migration** — Migrate scene serialization math paths to cglm-backed helpers and preserve behavior. (completed 2026-03-27)
 - [x] **Phase 7: Import Pipeline Long-Tail Migration** — Migrate JSONL/PLY importer math paths to cglm-backed helpers and preserve behavior. (completed 2026-03-27)
-- [ ] **Phase 8: Undo/Editor Utility Migration and Glue Burn-Down** — Migrate undo/editor utility paths and remove safe temporary thin-entrypoint glue.
+- [x] **Phase 8: Undo/Editor Utility Migration and Glue Burn-Down** — Migrate undo/editor utility paths and remove safe temporary thin-entrypoint glue. (completed 2026-03-28)
 - [ ] **Phase 9: Long-Tail Validation, Performance Gates, and Boundary Finalization** — Validate long-tail parity/perf and finalize minimal thin-entrypoint boundary docs.
 
 ## Phase Details
@@ -96,5 +96,5 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 |-------|----------------|--------|-----------|
 | 6. Serializer and Save/Load Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 7. Import Pipeline Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
-| 8. Undo/Editor Utility Migration and Glue Burn-Down | 3/3 | Executed (verification pending) | 2026-03-27 |
+| 8. Undo/Editor Utility Migration and Glue Burn-Down | 3/3 | Complete    | 2026-03-28 |
 | 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 0/3 | Not started | - |

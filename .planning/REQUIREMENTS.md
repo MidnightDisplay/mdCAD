@@ -11,11 +11,11 @@ Requirements for the long-tail migration milestone. Each maps to Phase 6+ roadma
 
 - [x] **TAIL-01**: User can save and reload scene data through cglm-backed serializer math paths without reintroducing migrated `math3d` helper dependencies.
 - [x] **TAIL-02**: User can import JSONL/PLY geometry through cglm-backed importer math paths without reintroducing migrated `math3d` helper dependencies.
-- [ ] **TAIL-03**: User can perform undo/redo and editor utility transform workflows with cglm-backed math and behavior parity to the pre-migration user experience.
+- [x] **TAIL-03**: User can perform undo/redo and editor utility transform workflows with cglm-backed math and behavior parity to the pre-migration user experience.
 
 ### Thin Entrypoint Reduction
 
-- [ ] **TRED-01**: Runtime-critical migrated paths no longer rely on removable temporary thin-entrypoint migration glue.
+- [x] **TRED-01**: Runtime-critical migrated paths no longer rely on removable temporary thin-entrypoint migration glue.
 - [ ] **TRED-02**: Remaining thin-entrypoint surface is intentionally minimal, documented, and aligned to long-term project-owned boundaries.
 
 ### Validation & Performance
@@ -49,8 +49,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | TAIL-01 | Phase 6 | Complete |
 | TAIL-02 | Phase 7 | Complete |
-| TAIL-03 | Phase 8 | Pending |
-| TRED-01 | Phase 8 | Pending |
+| TAIL-03 | Phase 8 | Complete |
+| TRED-01 | Phase 8 | Complete |
 | TRED-02 | Phase 9 | Pending |
 | VAL-01 | Phase 9 | Pending |
 | VAL-02 | Phase 9 | Pending |
