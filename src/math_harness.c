@@ -885,23 +885,160 @@ static bool mdcad_harness_compare_hierarchy_world_transform(mdcad_validation_rep
 }
 
 static bool mdcad_harness_compare_serializer_transform_parity(mdcad_validation_report_t *report) {
-    (void)report;
-    return false;
+    static const vec3_t sample_points[] = {
+        { -1.0f, 0.5f, 2.25f },
+        { 0.25f, -0.75f, -1.5f },
+        { 2.0f, 1.25f, 0.0f },
+    };
+    TransformComp serializer_transform = mdcad_harness_make_transform(vec3_make(-2.5f, 1.0f, 0.75f),
+                                                                      vec3_make(-0.35f, 0.2f, 0.9f),
+                                                                      vec3_make(0.8f, 1.4f, 1.1f));
+    mat4_t legacy_transform = mdcad_harness_legacy_transform_from_components(serializer_transform.position,
+                                                                             serializer_transform.rotation,
+                                                                             serializer_transform.scale);
+    mat4_t candidate_transform = transform_comp_compute_local(&serializer_transform);
+    size_t i;
+
+    mdcad_harness_expect(report,
+                         "serializer-transform-parity matrix",
+                         mdcad_compare_mat4_close(legacy_transform, candidate_transform.m, 1e-4f));
+
+    for (i = 0; i < (sizeof(sample_points) / sizeof(sample_points[0])); ++i) {
+        vec3_t legacy_point = mat4_transform_point(legacy_transform, sample_points[i]);
+        vec3_t candidate_point = ecs_scene_transform_point_world(&candidate_transform, sample_points[i]);
+        char label[112];
+
+        snprintf(label, sizeof(label), "serializer-transform-parity point-%zu", i + 1);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_point, &candidate_point.x, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
 }
 
 static bool mdcad_harness_compare_import_hierarchy_parity(mdcad_validation_report_t *report) {
-    (void)report;
-    return false;
+    static const vec3_t import_vertices[] = {
+        { -0.2f, 0.4f, 0.0f },
+        { 0.8f, -1.1f, 1.6f },
+        { 1.4f, 0.2f, -0.9f },
+    };
+    TransformComp import_root = mdcad_harness_make_transform(vec3_make(4.0f, -2.0f, 0.75f),
+                                                             vec3_make(0.1f, -0.5f, 0.2f),
+                                                             vec3_make(1.0f, 1.0f, 1.0f));
+    TransformComp imported_mesh = mdcad_harness_make_transform(vec3_make(-1.5f, 0.8f, 2.0f),
+                                                               vec3_make(0.25f, 0.4f, -0.35f),
+                                                               vec3_make(1.3f, 0.7f, 0.9f));
+    mat4_t legacy_root = mdcad_harness_legacy_transform_from_components(import_root.position,
+                                                                        import_root.rotation,
+                                                                        import_root.scale);
+    mat4_t legacy_mesh_local = mdcad_harness_legacy_transform_from_components(imported_mesh.position,
+                                                                              imported_mesh.rotation,
+                                                                              imported_mesh.scale);
+    mat4_t legacy_mesh_world = mat4_mul(legacy_root, legacy_mesh_local);
+    size_t i;
+
+    transform_comp_update(&import_root);
+    transform_comp_update_with_parent(&imported_mesh, &import_root.world_matrix);
+
+    mdcad_harness_expect(report,
+                         "import-hierarchy-parity root",
+                         mdcad_compare_mat4_close(legacy_root, import_root.world_matrix.m, 1e-4f));
+    mdcad_harness_expect(report,
+                         "import-hierarchy-parity mesh-world",
+                         mdcad_compare_mat4_close(legacy_mesh_world, imported_mesh.world_matrix.m, 1e-4f));
+
+    for (i = 0; i < (sizeof(import_vertices) / sizeof(import_vertices[0])); ++i) {
+        vec3_t legacy_world = mat4_transform_point(legacy_mesh_world, import_vertices[i]);
+        vec3_t candidate_world = ecs_scene_transform_point_world(&imported_mesh.world_matrix, import_vertices[i]);
+        char label[112];
+
+        snprintf(label, sizeof(label), "import-hierarchy-parity vertex-%zu", i + 1);
+        mdcad_harness_expect(report,
+                             label,
+                             mdcad_compare_vec3_close(legacy_world, &candidate_world.x, 1e-4f));
+    }
+
+    return report->checks_failed == 0;
 }
 
 static bool mdcad_harness_compare_undo_axis_drag_parity(mdcad_validation_report_t *report) {
-    (void)report;
-    return false;
+    vec3_t axis_origin = vec3_make(-0.5f, 1.2f, 2.8f);
+    vec3_t axis = vec3_make(0.0f, 0.0f, 1.0f);
+    ray_t start_ray = {
+        vec3_make(2.2f, -1.5f, 4.5f),
+        vec3_normalize(vec3_make(-0.62f, 0.34f, -0.71f)),
+    };
+    ray_t update_ray = {
+        vec3_make(1.8f, -1.3f, 4.0f),
+        vec3_normalize(vec3_make(-0.59f, 0.28f, -0.76f)),
+    };
+    float legacy_start = ray_axis_closest_t(start_ray, axis_origin, axis);
+    float legacy_update = ray_axis_closest_t(update_ray, axis_origin, axis);
+    float candidate_start = mdcad_interaction_ray_axis_closest_t(start_ray, axis_origin, axis);
+    float candidate_update = mdcad_interaction_ray_axis_closest_t(update_ray, axis_origin, axis);
+    float legacy_total = legacy_update - legacy_start;
+    float candidate_total = candidate_update - candidate_start;
+
+    mdcad_harness_expect(report,
+                         "undo-axis-drag-parity start",
+                         mdcad_compare_float_close(legacy_start, candidate_start, 1e-5f));
+    mdcad_harness_expect(report,
+                         "undo-axis-drag-parity update",
+                         mdcad_compare_float_close(legacy_update, candidate_update, 1e-5f));
+    mdcad_harness_expect(report,
+                         "undo-axis-drag-parity total",
+                         mdcad_compare_float_close(legacy_total, candidate_total, 1e-5f));
+    mdcad_harness_expect(report,
+                         "undo-axis-drag-parity finite",
+                         isfinite(candidate_start) && isfinite(candidate_update));
+
+    return report->checks_failed == 0;
 }
 
 static bool mdcad_harness_compare_editor_plane_drag_parity(mdcad_validation_report_t *report) {
-    (void)report;
-    return false;
+    vec3_t plane_point = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t plane_normal = vec3_make(0.0f, 1.0f, 0.0f);
+    ray_t drag_ray = {
+        vec3_make(-0.4f, 3.2f, 1.6f),
+        vec3_normalize(vec3_make(0.15f, -0.98f, 0.12f)),
+    };
+    ray_t miss_ray = {
+        vec3_make(0.0f, 0.0f, 0.0f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+    };
+    vec3_t legacy_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t candidate_hit = vec3_make(0.0f, 0.0f, 0.0f);
+    float legacy_t = ray_plane_intersect(drag_ray, plane_point, plane_normal, &legacy_hit);
+    float candidate_t = 0.0f;
+    bool candidate_ok = mdcad_interaction_ray_plane_intersect(drag_ray,
+                                                               plane_point,
+                                                               plane_normal,
+                                                               &candidate_hit,
+                                                               &candidate_t);
+    float legacy_miss_t = ray_plane_intersect(miss_ray, plane_point, plane_normal, NULL);
+    float candidate_miss_t = 0.0f;
+    bool candidate_miss_ok = mdcad_interaction_ray_plane_intersect(miss_ray,
+                                                                    plane_point,
+                                                                    plane_normal,
+                                                                    NULL,
+                                                                    &candidate_miss_t);
+
+    mdcad_harness_expect(report, "editor-plane-drag-parity legacy-hit", legacy_t >= 0.0f);
+    mdcad_harness_expect(report, "editor-plane-drag-parity candidate-hit", candidate_ok && candidate_t >= 0.0f);
+    mdcad_harness_expect(report,
+                         "editor-plane-drag-parity t",
+                         mdcad_compare_float_close(legacy_t, candidate_t, 1e-5f));
+    mdcad_harness_expect(report,
+                         "editor-plane-drag-parity hit",
+                         mdcad_compare_vec3_close(legacy_hit, &candidate_hit.x, 1e-5f));
+    mdcad_harness_expect(report, "editor-plane-drag-parity legacy-miss", legacy_miss_t < 0.0f);
+    mdcad_harness_expect(report, "editor-plane-drag-parity candidate-miss", !candidate_miss_ok);
+    mdcad_harness_expect(report,
+                         "editor-plane-drag-parity miss-t-fallback",
+                         mdcad_compare_float_close(candidate_miss_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
 }
 
 static void mdcad_harness_reset_bench_contexts(void) {
