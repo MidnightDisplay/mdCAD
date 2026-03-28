@@ -333,6 +333,47 @@ Mandatory workflow coverage:
 - gizmo vertex edit workflow
 - inspector edit workflow
 
+## Phase 9 long-tail closure workflow (manual + perf + boundary)
+
+Use this for final v1.1 closure evidence across `VAL-03` and `TRED-02`, with `VAL-02` perf status explicitly referenced.
+
+### 1) Wave/phase automated gate
+
+```powershell
+cmake --build build-vulkan --config Release --target math-validation
+```
+
+### 2) Review required evidence artifacts
+
+- Manual checklist:
+  - `.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/manual/long-tail-smoke-checklist.md`
+- Manual report:
+  - `.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/manual/long-tail-smoke-report.md`
+- Perf evaluations:
+  - `.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/perf/windows-vulkan-msvc/candidate/bench-eval.md`
+  - `.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/perf/macos-metal/candidate/bench-eval.md`
+- Boundary finalization:
+  - `.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/boundary/thin-entrypoint-boundary-finalization.md`
+
+### 3) Execute integrated manual long-tail smoke pass
+
+Run `mdCAD` on required native targets and execute serializer -> import -> undo -> editor workflows using the checklist:
+
+```text
+.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/manual/long-tail-smoke-checklist.md
+```
+
+Record all outcomes in:
+
+```text
+.planning/phases/09-long-tail-validation-performance-gates-and-boundary-finalization/evidence/manual/long-tail-smoke-report.md
+```
+
+### Blocking policy (D-03)
+
+- Treat any unresolved `FAIL` or `BLOCKED` status in required compare/perf/manual gates as blocking for Phase 9 completion.
+- Do not convert blocked/manual-unexecuted checks into synthetic pass results.
+
 ## iOS build using Xcode
 
 **NOTE** No conventional file system, loaders and savers will not work. Hotkeys untested, should work, requires a keyboard. 
