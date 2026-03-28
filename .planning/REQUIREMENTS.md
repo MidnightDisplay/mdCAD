@@ -20,7 +20,7 @@ Requirements for the long-tail migration milestone. Each maps to Phase 6+ roadma
 
 ### Validation & Performance
 
-- [ ] **VAL-01**: Compare harness coverage includes long-tail migration touchpoints and passes strict checks on required parity cases.
+- [x] **VAL-01**: Compare harness coverage includes long-tail migration touchpoints and passes strict checks on required parity cases.
 - [ ] **VAL-02**: Expanded migrated math slice shows no native performance regression on macOS Metal and Windows Vulkan benchmark gates.
 - [ ] **VAL-03**: Manual smoke workflows covering serializer/import/undo/editor interactions pass on native macOS and Windows validation paths.
 
@@ -52,7 +52,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TAIL-03 | Phase 8 | Complete |
 | TRED-01 | Phase 8 | Complete |
 | TRED-02 | Phase 9 | Pending |
-| VAL-01 | Phase 9 | Pending |
+| VAL-01 | Phase 9 | Complete |
 | VAL-02 | Phase 9 | Pending |
 | VAL-03 | Phase 9 | Pending |
 

@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: planned
-last_updated: "2026-03-28T12:05:06.534Z"
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-28T13:05:19.846Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 12
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 09 - long-tail-validation-performance-gates-and-boundary-finalization
+**Current focus:** Phase 09 — long-tail-validation-performance-gates-and-boundary-finalization
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — PLANNED
-Plan: 3 of 3
-Status: Phase 9 plans created, researched, and checker-verified; ready for execution.
-Last activity: 2026-03-28 -- Created 09-RESEARCH/09-VALIDATION and 09-01/02/03 plans (verification passed)
+Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-03-28
 
 ## Milestone Scope
 
@@ -38,3 +39,20 @@ Last activity: 2026-03-28 -- Created 09-RESEARCH/09-VALIDATION and 09-01/02/03 p
 ## Session Continuity
 
 Next command: `/gsd-execute-phase 9`
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 09 P01 | 2 min | 2 tasks | 4 files |
+
+## Decisions
+
+- [Phase 09]: Added dedicated long-tail compare IDs for serializer/import/undo/editor so VAL-01 mapping is explicit instead of inferred.
+- [Phase 09]: Kept harness architecture unchanged and extended only mdcad_compare_cases to preserve D-01/D-02 scope.
+
+## Session
+
+**Last Date:** 2026-03-28T13:05:19.843Z
+**Stopped At:** Completed 09-01-PLAN.md
+**Resume File:** None
