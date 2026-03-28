@@ -84,7 +84,7 @@ Plans:
 
 Plans:
 - [x] 09-01: Expand/verify long-tail compare and harness coverage
-- [ ] 09-02: Execute native benchmark/perf gates for expanded migration slice
+- [x] 09-02: Execute native benchmark/perf gates for expanded migration slice
 - [ ] 09-03: Run manual smoke workflows and finalize boundary docs
 
 ## Progress
