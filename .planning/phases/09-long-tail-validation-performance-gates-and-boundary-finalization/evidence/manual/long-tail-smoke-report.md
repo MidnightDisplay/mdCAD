@@ -11,8 +11,8 @@
 
 | Field | Value |
 |---|---|
-| Report updated at (UTC) | 2026-03-30T11:10:00Z |
-| Commit under test | `457057d` |
+| Report updated at (UTC) | 2026-03-30T13:40:00Z |
+| Commit under test | `e6c3bb8` |
 | Operator | `GSD executor` |
 | Required targets | `macOS Metal`, `Windows Vulkan (MSVC)` |
 
@@ -37,23 +37,22 @@
 | ID | Workflow | Windows Vulkan | macOS Metal | Notes |
 |---|---|---|---|---|
 | LT-VAL03-01 | serializer | PASS | BLOCKED | Windows manual run passed serializer checklist items. macOS host unavailable in current session. |
-| LT-VAL03-02 | import | FAIL | BLOCKED | Windows split outcome after Task 1 fix: PASS when importing `C:\dev\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply` as single-node point cloud, FAIL when importing as individual selectable entities; control sample `C:\dev\1m.ply` remains successful. |
+| LT-VAL03-02 | import | PASS | BLOCKED | Windows retest outcome (user-reported after commit `e6c3bb8`): PASS for required sample `C:\dev\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply` in both single-node point-cloud and editable individual-selectable-entities modes; control sample `C:\dev\1m.ply` also PASS. |
 | LT-VAL03-03 | undo | PASS | BLOCKED | Windows manual run passed undo/redo checklist items. macOS host unavailable in current session. |
 | LT-VAL03-04 | editor | PASS | BLOCKED | Windows manual run passed gizmo/inspector editor checklist items. macOS host unavailable in current session. |
 
 ## Blockers
 
-1. **LT-VAL03-02 import regression (required workflow FAIL):** For `C:\dev\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply`, point-cloud node path now passes, but editable individual-entities path still fails; control `C:\dev\1m.ply` succeeds.
-2. macOS Metal target execution is unavailable from this Windows-only environment, so required macOS VAL-03 rows remain `BLOCKED`.
+1. macOS Metal target execution is unavailable from this Windows-only environment, so required macOS VAL-03 rows remain `BLOCKED`.
 
 ## Issue notes (required failures)
 
-- **LT-VAL03-02 (import):** `FAIL` on Windows Vulkan due to remaining failure in the editable individual selectable entities path for the required sample; single-node point cloud path passes.
-- **Remediation applied (pending manual re-check):** importer parse-completion gating was aligned for editable imports to finalize when vertex parsing is complete for point-cloud workflows; requires rerun of LT-VAL03-02 editable path on required targets before status can move from `FAIL`.
-- **Status semantics applied:** `PASS` only where validated by manual run, `FAIL` for observed regression, `BLOCKED` where host execution was unavailable.
+- **LT-VAL03-02 (import):** `PASS` on Windows Vulkan from user-provided manual retest evidence after commit `e6c3bb8`; both required sample paths (single-node + editable individual selectable entities) and control sample succeeded.
+- **Provenance note:** This report update consumes operator-provided retest result text in continuation ("editable individual-selectable-entities retest on Windows is now PASS"). No synthetic/macOS outcomes were inferred.
+- **Status semantics applied:** `PASS` where explicitly evidenced by manual run input, `BLOCKED` where host execution is unavailable.
 
 ## Overall status
 
-`FAIL (BLOCKING)`
+`BLOCKED (BLOCKING)`
 
-Per D-03 policy, any unresolved required `FAIL` or `BLOCKED` status blocks Phase 9 completion.
+Per D-03 policy, any unresolved required `FAIL` or `BLOCKED` status blocks Phase 9 completion; with all Windows rows PASS and macOS rows still BLOCKED, overall remains BLOCKED.
