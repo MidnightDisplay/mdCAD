@@ -39,7 +39,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Large panel breathing space (rare) |
 | 3xl | 64px | Full-window major separation (rare) |
 
-Exceptions: existing global ImGui theme uses 6px `ItemSpacing.y` / `ItemInnerSpacing` in compact rows; keep for consistency with current panel style (source: `src/ui/ui_theme.h`).
+Exceptions: none for this phase. Any compact row spacing in SketchManager/GeometryManager must snap to nearest approved token (4px or 8px), not 6px.
 
 ---
 
@@ -84,6 +84,14 @@ Additional destructive actions in phase scope:
 - Multi-delete geometry action: `Delete {N} selected geometry items from this sketch? This will be one undo step.`
 
 Status labels (locked): `solved`, `loose`, `fixed`, `error` (source: D-08 in 10-CONTEXT.md).
+
+---
+
+## Visual Hierarchy
+
+- **Primary focal anchor:** GeometryManager row list and current selection state (this is the main work surface for Phase 10 actions).
+- **Secondary attention element:** Bulk action controls (`Fix`, `Unfix`, `Delete`) and `Create Sketch` action entrypoint.
+- **Tertiary metadata/status zones:** Sketch status labels (`solved`, `loose`, `fixed`, `error`), geometry/constraint counts, and color-policy summary text in inspector subsections.
 
 ---
 
