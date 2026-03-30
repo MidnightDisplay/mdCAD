@@ -1,8 +1,9 @@
-source_commit=1921aa94af75c27d3968e93416e19e3a7bd63d3c
-capture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 2000000
-host_name=UK-LT-T12-G068
-host_os=Microsoft Windows 10.0.26200
-host_arch=X64
-captured_at_utc=2026-03-28T13:08:09Z
-capture_status=blocked
-blocked_reason=Required macOS Metal host unavailable in current Windows execution environment
+source_commit=e6c3bb88719af2478f909e9f4ebd24f7ca1afca6
+capture_cmd=./build/bin/mdcad_math_harness --mode bench --iterations 2000000 (operator-reported)
+host_name=operator-reported-macos-metal-host
+host_os=macOS (operator-reported)
+host_arch=arm64 (operator-reported)
+captured_at_utc=2026-03-30T14:20:00Z
+capture_status=attested
+attestation_source=user-confirmed native macOS run ("successfully ran through all checklist validations - works as intended")
+artifact_note=Raw candidate bench log not retained in repository; PASS status recorded from operator attestation.

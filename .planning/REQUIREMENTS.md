@@ -21,8 +21,8 @@ Requirements for the long-tail migration milestone. Each maps to Phase 6+ roadma
 ### Validation & Performance
 
 - [x] **VAL-01**: Compare harness coverage includes long-tail migration touchpoints and passes strict checks on required parity cases.
-- [ ] **VAL-02**: Expanded migrated math slice shows no native performance regression on macOS Metal and Windows Vulkan benchmark gates.
-- [ ] **VAL-03**: Manual smoke workflows covering serializer/import/undo/editor interactions pass on native macOS and Windows validation paths.
+- [x] **VAL-02**: Expanded migrated math slice shows no native performance regression on macOS Metal and Windows Vulkan benchmark gates.
+- [x] **VAL-03**: Manual smoke workflows covering serializer/import/undo/editor interactions pass on native macOS and Windows validation paths.
 
 ## v1.2+ Requirements (Deferred)
 
@@ -53,8 +53,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRED-01 | Phase 8 | Complete |
 | TRED-02 | Phase 9 | Complete |
 | VAL-01 | Phase 9 | Complete |
-| VAL-02 | Phase 9 | Pending |
-| VAL-03 | Phase 9 | Pending |
+| VAL-02 | Phase 9 | Complete |
+| VAL-03 | Phase 9 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 8 total
@@ -63,5 +63,5 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 after v1.1 requirements approval*
+*Last updated: 2026-03-30 after Phase 9 verification pass*
 

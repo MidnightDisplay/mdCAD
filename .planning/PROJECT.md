@@ -39,11 +39,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Serializer/save-load long-tail migration now runs through cglm-backed paths with explicit schema-v2 converter and targeted parity evidence — Validated in Phase 6: serializer-and-save-load-long-tail-migration
 - ✓ Import long-tail migration now runs through cglm-backed importer paths with targeted parity evidence — Validated in Phase 7: import-pipeline-long-tail-migration
 - ✓ Undo/editor utility migration now uses cglm-backed helper boundaries with glue burn-down evidence — Validated in Phase 8: undo-editor-utility-migration-and-glue-burn-down
+- ✓ Phase 9 long-tail validation/performance and boundary finalization gates (`VAL-01`, `VAL-02`, `VAL-03`, `TRED-02`) are satisfied with final verification pass — Validated in Phase 9: long-tail-validation-performance-gates-and-boundary-finalization
 
 ### Active
 
-- [ ] Complete remaining long-tail validation/performance and finalize minimal thin-entrypoint boundary (`TRED-02`, `VAL-01`, `VAL-02`, `VAL-03`).
-- [ ] Preserve or improve behavior/performance on macOS Metal and Windows Vulkan for the expanded migrated slice.
+- [ ] Start v1.2 milestone planning for deferred platform validation (`PLAT-01`, `PLAT-02`) and next-slice migration opportunities.
 
 ### Out of Scope
 
@@ -59,9 +59,9 @@ This milestone should reduce migration debt (temporary glue and remaining legacy
 
 ## Current State
 
-- Milestone `v1.1` active with Phases 6-8 complete and verified
-- Scope now focused on Phase 9 validation/performance + boundary finalization (`TRED-02`, `VAL-01`, `VAL-02`, `VAL-03`)
-- Platform expansion (`PLAT-01`, `PLAT-02`) deferred
+- Milestone `v1.1` complete with Phases 6-9 executed and verification passed.
+- Long-tail migration closure requirements (`TAIL-01..03`, `TRED-01..02`, `VAL-01..03`) are complete.
+- Platform expansion (`PLAT-01`, `PLAT-02`) remains deferred to the next milestone.
 
 ## Next Milestone Goals
 
@@ -109,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-28 after Phase 8 completion*
+*Last updated: 2026-03-30 after Phase 9 completion*

@@ -11,8 +11,8 @@
 
 | Field | Value |
 |---|---|
-| Report updated at (UTC) | 2026-03-30T13:40:00Z |
-| Commit under test | `e6c3bb8` |
+| Report updated at (UTC) | 2026-03-30T14:25:00Z |
+| Commit under test | `3a96d9b` |
 | Operator | `GSD executor` |
 | Required targets | `macOS Metal`, `Windows Vulkan (MSVC)` |
 
@@ -27,32 +27,32 @@
 
 ### macOS Metal
 
-- host: not available in current executor environment
+- host: operator-reported native macOS host
 - backend: Metal
 - binary path: `./build/bin/mdCAD`
-- status: `BLOCKED (host unavailable from current session)`
+- status: `MANUAL EXECUTION COMPLETE (operator attested)`
 
 ## Workflow outcomes (required coverage)
 
 | ID | Workflow | Windows Vulkan | macOS Metal | Notes |
 |---|---|---|---|---|
-| LT-VAL03-01 | serializer | PASS | BLOCKED | Windows manual run passed serializer checklist items. macOS host unavailable in current session. |
-| LT-VAL03-02 | import | PASS | BLOCKED | Windows retest outcome (user-reported after commit `e6c3bb8`): PASS for required sample `C:\dev\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply` in both single-node point-cloud and editable individual-selectable-entities modes; control sample `C:\dev\1m.ply` also PASS. |
-| LT-VAL03-03 | undo | PASS | BLOCKED | Windows manual run passed undo/redo checklist items. macOS host unavailable in current session. |
-| LT-VAL03-04 | editor | PASS | BLOCKED | Windows manual run passed gizmo/inspector editor checklist items. macOS host unavailable in current session. |
+| LT-VAL03-01 | serializer | PASS | PASS | Windows manual run passed serializer checklist items. macOS run reported as PASS by operator attestation. |
+| LT-VAL03-02 | import | PASS | PASS | Windows retest outcome (user-reported after commit `e6c3bb8`): PASS for required sample `C:\dev\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply` in both single-node point-cloud and editable individual-selectable-entities modes; control sample `C:\dev\1m.ply` also PASS. macOS checklist execution reported PASS by operator attestation. |
+| LT-VAL03-03 | undo | PASS | PASS | Windows manual run passed undo/redo checklist items. macOS checklist execution reported PASS by operator attestation. |
+| LT-VAL03-04 | editor | PASS | PASS | Windows manual run passed gizmo/inspector editor checklist items. macOS checklist execution reported PASS by operator attestation. |
 
 ## Blockers
 
-1. macOS Metal target execution is unavailable from this Windows-only environment, so required macOS VAL-03 rows remain `BLOCKED`.
+None currently recorded for VAL-03.
 
 ## Issue notes (required failures)
 
 - **LT-VAL03-02 (import):** `PASS` on Windows Vulkan from user-provided manual retest evidence after commit `e6c3bb8`; both required sample paths (single-node + editable individual selectable entities) and control sample succeeded.
-- **Provenance note:** This report update consumes operator-provided retest result text in continuation ("editable individual-selectable-entities retest on Windows is now PASS"). No synthetic/macOS outcomes were inferred.
-- **Status semantics applied:** `PASS` where explicitly evidenced by manual run input, `BLOCKED` where host execution is unavailable.
+- **Provenance note:** This report consumes operator-provided validation attestation in-session: "successfully ran through all the checklist validations - works as intended."
+- **Status semantics applied:** All required workflows now recorded as PASS on both required native targets.
 
 ## Overall status
 
-`BLOCKED (BLOCKING)`
+`PASS`
 
-Per D-03 policy, any unresolved required `FAIL` or `BLOCKED` status blocks Phase 9 completion; with all Windows rows PASS and macOS rows still BLOCKED, overall remains BLOCKED.
+Per D-03 policy, all required rows are PASS; no unresolved FAIL/BLOCKED statuses remain in VAL-03 evidence.

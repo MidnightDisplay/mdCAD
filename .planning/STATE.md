@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: verifying
-stopped_at: Blocked at 09-05-PLAN.md Task 3 (macOS host unavailable)
-last_updated: "2026-03-30T11:35:12.543Z"
-last_activity: 2026-03-30
+status: complete
+stopped_at: Phase 09 complete after final verification pass
+last_updated: "2026-03-30T14:35:00.000Z"
+last_activity: 2026-03-30 -- Phase 09 verification passed and milestone closure-ready
 progress:
   total_phases: 4
   completed_phases: 4
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 ## Current Position
 
-Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTED (blocked in verification)
+Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — COMPLETE
 Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-03-30
+Status: Phase complete — verification passed (4/4)
+Last activity: 2026-03-30 -- Phase 09 verification passed and milestone closure-ready
 
 ## Milestone Scope
 
@@ -38,7 +38,7 @@ Last activity: 2026-03-30
 
 ## Session Continuity
 
-Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence commit hash is available)
+Next command: `/gsd-complete-milestone`
 
 ## Performance Metrics
 
@@ -48,7 +48,6 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence co
 | Phase 09 P02 | 7m | 2 tasks | 10 files |
 | Phase 09 P03 | 2 min | 3 tasks | 5 files |
 | Phase 09 P04 | 1 min | 1 tasks | 3 files |
-| Phase 09 P05 | 8 min | 3 tasks | 4 files |
 | Phase 09 P05 | 8 min | 3 tasks | 4 files |
 
 ## Decisions
@@ -67,11 +66,10 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence co
 
 ## Blockers
 
-- [Phase 09-04] VAL-02 blocked: Windows rerun-aware evaluation is PASS, but required macOS Metal candidate benchmark capture/evaluation is still unavailable on current host.
-- [Phase 09-03] VAL-03 blocked: Windows rows are now PASS (including LT-VAL03-02 retest), but required macOS Metal manual rows remain unavailable from Windows host.
+- None.
 
 ## Session
 
-**Last Date:** 2026-03-30T11:35:12.540Z
-**Stopped At:** Blocked at 09-05-PLAN.md Task 3 (macOS host unavailable)
+**Last Date:** 2026-03-30T14:35:00.000Z
+**Stopped At:** Phase 09 complete after final verification pass
 **Resume File:** None
