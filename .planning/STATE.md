@@ -1,68 +1,55 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Long-Tail Migration
-status: complete
-stopped_at: Phase 09 complete after final verification pass
-last_updated: "2026-03-30T14:35:00.000Z"
-last_activity: 2026-03-30 -- Phase 09 verification passed and milestone closure-ready
+milestone: v1.2
+milestone_name: TBD
+status: ready
+stopped_at: v1.1 milestone archived and tagged
+last_updated: "2026-03-30T15:10:00.000Z"
+last_activity: 2026-03-30 -- v1.1 archived, next milestone setup pending
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-28)
+See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 09 — long-tail-validation-performance-gates-and-boundary-finalization
+**Current focus:** Milestone planning setup (v1.2)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — COMPLETE
-Plan: 5 of 5
-Status: Phase complete — verification passed (4/4)
-Last activity: 2026-03-30 -- Phase 09 verification passed and milestone closure-ready
+Phase: None (new milestone not started)
+Plan: 0 of 0
+Status: v1.1 complete and archived
+Last activity: 2026-03-30 -- v1.1 archived and tagged
 
 ## Milestone Scope
 
-- In scope: complete remaining v1.1 closure work in Phase 9 (`TRED-02`, `VAL-01`, `VAL-02`, `VAL-03`).
-- Deferred: `PLAT-01` and `PLAT-02`.
+- In scope: define v1.2 requirements/roadmap and phase plan.
+- Deferred from v1.1: `PLAT-01` and `PLAT-02`.
 
 ## Session Continuity
 
-Next command: `/gsd-complete-milestone`
+Next command: `/gsd-new-milestone`
 
 ## Performance Metrics
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
-| Phase 09 P01 | 2 min | 2 tasks | 4 files |
-| Phase 09 P02 | 7m | 2 tasks | 10 files |
-| Phase 09 P03 | 2 min | 3 tasks | 5 files |
-| Phase 09 P04 | 1 min | 1 tasks | 3 files |
-| Phase 09 P05 | 8 min | 3 tasks | 4 files |
+| v1.1 closeout | complete | archived | milestone docs updated |
 
 ## Decisions
 
-- [Phase 09]: Added dedicated long-tail compare IDs for serializer/import/undo/editor so VAL-01 mapping is explicit instead of inferred.
-- [Phase 09]: Kept harness architecture unchanged and extended only mdcad_compare_cases to preserve D-01/D-02 scope.
-- [Phase 09]: Published explicit OVERALL FAIL perf gates for unresolved regression/blockage rather than masking as pass.
-- [Phase 09]: Recorded macOS Metal candidate capture as blocked with complete evidence artifact structure and provenance.
-- [Phase 09]: Recorded real VAL-03 manual outcomes with LT-VAL03-02 import marked FAIL and explicit issue notes.
-- [Phase 09]: Retained D-03 blocking semantics: required FAIL/BLOCKED manual rows prevent Phase 9 closure claims.
-- [Phase 09]: Accepted Windows rerun-aware VAL-02 result as PASS and kept VAL-02 blocked until true macOS Metal candidate evidence exists.
-- [Phase 09]: Accepted Windows rerun-aware VAL-02 result while preserving macOS-native evidence as required blocker.
-- [Phase 09]: Kept 09-04 Task 3 unstarted because Task 2 human-action checkpoint remained unresolved.
-- [Phase 09]: Accepted user-provided Windows LT-VAL03-02 retest PASS and recorded provenance in the canonical report.
-- [Phase 09]: Preserved D-03 blocking semantics: overall VAL-03 remains BLOCKED until required macOS rows are executed.
+- [Milestone]: v1.1 archival completed with roadmap/requirements archives and release tag.
+- [Milestone]: next-cycle continuity routed to `/gsd-new-milestone`.
 
 ## Blockers
 
@@ -70,6 +57,6 @@ Next command: `/gsd-complete-milestone`
 
 ## Session
 
-**Last Date:** 2026-03-30T14:35:00.000Z
-**Stopped At:** Phase 09 complete after final verification pass
+**Last Date:** 2026-03-30T15:10:00.000Z
+**Stopped At:** v1.1 milestone archived and tagged
 **Resume File:** None

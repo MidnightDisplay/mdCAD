@@ -8,15 +8,14 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
-## Current Milestone: v1.1 Long-Tail Migration
+## Current Milestone: v1.2 (Planning)
 
-**Goal:** Complete long-tail math migration slices and finish thin-entrypoint reduction while preserving native gate stability.
+**Goal:** Define and execute the next milestone scope after v1.1 ship.
 
 **Target features:**
-- Migrate lower-priority math consumers (serializer, importers, undo/redo helpers, editor utilities) to cglm-backed paths.
-- Complete `TAIL-02` by removing/reducing temporary thin-entrypoint migration glue where safe.
-- Keep macOS Metal and Windows Vulkan behavior/performance gates stable for expanded migrated surfaces.
-- Explicitly defer iOS/web validation work (`PLAT-01`, `PLAT-02`) to a follow-up milestone.
+- Define fresh requirements for deferred platform validation and next migration opportunities.
+- Preserve native gate stability while expanding confidence to deferred targets.
+- Keep milestone scope explicit and phase-mapped from the start.
 
 ## Requirements
 
@@ -43,7 +42,8 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Start v1.2 milestone planning for deferred platform validation (`PLAT-01`, `PLAT-02`) and next-slice migration opportunities.
+- [ ] Define v1.2 milestone requirements and roadmap via `/gsd-new-milestone`.
+- [ ] Plan deferred platform validation scope (`PLAT-01`, `PLAT-02`) with explicit acceptance gates.
 
 ### Out of Scope
 
@@ -53,21 +53,21 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Context
 
-v1.0 is shipped and archived with all five planned phases complete, a passed milestone audit, and release tag `v1.0`. The next step is to finish long-tail migration work that was intentionally deferred after hotspot stabilization.
+v1.0 and v1.1 are shipped and archived. v1.1 closed long-tail migration and validation gates across phases 6-9, including final boundary documentation and parity/perf/manual verification.
 
-This milestone should reduce migration debt (temporary glue and remaining legacy helper dependence) while keeping existing native runtime confidence intact via compare/bench/manual gates.
+The next step is to open a fresh milestone scope (`/gsd-new-milestone`) for deferred platform expansion and any newly discovered migration follow-ups.
 
 ## Current State
 
-- Milestone `v1.1` complete with Phases 6-9 executed and verification passed.
+- Milestone `v1.1` shipped with Phases 6-9 complete and archived.
 - Long-tail migration closure requirements (`TAIL-01..03`, `TRED-01..02`, `VAL-01..03`) are complete.
-- Platform expansion (`PLAT-01`, `PLAT-02`) remains deferred to the next milestone.
+- Deferred platform expansion (`PLAT-01`, `PLAT-02`) is ready to be scoped as the next milestone.
 
 ## Next Milestone Goals
 
-1. Expand/verify long-tail compare and harness coverage for migrated surfaces.
-2. Execute native benchmark/performance gates on macOS Metal and Windows Vulkan.
-3. Finalize intentionally retained thin-entrypoint boundary documentation.
+1. Define v1.2 requirements and roadmap with explicit platform-expansion acceptance gates.
+2. Execute deferred platform validation (`PLAT-01`, `PLAT-02`) where feasible.
+3. Capture new migration debt/workstream candidates discovered during v1.1 closeout.
 
 ## Constraints
 
@@ -89,7 +89,7 @@ This milestone should reduce migration debt (temporary glue and remaining legacy
 | Use direct `cglm` adoption through a thin project-owned entrypoint | Direct vendor adoption reduces wrapper maintenance while preserving one integration choke point | Confirmed in Phase 1 |
 | Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
-| Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Active for v1.1 (Phase 6 complete) |
+| Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Completed in v1.1 |
 
 ## Evolution
 
@@ -109,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-30 after Phase 9 completion*
+*Last updated: 2026-03-30 after v1.1 milestone completion*

@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.1 Long-Tail Migration (Shipped: 2026-03-30)
+
+**Phases completed:** 4 phases, 14 plans, 35 tasks
+
+**Key accomplishments:**
+
+- Completed serializer/save-load migration to cglm-backed paths with targeted parity evidence and converter validation.
+- Completed JSONL/PLY import migration to cglm-backed paths and stabilized native validation gates.
+- Completed undo/editor utility migration and reduced temporary thin-entrypoint glue while preserving behavior parity.
+- Closed long-tail validation and boundary finalization with strict compare coverage plus native perf/manual gate evidence.
+- Resolved LT-VAL03-02 point-cloud import regression in editable mode and re-validated Windows workflows.
+- Finalized Phase 9 verification to `passed (4/4)` and synchronized milestone closure metadata.
+
+**Archives:**
+
+- [v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
+- [v1.1-REQUIREMENTS.md](milestones/v1.1-REQUIREMENTS.md)
+
+---
+
 ## v1.0 Math Migration (Shipped: 2026-03-26)
 
 **Phases completed:** 5 phases, 15 plans, 30 tasks
