@@ -219,7 +219,7 @@ static inline bool ply_import_job_should_sync(const ply_import_job_t *job) {
 //------------------------------------------------------------------------------
 
 static inline bool ply_import_job_parse_step_complete(const ply_import_job_t *job) {
-    if (job->import_mode == 0) {
+    if (job->import_mode == 0 || job->import_mode == 1) {
         return ply_vertices_complete(&job->parse_state);
     }
     return ply_is_complete(&job->parse_state);

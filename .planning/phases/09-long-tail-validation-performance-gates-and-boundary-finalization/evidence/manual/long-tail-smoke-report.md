@@ -49,6 +49,7 @@
 ## Issue notes (required failures)
 
 - **LT-VAL03-02 (import):** `FAIL` on Windows Vulkan due to remaining failure in the editable individual selectable entities path for the required sample; single-node point cloud path passes.
+- **Remediation applied (pending manual re-check):** importer parse-completion gating was aligned for editable imports to finalize when vertex parsing is complete for point-cloud workflows; requires rerun of LT-VAL03-02 editable path on required targets before status can move from `FAIL`.
 - **Status semantics applied:** `PASS` only where validated by manual run, `FAIL` for observed regression, `BLOCKED` where host execution was unavailable.
 
 ## Overall status
