@@ -80,6 +80,21 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
     igSeparator();
 
+    SketchComp *sketch = ecs_world_get_sketch(w, e);
+    if (sketch && igCollapsingHeader_TreeNodeFlags("SketchManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        igText("Status: %s", sketch_status_name(sketch->status));
+        igTextDisabled("Fixed-state: %d/%d geometry fixed",
+            sketch->fixed_geometry_count, sketch->geometry_count);
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igText("Geometry count: %d", sketch->geometry_count);
+        igText("Constraint count: %d", sketch->constraint_count);
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Color policy");
+        igTextWrapped("Sketch color applies by default; geometry with explicit non-black RGB color overrides inherited sketch color.");
+    }
+
     // Label section (optional component - only shown if entity has one)
     LabelComp *label = ecs_world_get_label(w, e);
     if (label && igCollapsingHeader_TreeNodeFlags("Label", ImGuiTreeNodeFlags_DefaultOpen)) {
