@@ -8,6 +8,7 @@
 #include "components/transform_comp.h"
 #include "ecs/ecs_scene.h"
 #include "orbit_camera.h"
+#include "ply_import_job.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -132,6 +133,7 @@ static bool mdcad_harness_compare_serializer_transform_parity(mdcad_validation_r
 static bool mdcad_harness_compare_import_hierarchy_parity(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_undo_axis_drag_parity(mdcad_validation_report_t *report);
 static bool mdcad_harness_compare_editor_plane_drag_parity(mdcad_validation_report_t *report);
+static bool mdcad_harness_compare_ply_point_cloud_completion_regression(mdcad_validation_report_t *report);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_from_axis_angle(vec3_t axis, float radians);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_normalize(mdcad_harness_baseline_quat_t quat);
 static mdcad_harness_baseline_quat_t mdcad_harness_baseline_quat_mul(mdcad_harness_baseline_quat_t lhs,
@@ -174,6 +176,7 @@ static const mdcad_compare_case_t mdcad_compare_cases[] = {
     { "import-hierarchy-parity", mdcad_harness_compare_import_hierarchy_parity },
     { "undo-axis-drag-parity", mdcad_harness_compare_undo_axis_drag_parity },
     { "editor-plane-drag-parity", mdcad_harness_compare_editor_plane_drag_parity },
+    { "ply-point-cloud-completion-regression", mdcad_harness_compare_ply_point_cloud_completion_regression },
 };
 
 static mdcad_bench_case_t mdcad_bench_cases[] = {
@@ -1037,6 +1040,47 @@ static bool mdcad_harness_compare_editor_plane_drag_parity(mdcad_validation_repo
     mdcad_harness_expect(report,
                          "editor-plane-drag-parity miss-t-fallback",
                          mdcad_compare_float_close(candidate_miss_t, 0.0f, 1e-6f));
+
+    return report->checks_failed == 0;
+}
+
+static bool mdcad_harness_compare_ply_point_cloud_completion_regression(mdcad_validation_report_t *report) {
+    const char *samples[] = {
+        "C:\\dev\\pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply",
+        "C:\\dev\\1m.ply",
+    };
+    const char *labels[] = {
+        "ply-point-cloud-completion-regression failing-sample",
+        "ply-point-cloud-completion-regression control-sample",
+    };
+
+    for (size_t i = 0; i < (sizeof(samples) / sizeof(samples[0])); ++i) {
+        ply_import_job_t job;
+        ply_import_job_init(&job);
+        job.import_mode = 0; /* Point Cloud Node mode */
+
+        ply_error_t open_err = ply_open(samples[i], &job.parse_state);
+        if (!mdcad_harness_expect(report, labels[i], open_err == PLY_OK)) {
+            continue;
+        }
+
+        while (job.parse_state.error == PLY_OK && !ply_vertices_complete(&job.parse_state)) {
+            int parsed = ply_parse_vertices_chunk(&job.parse_state, 5000);
+            mdcad_harness_expect(report,
+                                 "ply-point-cloud-completion-regression chunk-progress",
+                                 parsed > 0 || ply_vertices_complete(&job.parse_state));
+            if (parsed <= 0 && !ply_vertices_complete(&job.parse_state)) {
+                job.parse_state.error = PLY_ERROR_PARSE_ERROR;
+                break;
+            }
+        }
+
+        mdcad_harness_expect(report,
+                             labels[i],
+                             job.parse_state.error == PLY_OK &&
+                             ply_import_job_parse_step_complete(&job));
+        ply_parse_state_free(&job.parse_state);
+    }
 
     return report->checks_failed == 0;
 }
