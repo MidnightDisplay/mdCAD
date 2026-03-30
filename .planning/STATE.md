@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: blocked
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-03-30T10:57:01.946Z"
+status: planned
+stopped_at: Planned 09-04-PLAN.md and 09-05-PLAN.md (gap closure)
+last_updated: "2026-03-30T12:20:00.000Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 12
+  total_plans: 14
   completed_plans: 12
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 ## Current Position
 
-Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTED (blocked in verification)
-Plan: 3 of 3
-Status: Blocked — unresolved required VAL-02/VAL-03 failures
+Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — PLANNED (gap closure)
+Plan: 3 of 5
+Status: Planned — execute 09-04 and 09-05 to resolve VAL-02/VAL-03 blockers
 Last activity: 2026-03-30
 
 ## Milestone Scope
@@ -38,7 +38,7 @@ Last activity: 2026-03-30
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 9 --gaps`
+Next command: `/gsd-execute-phase 9 --gaps-only`
 
 ## Performance Metrics
 

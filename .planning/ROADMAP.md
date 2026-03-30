@@ -31,7 +31,7 @@ v1.1 executes the deferred long-tail migration and thin-entrypoint reduction wor
   1. Scene save/load paths rely on cglm-backed math helpers for migrated concerns.
   2. Save/load behavior remains parity-safe for representative scene content.
   3. No newly migrated serializer path depends on deprecated `math3d` helper equivalents.
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 - [x] 06-01: Map and migrate serializer math touchpoints to cglm-backed helpers
@@ -47,7 +47,7 @@ Plans:
   1. JSONL/PLY import math operations in scope use cglm-backed paths.
   2. Imported geometry behavior (orientation/scale/placement) remains parity-safe.
   3. Import flows avoid reintroducing migrated deprecated `math3d` helper dependencies.
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 - [x] 07-01-PLAN.md — Migrate importer math touchpoints and update boundaries
@@ -86,6 +86,8 @@ Plans:
 - [x] 09-01: Expand/verify long-tail compare and harness coverage
 - [x] 09-02: Execute native benchmark/perf gates for expanded migration slice
 - [x] 09-03: Run manual smoke workflows and finalize boundary docs
+- [ ] 09-04-PLAN.md — Gap closure for VAL-02 perf blockers (Windows rerun policy + macOS native candidate capture)
+- [ ] 09-05-PLAN.md — Gap closure for VAL-03 blockers (LT-VAL03-02 import regression + macOS manual rows)
 
 ## Progress
 
@@ -97,4 +99,4 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 | 6. Serializer and Save/Load Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 7. Import Pipeline Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 8. Undo/Editor Utility Migration and Glue Burn-Down | 3/3 | Complete    | 2026-03-28 |
-| 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 3/3 | Blocked |  |
+| 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 3/5 | Blocked |  |
