@@ -77,37 +77,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKCH-01 | TBD | Pending |
-| SKCH-02 | TBD | Pending |
-| SKCH-03 | TBD | Pending |
-| SKCH-04 | TBD | Pending |
-| CONS-01 | TBD | Pending |
-| CONS-02 | TBD | Pending |
-| CONS-03 | TBD | Pending |
-| CONS-04 | TBD | Pending |
-| CONS-05 | TBD | Pending |
-| SOLV-01 | TBD | Pending |
-| SOLV-02 | TBD | Pending |
-| SOLV-03 | TBD | Pending |
-| SOLV-04 | TBD | Pending |
-| SCRP-01 | TBD | Pending |
-| SCRP-02 | TBD | Pending |
-| SCRP-03 | TBD | Pending |
-| SCRP-04 | TBD | Pending |
-| SCRP-05 | TBD | Pending |
-| SCRP-06 | TBD | Pending |
-| API-01 | TBD | Pending |
-| API-02 | TBD | Pending |
-| API-03 | TBD | Pending |
-| VAL-01 | TBD | Pending |
-| VAL-02 | TBD | Pending |
-| VAL-03 | TBD | Pending |
+| SKCH-01 | Phase 10 | Pending |
+| SKCH-02 | Phase 10 | Pending |
+| SKCH-03 | Phase 10 | Pending |
+| SKCH-04 | Phase 11 | Pending |
+| CONS-01 | Phase 11 | Pending |
+| CONS-02 | Phase 11 | Pending |
+| CONS-03 | Phase 11 | Pending |
+| CONS-04 | Phase 11 | Pending |
+| CONS-05 | Phase 11 | Pending |
+| SOLV-01 | Phase 12 | Pending |
+| SOLV-02 | Phase 12 | Pending |
+| SOLV-03 | Phase 12 | Pending |
+| SOLV-04 | Phase 12 | Pending |
+| SCRP-01 | Phase 13 | Pending |
+| SCRP-02 | Phase 13 | Pending |
+| SCRP-03 | Phase 13 | Pending |
+| SCRP-04 | Phase 14 | Pending |
+| SCRP-05 | Phase 14 | Pending |
+| SCRP-06 | Phase 13 | Pending |
+| API-01 | Phase 14 | Pending |
+| API-02 | Phase 14 | Pending |
+| API-03 | Phase 12 | Pending |
+| VAL-01 | Phase 15 | Pending |
+| VAL-02 | Phase 15 | Pending |
+| VAL-03 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25 ✅
+- Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-03-30 after v1.2 requirement approval*
+*Last updated: 2026-03-30 after v1.2 roadmap phase mapping*
