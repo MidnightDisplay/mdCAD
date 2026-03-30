@@ -1,0 +1,113 @@
+# Requirements: mdCAD
+
+**Defined:** 2026-03-30
+**Core Value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
+
+## v1.2 Requirements
+
+Requirements for the sketches/constraints/scripting milestone. Each maps to roadmap phases.
+
+### Sketch Core
+
+- [ ] **SKCH-01**: User can create a sketch entity and attach point, line, and arc/circle geometry to that sketch.
+- [ ] **SKCH-02**: User can view per-sketch solve status, color policy, geometry count, and constraint count in the Entity Inspector.
+- [ ] **SKCH-03**: User can fix, unfix, and delete sketch geometries from GeometryManager using single-select and multi-select workflows.
+- [ ] **SKCH-04**: User can select a constraint and see all participating geometry entities/sub-entities highlighted.
+
+### Constraint Authoring
+
+- [ ] **CONS-01**: User can apply the initial constraint set (`FIXED`, `COINCIDENT`, `COLLINEAR`, `PARALLEL`, `PERPENDICULAR`, `ALONG X`, `ALONG Y`, `ALONG Z`, `CORADIAL`, `CONCENTRIC`, `LENGTH`, `ANGLE`, `TANGENTIAL`) to geometrically legal entity types.
+- [ ] **CONS-02**: User can open a Tab-triggered in-context constraint menu that lists only currently applicable constraints and auto-hides after applying one.
+- [ ] **CONS-03**: User can hover and select constraints through constant-screen-size viewport glyphs anchored to constrained geometry/sub-geometry.
+- [ ] **CONS-04**: User can create, view, and edit `LENGTH`/`ANGLE` constraints both from viewport dimensions and ConstraintManager with mirrored values.
+- [ ] **CONS-05**: User can mark `LENGTH`/`ANGLE` constraints as driven so they remain visible/readable but do not drive solver equations.
+
+### Solver Control
+
+- [ ] **SOLV-01**: User can toggle auto-solve per sketch and manually trigger solve recalculation from Solver controls.
+- [ ] **SOLV-02**: User can see sketch solve states (`solved`, `loose`, `fixed`, `error`) and timestamped solver diagnostics with `INFO`, `WARNING`, and `ERROR` levels.
+- [ ] **SOLV-03**: The system uses one solver backend type for v1.2 and exposes that active type in sketch solver controls.
+- [ ] **SOLV-04**: User can identify implicated constraints/geometries when a solve fails or is invalid.
+
+### Scripting
+
+- [ ] **SCRP-01**: User can open a standalone sketch script editor window from SketchManager.
+- [ ] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
+- [ ] **SCRP-03**: UI-side sketch/geometry/constraint edits update script output deterministically.
+- [ ] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
+- [ ] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
+- [ ] **SCRP-06**: v1.2 scripting runtime is Lua 5.4.x.
+
+### Integration and Validation
+
+- [ ] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
+- [ ] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
+- [ ] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
+- [ ] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
+- [ ] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
+- [ ] **VAL-03**: macOS parity validation is executed after Windows gate pass and results are recorded.
+
+## v1.3+ Requirements (Deferred)
+
+### Platform Expansion
+
+- **PLAT-01**: mdCAD validates sketch/constraint/scripting runtime flows on iOS native builds.
+- **PLAT-02**: mdCAD validates sketch/constraint/scripting runtime flows on the web build (Emscripten) and closes runtime-specific gaps.
+
+### Capability Expansion
+
+- **CAP-01**: mdCAD supports multi-sketch dependency solving and cross-sketch constraint relations.
+- **CAP-02**: mdCAD supports multiple solver backend choices and migration-safe backend switching.
+- **CAP-03**: mdCAD expands script language/runtime features beyond deterministic sketch-parametric workflows.
+
+## Out of Scope
+
+Explicitly excluded from v1.2 to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Equal-priority iOS/web validation gates during active development | v1.2 delivery is explicitly Windows MSVC+Vulkan first |
+| Multi-sketch/global solve graph | Too large for first integrated constraint+scripting milestone |
+| Multi-backend solver selection UX | v1.2 requires one backend only to reduce integration risk |
+| General-purpose scripting platform features (modules/filesystem/async) | Not required for deterministic sketch bidirectional workflows |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SKCH-01 | TBD | Pending |
+| SKCH-02 | TBD | Pending |
+| SKCH-03 | TBD | Pending |
+| SKCH-04 | TBD | Pending |
+| CONS-01 | TBD | Pending |
+| CONS-02 | TBD | Pending |
+| CONS-03 | TBD | Pending |
+| CONS-04 | TBD | Pending |
+| CONS-05 | TBD | Pending |
+| SOLV-01 | TBD | Pending |
+| SOLV-02 | TBD | Pending |
+| SOLV-03 | TBD | Pending |
+| SOLV-04 | TBD | Pending |
+| SCRP-01 | TBD | Pending |
+| SCRP-02 | TBD | Pending |
+| SCRP-03 | TBD | Pending |
+| SCRP-04 | TBD | Pending |
+| SCRP-05 | TBD | Pending |
+| SCRP-06 | TBD | Pending |
+| API-01 | TBD | Pending |
+| API-02 | TBD | Pending |
+| API-03 | TBD | Pending |
+| VAL-01 | TBD | Pending |
+| VAL-02 | TBD | Pending |
+| VAL-03 | TBD | Pending |
+
+**Coverage:**
+- v1.2 requirements: 25 total
+- Mapped to phases: 0
+- Unmapped: 25 ⚠️
+
+---
+*Requirements defined: 2026-03-30*
+*Last updated: 2026-03-30 after v1.2 requirement approval*
