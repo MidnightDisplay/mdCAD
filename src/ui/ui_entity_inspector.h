@@ -251,6 +251,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igDummy((ImVec2){0.0f, 8.0f});
         igTextDisabled("Selected rows: %d", gm_selected_count);
 
+        igBeginDisabled(gm_selected_count <= 0);
         if (igButton("Fix##geometry_manager_bulk_fix", (ImVec2){0, 0})) {
             if (gm_selected_count > 0) {
                 bool *old_fixed = NULL;
@@ -288,7 +289,9 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 }
             }
         }
+        igEndDisabled();
         igSameLine(0, 8);
+        igBeginDisabled(gm_selected_count <= 0);
         if (igButton("Unfix##geometry_manager_bulk_unfix", (ImVec2){0, 0})) {
             if (gm_selected_count > 0) {
                 bool *old_fixed = NULL;
@@ -326,13 +329,16 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 }
             }
         }
+        igEndDisabled();
         igSameLine(0, 8);
+        igBeginDisabled(gm_selected_count <= 0);
         if (igButton("Delete##geometry_manager_bulk_delete", (ImVec2){0, 0})) {
             if (gm_selected_count > 0) {
                 gm_delete_pending_count = gm_selected_count;
                 igOpenPopup_Str("Delete Geometry##geometry_manager_delete_popup", 0);
             }
         }
+        igEndDisabled();
 
         if (igBeginPopupModal("Delete Geometry##geometry_manager_delete_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             if (gm_delete_pending_count > 1) {
