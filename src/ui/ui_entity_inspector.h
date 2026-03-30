@@ -20,6 +20,7 @@
 #include "../math/math_undo_editor.h"
 #include "../undo_redo_exec.h"
 #include <float.h>
+#include <stdlib.h>
 
 //------------------------------------------------------------------------------
 // Types
@@ -61,6 +62,75 @@ static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t
     state->undo_redo = undo_redo;
 }
 
+#define UI_GEOMETRY_MANAGER_MAX_ROWS 2048
+
+static inline bool ui_geometry_manager_contains(const ecs_entity_t *entities, int count, ecs_entity_t target) {
+    for (int i = 0; i < count; i++) {
+        if (entities[i] == target) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline int ui_geometry_manager_index_of(const ecs_entity_t *entities, int count, ecs_entity_t target) {
+    for (int i = 0; i < count; i++) {
+        if (entities[i] == target) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static inline void ui_geometry_manager_selection_clear(ecs_entity_t *selection, int *selection_count) {
+    (void)selection;
+    *selection_count = 0;
+}
+
+static inline void ui_geometry_manager_selection_add(ecs_entity_t *selection, int *selection_count, ecs_entity_t e) {
+    if (e == 0) return;
+    if (ui_geometry_manager_contains(selection, *selection_count, e)) return;
+    if (*selection_count >= UI_GEOMETRY_MANAGER_MAX_ROWS) return;
+    selection[*selection_count] = e;
+    (*selection_count)++;
+}
+
+static inline void ui_geometry_manager_selection_remove(ecs_entity_t *selection, int *selection_count, ecs_entity_t e) {
+    for (int i = 0; i < *selection_count; i++) {
+        if (selection[i] == e) {
+            selection[i] = selection[*selection_count - 1];
+            (*selection_count)--;
+            return;
+        }
+    }
+}
+
+static inline void ui_geometry_manager_handle_click(ecs_entity_t *selection,
+                                                    int *selection_count,
+                                                    ecs_entity_t clicked_entity,
+                                                    bool shift_held,
+                                                    bool ctrl_held) {
+    if (clicked_entity == 0) {
+        if (!shift_held && !ctrl_held) {
+            ui_geometry_manager_selection_clear(selection, selection_count);
+        }
+        return;
+    }
+
+    if (ctrl_held) {
+        if (ui_geometry_manager_contains(selection, *selection_count, clicked_entity)) {
+            ui_geometry_manager_selection_remove(selection, selection_count, clicked_entity);
+        } else {
+            ui_geometry_manager_selection_add(selection, selection_count, clicked_entity);
+        }
+    } else if (shift_held) {
+        ui_geometry_manager_selection_add(selection, selection_count, clicked_entity);
+    } else {
+        selection[0] = clicked_entity;
+        *selection_count = 1;
+    }
+}
+
 //------------------------------------------------------------------------------
 // Internal: Draw single entity inspector
 //------------------------------------------------------------------------------
@@ -80,8 +150,50 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
     igSeparator();
 
+    static ecs_entity_t gm_selected_entities[UI_GEOMETRY_MANAGER_MAX_ROWS] = {0};
+    static int gm_selected_count = 0;
+    static ecs_entity_t gm_bound_sketch = 0;
+    static int gm_delete_pending_count = 0;
+
     SketchComp *sketch = ecs_world_get_sketch(w, e);
     if (sketch && igCollapsingHeader_TreeNodeFlags("SketchManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ecs_scene_t *scene = NULL;
+        if (state->undo_redo && state->undo_redo->scene) {
+            scene = (ecs_scene_t*)state->undo_redo->scene;
+        }
+
+        if (gm_bound_sketch != e) {
+            gm_bound_sketch = e;
+            gm_selected_count = 0;
+        }
+
+        ecs_entity_t geometry_rows[UI_GEOMETRY_MANAGER_MAX_ROWS];
+        int geometry_row_count = 0;
+        ecs_iter_t child_it = ecs_children(w->world, e);
+        while (ecs_children_next(&child_it)) {
+            for (int i = 0; i < child_it.count; i++) {
+                ecs_entity_t child = child_it.entities[i];
+                if (!ecs_world_get_geometry(w, child)) {
+                    continue;
+                }
+                if (geometry_row_count < UI_GEOMETRY_MANAGER_MAX_ROWS) {
+                    geometry_rows[geometry_row_count++] = child;
+                }
+            }
+        }
+
+        for (int i = gm_selected_count - 1; i >= 0; i--) {
+            if (!ui_geometry_manager_contains(geometry_rows, geometry_row_count, gm_selected_entities[i])) {
+                gm_selected_entities[i] = gm_selected_entities[gm_selected_count - 1];
+                gm_selected_count--;
+            }
+        }
+
+        if (scene) {
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+        }
+
         igText("Status: %s", sketch_status_name(sketch->status));
         igTextDisabled("Fixed-state: %d/%d geometry fixed",
             sketch->fixed_geometry_count, sketch->geometry_count);
@@ -93,6 +205,180 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igDummy((ImVec2){0.0f, 8.0f});
         igTextDisabled("Color policy");
         igTextWrapped("Sketch color applies by default; geometry with explicit non-black RGB color overrides inherited sketch color.");
+
+        igDummy((ImVec2){0.0f, 16.0f});
+        igText("GeometryManager");
+
+        if (geometry_row_count == 0) {
+            igTextDisabled("No geometry in this sketch");
+            igTextWrapped("Add Point, Line, or Arc/Circle from Add Entity or GeometryManager controls to start defining this sketch.");
+        } else {
+            for (int row = 0; row < geometry_row_count; row++) {
+                ecs_entity_t child = geometry_rows[row];
+                GeometryComp *child_geom = ecs_world_get_geometry(w, child);
+                if (!child_geom) continue;
+
+                LabelComp *child_label = ecs_world_get_label(w, child);
+                SketchGeometryStateComp *child_state = ecs_world_get_sketch_geometry_state(w, child);
+                SketchGeometryStateComp effective_state = child_state ? *child_state : sketch_geometry_state_comp_default();
+                const char *type_name = geometry_type_name(child_geom->type);
+                const char *row_name = (child_label && child_label->name[0] != '\0') ? child_label->name : NULL;
+                const char *fixed_label = sketch_geometry_state_label(effective_state);
+
+                char row_text[256];
+                if (row_name) {
+                    snprintf(row_text, sizeof(row_text), "%s | %s | %s##geom_row_%llu",
+                        type_name, row_name, fixed_label, (unsigned long long)child);
+                } else {
+                    snprintf(row_text, sizeof(row_text), "%s | #%llu | %s##geom_row_%llu",
+                        type_name, (unsigned long long)child, fixed_label, (unsigned long long)child);
+                }
+
+                bool selected = ui_geometry_manager_contains(gm_selected_entities, gm_selected_count, child);
+                if (igSelectable_Bool(row_text, selected, 0, (ImVec2){0.0f, 0.0f})) {
+                    ImGuiIO *io = igGetIO_Nil();
+                    ui_geometry_manager_handle_click(
+                        gm_selected_entities,
+                        &gm_selected_count,
+                        child,
+                        io->KeyShift,
+                        io->KeyCtrl
+                    );
+                }
+            }
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Selected rows: %d", gm_selected_count);
+
+        if (igButton("Fix##geometry_manager_bulk_fix", (ImVec2){0, 0})) {
+            if (gm_selected_count > 0) {
+                bool *old_fixed = NULL;
+                if (state->undo_redo) {
+                    old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
+                }
+
+                ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+                int action_count = 0;
+                for (int i = 0; i < gm_selected_count; i++) {
+                    ecs_entity_t target = gm_selected_entities[i];
+                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+
+                    SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
+                    if (!row_state) {
+                        SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                        ecs_world_set_sketch_geometry_state(w, target, &init_state);
+                        row_state = ecs_world_get_sketch_geometry_state(w, target);
+                    }
+                    if (!row_state) continue;
+
+                    if (old_fixed) old_fixed[action_count] = row_state->fixed;
+                    row_state->fixed = true;
+                    action_entities[action_count++] = target;
+                }
+
+                if (state->undo_redo && action_count > 0 && old_fixed) {
+                    undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, true);
+                }
+                if (old_fixed) free(old_fixed);
+
+                if (scene) {
+                    scene_refresh_sketch_metadata(scene, e);
+                    sketch = ecs_world_get_sketch(w, e);
+                }
+            }
+        }
+        igSameLine(0, 8);
+        if (igButton("Unfix##geometry_manager_bulk_unfix", (ImVec2){0, 0})) {
+            if (gm_selected_count > 0) {
+                bool *old_fixed = NULL;
+                if (state->undo_redo) {
+                    old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
+                }
+
+                ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+                int action_count = 0;
+                for (int i = 0; i < gm_selected_count; i++) {
+                    ecs_entity_t target = gm_selected_entities[i];
+                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+
+                    SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
+                    if (!row_state) {
+                        SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                        ecs_world_set_sketch_geometry_state(w, target, &init_state);
+                        row_state = ecs_world_get_sketch_geometry_state(w, target);
+                    }
+                    if (!row_state) continue;
+
+                    if (old_fixed) old_fixed[action_count] = row_state->fixed;
+                    row_state->fixed = false;
+                    action_entities[action_count++] = target;
+                }
+
+                if (state->undo_redo && action_count > 0 && old_fixed) {
+                    undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, false);
+                }
+                if (old_fixed) free(old_fixed);
+
+                if (scene) {
+                    scene_refresh_sketch_metadata(scene, e);
+                    sketch = ecs_world_get_sketch(w, e);
+                }
+            }
+        }
+        igSameLine(0, 8);
+        if (igButton("Delete##geometry_manager_bulk_delete", (ImVec2){0, 0})) {
+            if (gm_selected_count > 0) {
+                gm_delete_pending_count = gm_selected_count;
+                igOpenPopup_Str("Delete Geometry##geometry_manager_delete_popup", 0);
+            }
+        }
+
+        if (igBeginPopupModal("Delete Geometry##geometry_manager_delete_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (gm_delete_pending_count > 1) {
+                igTextWrapped("Delete %d selected geometry items from this sketch? This will be one undo step.", gm_delete_pending_count);
+            } else {
+                igTextWrapped("Delete selected geometry from this sketch? This action can be undone in one step.");
+            }
+
+            igDummy((ImVec2){0.0f, 8.0f});
+            if (igButton("Delete##geometry_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
+                ecs_entity_t delete_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+                int delete_count = 0;
+                for (int i = 0; i < gm_selected_count; i++) {
+                    ecs_entity_t target = gm_selected_entities[i];
+                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+                    delete_entities[delete_count++] = target;
+                }
+
+                if (state->undo_redo && delete_count > 0) {
+                    undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
+                }
+
+                for (int i = 0; i < delete_count; i++) {
+                    if (scene) {
+                        scene_remove_entity(scene, delete_entities[i]);
+                    } else {
+                        ecs_delete(w->world, delete_entities[i]);
+                    }
+                }
+
+                gm_selected_count = 0;
+                gm_delete_pending_count = 0;
+
+                if (scene) {
+                    scene_refresh_sketch_metadata(scene, e);
+                    sketch = ecs_world_get_sketch(w, e);
+                }
+                igCloseCurrentPopup();
+            }
+            igSameLine(0, 8);
+            if (igButton("Cancel##geometry_manager_cancel_delete", (ImVec2){120.0f, 0.0f})) {
+                gm_delete_pending_count = 0;
+                igCloseCurrentPopup();
+            }
+            igEndPopup();
+        }
     }
 
     // Label section (optional component - only shown if entity has one)
