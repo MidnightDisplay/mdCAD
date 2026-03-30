@@ -12,7 +12,7 @@
 | legacy-screen-ray | 6.731 | 6.816 | - | 6.816 | 1.263% | PASS | - |
 | cglm-screen-ray | 29.512 | 29.700 | - | 29.700 | 0.637% | PASS | - |
 | bench-interaction-ray | 25.396 | 25.940 | - | 25.940 | 2.142% | PASS | - |
-| bench-interaction-drag | 100.857 | 106.943 | - | 106.943 | 6.034% | FAIL | - |
+| bench-interaction-drag | 100.857 | 106.943 | 103.555 | 103.555 | 2.675% | PASS | rerun-applied |
 | bench-quat-ops | 50.614 | 51.430 | - | 51.430 | 1.612% | PASS | - |
 
-OVERALL: FAIL
+OVERALL: PASS

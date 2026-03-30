@@ -1,7 +1,7 @@
-source_commit=1921aa94af75c27d3968e93416e19e3a7bd63d3c
+source_commit=4f7562761d7d0519a4f8927bbef782d8eff13265
 capture_cmd=.\\build-vulkan\\bin\\Release\\mdcad_math_harness.exe --mode bench --iterations 2000000
 host_name=UK-LT-T12-G068
-host_os=Microsoft Windows 10.0.26200
+host_os=Microsoft Windows 11 Enterprise
 host_arch=X64
-captured_at_utc=2026-03-28T13:08:09Z
+captured_at_utc=2026-03-30T10:35:19Z
 capture_status=ok
