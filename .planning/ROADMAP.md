@@ -12,7 +12,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 
 ## Phases
 
-- [ ] **Phase 10: Sketch Foundations & Managers** - Users can create sketches, attach/edit core geometry, and inspect sketch-level status.
+- [x] **Phase 10: Sketch Foundations & Managers** - Users can create sketches, attach/edit core geometry, and inspect sketch-level status. (completed 2026-03-30)
 - [ ] **Phase 11: Constraint Authoring UX** - Users can author, inspect, and edit legal constraints through manager and viewport workflows.
 - [ ] **Phase 12: Solver Control & Constrained Interaction** - Users can control solving, read diagnostics, and manipulate geometry with constraints respected.
 - [ ] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime.
@@ -33,7 +33,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 Plans:
 - [x] 10-01-PLAN.md — Create sketch ECS contracts, scene helpers, and atomic bulk undo primitives.
 - [x] 10-02-PLAN.md — Implement sketch creation/attachment UX and inspector sketch status surfaces.
-- [ ] 10-03-PLAN.md — Implement GeometryManager flat-list bulk actions and validation checklist evidence.
+- [x] 10-03-PLAN.md — Implement GeometryManager flat-list bulk actions and validation checklist evidence.
 **UI hint**: yes
 
 ### Phase 11: Constraint Authoring UX
@@ -100,7 +100,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 10. Sketch Foundations & Managers | 2/3 | In Progress|  |
+| 10. Sketch Foundations & Managers | 3/3 | Complete   | 2026-03-30 |
 | 11. Constraint Authoring UX | 0/TBD | Not started | - |
 | 12. Solver Control & Constrained Interaction | 0/TBD | Not started | - |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
