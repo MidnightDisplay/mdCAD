@@ -9,9 +9,9 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 ### Sketch Core
 
-- [ ] **SKCH-01**: User can create a sketch entity and attach point, line, and arc/circle geometry to that sketch.
+- [x] **SKCH-01**: User can create a sketch entity and attach point, line, and arc/circle geometry to that sketch.
 - [ ] **SKCH-02**: User can view per-sketch solve status, color policy, geometry count, and constraint count in the Entity Inspector.
-- [ ] **SKCH-03**: User can fix, unfix, and delete sketch geometries from GeometryManager using single-select and multi-select workflows.
+- [x] **SKCH-03**: User can fix, unfix, and delete sketch geometries from GeometryManager using single-select and multi-select workflows.
 - [ ] **SKCH-04**: User can select a constraint and see all participating geometry entities/sub-entities highlighted.
 
 ### Constraint Authoring
@@ -77,9 +77,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKCH-01 | Phase 10 | Pending |
+| SKCH-01 | Phase 10 | Complete |
 | SKCH-02 | Phase 10 | Pending |
-| SKCH-03 | Phase 10 | Pending |
+| SKCH-03 | Phase 10 | Complete |
 | SKCH-04 | Phase 11 | Pending |
 | CONS-01 | Phase 11 | Pending |
 | CONS-02 | Phase 11 | Pending |
