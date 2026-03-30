@@ -16,7 +16,7 @@ Requirements for the long-tail migration milestone. Each maps to Phase 6+ roadma
 ### Thin Entrypoint Reduction
 
 - [x] **TRED-01**: Runtime-critical migrated paths no longer rely on removable temporary thin-entrypoint migration glue.
-- [ ] **TRED-02**: Remaining thin-entrypoint surface is intentionally minimal, documented, and aligned to long-term project-owned boundaries.
+- [x] **TRED-02**: Remaining thin-entrypoint surface is intentionally minimal, documented, and aligned to long-term project-owned boundaries.
 
 ### Validation & Performance
 
@@ -51,7 +51,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TAIL-02 | Phase 7 | Complete |
 | TAIL-03 | Phase 8 | Complete |
 | TRED-01 | Phase 8 | Complete |
-| TRED-02 | Phase 9 | Pending |
+| TRED-02 | Phase 9 | Complete |
 | VAL-01 | Phase 9 | Complete |
 | VAL-02 | Phase 9 | Pending |
 | VAL-03 | Phase 9 | Pending |

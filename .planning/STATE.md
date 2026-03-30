@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-28T13:10:46.221Z"
-last_activity: 2026-03-28
+status: blocked
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-03-30T09:55:02.400Z"
+last_activity: 2026-03-30
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-03-28
+Status: Blocked — unresolved required VAL-02/VAL-03 failures
+Last activity: 2026-03-30
 
 ## Milestone Scope
 
@@ -38,7 +38,7 @@ Last activity: 2026-03-28
 
 ## Session Continuity
 
-Next command: `/gsd-execute-phase 9`
+Next command: `/gsd-verify-work 9`
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Next command: `/gsd-execute-phase 9`
 |------|----------|-------|-------|
 | Phase 09 P01 | 2 min | 2 tasks | 4 files |
 | Phase 09 P02 | 7m | 2 tasks | 10 files |
+| Phase 09 P03 | 2 min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -53,13 +54,16 @@ Next command: `/gsd-execute-phase 9`
 - [Phase 09]: Kept harness architecture unchanged and extended only mdcad_compare_cases to preserve D-01/D-02 scope.
 - [Phase 09]: Published explicit OVERALL FAIL perf gates for unresolved regression/blockage rather than masking as pass.
 - [Phase 09]: Recorded macOS Metal candidate capture as blocked with complete evidence artifact structure and provenance.
+- [Phase 09]: Recorded real VAL-03 manual outcomes with LT-VAL03-02 import marked FAIL and explicit issue notes.
+- [Phase 09]: Retained D-03 blocking semantics: required FAIL/BLOCKED manual rows prevent Phase 9 closure claims.
 
 ## Blockers
 
 - [Phase 09-02] VAL-02 blocked: `bench-interaction-drag` slowdown is 6.034% on Windows Vulkan (>5% threshold) and macOS native candidate capture is unavailable on current host.
+- [Phase 09-03] VAL-03 blocked: LT-VAL03-02 import fails for sample 'pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply' after points parsed; macOS Metal manual target remains unavailable from Windows host.
 
 ## Session
 
-**Last Date:** 2026-03-28T13:10:46.218Z
-**Stopped At:** Completed 09-02-PLAN.md
+**Last Date:** 2026-03-30T09:54:53.635Z
+**Stopped At:** Completed 09-03-PLAN.md
 **Resume File:** None
