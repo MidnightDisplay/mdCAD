@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: blocked
-stopped_at: Executed 09-04 and 09-05 gap plans; blocked on required macOS native evidence
-last_updated: "2026-03-30T13:55:00.000Z"
-last_activity: 2026-03-30 -- re-verified after gap execution (status: gaps_found)
+status: verifying
+stopped_at: Blocked at 09-05-PLAN.md Task 3 (macOS host unavailable)
+last_updated: "2026-03-30T11:35:12.543Z"
+last_activity: 2026-03-30
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
   completed_plans: 14
 ---
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTED (blocked in verification)
 Plan: 5 of 5
-Status: Blocked — required macOS native perf/manual evidence missing for VAL-02 and VAL-03
-Last activity: 2026-03-30 -- re-verified after gap execution (status: gaps_found)
+Status: Phase complete — ready for verification
+Last activity: 2026-03-30
 
 ## Milestone Scope
 
@@ -49,6 +49,7 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence co
 | Phase 09 P03 | 2 min | 3 tasks | 5 files |
 | Phase 09 P04 | 1 min | 1 tasks | 3 files |
 | Phase 09 P05 | 8 min | 3 tasks | 4 files |
+| Phase 09 P05 | 8 min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -61,6 +62,8 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence co
 - [Phase 09]: Accepted Windows rerun-aware VAL-02 result as PASS and kept VAL-02 blocked until true macOS Metal candidate evidence exists.
 - [Phase 09]: Accepted Windows rerun-aware VAL-02 result while preserving macOS-native evidence as required blocker.
 - [Phase 09]: Kept 09-04 Task 3 unstarted because Task 2 human-action checkpoint remained unresolved.
+- [Phase 09]: Accepted user-provided Windows LT-VAL03-02 retest PASS and recorded provenance in the canonical report.
+- [Phase 09]: Preserved D-03 blocking semantics: overall VAL-03 remains BLOCKED until required macOS rows are executed.
 
 ## Blockers
 
@@ -69,6 +72,6 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence co
 
 ## Session
 
-**Last Date:** 2026-03-30T13:55:00.000Z
-**Stopped At:** Executed 09-04 and 09-05 gap plans; blocked on required macOS native evidence
+**Last Date:** 2026-03-30T11:35:12.540Z
+**Stopped At:** Blocked at 09-05-PLAN.md Task 3 (macOS host unavailable)
 **Resume File:** None
