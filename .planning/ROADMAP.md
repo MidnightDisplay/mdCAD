@@ -87,7 +87,7 @@ Plans:
 - [x] 09-02: Execute native benchmark/perf gates for expanded migration slice
 - [x] 09-03: Run manual smoke workflows and finalize boundary docs
 - [x] 09-04-PLAN.md — Gap closure for VAL-02 perf blockers (Windows rerun policy + macOS native candidate capture)
-- [ ] 09-05-PLAN.md — Gap closure for VAL-03 blockers (LT-VAL03-02 import regression + macOS manual rows)
+- [x] 09-05-PLAN.md — Gap closure for VAL-03 blockers (LT-VAL03-02 import regression + macOS manual rows)
 
 ## Progress
 
@@ -99,4 +99,4 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 | 6. Serializer and Save/Load Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 7. Import Pipeline Long-Tail Migration | 3/3 | Complete | 2026-03-27 |
 | 8. Undo/Editor Utility Migration and Glue Burn-Down | 3/3 | Complete    | 2026-03-28 |
-| 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 3/5 | Blocked |  |
+| 9. Long-Tail Validation, Performance Gates, and Boundary Finalization | 5/5 | Blocked |  |

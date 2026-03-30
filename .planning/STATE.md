@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Long-Tail Migration
-status: Blocked — 09-04 Task 2 requires native macOS Metal candidate perf capture
-stopped_at: Blocked at 09-04-PLAN.md Task 2 (macOS host unavailable)
-last_updated: "2026-03-30T11:00:46.439Z"
-last_activity: 2026-03-30 -- 09-04 continuation ended blocked at Task 2
+status: blocked
+stopped_at: Executed 09-04 and 09-05 gap plans; blocked on required macOS native evidence
+last_updated: "2026-03-30T13:55:00.000Z"
+last_activity: 2026-03-30 -- re-verified after gap execution (status: gaps_found)
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 ## Current Position
 
-Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — BLOCKED
-Plan: 4 of 5
-Status: Blocked — 09-04 Task 2 requires native macOS Metal candidate perf capture
-Last activity: 2026-03-30 -- 09-04 continuation ended blocked at Task 2
+Phase: 09 (long-tail-validation-performance-gates-and-boundary-finalization) — EXECUTED (blocked in verification)
+Plan: 5 of 5
+Status: Blocked — required macOS native perf/manual evidence missing for VAL-02 and VAL-03
+Last activity: 2026-03-30 -- re-verified after gap execution (status: gaps_found)
 
 ## Milestone Scope
 
@@ -38,7 +38,7 @@ Last activity: 2026-03-30 -- 09-04 continuation ended blocked at Task 2
 
 ## Session Continuity
 
-Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS candidate evidence commit hash is available)
+Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS evidence commit hash is available)
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS candidate e
 | Phase 09 P02 | 7m | 2 tasks | 10 files |
 | Phase 09 P03 | 2 min | 3 tasks | 5 files |
 | Phase 09 P04 | 1 min | 1 tasks | 3 files |
+| Phase 09 P05 | 8 min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -64,10 +65,10 @@ Next command: `/gsd-execute-phase 9 --gaps-only` (resume after macOS candidate e
 ## Blockers
 
 - [Phase 09-04] VAL-02 blocked: Windows rerun-aware evaluation is PASS, but required macOS Metal candidate benchmark capture/evaluation is still unavailable on current host.
-- [Phase 09-03] VAL-03 blocked: LT-VAL03-02 import fails for sample 'pc1_Wednesday, 17 December 2025 at 15_08_15 Greenwich Mean Time.ply' after points parsed; macOS Metal manual target remains unavailable from Windows host.
+- [Phase 09-03] VAL-03 blocked: Windows rows are now PASS (including LT-VAL03-02 retest), but required macOS Metal manual rows remain unavailable from Windows host.
 
 ## Session
 
-**Last Date:** 2026-03-30T11:00:08.208Z
-**Stopped At:** Blocked at 09-04-PLAN.md Task 2 (macOS host unavailable)
+**Last Date:** 2026-03-30T13:55:00.000Z
+**Stopped At:** Executed 09-04 and 09-05 gap plans; blocked on required macOS native evidence
 **Resume File:** None
