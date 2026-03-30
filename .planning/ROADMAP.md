@@ -32,7 +32,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 **Plans**: 3 plans
 Plans:
 - [x] 10-01-PLAN.md — Create sketch ECS contracts, scene helpers, and atomic bulk undo primitives.
-- [ ] 10-02-PLAN.md — Implement sketch creation/attachment UX and inspector sketch status surfaces.
+- [x] 10-02-PLAN.md — Implement sketch creation/attachment UX and inspector sketch status surfaces.
 - [ ] 10-03-PLAN.md — Implement GeometryManager flat-list bulk actions and validation checklist evidence.
 **UI hint**: yes
 
@@ -100,7 +100,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 10. Sketch Foundations & Managers | 1/3 | In Progress|  |
+| 10. Sketch Foundations & Managers | 2/3 | In Progress|  |
 | 11. Constraint Authoring UX | 0/TBD | Not started | - |
 | 12. Solver Control & Constrained Interaction | 0/TBD | Not started | - |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
