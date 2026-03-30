@@ -540,6 +540,29 @@ static inline vec4_t ui_scene_hierarchy_random_color(void) {
     return vec4_make(r + m, g + m, b + m, 1.0f);
 }
 
+static inline ecs_entity_t ui_scene_hierarchy_get_active_sketch(ui_scene_hierarchy_state_t *state) {
+    if (!state || !state->scene || !state->selection) {
+        return 0;
+    }
+
+    int selected_count = selection_count(state->selection);
+    for (int i = 0; i < selected_count; i++) {
+        ecs_entity_t selected = selection_get(state->selection, i);
+        if (selected == 0) continue;
+
+        if (scene_is_sketch(state->scene, selected)) {
+            return selected;
+        }
+
+        ecs_entity_t parent = scene_get_parent(state->scene, selected);
+        if (parent != 0 && scene_is_sketch(state->scene, parent)) {
+            return parent;
+        }
+    }
+
+    return 0;
+}
+
 //------------------------------------------------------------------------------
 // Internal: Add Entity Menu
 //------------------------------------------------------------------------------
@@ -547,40 +570,100 @@ static inline vec4_t ui_scene_hierarchy_random_color(void) {
 static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *state) {
     if (igBeginMenu("Add Entity", true)) {
         ecs_entity_t new_entity = 0;
+        ecs_entity_t active_sketch = ui_scene_hierarchy_get_active_sketch(state);
+
+        if (igMenuItem_Bool("Create Sketch", NULL, false, true)) {
+            vec4_t sketch_color = ui_scene_hierarchy_random_color();
+            new_entity = scene_add_sketch(state->scene, "Sketch", "", sketch_color);
+            if (new_entity != 0) {
+                selection_set_single(state->selection, new_entity);
+                state->cache_dirty = true;
+                active_sketch = new_entity;
+            }
+        }
+
+        igSeparator();
 
         if (igMenuItem_Bool("Point", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_point(state->scene,
-                vec3_make(0.0f, 0.0f, 0.0f),
-                color, 0.06f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_point_to_sketch(state->scene, active_sketch,
+                    vec3_make(0.0f, 0.0f, 0.0f),
+                    color, 0.06f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_point(state->scene,
+                    vec3_make(0.0f, 0.0f, 0.0f),
+                    color, 0.06f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Line (X axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_line(state->scene,
-                vec3_make(-1.0f, 0.0f, 0.0f),
-                vec3_make(1.0f, 0.0f, 0.0f),
-                color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_line_to_sketch(state->scene, active_sketch,
+                    vec3_make(-1.0f, 0.0f, 0.0f),
+                    vec3_make(1.0f, 0.0f, 0.0f),
+                    color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_line(state->scene,
+                    vec3_make(-1.0f, 0.0f, 0.0f),
+                    vec3_make(1.0f, 0.0f, 0.0f),
+                    color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Line (Y axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_line(state->scene,
-                vec3_make(0.0f, -1.0f, 0.0f),
-                vec3_make(0.0f, 1.0f, 0.0f),
-                color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_line_to_sketch(state->scene, active_sketch,
+                    vec3_make(0.0f, -1.0f, 0.0f),
+                    vec3_make(0.0f, 1.0f, 0.0f),
+                    color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_line(state->scene,
+                    vec3_make(0.0f, -1.0f, 0.0f),
+                    vec3_make(0.0f, 1.0f, 0.0f),
+                    color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Line (Z axis)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_line(state->scene,
-                vec3_make(0.0f, 0.0f, -1.0f),
-                vec3_make(0.0f, 0.0f, 1.0f),
-                color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_line_to_sketch(state->scene, active_sketch,
+                    vec3_make(0.0f, 0.0f, -1.0f),
+                    vec3_make(0.0f, 0.0f, 1.0f),
+                    color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_line(state->scene,
+                    vec3_make(0.0f, 0.0f, -1.0f),
+                    vec3_make(0.0f, 0.0f, 1.0f),
+                    color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Line (Random)", NULL, false, true)) {
@@ -595,8 +678,17 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
                 ((float)(rand() % 200) - 100.0f) / 50.0f,
                 ((float)(rand() % 200) - 100.0f) / 50.0f
             );
-            new_entity = scene_add_line(state->scene, a, b, color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_line_to_sketch(state->scene, active_sketch, a, b, color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_line(state->scene, a, b, color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         igSeparator();
@@ -615,26 +707,56 @@ static inline void ui_scene_hierarchy_draw_add_menu(ui_scene_hierarchy_state_t *
 
         if (igMenuItem_Bool("Arc (Quarter Circle)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_arc(state->scene,
-                vec3_make(0.0f, 0.0f, 0.0f),  // center
-                1.0f,                          // radius
-                0.0f,                          // start angle
-                1.5707963f,                    // end angle (PI/2)
-                vec3_make(0.0f, 0.0f, 1.0f),  // normal (XY plane)
-                color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_arc_to_sketch(state->scene, active_sketch,
+                    vec3_make(0.0f, 0.0f, 0.0f),  // center
+                    1.0f,                          // radius
+                    0.0f,                          // start angle
+                    1.5707963f,                    // end angle (PI/2)
+                    vec3_make(0.0f, 0.0f, 1.0f),  // normal (XY plane)
+                    color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_arc(state->scene,
+                    vec3_make(0.0f, 0.0f, 0.0f),  // center
+                    1.0f,                          // radius
+                    0.0f,                          // start angle
+                    1.5707963f,                    // end angle (PI/2)
+                    vec3_make(0.0f, 0.0f, 1.0f),  // normal (XY plane)
+                    color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Arc (Semicircle)", NULL, false, true)) {
             vec4_t color = ui_scene_hierarchy_random_color();
-            new_entity = scene_add_arc(state->scene,
-                vec3_make(0.0f, 0.0f, 0.0f),
-                1.0f,
-                0.0f,
-                3.1415926f,                    // PI
-                vec3_make(0.0f, 0.0f, 1.0f),
-                color, 0.03f);
-            state->cache_dirty = true;
+            if (active_sketch != 0) {
+                new_entity = scene_add_arc_to_sketch(state->scene, active_sketch,
+                    vec3_make(0.0f, 0.0f, 0.0f),
+                    1.0f,
+                    0.0f,
+                    3.1415926f,                    // PI
+                    vec3_make(0.0f, 0.0f, 1.0f),
+                    color, 0.03f);
+                if (new_entity != 0) {
+                    scene_refresh_sketch_metadata(state->scene, active_sketch);
+                }
+            } else {
+                new_entity = scene_add_arc(state->scene,
+                    vec3_make(0.0f, 0.0f, 0.0f),
+                    1.0f,
+                    0.0f,
+                    3.1415926f,                    // PI
+                    vec3_make(0.0f, 0.0f, 1.0f),
+                    color, 0.03f);
+            }
+            if (new_entity != 0) {
+                state->cache_dirty = true;
+            }
         }
 
         if (igMenuItem_Bool("Polygon (Triangle)", NULL, false, true)) {
