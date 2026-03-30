@@ -11,6 +11,8 @@
 #include "../components/selectable_comp.h"
 #include "../components/label_comp.h"
 #include "../components/light_comp.h"
+#include "../components/sketch_comp.h"
+#include "../components/sketch_geometry_state_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -27,6 +29,8 @@ typedef struct {
     ecs_entity_t SelectableComp_id;
     ecs_entity_t LabelComp_id;
     ecs_entity_t LightComp_id;
+    ecs_entity_t SketchComp_id;
+    ecs_entity_t SketchGeometryStateComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -110,6 +114,18 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "LightComp" }),
         .type.size = sizeof(LightComp),
         .type.alignment = ECS_ALIGNOF(LightComp)
+    });
+
+    s->SketchComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "SketchComp" }),
+        .type.size = sizeof(SketchComp),
+        .type.alignment = ECS_ALIGNOF(SketchComp)
+    });
+
+    s->SketchGeometryStateComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "SketchGeometryStateComp" }),
+        .type.size = sizeof(SketchGeometryStateComp),
+        .type.alignment = ECS_ALIGNOF(SketchGeometryStateComp)
     });
 
     // Register tag components (zero-size)
@@ -260,6 +276,23 @@ static inline void ecs_world_set_label(ecs_world_state_t *s, ecs_entity_t e, con
 
 static inline LightComp* ecs_world_get_light(ecs_world_state_t *s, ecs_entity_t e) {
     return (LightComp*)ecs_get_id(s->world, e, s->LightComp_id);
+}
+
+static inline SketchComp* ecs_world_get_sketch(ecs_world_state_t *s, ecs_entity_t e) {
+    return (SketchComp*)ecs_get_id(s->world, e, s->SketchComp_id);
+}
+
+static inline void ecs_world_set_sketch(ecs_world_state_t *s, ecs_entity_t e, const SketchComp *sketch) {
+    ecs_set_id(s->world, e, s->SketchComp_id, sizeof(SketchComp), sketch);
+}
+
+static inline SketchGeometryStateComp* ecs_world_get_sketch_geometry_state(ecs_world_state_t *s, ecs_entity_t e) {
+    return (SketchGeometryStateComp*)ecs_get_id(s->world, e, s->SketchGeometryStateComp_id);
+}
+
+static inline void ecs_world_set_sketch_geometry_state(ecs_world_state_t *s, ecs_entity_t e,
+                                                        const SketchGeometryStateComp *state) {
+    ecs_set_id(s->world, e, s->SketchGeometryStateComp_id, sizeof(SketchGeometryStateComp), state);
 }
 
 //------------------------------------------------------------------------------
