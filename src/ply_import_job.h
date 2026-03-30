@@ -214,6 +214,18 @@ static inline bool ply_import_job_should_sync(const ply_import_job_t *job) {
 }
 
 //------------------------------------------------------------------------------
+// Internal: parse completion for current import mode
+// Point-cloud imports only require vertex completion; mesh paths require full completion.
+//------------------------------------------------------------------------------
+
+static inline bool ply_import_job_parse_step_complete(const ply_import_job_t *job) {
+    if (job->import_mode == 0) {
+        return ply_vertices_complete(&job->parse_state);
+    }
+    return ply_is_complete(&job->parse_state);
+}
+
+//------------------------------------------------------------------------------
 // Internal: Apply transformations to parsed point data
 // Order: 1) CoM shift, 2) Rotation (X->Y->Z), 3) Scale
 //------------------------------------------------------------------------------
@@ -318,7 +330,7 @@ static inline bool ply_import_job_tick(ply_import_job_t *job, ecs_scene_t *scene
                  job->parse_state.parsed_count, job->total_points);
 
         // Check if parsing is complete
-        if (ply_is_complete(&job->parse_state)) {
+        if (ply_import_job_parse_step_complete(job)) {
             ply_close(&job->parse_state);  // Close file, keep data
 
             // Apply all transformations to parsed data (CoM shift, rotation, scale)
