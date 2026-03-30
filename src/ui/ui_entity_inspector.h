@@ -156,12 +156,123 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     static int gm_delete_pending_count = 0;
 
     SketchComp *sketch = ecs_world_get_sketch(w, e);
-    if (sketch && igCollapsingHeader_TreeNodeFlags("SketchManager", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ecs_scene_t *scene = NULL;
-        if (state->undo_redo && state->undo_redo->scene) {
-            scene = (ecs_scene_t*)state->undo_redo->scene;
+    ecs_scene_t *scene = NULL;
+    if (state->undo_redo && state->undo_redo->scene) {
+        scene = (ecs_scene_t*)state->undo_redo->scene;
+    }
+
+    // Label section (optional component - only shown if entity has one)
+    LabelComp *label = ecs_world_get_label(w, e);
+    if (label && igCollapsingHeader_TreeNodeFlags("Label", ImGuiTreeNodeFlags_DefaultOpen)) {
+        igInputText("Name", label->name, LABEL_NAME_MAX, 0, NULL, NULL);
+        igInputTextMultiline("Description", label->description, LABEL_DESC_MAX,
+                             (ImVec2){-FLT_MIN, igGetTextLineHeight() * 3}, 0, NULL, NULL);
+    }
+
+    // Transform section
+    TransformComp *t = ecs_world_get_transform(w, e);
+    if (t && igCollapsingHeader_TreeNodeFlags("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool changed = false;
+
+        // Position
+        float pos[3] = { t->position.x, t->position.y, t->position.z };
+        if (igDragFloat3("Position", pos, 0.1f, -100.0f, 100.0f, "%.2f", 0)) {
+            t->position.x = pos[0];
+            t->position.y = pos[1];
+            t->position.z = pos[2];
+            changed = true;
+        }
+        // Capture value at drag start
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_position = t->position;
+        }
+        // Record undo command at drag end
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_pos = t->position;
+            if (state->drag_start_position.x != new_pos.x ||
+                state->drag_start_position.y != new_pos.y ||
+                state->drag_start_position.z != new_pos.z) {
+                undo_cmd_set_position(state->undo_redo, e, state->drag_start_position, new_pos);
+            }
         }
 
+        // Rotation (in degrees for user friendliness)
+        float rot_deg[3] = {
+            mdcad_undo_editor_rad_to_deg(t->rotation.x),  // rad to deg
+            mdcad_undo_editor_rad_to_deg(t->rotation.y),
+            mdcad_undo_editor_rad_to_deg(t->rotation.z)
+        };
+        if (igDragFloat3("Rotation", rot_deg, 1.0f, -360.0f, 360.0f, "%.1f", 0)) {
+            t->rotation.x = mdcad_undo_editor_deg_to_rad(rot_deg[0]);  // deg to rad
+            t->rotation.y = mdcad_undo_editor_deg_to_rad(rot_deg[1]);
+            t->rotation.z = mdcad_undo_editor_deg_to_rad(rot_deg[2]);
+            changed = true;
+        }
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_rotation = t->rotation;
+        }
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_rot = t->rotation;
+            if (state->drag_start_rotation.x != new_rot.x ||
+                state->drag_start_rotation.y != new_rot.y ||
+                state->drag_start_rotation.z != new_rot.z) {
+                undo_cmd_set_rotation(state->undo_redo, e, state->drag_start_rotation, new_rot);
+            }
+        }
+
+        // Scale
+        float scale[3] = { t->scale.x, t->scale.y, t->scale.z };
+        if (igDragFloat3("Scale", scale, 0.01f, 0.01f, 10.0f, "%.2f", 0)) {
+            t->scale.x = scale[0];
+            t->scale.y = scale[1];
+            t->scale.z = scale[2];
+            changed = true;
+        }
+        if (igIsItemActivated()) {
+            state->editing_entity = e;
+            state->drag_start_scale = t->scale;
+        }
+        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
+            vec3_t new_scale = t->scale;
+            if (state->drag_start_scale.x != new_scale.x ||
+                state->drag_start_scale.y != new_scale.y ||
+                state->drag_start_scale.z != new_scale.z) {
+                undo_cmd_set_scale(state->undo_redo, e, state->drag_start_scale, new_scale);
+            }
+        }
+
+        if (changed) {
+            t->dirty = true;
+            RenderableComp *r = ecs_world_get_renderable(w, e);
+            if (r) r->instance_dirty = true;
+
+            // Mark all descendants dirty so they update their world matrices
+            ecs_world_mark_descendants_dirty(w, e);
+        }
+    }
+
+    if (sketch && igCollapsingHeader_TreeNodeFlags("SketchManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (scene) {
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+        }
+
+        igText("Status: %s", sketch_status_name(sketch->status));
+        igTextDisabled("Fixed-state: %d/%d geometry fixed",
+            sketch->fixed_geometry_count, sketch->geometry_count);
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igText("Geometry count: %d", sketch->geometry_count);
+        igText("Constraint count: %d", sketch->constraint_count);
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Color policy");
+        igTextWrapped("Sketch color applies by default; geometry with explicit non-black RGB color overrides inherited sketch color.");
+    }
+
+    if (sketch && igCollapsingHeader_TreeNodeFlags("GeometryManager", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (gm_bound_sketch != e) {
             gm_bound_sketch = e;
             gm_selected_count = 0;
@@ -188,26 +299,6 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 gm_selected_count--;
             }
         }
-
-        if (scene) {
-            scene_refresh_sketch_metadata(scene, e);
-            sketch = ecs_world_get_sketch(w, e);
-        }
-
-        igText("Status: %s", sketch_status_name(sketch->status));
-        igTextDisabled("Fixed-state: %d/%d geometry fixed",
-            sketch->fixed_geometry_count, sketch->geometry_count);
-
-        igDummy((ImVec2){0.0f, 8.0f});
-        igText("Geometry count: %d", sketch->geometry_count);
-        igText("Constraint count: %d", sketch->constraint_count);
-
-        igDummy((ImVec2){0.0f, 8.0f});
-        igTextDisabled("Color policy");
-        igTextWrapped("Sketch color applies by default; geometry with explicit non-black RGB color overrides inherited sketch color.");
-
-        igDummy((ImVec2){0.0f, 16.0f});
-        igText("GeometryManager");
 
         if (geometry_row_count == 0) {
             igTextDisabled("No geometry in this sketch");
@@ -384,98 +475,6 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 igCloseCurrentPopup();
             }
             igEndPopup();
-        }
-    }
-
-    // Label section (optional component - only shown if entity has one)
-    LabelComp *label = ecs_world_get_label(w, e);
-    if (label && igCollapsingHeader_TreeNodeFlags("Label", ImGuiTreeNodeFlags_DefaultOpen)) {
-        igInputText("Name", label->name, LABEL_NAME_MAX, 0, NULL, NULL);
-        igInputTextMultiline("Description", label->description, LABEL_DESC_MAX,
-                             (ImVec2){-FLT_MIN, igGetTextLineHeight() * 3}, 0, NULL, NULL);
-    }
-
-    // Transform section
-    TransformComp *t = ecs_world_get_transform(w, e);
-    if (t && igCollapsingHeader_TreeNodeFlags("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-        bool changed = false;
-
-        // Position
-        float pos[3] = { t->position.x, t->position.y, t->position.z };
-        if (igDragFloat3("Position", pos, 0.1f, -100.0f, 100.0f, "%.2f", 0)) {
-            t->position.x = pos[0];
-            t->position.y = pos[1];
-            t->position.z = pos[2];
-            changed = true;
-        }
-        // Capture value at drag start
-        if (igIsItemActivated()) {
-            state->editing_entity = e;
-            state->drag_start_position = t->position;
-        }
-        // Record undo command at drag end
-        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
-            vec3_t new_pos = t->position;
-            if (state->drag_start_position.x != new_pos.x ||
-                state->drag_start_position.y != new_pos.y ||
-                state->drag_start_position.z != new_pos.z) {
-                undo_cmd_set_position(state->undo_redo, e, state->drag_start_position, new_pos);
-            }
-        }
-
-        // Rotation (in degrees for user friendliness)
-        float rot_deg[3] = {
-            mdcad_undo_editor_rad_to_deg(t->rotation.x),  // rad to deg
-            mdcad_undo_editor_rad_to_deg(t->rotation.y),
-            mdcad_undo_editor_rad_to_deg(t->rotation.z)
-        };
-        if (igDragFloat3("Rotation", rot_deg, 1.0f, -360.0f, 360.0f, "%.1f", 0)) {
-            t->rotation.x = mdcad_undo_editor_deg_to_rad(rot_deg[0]);  // deg to rad
-            t->rotation.y = mdcad_undo_editor_deg_to_rad(rot_deg[1]);
-            t->rotation.z = mdcad_undo_editor_deg_to_rad(rot_deg[2]);
-            changed = true;
-        }
-        if (igIsItemActivated()) {
-            state->editing_entity = e;
-            state->drag_start_rotation = t->rotation;
-        }
-        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
-            vec3_t new_rot = t->rotation;
-            if (state->drag_start_rotation.x != new_rot.x ||
-                state->drag_start_rotation.y != new_rot.y ||
-                state->drag_start_rotation.z != new_rot.z) {
-                undo_cmd_set_rotation(state->undo_redo, e, state->drag_start_rotation, new_rot);
-            }
-        }
-
-        // Scale
-        float scale[3] = { t->scale.x, t->scale.y, t->scale.z };
-        if (igDragFloat3("Scale", scale, 0.01f, 0.01f, 10.0f, "%.2f", 0)) {
-            t->scale.x = scale[0];
-            t->scale.y = scale[1];
-            t->scale.z = scale[2];
-            changed = true;
-        }
-        if (igIsItemActivated()) {
-            state->editing_entity = e;
-            state->drag_start_scale = t->scale;
-        }
-        if (igIsItemDeactivatedAfterEdit() && state->undo_redo && state->editing_entity == e) {
-            vec3_t new_scale = t->scale;
-            if (state->drag_start_scale.x != new_scale.x ||
-                state->drag_start_scale.y != new_scale.y ||
-                state->drag_start_scale.z != new_scale.z) {
-                undo_cmd_set_scale(state->undo_redo, e, state->drag_start_scale, new_scale);
-            }
-        }
-
-        if (changed) {
-            t->dirty = true;
-            RenderableComp *r = ecs_world_get_renderable(w, e);
-            if (r) r->instance_dirty = true;
-
-            // Mark all descendants dirty so they update their world matrices
-            ecs_world_mark_descendants_dirty(w, e);
         }
     }
 
