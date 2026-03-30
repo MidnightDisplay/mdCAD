@@ -8,14 +8,16 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
-## Current Milestone: v1.2 (Planning)
+## Current Milestone: v1.2 Sketches, Constraints, Scripting
 
-**Goal:** Define and execute the next milestone scope after v1.1 ship.
+**Goal:** Add a constrained-sketch subsystem with solver-driven geometry and bidirectional script representation.
 
 **Target features:**
-- Define fresh requirements for deferred platform validation and next migration opportunities.
-- Preserve native gate stability while expanding confidence to deferred targets.
-- Keep milestone scope explicit and phase-mapped from the start.
+- Add sketch-level ECS management components (`SketchManager`, `GeometryManager`, `ConstraintManager`) and one solver backend.
+- Add sketch UX in Entity Inspector + viewport glyphs + Tab-driven in-context constraint menu.
+- Add constraint-capable geometry scope (points, lines, arcs/circles) with legal constraint typing and status visibility.
+- Add script editor + script serialization/reconstruction + bidirectional UI/script sync with parameter IO frontend.
+- Expand scene API for sketch, geometry, constraint, and script operations.
 
 ## Requirements
 
@@ -42,32 +44,35 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Define v1.2 milestone requirements and roadmap via `/gsd-new-milestone`.
-- [ ] Plan deferred platform validation scope (`PLAT-01`, `PLAT-02`) with explicit acceptance gates.
+- [ ] Add sketch entity system with solver status, geometry/constraint management, and fix/loose workflow controls.
+- [ ] Add constraint authoring/view/edit workflows (glyphs, menu, legal-type filtering, dimensional editing).
+- [ ] Add bidirectional sketch scripting subsystem with script editor, parser, serializer, and IO parameter UI.
+- [ ] Expand scene API + undo integration for sketch/constraint/script operations.
+- [ ] Add constraint-focused example sketches/scripts for validation and debugging.
 
 ### Out of Scope
 
 - Full repo-wide big-bang replacement in a single step — staged migration is easier to verify and safer for existing native builds
 - Adoption of a C++ math library — the codebase is intentionally C-first and the user explicitly rejected C++ for this work
-- Full iOS native and web/WASM validation in this milestone — intentionally deferred to keep v1.1 focused on long-tail migration execution
+- macOS parity as an equal-time dev gate during feature buildout — deferred until Windows Vulkan feature completion
 
 ## Context
 
 v1.0 and v1.1 are shipped and archived. v1.1 closed long-tail migration and validation gates across phases 6-9, including final boundary documentation and parity/perf/manual verification.
 
-The next step is to open a fresh milestone scope (`/gsd-new-milestone`) for deferred platform expansion and any newly discovered migration follow-ups.
+v1.2 pivots to a larger feature system proposal captured in `docs/feature-proposal/Sketches, Constraints, Scripting.md`: constrained sketches, solver UX, and scripting-first bidirectional workflows.
 
 ## Current State
 
 - Milestone `v1.1` shipped with Phases 6-9 complete and archived.
 - Long-tail migration closure requirements (`TAIL-01..03`, `TRED-01..02`, `VAL-01..03`) are complete.
-- Deferred platform expansion (`PLAT-01`, `PLAT-02`) is ready to be scoped as the next milestone.
+- Milestone `v1.2` scope is now centered on sketch constraints and scripting workflows.
 
 ## Next Milestone Goals
 
-1. Define v1.2 requirements and roadmap with explicit platform-expansion acceptance gates.
-2. Execute deferred platform validation (`PLAT-01`, `PLAT-02`) where feasible.
-3. Capture new migration debt/workstream candidates discovered during v1.1 closeout.
+1. Define v1.2 requirements for sketch entities, solver control, constraint UX, and scripting semantics.
+2. Plan phased delivery order with Windows Vulkan as the active development/test gate.
+3. Preserve runtime visual quality while permitting broad refactors required by sketch/solver integration.
 
 ## Constraints
 
@@ -90,6 +95,7 @@ The next step is to open a fresh milestone scope (`/gsd-new-milestone`) for defe
 | Use a harness-first validation workflow before hotspot migration | Staged rollout needs repeatable compare/bench gates before runtime math is swapped | Confirmed in Phase 2 |
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
 | Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Completed in v1.1 |
+| Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
 
 ## Evolution
 
