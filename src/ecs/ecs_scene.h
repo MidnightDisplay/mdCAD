@@ -1050,11 +1050,84 @@ static inline void scene_set_parent(ecs_scene_t *scene, ecs_entity_t child, ecs_
 
 // Create a transform-only anchor entity (no geometry, no GPU slot)
 static inline ecs_entity_t scene_add_anchor(ecs_scene_t *scene,
-                                              const char *name, const char *desc) {
+                                               const char *name, const char *desc) {
     ecs_entity_t e = ecs_world_create_anchor_entity(scene->world);
     if (name || desc) {
         LabelComp label = label_comp_make(name ? name : "", desc ? desc : "");
         ecs_world_set_label(scene->world, e, &label);
+    }
+    return e;
+}
+
+// Create a sketch container entity
+static inline ecs_entity_t scene_add_sketch(ecs_scene_t *scene,
+                                            const char *name, const char *desc,
+                                            vec4_t sketch_color) {
+    ecs_entity_t sketch = scene_add_anchor(scene, name ? name : "Sketch", desc ? desc : "");
+    if (sketch == 0) return 0;
+
+    SketchComp sketch_comp = sketch_comp_default();
+    sketch_comp.color = sketch_color;
+    ecs_world_set_sketch(scene->world, sketch, &sketch_comp);
+
+    return sketch;
+}
+
+static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e) {
+    return ecs_world_get_sketch(scene->world, e) != NULL;
+}
+
+// Attach an existing geometry entity to a sketch container
+static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
+                                                   ecs_entity_t sketch,
+                                                   ecs_entity_t geometry_entity) {
+    if (!scene_is_sketch(scene, sketch)) return false;
+    if (!ecs_is_alive(scene->world->world, geometry_entity)) return false;
+    if (!ecs_world_get_geometry(scene->world, geometry_entity)) return false;
+
+    scene_set_parent(scene, geometry_entity, sketch);
+
+    SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(scene->world, geometry_entity);
+    if (!state) {
+        SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+        ecs_world_set_sketch_geometry_state(scene->world, geometry_entity, &init_state);
+    }
+
+    return true;
+}
+
+// Create geometry and attach it to a sketch in one helper call
+static inline ecs_entity_t scene_add_point_to_sketch(ecs_scene_t *scene, ecs_entity_t sketch,
+                                                     vec3_t pos, vec4_t color, float size) {
+    ecs_entity_t e = scene_add_point(scene, pos, color, size);
+    if (e == 0) return 0;
+    if (!scene_attach_geometry_to_sketch(scene, sketch, e)) {
+        scene_remove_entity(scene, e);
+        return 0;
+    }
+    return e;
+}
+
+static inline ecs_entity_t scene_add_line_to_sketch(ecs_scene_t *scene, ecs_entity_t sketch,
+                                                    vec3_t a, vec3_t b, vec4_t color, float width) {
+    ecs_entity_t e = scene_add_line(scene, a, b, color, width);
+    if (e == 0) return 0;
+    if (!scene_attach_geometry_to_sketch(scene, sketch, e)) {
+        scene_remove_entity(scene, e);
+        return 0;
+    }
+    return e;
+}
+
+static inline ecs_entity_t scene_add_arc_to_sketch(ecs_scene_t *scene, ecs_entity_t sketch,
+                                                   vec3_t center, float radius,
+                                                   float start_angle, float end_angle,
+                                                   vec3_t normal, vec4_t color, float width) {
+    ecs_entity_t e = scene_add_arc(scene, center, radius, start_angle, end_angle, normal, color, width);
+    if (e == 0) return 0;
+    if (!scene_attach_geometry_to_sketch(scene, sketch, e)) {
+        scene_remove_entity(scene, e);
+        return 0;
     }
     return e;
 }
@@ -1095,6 +1168,84 @@ static inline int scene_count_children(ecs_scene_t *scene, ecs_entity_t parent) 
 // Check if entity has any children
 static inline bool scene_has_children(ecs_scene_t *scene, ecs_entity_t e) {
     return ecs_world_has_children(scene->world, e);
+}
+
+static inline int scene_count_sketch_geometry(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene_is_sketch(scene, sketch)) return 0;
+
+    int count = 0;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            if (ecs_world_get_geometry(scene->world, it.entities[i])) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static inline int scene_count_sketch_fixed_geometry(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene_is_sketch(scene, sketch)) return 0;
+
+    int fixed_count = 0;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t child = it.entities[i];
+            if (!ecs_world_get_geometry(scene->world, child)) {
+                continue;
+            }
+            SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(scene->world, child);
+            if (state && state->fixed) {
+                fixed_count++;
+            }
+        }
+    }
+    return fixed_count;
+}
+
+static inline int scene_get_sketch_constraint_count(ecs_scene_t *scene, ecs_entity_t sketch) {
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return 0;
+    return sk->constraint_count;
+}
+
+// Placeholder derivation for Phase 10 (D-06/D-08):
+// - error: negative counts (invalid state)
+// - loose: no geometry or mixed fixed state
+// - fixed: all geometry is fixed
+// - solved: has geometry, none fixed, non-negative counts
+static inline sketch_status_t scene_derive_sketch_status(ecs_scene_t *scene, ecs_entity_t sketch) {
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return SKETCH_STATUS_ERROR;
+
+    int geometry_count = scene_count_sketch_geometry(scene, sketch);
+    int fixed_count = scene_count_sketch_fixed_geometry(scene, sketch);
+    int constraint_count = sk->constraint_count;
+
+    if (geometry_count < 0 || fixed_count < 0 || constraint_count < 0 || fixed_count > geometry_count) {
+        return SKETCH_STATUS_ERROR;
+    }
+    if (geometry_count == 0) {
+        return SKETCH_STATUS_LOOSE;
+    }
+    if (fixed_count == geometry_count) {
+        return SKETCH_STATUS_FIXED;
+    }
+    if (fixed_count == 0) {
+        return SKETCH_STATUS_SOLVED;
+    }
+    return SKETCH_STATUS_LOOSE;
+}
+
+static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_t sketch) {
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return;
+
+    sk->geometry_count = scene_count_sketch_geometry(scene, sketch);
+    sk->fixed_geometry_count = scene_count_sketch_fixed_geometry(scene, sketch);
+    sk->status = scene_derive_sketch_status(scene, sketch);
 }
 
 //------------------------------------------------------------------------------
