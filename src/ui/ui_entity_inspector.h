@@ -165,8 +165,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     LabelComp *label = ecs_world_get_label(w, e);
     if (label && igCollapsingHeader_TreeNodeFlags("Label", ImGuiTreeNodeFlags_DefaultOpen)) {
         igInputText("Name", label->name, LABEL_NAME_MAX, 0, NULL, NULL);
-        igInputTextMultiline("Description", label->description, LABEL_DESC_MAX,
-                             (ImVec2){-FLT_MIN, igGetTextLineHeight() * 3}, 0, NULL, NULL);
+        igInputText("Description", label->description, LABEL_DESC_MAX, 0, NULL, NULL);
     }
 
     // Transform section
@@ -299,6 +298,73 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 gm_selected_count--;
             }
         }
+
+        igTextDisabled("Add geometry");
+        igBeginDisabled(scene == NULL);
+        if (igButton("Add Point##geometry_manager_add_point", (ImVec2){0, 0})) {
+            ecs_entity_t created = scene_add_point_to_sketch(scene, e,
+                vec3_make(0.0f, 0.0f, 0.0f), sketch->color, 0.06f);
+            if (created != 0) {
+                if (state->undo_redo) {
+                    undo_cmd_create_entity(state->undo_redo, created);
+                }
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                gm_selected_entities[0] = created;
+                gm_selected_count = 1;
+            }
+        }
+        igSameLine(0, 8);
+        if (igButton("Add Line##geometry_manager_add_line", (ImVec2){0, 0})) {
+            ecs_entity_t created = scene_add_line_to_sketch(scene, e,
+                vec3_make(-1.0f, 0.0f, 0.0f),
+                vec3_make(1.0f, 0.0f, 0.0f),
+                sketch->color, 0.03f);
+            if (created != 0) {
+                if (state->undo_redo) {
+                    undo_cmd_create_entity(state->undo_redo, created);
+                }
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                gm_selected_entities[0] = created;
+                gm_selected_count = 1;
+            }
+        }
+        igSameLine(0, 8);
+        if (igButton("Add Arc##geometry_manager_add_arc", (ImVec2){0, 0})) {
+            ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
+                vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f,
+                vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+            if (created != 0) {
+                if (state->undo_redo) {
+                    undo_cmd_create_entity(state->undo_redo, created);
+                }
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                gm_selected_entities[0] = created;
+                gm_selected_count = 1;
+            }
+        }
+        igSameLine(0, 8);
+        if (igButton("Add Circle##geometry_manager_add_circle", (ImVec2){0, 0})) {
+            ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
+                vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 6.2831853f,
+                vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+            if (created != 0) {
+                if (state->undo_redo) {
+                    undo_cmd_create_entity(state->undo_redo, created);
+                }
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                gm_selected_entities[0] = created;
+                gm_selected_count = 1;
+            }
+        }
+        igEndDisabled();
+        if (scene == NULL) {
+            igTextDisabled("GeometryManager add controls require scene context.");
+        }
+        igDummy((ImVec2){0.0f, 8.0f});
 
         if (geometry_row_count == 0) {
             igTextDisabled("No geometry in this sketch");

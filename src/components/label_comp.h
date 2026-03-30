@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define LABEL_NAME_MAX 128
-#define LABEL_DESC_MAX 256
+#define LABEL_DESC_MAX 128
 
 typedef struct {
     char name[LABEL_NAME_MAX];
