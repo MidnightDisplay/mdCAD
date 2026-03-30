@@ -67,6 +67,8 @@ typedef enum {
     // Bulk operations
     CMD_BULK_SET_COLOR,
     CMD_BULK_SET_VISIBLE,
+    CMD_BULK_SET_SKETCH_FIXED,
+    CMD_BULK_DELETE_ENTITIES,
 
     // Geometry vertex editing (gizmo geometry mode)
     CMD_SET_GEOMETRY_VERTICES,
@@ -229,6 +231,19 @@ typedef struct {
 } cmd_bulk_set_visible_t;
 
 typedef struct {
+    uint64_t *entity_ids;
+    bool *old_fixed;
+    int count;
+    bool new_fixed;
+} cmd_bulk_set_sketch_fixed_t;
+
+typedef struct {
+    uint64_t *entity_ids;
+    undo_entity_snapshot_t *snapshots;
+    int count;
+} cmd_bulk_delete_entities_t;
+
+typedef struct {
     uint64_t entity_id;
     int *vertex_indices;      // Which vertices changed
     vec3_t *old_positions;    // Original positions (local space)
@@ -254,6 +269,8 @@ typedef struct {
         cmd_set_parent_t set_parent;
         cmd_bulk_set_color_t bulk_color;
         cmd_bulk_set_visible_t bulk_visible;
+        cmd_bulk_set_sketch_fixed_t bulk_sketch_fixed;
+        cmd_bulk_delete_entities_t bulk_delete;
         cmd_set_geometry_vertices_t set_vertices;
     } data;
 } undo_command_t;
@@ -348,6 +365,33 @@ static inline void undo_command_free(undo_command_t *cmd) {
         case CMD_BULK_SET_VISIBLE:
             if (cmd->data.bulk_visible.entity_ids) free(cmd->data.bulk_visible.entity_ids);
             if (cmd->data.bulk_visible.old_visible) free(cmd->data.bulk_visible.old_visible);
+            break;
+
+        case CMD_BULK_SET_SKETCH_FIXED:
+            if (cmd->data.bulk_sketch_fixed.entity_ids) free(cmd->data.bulk_sketch_fixed.entity_ids);
+            if (cmd->data.bulk_sketch_fixed.old_fixed) free(cmd->data.bulk_sketch_fixed.old_fixed);
+            break;
+
+        case CMD_BULK_DELETE_ENTITIES:
+            if (cmd->data.bulk_delete.snapshots) {
+                for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+                    undo_entity_snapshot_t *snap = &cmd->data.bulk_delete.snapshots[i];
+                    if (snap->geom_type == UNDO_GEOM_POLYLINE && snap->data.polyline.points) {
+                        free(snap->data.polyline.points);
+                    }
+                    if (snap->geom_type == UNDO_GEOM_POLYGON && snap->data.polygon.points) {
+                        free(snap->data.polygon.points);
+                    }
+                    if (snap->geom_type == UNDO_GEOM_MESH) {
+                        if (snap->data.mesh.vertices) free(snap->data.mesh.vertices);
+                        if (snap->data.mesh.normals) free(snap->data.mesh.normals);
+                        if (snap->data.mesh.vertex_colors) free(snap->data.mesh.vertex_colors);
+                        if (snap->data.mesh.indices) free(snap->data.mesh.indices);
+                    }
+                }
+                free(cmd->data.bulk_delete.snapshots);
+            }
+            if (cmd->data.bulk_delete.entity_ids) free(cmd->data.bulk_delete.entity_ids);
             break;
 
         case CMD_SET_GEOMETRY_VERTICES:
@@ -463,6 +507,8 @@ static inline const char* undo_cmd_name(undo_cmd_type_t type) {
         case CMD_SET_PARENT: return "Reparent";
         case CMD_BULK_SET_COLOR: return "Bulk Color";
         case CMD_BULK_SET_VISIBLE: return "Bulk Visibility";
+        case CMD_BULK_SET_SKETCH_FIXED: return "Bulk Fix/Unfix";
+        case CMD_BULK_DELETE_ENTITIES: return "Bulk Delete";
         case CMD_SET_GEOMETRY_VERTICES: return "Edit Vertices";
         default: return "Unknown";
     }

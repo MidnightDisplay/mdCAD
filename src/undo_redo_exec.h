@@ -462,6 +462,45 @@ static inline void undo_cmd_bulk_set_visible(undo_redo_t *ur, ecs_entity_t *enti
     undo_redo_push(ur, &cmd);
 }
 
+// Record bulk sketch fixed-state change
+static inline void undo_cmd_bulk_set_sketch_fixed(undo_redo_t *ur, ecs_entity_t *entities,
+                                                   bool *old_fixed, int count, bool new_fixed) {
+    if (!ur || count <= 0) return;
+
+    undo_command_t cmd = {0};
+    cmd.type = CMD_BULK_SET_SKETCH_FIXED;
+    cmd.data.bulk_sketch_fixed.entity_ids = (uint64_t*)malloc(sizeof(uint64_t) * count);
+    cmd.data.bulk_sketch_fixed.old_fixed = (bool*)malloc(sizeof(bool) * count);
+    cmd.data.bulk_sketch_fixed.count = count;
+    cmd.data.bulk_sketch_fixed.new_fixed = new_fixed;
+
+    for (int i = 0; i < count; i++) {
+        cmd.data.bulk_sketch_fixed.entity_ids[i] = (uint64_t)entities[i];
+        cmd.data.bulk_sketch_fixed.old_fixed[i] = old_fixed[i];
+    }
+
+    undo_redo_push(ur, &cmd);
+}
+
+// Record bulk entity delete as one atomic undo command
+static inline void undo_cmd_bulk_delete_entities(undo_redo_t *ur, ecs_entity_t *entities, int count) {
+    if (!ur || !ur->scene || !entities || count <= 0) return;
+    ecs_scene_t *scene = (ecs_scene_t*)ur->scene;
+
+    undo_command_t cmd = {0};
+    cmd.type = CMD_BULK_DELETE_ENTITIES;
+    cmd.data.bulk_delete.entity_ids = (uint64_t*)malloc(sizeof(uint64_t) * count);
+    cmd.data.bulk_delete.snapshots = (undo_entity_snapshot_t*)calloc((size_t)count, sizeof(undo_entity_snapshot_t));
+    cmd.data.bulk_delete.count = count;
+
+    for (int i = 0; i < count; i++) {
+        cmd.data.bulk_delete.entity_ids[i] = (uint64_t)entities[i];
+        cmd.data.bulk_delete.snapshots[i] = undo_snapshot_entity(scene, entities[i]);
+    }
+
+    undo_redo_push(ur, &cmd);
+}
+
 // Record geometry vertex position changes
 static inline void undo_cmd_set_geometry_vertices(undo_redo_t *ur, ecs_entity_t e,
                                                     int *vertex_indices, vec3_t *old_positions,
@@ -674,6 +713,44 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             break;
         }
 
+        case CMD_BULK_SET_SKETCH_FIXED: {
+            for (int i = 0; i < cmd->data.bulk_sketch_fixed.count; i++) {
+                ecs_entity_t e = (ecs_entity_t)cmd->data.bulk_sketch_fixed.entity_ids[i];
+                SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(w, e);
+                if (!state) {
+                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                    ecs_world_set_sketch_geometry_state(w, e, &init_state);
+                    state = ecs_world_get_sketch_geometry_state(w, e);
+                }
+                if (state) {
+                    state->fixed = cmd->data.bulk_sketch_fixed.new_fixed;
+                }
+                ecs_entity_t parent = scene_get_parent(scene, e);
+                if (parent != 0 && scene_is_sketch(scene, parent)) {
+                    scene_refresh_sketch_metadata(scene, parent);
+                }
+            }
+            break;
+        }
+
+        case CMD_BULK_DELETE_ENTITIES: {
+            for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+                ecs_entity_t e = (ecs_entity_t)cmd->data.bulk_delete.entity_ids[i];
+                if (!ecs_is_alive(w->world, e)) continue;
+
+                ecs_entity_t parent = scene_get_parent(scene, e);
+                if (ur->selection) {
+                    selection_buffer_t *sel = (selection_buffer_t*)ur->selection;
+                    selection_remove(sel, e);
+                }
+                scene_remove_entity(scene, e);
+                if (parent != 0 && scene_is_sketch(scene, parent)) {
+                    scene_refresh_sketch_metadata(scene, parent);
+                }
+            }
+            break;
+        }
+
         case CMD_SET_GEOMETRY_VERTICES: {
             ecs_entity_t e = (ecs_entity_t)cmd->data.set_vertices.entity_id;
             GeometryComp *g = ecs_world_get_geometry(w, e);
@@ -867,6 +944,42 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
                 if (r) {
                     r->visible = cmd->data.bulk_visible.old_visible[i];
                     r->instance_dirty = true;
+                }
+            }
+            break;
+        }
+
+        case CMD_BULK_SET_SKETCH_FIXED: {
+            for (int i = 0; i < cmd->data.bulk_sketch_fixed.count; i++) {
+                ecs_entity_t e = (ecs_entity_t)cmd->data.bulk_sketch_fixed.entity_ids[i];
+                SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(w, e);
+                if (!state) {
+                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                    ecs_world_set_sketch_geometry_state(w, e, &init_state);
+                    state = ecs_world_get_sketch_geometry_state(w, e);
+                }
+                if (state) {
+                    state->fixed = cmd->data.bulk_sketch_fixed.old_fixed[i];
+                }
+                ecs_entity_t parent = scene_get_parent(scene, e);
+                if (parent != 0 && scene_is_sketch(scene, parent)) {
+                    scene_refresh_sketch_metadata(scene, parent);
+                }
+            }
+            break;
+        }
+
+        case CMD_BULK_DELETE_ENTITIES: {
+            for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+                ecs_entity_t recreated = undo_create_from_snapshot(scene, &cmd->data.bulk_delete.snapshots[i]);
+                cmd->data.bulk_delete.entity_ids[i] = (uint64_t)recreated;
+
+                if (cmd->data.bulk_delete.snapshots[i].parent_id != 0) {
+                    scene_set_parent(scene, recreated, (ecs_entity_t)cmd->data.bulk_delete.snapshots[i].parent_id);
+                    ecs_entity_t parent = (ecs_entity_t)cmd->data.bulk_delete.snapshots[i].parent_id;
+                    if (scene_is_sketch(scene, parent)) {
+                        scene_refresh_sketch_metadata(scene, parent);
+                    }
                 }
             }
             break;
