@@ -171,6 +171,7 @@ typedef struct {
 
 static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e);
 static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e);
 
 //------------------------------------------------------------------------------
 // Scene Initialization
@@ -994,6 +995,31 @@ static inline void scene_constraint_unlink_participants(ecs_scene_t *scene,
     }
 }
 
+static inline void scene_geometry_unlink_constraints(ecs_scene_t *scene, ecs_entity_t geometry_entity) {
+    if (!scene || geometry_entity == 0) return;
+    if (!ecs_is_alive(scene->world->world, geometry_entity)) return;
+
+    ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, geometry_entity);
+    if (!refs || refs->constraint_count == 0) return;
+
+    uint64_t constraints_to_remove[CONSTRAINT_PARTICIPANT_MAX_REFS];
+    uint32_t remove_count = refs->constraint_count;
+    if (remove_count > CONSTRAINT_PARTICIPANT_MAX_REFS) {
+        remove_count = CONSTRAINT_PARTICIPANT_MAX_REFS;
+    }
+
+    for (uint32_t i = 0; i < remove_count; i++) {
+        constraints_to_remove[i] = refs->constraints[i];
+    }
+
+    for (uint32_t i = 0; i < remove_count; i++) {
+        ecs_entity_t constraint_entity = (ecs_entity_t)constraints_to_remove[i];
+        if (constraint_entity != 0 && ecs_is_alive(scene->world->world, constraint_entity)) {
+            scene_remove_entity(scene, constraint_entity);
+        }
+    }
+}
+
 // Internal helper to free instance slots for an entity (without deleting from ECS)
 static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
     RenderableComp *r = ecs_world_get_renderable(scene->world, e);
@@ -1057,6 +1083,12 @@ static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
         for (int i = 0; i < child_count; i++) {
             scene_remove_entity(scene, children[i]);
         }
+    }
+
+    // Deleting a geometry entity must also delete constraints referencing it.
+    // This avoids dangling constraint entities and stale glyph references.
+    if (ecs_world_get_geometry(scene->world, e)) {
+        scene_geometry_unlink_constraints(scene, e);
     }
 
     // Keep constraint participant links coherent when deleting constraint entities.

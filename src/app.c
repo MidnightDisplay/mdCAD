@@ -188,22 +188,6 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
     return *out_sketch != 0;
 }
 
-static void mdcad_select_constraint_participants(ecs_scene_t *scene,
-                                                 selection_buffer_t *selection,
-                                                 ecs_entity_t constraint_entity) {
-    if (!scene || !selection || constraint_entity == 0) return;
-    ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_entity);
-    if (!constraint) return;
-
-    selection_clear(selection);
-    for (uint32_t i = 0; i < constraint->participant_count; i++) {
-        ecs_entity_t participant = (ecs_entity_t)constraint->participants[i];
-        if (ecs_is_alive(scene->world->world, participant)) {
-            selection_add(selection, participant);
-        }
-    }
-}
-
 static void mdcad_draw_constraint_context_menu(void) {
     if (!state.constraint_menu_open_request && !state.constraint_menu_open) return;
 
@@ -251,7 +235,6 @@ static void mdcad_draw_constraint_context_menu(void) {
                         state.constraint_menu_anchor = (ImVec2){ glyph->anchor_screen_x, glyph->anchor_screen_y };
                     }
                 }
-                mdcad_select_constraint_participants(&state.ecs_scene, &state.selection, created);
                 ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
                 applied = true;
             }
@@ -320,10 +303,19 @@ static void mdcad_draw_constraint_dimension_popup(void) {
                  &state.constraint_dimension_popup_value, 0.1f, 1.0f, "%.4f", 0);
 
     bool close_popup = false;
-    if (state.constraint_dimension_popup_open &&
-        igIsMouseClicked_Bool(ImGuiMouseButton_Left, false) &&
-        !igIsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) {
-        close_popup = true;
+    ImVec2_c popup_pos = igGetWindowPos();
+    ImVec2_c popup_size = igGetWindowSize();
+    bool mouse_clicked = igIsMouseClicked_Bool(ImGuiMouseButton_Left, false);
+    if (state.constraint_dimension_popup_open && mouse_clicked) {
+        ImGuiIO *io = igGetIO_Nil();
+        float mx = io->MousePos.x;
+        float my = io->MousePos.y;
+        bool inside_popup =
+            mx >= popup_pos.x && mx <= (popup_pos.x + popup_size.x) &&
+            my >= popup_pos.y && my <= (popup_pos.y + popup_size.y);
+        if (!inside_popup) {
+            close_popup = true;
+        }
     }
 
     if (igButton("Accept##constraint_dimension_popup_accept", (ImVec2){100.0f, 0.0f})) {
@@ -943,7 +935,9 @@ static void frame(void) {
                                 constraint_glyphs_constraint_from_pick_id(&state.constraint_glyphs, pick_id);
                             if (clicked_constraint != 0) {
                                 state.selected_constraint_entity = clicked_constraint;
-                                mdcad_select_constraint_participants(&state.ecs_scene, &state.selection, clicked_constraint);
+                                // Glyph click selects the constraint itself (not participants).
+                                // Participant highlighting is handled in ConstraintManager row actions.
+                                selection_set_single(&state.selection, clicked_constraint);
 
                                 ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, clicked_constraint);
                                 if (constraint && constraint_type_is_dimensional(constraint->type) &&
