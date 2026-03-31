@@ -188,6 +188,126 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
     return *out_sketch != 0;
 }
 
+static void mdcad_seed_default_sketch_scene(void) {
+    const vec4_t sketch_color = vec4_make(0.90f, 0.90f, 0.95f, 1.0f);
+    ecs_entity_t sketch = scene_add_sketch(&state.ecs_scene,
+                                           "StartupSketch",
+                                           "Default startup sketch: rounded cube wireframe with through-hole.",
+                                           sketch_color);
+    if (sketch == 0) return;
+
+    const float z_front = 0.5f;
+    const float z_back = -0.5f;
+    const float half_extent = 1.0f;
+    const float fillet = 0.25f;
+    const float top_y = half_extent;
+    const float bottom_y = -half_extent;
+    const float left_x = -half_extent;
+    const float right_x = half_extent;
+    const float inner_x = half_extent - fillet;
+    const float inner_y = half_extent - fillet;
+
+    ecs_entity_t f_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, top_y, z_front), vec3_make(inner_x, top_y, z_front), sketch_color, 0.03f);
+    ecs_entity_t f_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, bottom_y, z_front), vec3_make(inner_x, bottom_y, z_front), sketch_color, 0.03f);
+    ecs_entity_t f_left = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(left_x, -inner_y, z_front), vec3_make(left_x, inner_y, z_front), sketch_color, 0.03f);
+    ecs_entity_t f_right = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(right_x, -inner_y, z_front), vec3_make(right_x, inner_y, z_front), sketch_color, 0.03f);
+
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, inner_y, z_front), fillet, 3.14159265f, 1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(inner_x, inner_y, z_front), fillet, 1.57079633f, 0.0f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(inner_x, -inner_y, z_front), fillet, 0.0f, -1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, -inner_y, z_front), fillet, -1.57079633f, -3.14159265f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+
+    ecs_entity_t b_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, top_y, z_back), vec3_make(inner_x, top_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t b_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, bottom_y, z_back), vec3_make(inner_x, bottom_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t b_left = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(left_x, -inner_y, z_back), vec3_make(left_x, inner_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t b_right = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(right_x, -inner_y, z_back), vec3_make(right_x, inner_y, z_back), sketch_color, 0.03f);
+
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, inner_y, z_back), fillet, 3.14159265f, 1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(inner_x, inner_y, z_back), fillet, 1.57079633f, 0.0f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(inner_x, -inner_y, z_back), fillet, 0.0f, -1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-inner_x, -inner_y, z_back), fillet, -1.57079633f, -3.14159265f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+
+    ecs_entity_t cube_conn_1 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(left_x, inner_y, z_front), vec3_make(left_x, inner_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t cube_conn_2 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(right_x, inner_y, z_front), vec3_make(right_x, inner_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t cube_conn_3 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(right_x, -inner_y, z_front), vec3_make(right_x, -inner_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t cube_conn_4 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(left_x, -inner_y, z_front), vec3_make(left_x, -inner_y, z_back), sketch_color, 0.03f);
+
+    const float hole_r = 0.35f;
+    ecs_entity_t hole_front = scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(0.0f, 0.0f, z_front), hole_r, 0.0f, 6.28318531f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+    ecs_entity_t hole_back = scene_add_arc_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(0.0f, 0.0f, z_back), hole_r, 0.0f, 6.28318531f, vec3_make(0.0f, 0.0f, 1.0f),
+        sketch_color, 0.03f);
+
+    ecs_entity_t hole_conn_1 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(hole_r, 0.0f, z_front), vec3_make(hole_r, 0.0f, z_back), sketch_color, 0.03f);
+    ecs_entity_t hole_conn_2 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-hole_r, 0.0f, z_front), vec3_make(-hole_r, 0.0f, z_back), sketch_color, 0.03f);
+    ecs_entity_t hole_conn_3 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(0.0f, hole_r, z_front), vec3_make(0.0f, hole_r, z_back), sketch_color, 0.03f);
+    ecs_entity_t hole_conn_4 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(0.0f, -hole_r, z_front), vec3_make(0.0f, -hole_r, z_back), sketch_color, 0.03f);
+
+    ecs_entity_t parallel_set_1[] = { cube_conn_1, cube_conn_2, cube_conn_3, cube_conn_4 };
+    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
+                                   parallel_set_1, 4, 0.0f, false);
+
+    ecs_entity_t parallel_set_2[] = { hole_conn_1, hole_conn_2, hole_conn_3, hole_conn_4 };
+    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
+                                   parallel_set_2, 4, 0.0f, false);
+
+    ecs_entity_t side_lines[] = { f_left, f_right, b_left, b_right };
+    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
+                                   side_lines, 4, 0.0f, false);
+
+    if (f_top != 0) {
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_LENGTH, &f_top, 1, 1.5f, false);
+    }
+    if (hole_conn_1 != 0) {
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_LENGTH, &hole_conn_1, 1, 1.0f, false);
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_ALONG_Z, &hole_conn_1, 1, 0.0f, false);
+    }
+    if (hole_front != 0 && hole_back != 0) {
+        ecs_entity_t hole_pair[] = { hole_front, hole_back };
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_CORADIAL, hole_pair, 2, 0.0f, false);
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_CONCENTRIC, hole_pair, 2, 0.0f, false);
+    }
+    if (f_bottom != 0) {
+        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_FIXED, &f_bottom, 1, 0.0f, false);
+    }
+
+    scene_refresh_sketch_metadata(&state.ecs_scene, sketch);
+}
+
 static void mdcad_draw_constraint_context_menu(void) {
     if (!state.constraint_menu_open_request && !state.constraint_menu_open) return;
 
@@ -230,9 +350,16 @@ static void mdcad_draw_constraint_context_menu(void) {
                 undo_cmd_create_entity(&state.undo_redo, created);
                 state.selected_constraint_entity = created;
                 if (constraint_type_is_dimensional(type)) {
+                    ConstraintComp *created_constraint = ecs_world_get_constraint(&state.ecs_world, created);
                     const constraint_glyph_entry_t *glyph = constraint_glyphs_find_by_constraint(&state.constraint_glyphs, created);
                     if (glyph && glyph->has_screen_anchor) {
                         state.constraint_menu_anchor = (ImVec2){ glyph->anchor_screen_x, glyph->anchor_screen_y };
+                    }
+                    if (type == CONSTRAINT_LENGTH && created_constraint) {
+                        state.constraint_dimension_popup_constraint = created;
+                        state.constraint_dimension_popup_value = created_constraint->value;
+                        state.constraint_dimension_popup_open_request = true;
+                        state.constraint_dimension_popup_open = false;
                     }
                 }
                 ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
@@ -299,8 +426,12 @@ static void mdcad_draw_constraint_dimension_popup(void) {
 
     igText("%s", constraint_type_display_name(constraint->type));
     igSetNextItemWidth(180.0f);
+    char value_fmt[16];
+    uint8_t decimals = constraint->display_decimals;
+    constraint_build_float_format(value_fmt, sizeof(value_fmt), decimals);
     igInputFloat("Value##constraint_dimension_popup_value",
-                 &state.constraint_dimension_popup_value, 0.1f, 1.0f, "%.4f", 0);
+                 &state.constraint_dimension_popup_value, 0.1f, 1.0f, value_fmt,
+                 ImGuiInputTextFlags_CharsDecimal);
 
     bool close_popup = false;
     ImVec2_c popup_pos = igGetWindowPos();
@@ -319,6 +450,14 @@ static void mdcad_draw_constraint_dimension_popup(void) {
     }
 
     if (igButton("Accept##constraint_dimension_popup_accept", (ImVec2){100.0f, 0.0f})) {
+        scene_constraint_set_dimensional_value(
+            &state.ecs_scene,
+            state.constraint_dimension_popup_constraint,
+            state.constraint_dimension_popup_value,
+            constraint->driven);
+        close_popup = true;
+    }
+    if (igIsKeyPressed_Bool(ImGuiKey_Enter, false) || igIsKeyPressed_Bool(ImGuiKey_KeypadEnter, false)) {
         scene_constraint_set_dimensional_value(
             &state.ecs_scene,
             state.constraint_dimension_popup_constraint,
@@ -374,8 +513,8 @@ static void init(void) {
     ImGuiIO* io = igGetIO_Nil();
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    // Apply Visual Studio theme
-    ui_theme_apply_catppuccin_frappe();
+    // Default startup theme
+    ui_theme_apply_visual_studio();
 
     // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
     imgui_storage_init();
@@ -456,25 +595,25 @@ static void init(void) {
 
     // Create test ECS entities using the scene API
     {
-        ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
-        vec3_make(0.0f, 0.0f, 0.0f), vec4_make(0.0f, 0.0f, 0.0f, 1.0f), 0.03f);  // White parent (geometry at origin)
+        // ecs_entity_t parent_point = scene_add_point(&state.ecs_scene,
+        // vec3_make(0.0f, 0.0f, 0.0f), vec4_make(0.0f, 0.0f, 0.0f, 1.0f), 0.03f);  // White parent (geometry at origin)
 
-        // RGB axis lines (visible in 3D viewport)
-        ecs_entity_t xAxis = scene_add_line(&state.ecs_scene,
-            vec3_make(-1.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
-            vec4_make(1.0f, 0.2f, 0.2f, 1.0f), 0.03f);  // Red X axis
+        // // RGB axis lines (visible in 3D viewport)
+        // ecs_entity_t xAxis = scene_add_line(&state.ecs_scene,
+        //     vec3_make(-1.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        //     vec4_make(1.0f, 0.2f, 0.2f, 1.0f), 0.03f);  // Red X axis
 
-        ecs_entity_t yAxis = scene_add_line(&state.ecs_scene,
-            vec3_make(0.0f, -1.0f, 0.0f), vec3_make(0.0f, 1.0f, 0.0f),
-            vec4_make(0.2f, 1.0f, 0.2f, 1.0f), 0.03f);  // Green Y axis
+        // ecs_entity_t yAxis = scene_add_line(&state.ecs_scene,
+        //     vec3_make(0.0f, -1.0f, 0.0f), vec3_make(0.0f, 1.0f, 0.0f),
+        //     vec4_make(0.2f, 1.0f, 0.2f, 1.0f), 0.03f);  // Green Y axis
 
-        ecs_entity_t zAxis = scene_add_line(&state.ecs_scene,
-            vec3_make(0.0f, 0.0f, -1.0f), vec3_make(0.0f, 0.0f, 1.0f),
-            vec4_make(0.2f, 0.2f, 1.0f, 1.0f), 0.03f);  // Blue Z axis
+        // ecs_entity_t zAxis = scene_add_line(&state.ecs_scene,
+        //     vec3_make(0.0f, 0.0f, -1.0f), vec3_make(0.0f, 0.0f, 1.0f),
+        //     vec4_make(0.2f, 0.2f, 1.0f, 1.0f), 0.03f);  // Blue Z axis
 
-        scene_set_parent(&state.ecs_scene, xAxis, parent_point);
-        scene_set_parent(&state.ecs_scene, yAxis, parent_point);
-        scene_set_parent(&state.ecs_scene, zAxis, parent_point);
+        // scene_set_parent(&state.ecs_scene, xAxis, parent_point);
+        // scene_set_parent(&state.ecs_scene, yAxis, parent_point);
+        // scene_set_parent(&state.ecs_scene, zAxis, parent_point);
 
         // // Sample triangles in the XZ plane
         // scene_add_triangle(&state.ecs_scene,
@@ -552,6 +691,10 @@ static void init(void) {
         // and child_y from (1.5, 1.0, 0) to (1.5, 2.0, 0)
         // Edit the parent's position in Entity Inspector to see children move together!
     }
+
+    // Seed a default sketch scene for startup UX and quick constraint validation.
+    mdcad_seed_default_sketch_scene();
+    ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
 
     // Create default 3-point studio lighting
     state.lighting_enabled = true;
@@ -682,10 +825,8 @@ static void frame(void) {
                 ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
                 selection_copy_entities(&state.selection, to_delete, count);
 
-                // Record undo commands BEFORE deleting (in reverse order so undo restores in correct order)
-                for (int i = count - 1; i >= 0; i--) {
-                    undo_cmd_delete_entity(&state.undo_redo, to_delete[i]);
-                }
+                // Record one atomic delete command so undo can restore coupled side-effects (e.g., constraints).
+                undo_cmd_bulk_delete_entities(&state.undo_redo, to_delete, count);
 
                 // Clear selection first (before deleting entities)
                 selection_clear(&state.selection);
@@ -745,7 +886,7 @@ static void frame(void) {
     mat4_t proj_legacy = mdcad_mat4_bridge_from_cglm(proj);
     mat4_t vp_legacy = mdcad_mat4_bridge_from_cglm(vp);
     mat4_t mvp_legacy = mdcad_mat4_bridge_from_cglm(mvp);
-    constraint_glyphs_update_screen_anchors(&state.constraint_glyphs,
+    constraint_glyphs_update_screen_anchors(&state.constraint_glyphs, &state.ecs_scene,
         view_legacy, proj_legacy,
         state.viewport.window_pos_x, state.viewport.window_pos_y,
         (float)state.viewport.content_width, (float)state.viewport.content_height);
@@ -845,8 +986,11 @@ static void frame(void) {
                 gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
                 vec3_t cam_eye = orbit_camera_get_eye_position(&state.camera);
                 constraint_glyphs_populate_pick_buffer(&state.constraint_glyphs, &state.ecs_scene, &state.pick_buffer,
-                                                       cam_eye, 0.785398f);
-                constraint_glyphs_update_screen_anchors(&state.constraint_glyphs,
+                                                       cam_eye, 0.785398f,
+                                                       view_legacy, proj_legacy,
+                                                       state.viewport.window_pos_x, state.viewport.window_pos_y,
+                                                       (float)state.viewport.content_width, (float)state.viewport.content_height);
+                constraint_glyphs_update_screen_anchors(&state.constraint_glyphs, &state.ecs_scene,
                     view_legacy, proj_legacy,
                     state.viewport.window_pos_x, state.viewport.window_pos_y,
                     (float)state.viewport.content_width, (float)state.viewport.content_height);
@@ -934,18 +1078,20 @@ static void frame(void) {
                             ecs_entity_t clicked_constraint =
                                 constraint_glyphs_constraint_from_pick_id(&state.constraint_glyphs, pick_id);
                             if (clicked_constraint != 0) {
-                                state.selected_constraint_entity = clicked_constraint;
-                                // Glyph click selects the constraint itself (not participants).
-                                // Participant highlighting is handled in ConstraintManager row actions.
-                                selection_set_single(&state.selection, clicked_constraint);
+                                if (ecs_is_alive(state.ecs_world.world, clicked_constraint)) {
+                                    state.selected_constraint_entity = clicked_constraint;
+                                    // Glyph click selects the constraint itself (not participants).
+                                    // Participant highlighting is handled in ConstraintManager row actions.
+                                    selection_set_single(&state.selection, clicked_constraint);
 
-                                ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, clicked_constraint);
-                                if (constraint && constraint_type_is_dimensional(constraint->type) &&
-                                    igIsMouseDoubleClicked_Nil(ImGuiMouseButton_Left)) {
-                                    state.constraint_dimension_popup_constraint = clicked_constraint;
-                                    state.constraint_dimension_popup_value = constraint->value;
-                                    state.constraint_dimension_popup_open_request = true;
-                                    state.constraint_dimension_popup_open = false;
+                                    ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, clicked_constraint);
+                                    if (constraint && constraint_type_is_dimensional(constraint->type) &&
+                                        igIsMouseDoubleClicked_Nil(ImGuiMouseButton_Left)) {
+                                        state.constraint_dimension_popup_constraint = clicked_constraint;
+                                        state.constraint_dimension_popup_value = constraint->value;
+                                        state.constraint_dimension_popup_open_request = true;
+                                        state.constraint_dimension_popup_open = false;
+                                    }
                                 }
                             }
                         } else {

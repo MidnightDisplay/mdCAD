@@ -207,7 +207,30 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
-## Most Recent Changes (2026-02-12)
+## Most Recent Changes (2026-03-31)
+
+### Phase 11 UAT Stabilization + Sketch/Constraint Undo Hardening (IMPLEMENTED)
+
+- Closed all remaining Phase 11 focused UAT items on Windows MSVC+Vulkan.
+- Fixed dimensional precision/init UX:
+  - no padded `1.0000` defaults for whole-number dimensional constraints
+  - Enter accepts and Esc/Cancel closes Edit Dimension popup
+  - creating Length constraint auto-opens Edit Dimension popup
+- Stabilized constraint/geometry undo flows:
+  - no duplicate constraint entities after undo in n-ary delete scenarios
+  - restored geometry labels on undo
+  - `Clear Scene` now supports atomic undo
+  - deleting sketch/root nodes restores full subtree with correct hierarchy, participant links, and glyph visibility
+- Reworked bulk delete undo restoration to:
+  - snapshot recursive subtree entities
+  - preserve component identity for recreated entities (sketch/constraint/sketch-state/light/label/renderable)
+  - remap parent + constraint participant IDs old->new and rebuild participant backrefs
+- Theme default switched to Visual Studio Dark with matching UI preselection.
+- Rebuilt repeatedly via `cmake --build build-vulkan --config Release --target mdCAD` and passed final gate.
+
+### Archived baseline notes
+
+### ECS Batch Parenting and other fixes (IMPLEMENTED)
 
 ### ECS Batch Parenting and other fixes (IMPLEMENTED)
 

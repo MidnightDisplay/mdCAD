@@ -31,6 +31,11 @@
 #include <stdio.h>
 #include "math3d.h"
 #include "components/component_types.h"
+#include "components/label_comp.h"
+#include "components/light_comp.h"
+#include "components/sketch_comp.h"
+#include "components/sketch_geometry_state_comp.h"
+#include "components/constraint_comp.h"
 
 // Forward declarations - we use void* to avoid coupling to ECS headers
 // Actual types: ecs_scene_t* and selection_buffer_t*
@@ -99,6 +104,14 @@ typedef enum {
 // ============================================================================
 
 typedef struct {
+    // Component presence
+    bool has_geometry;
+    bool has_light;
+    bool has_sketch;
+    bool has_constraint;
+    bool has_sketch_geometry_state;
+    bool has_renderable;
+
     // Geometry type
     undo_geom_type_t geom_type;
 
@@ -118,6 +131,16 @@ typedef struct {
 
     // Parent (0 = no parent)
     uint64_t parent_id;
+
+    // Label
+    bool has_label;
+    LabelComp label;
+
+    // Non-geometry components
+    LightComp light;
+    SketchComp sketch;
+    ConstraintComp constraint;
+    SketchGeometryStateComp sketch_geometry_state;
 
     // Geometry-specific data
     union {
@@ -174,10 +197,23 @@ typedef struct {
 typedef struct {
     uint64_t entity_id;
     undo_entity_snapshot_t snapshot;
+    uint64_t parent_id;
+    ConstraintComp constraint;
+    LabelComp label;
+    bool has_label;
+} undo_constraint_snapshot_t;
+
+typedef struct {
+    uint64_t entity_id;
+    undo_entity_snapshot_t snapshot;
     // For hierarchies, we store child data too
     uint64_t *child_ids;
     undo_entity_snapshot_t *child_snapshots;
     int child_count;
+
+    // Constraints deleted as side effects of deleting geometry entities
+    undo_constraint_snapshot_t *linked_constraint_snapshots;
+    int linked_constraint_count;
 } cmd_delete_entity_t;
 
 typedef struct {
@@ -241,6 +277,10 @@ typedef struct {
     uint64_t *entity_ids;
     undo_entity_snapshot_t *snapshots;
     int count;
+
+    // Constraints deleted as side effects of deleting geometry entities
+    undo_constraint_snapshot_t *linked_constraint_snapshots;
+    int linked_constraint_count;
 } cmd_bulk_delete_entities_t;
 
 typedef struct {
@@ -355,6 +395,9 @@ static inline void undo_command_free(undo_command_t *cmd) {
             if (cmd->data.delete_.child_ids) {
                 free(cmd->data.delete_.child_ids);
             }
+            if (cmd->data.delete_.linked_constraint_snapshots) {
+                free(cmd->data.delete_.linked_constraint_snapshots);
+            }
             break;
 
         case CMD_BULK_SET_COLOR:
@@ -392,6 +435,9 @@ static inline void undo_command_free(undo_command_t *cmd) {
                 free(cmd->data.bulk_delete.snapshots);
             }
             if (cmd->data.bulk_delete.entity_ids) free(cmd->data.bulk_delete.entity_ids);
+            if (cmd->data.bulk_delete.linked_constraint_snapshots) {
+                free(cmd->data.bulk_delete.linked_constraint_snapshots);
+            }
             break;
 
         case CMD_SET_GEOMETRY_VERTICES:

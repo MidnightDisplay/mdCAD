@@ -510,6 +510,8 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         json_write_indent(b, depth + 3);
         json_builder_appendf(b, "\"value\": %.6g,\n", constraint->value);
         json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"display_decimals\": %u,\n", (unsigned int)constraint->display_decimals);
+        json_write_indent(b, depth + 3);
         json_builder_append(b, "\"participants\": [");
         for (uint32_t i = 0; i < constraint->participant_count; i++) {
             if (i > 0) json_builder_append(b, ", ");
@@ -1620,6 +1622,7 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
 
     ent->constraint = constraint_comp_default();
     ent->has_constraint = true;
+    bool has_display_decimals = false;
 
     if (!json_next_token(p)) return false;
 
@@ -1651,6 +1654,14 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
             if (p->token != JSON_TOK_NUMBER) return false;
             ent->constraint.value = (float)p->num_value;
             if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "display_decimals") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            int decimals = (int)p->num_value;
+            if (decimals < 0) decimals = 0;
+            if (decimals > 6) decimals = 6;
+            ent->constraint.display_decimals = (uint8_t)decimals;
+            has_display_decimals = true;
+            if (!json_next_token(p)) return false;
         } else if (strcmp(key, "participants") == 0) {
             if (p->token != JSON_TOK_LBRACKET) return false;
             ent->constraint.participant_count = 0;
@@ -1672,6 +1683,17 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
         if (p->token == JSON_TOK_COMMA) {
             if (!json_next_token(p)) return false;
         }
+    }
+
+    if (constraint_comp_is_dimensional(&ent->constraint)) {
+        if (!ent->constraint.has_value) {
+            ent->constraint.display_decimals = 0;
+        } else if (!has_display_decimals) {
+            ent->constraint.display_decimals = constraint_value_infer_decimals(ent->constraint.value, 0);
+        } else if (ent->constraint.display_decimals > 6) {
+            ent->constraint.display_decimals = 6;
+        }
+        ent->constraint.value = constraint_round_to_decimals(ent->constraint.value, ent->constraint.display_decimals);
     }
 
     return json_next_token(p);  // Skip }

@@ -32,6 +32,7 @@ typedef struct {
     bool has_value;                             // true for dimensional constraints
     bool driven;                                // CONS-05 for LENGTH/ANGLE
     float value;                                // LENGTH/ANGLE value
+    uint8_t display_decimals;                   // UI display precision for dimensional values
     uint32_t participant_count;
     uint64_t participants[CONSTRAINT_MAX_PARTICIPANTS];
 } ConstraintComp;
@@ -40,6 +41,7 @@ static inline ConstraintComp constraint_comp_default(void) {
     ConstraintComp c;
     memset(&c, 0, sizeof(c));
     c.type = CONSTRAINT_COINCIDENT;
+    c.display_decimals = 4;
     return c;
 }
 
@@ -80,6 +82,7 @@ static inline ConstraintComp constraint_comp_make(constraint_type_t type,
     c.has_value = (type == CONSTRAINT_LENGTH || type == CONSTRAINT_ANGLE);
     c.driven = c.has_value ? driven : false;
     c.value = c.has_value ? value : 0.0f;
+    c.display_decimals = 4;
 
     if (participants && participant_count > 0) {
         if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {

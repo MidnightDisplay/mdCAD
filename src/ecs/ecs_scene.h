@@ -17,6 +17,7 @@
 #include "../components/selectable_comp.h"
 #include "../components/constraint_comp.h"
 #include "../components/constraint_participant_comp.h"
+#include "../constraints/constraint_types.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -995,6 +996,51 @@ static inline void scene_constraint_unlink_participants(ecs_scene_t *scene,
     }
 }
 
+static inline bool scene_constraint_remove_participant(ecs_scene_t *scene,
+                                                       ecs_entity_t constraint_entity,
+                                                       ecs_entity_t participant_entity) {
+    if (!scene || constraint_entity == 0 || participant_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, constraint_entity)) return false;
+    if (!ecs_is_alive(scene->world->world, participant_entity)) return false;
+
+    ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_entity);
+    if (!constraint) return false;
+
+    int remove_index = -1;
+    for (uint32_t i = 0; i < constraint->participant_count; i++) {
+        if ((ecs_entity_t)constraint->participants[i] == participant_entity) {
+            remove_index = (int)i;
+            break;
+        }
+    }
+    if (remove_index < 0) return false;
+
+    ConstraintParticipantComp *participant_refs =
+        ecs_world_get_constraint_participant(scene->world, participant_entity);
+    if (participant_refs) {
+        constraint_participant_remove(participant_refs, (uint64_t)constraint_entity);
+    }
+
+    for (uint32_t i = (uint32_t)remove_index; i + 1 < constraint->participant_count; i++) {
+        constraint->participants[i] = constraint->participants[i + 1];
+    }
+    if (constraint->participant_count > 0) {
+        constraint->participants[constraint->participant_count - 1] = 0;
+        constraint->participant_count--;
+    }
+
+    if (constraint->participant_count < constraint_type_min_participants(constraint->type)) {
+        scene_remove_entity(scene, constraint_entity);
+        return true;
+    }
+
+    ecs_entity_t sketch = ecs_world_get_parent(scene->world, constraint_entity);
+    if (scene_is_sketch(scene, sketch)) {
+        scene_refresh_sketch_metadata(scene, sketch);
+    }
+    return true;
+}
+
 static inline void scene_geometry_unlink_constraints(ecs_scene_t *scene, ecs_entity_t geometry_entity) {
     if (!scene || geometry_entity == 0) return;
     if (!ecs_is_alive(scene->world->world, geometry_entity)) return;
@@ -1002,20 +1048,20 @@ static inline void scene_geometry_unlink_constraints(ecs_scene_t *scene, ecs_ent
     ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, geometry_entity);
     if (!refs || refs->constraint_count == 0) return;
 
-    uint64_t constraints_to_remove[CONSTRAINT_PARTICIPANT_MAX_REFS];
-    uint32_t remove_count = refs->constraint_count;
-    if (remove_count > CONSTRAINT_PARTICIPANT_MAX_REFS) {
-        remove_count = CONSTRAINT_PARTICIPANT_MAX_REFS;
+    uint64_t linked_constraints[CONSTRAINT_PARTICIPANT_MAX_REFS];
+    uint32_t linked_count = refs->constraint_count;
+    if (linked_count > CONSTRAINT_PARTICIPANT_MAX_REFS) {
+        linked_count = CONSTRAINT_PARTICIPANT_MAX_REFS;
     }
 
-    for (uint32_t i = 0; i < remove_count; i++) {
-        constraints_to_remove[i] = refs->constraints[i];
+    for (uint32_t i = 0; i < linked_count; i++) {
+        linked_constraints[i] = refs->constraints[i];
     }
 
-    for (uint32_t i = 0; i < remove_count; i++) {
-        ecs_entity_t constraint_entity = (ecs_entity_t)constraints_to_remove[i];
+    for (uint32_t i = 0; i < linked_count; i++) {
+        ecs_entity_t constraint_entity = (ecs_entity_t)linked_constraints[i];
         if (constraint_entity != 0 && ecs_is_alive(scene->world->world, constraint_entity)) {
-            scene_remove_entity(scene, constraint_entity);
+            scene_constraint_remove_participant(scene, constraint_entity, geometry_entity);
         }
     }
 }
@@ -1353,20 +1399,31 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
                                                           bool driven) {
     if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
     if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
+    if (participant_count < constraint_type_min_participants(type)) return 0;
 
+    constraint_selection_signature_t signature = {0};
+    signature.count = participant_count;
     uint64_t participant_ids[CONSTRAINT_MAX_PARTICIPANTS];
     for (uint32_t i = 0; i < participant_count; i++) {
         ecs_entity_t p = participants[i];
         if (!ecs_is_alive(scene->world->world, p)) return 0;
-        if (!ecs_world_get_geometry(scene->world, p)) return 0;
+        GeometryComp *g = ecs_world_get_geometry(scene->world, p);
+        if (!g) return 0;
         if (ecs_world_get_parent(scene->world, p) != sketch) return 0;
         participant_ids[i] = (uint64_t)p;
+        signature.geometry_types[i] = g->type;
+        signature.roles[i] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
     }
+    if (!constraint_type_is_selection_legal(&signature, type)) return 0;
 
     ecs_entity_t constraint_e = scene_add_anchor(scene, "", "");
     if (constraint_e == 0) return 0;
 
     ConstraintComp constraint = constraint_comp_make(type, participant_ids, participant_count, value, driven);
+    if (constraint_comp_is_dimensional(&constraint)) {
+        constraint.display_decimals = constraint_value_infer_decimals(value, 0);
+        constraint.value = constraint_round_to_decimals(value, constraint.display_decimals);
+    }
     ecs_world_set_constraint(scene->world, constraint_e, &constraint);
     scene_set_parent(scene, constraint_e, sketch);
     scene_set_constraint_default_label(scene, sketch, constraint_e, type);
@@ -1395,9 +1452,13 @@ static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
                                                           bool driven) {
     ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_entity);
     if (!constraint || !constraint_comp_is_dimensional(constraint)) return false;
+    uint8_t fallback_decimals = constraint->display_decimals;
+    if (fallback_decimals == 0) fallback_decimals = 4;
     constraint->has_value = true;
-    constraint->value = value;
+    uint8_t inferred_decimals = constraint_value_infer_decimals(value, fallback_decimals);
+    constraint->value = constraint_round_to_decimals(value, inferred_decimals);
     constraint->driven = driven;
+    constraint->display_decimals = inferred_decimals;
     return true;
 }
 

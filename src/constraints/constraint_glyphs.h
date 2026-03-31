@@ -6,6 +6,7 @@
 
 #include "../ecs/ecs_scene.h"
 #include "../gpu/pick_buffer.h"
+#include "../math/math_interaction.h"
 #include "../components/component_types.h"
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
@@ -19,6 +20,7 @@ typedef struct {
     uint32_t pick_id;
     ecs_entity_t constraint_entity;
     vec3_t anchor_world;
+    vec3_t pick_world;
     float anchor_screen_x;
     float anchor_screen_y;
     bool has_screen_anchor;
@@ -29,6 +31,10 @@ typedef struct {
     int count;
     ecs_entity_t hovered_constraint;
 } constraint_glyph_state_t;
+
+static inline int constraint_glyphs_compute_stack_index(constraint_glyph_state_t *state,
+                                                        ecs_scene_t *scene,
+                                                        int entry_index);
 
 static inline void constraint_glyphs_init(constraint_glyph_state_t *state) {
     if (!state) return;
@@ -137,7 +143,13 @@ static inline void constraint_glyphs_populate_pick_buffer(constraint_glyph_state
                                                           ecs_scene_t *scene,
                                                           pick_buffer_t *pick_buffer,
                                                           vec3_t camera_position,
-                                                          float camera_fov_radians) {
+                                                          float camera_fov_radians,
+                                                          mat4_t view,
+                                                          mat4_t proj,
+                                                          float viewport_x,
+                                                          float viewport_y,
+                                                          float viewport_width,
+                                                          float viewport_height) {
     if (!state || !scene || !pick_buffer) return;
 
     constraint_glyphs_begin_frame(state);
@@ -175,37 +187,81 @@ static inline void constraint_glyphs_populate_pick_buffer(constraint_glyph_state
             entry->pick_id = pick_id;
             entry->constraint_entity = constraint_entity;
             entry->anchor_world = anchor_world;
+            entry->pick_world = anchor_world;
             entry->has_screen_anchor = false;
-
-            // Keep glyph hit target approximately constant on screen across zoom.
-            float dist = vec3_length(vec3_sub(camera_position, anchor_world));
-            float glyph_world_size = dist * tanf(camera_fov_radians * 0.5f) * 0.02f;
-            if (glyph_world_size < 0.005f) glyph_world_size = 0.005f;
-            pick_buffer_add_overlay_point(pick_buffer, anchor_world, pick_id);
-            pick_buffer_add_overlay_line(pick_buffer,
-                vec3_add(anchor_world, vec3_make(-glyph_world_size, 0.0f, 0.0f)),
-                vec3_add(anchor_world, vec3_make( glyph_world_size, 0.0f, 0.0f)),
-                pick_id);
-            pick_buffer_add_overlay_line(pick_buffer,
-                vec3_add(anchor_world, vec3_make(0.0f, -glyph_world_size, 0.0f)),
-                vec3_add(anchor_world, vec3_make(0.0f,  glyph_world_size, 0.0f)),
-                pick_id);
         }
+    }
+
+    for (int i = 0; i < state->count; i++) {
+        constraint_glyph_entry_t *entry = &state->entries[i];
+        if (!ecs_is_alive(scene->world->world, entry->constraint_entity)) continue;
+        ConstraintComp *constraint = ecs_world_get_constraint(scene->world, entry->constraint_entity);
+        if (!constraint) continue;
+
+        float ndc_x = 0.0f;
+        float ndc_y = 0.0f;
+        mat4_t vp = mat4_mul(proj, view);
+        if (!clip_space_project(vp, entry->anchor_world, &ndc_x, &ndc_y)) {
+            continue;
+        }
+        float base_screen_x = viewport_x + (ndc_x * 0.5f + 0.5f) * viewport_width;
+        float base_screen_y = viewport_y + (-ndc_y * 0.5f + 0.5f) * viewport_height;
+
+        int stack_index = constraint_glyphs_compute_stack_index(state, scene, i);
+        const float stack_spacing_px = 18.0f;
+        const float singular_offset_px = (constraint->participant_count <= 1) ? -12.0f : 0.0f;
+        float target_screen_x = base_screen_x + (float)stack_index * stack_spacing_px;
+        float target_screen_y = base_screen_y + singular_offset_px;
+
+        float rel_x = (target_screen_x - viewport_x) / viewport_width;
+        float rel_y = (target_screen_y - viewport_y) / viewport_height;
+        if (rel_x < 0.0f) rel_x = 0.0f;
+        if (rel_x > 1.0f) rel_x = 1.0f;
+        if (rel_y < 0.0f) rel_y = 0.0f;
+        if (rel_y > 1.0f) rel_y = 1.0f;
+        ray_t screen_ray = mdcad_interaction_screen_ray_from_viewport(
+            rel_x, rel_y, viewport_width, viewport_height, view, proj);
+        vec3_t to_anchor = vec3_sub(entry->anchor_world, camera_position);
+        float depth_along_ray = vec3_dot(to_anchor, screen_ray.direction);
+        if (depth_along_ray < 0.01f) depth_along_ray = vec3_length(to_anchor);
+        if (depth_along_ray < 0.01f) depth_along_ray = 0.01f;
+        vec3_t pick_anchor = vec3_add(camera_position, vec3_scale(screen_ray.direction, depth_along_ray));
+        entry->pick_world = pick_anchor;
+
+        // Keep glyph hit target approximately constant on screen across zoom.
+        float pick_dist = vec3_length(vec3_sub(camera_position, pick_anchor));
+        if (pick_dist < 0.001f) pick_dist = 0.001f;
+        float glyph_world_size = pick_dist * tanf(camera_fov_radians * 0.5f) * 0.02f;
+        if (glyph_world_size < 0.005f) glyph_world_size = 0.005f;
+        pick_buffer_add_overlay_point(pick_buffer, pick_anchor, entry->pick_id);
+        pick_buffer_add_overlay_line(pick_buffer,
+            vec3_add(pick_anchor, vec3_make(-glyph_world_size, 0.0f, 0.0f)),
+            vec3_add(pick_anchor, vec3_make( glyph_world_size, 0.0f, 0.0f)),
+            entry->pick_id);
+        pick_buffer_add_overlay_line(pick_buffer,
+            vec3_add(pick_anchor, vec3_make(0.0f, -glyph_world_size, 0.0f)),
+            vec3_add(pick_anchor, vec3_make(0.0f,  glyph_world_size, 0.0f)),
+            entry->pick_id);
     }
     ecs_query_fini(query);
 }
 
 static inline void constraint_glyphs_update_screen_anchors(constraint_glyph_state_t *state,
+                                                           ecs_scene_t *scene,
                                                            mat4_t view,
                                                            mat4_t proj,
                                                            float viewport_x,
                                                            float viewport_y,
                                                            float viewport_width,
                                                            float viewport_height) {
-    if (!state || viewport_width <= 0.0f || viewport_height <= 0.0f) return;
+    if (!state || !scene || viewport_width <= 0.0f || viewport_height <= 0.0f) return;
 
     mat4_t vp = mat4_mul(proj, view);
     for (int i = 0; i < state->count; i++) {
+        if (!ecs_is_alive(scene->world->world, state->entries[i].constraint_entity)) {
+            state->entries[i].has_screen_anchor = false;
+            continue;
+        }
         float ndc_x = 0.0f;
         float ndc_y = 0.0f;
         if (!clip_space_project(vp, state->entries[i].anchor_world, &ndc_x, &ndc_y)) {
@@ -221,6 +277,68 @@ static inline void constraint_glyphs_update_screen_anchors(constraint_glyph_stat
 static inline void constraint_glyphs_handle_hover(constraint_glyph_state_t *state, uint32_t pick_id) {
     if (!state) return;
     state->hovered_constraint = constraint_glyphs_constraint_from_pick_id(state, pick_id);
+}
+
+static inline bool constraint_glyphs_constraints_share_participant(ecs_scene_t *scene,
+                                                                    ecs_entity_t a_entity,
+                                                                    ecs_entity_t b_entity) {
+    if (!scene || a_entity == 0 || b_entity == 0 || a_entity == b_entity) return false;
+    ConstraintComp *a = ecs_world_get_constraint(scene->world, a_entity);
+    ConstraintComp *b = ecs_world_get_constraint(scene->world, b_entity);
+    if (!a || !b) return false;
+    for (uint32_t i = 0; i < a->participant_count; i++) {
+        uint64_t p = a->participants[i];
+        if (p == 0) continue;
+        for (uint32_t j = 0; j < b->participant_count; j++) {
+            if (p == b->participants[j]) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static inline int constraint_glyphs_type_priority(const ConstraintComp *constraint) {
+    if (!constraint) return 0;
+    if (constraint->type == CONSTRAINT_LENGTH || constraint->type == CONSTRAINT_ANGLE) {
+        return 1;
+    }
+    return 0;
+}
+
+static inline int constraint_glyphs_compute_stack_index(constraint_glyph_state_t *state,
+                                                        ecs_scene_t *scene,
+                                                        int entry_index) {
+    if (!state || !scene || entry_index < 0 || entry_index >= state->count) return 0;
+    const constraint_glyph_entry_t *entry = &state->entries[entry_index];
+    if (!ecs_is_alive(scene->world->world, entry->constraint_entity)) return 0;
+    ConstraintComp *entry_constraint = ecs_world_get_constraint(scene->world, entry->constraint_entity);
+    if (!entry_constraint) return 0;
+
+    int index = 0;
+    int entry_priority = constraint_glyphs_type_priority(entry_constraint);
+    uint64_t entry_id = (uint64_t)entry->constraint_entity;
+
+    for (int j = 0; j < state->count; j++) {
+        if (j == entry_index) continue;
+        const constraint_glyph_entry_t *other = &state->entries[j];
+        if (!ecs_is_alive(scene->world->world, other->constraint_entity)) continue;
+        if (!constraint_glyphs_constraints_share_participant(scene,
+                                                             entry->constraint_entity,
+                                                             other->constraint_entity)) {
+            continue;
+        }
+
+        ConstraintComp *other_constraint = ecs_world_get_constraint(scene->world, other->constraint_entity);
+        if (!other_constraint) continue;
+        int other_priority = constraint_glyphs_type_priority(other_constraint);
+        uint64_t other_id = (uint64_t)other->constraint_entity;
+        if (other_priority < entry_priority ||
+            (other_priority == entry_priority && other_id < entry_id)) {
+            index++;
+        }
+    }
+    return index;
 }
 
 static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *state,
@@ -249,7 +367,9 @@ static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *stat
         if (!entry->has_screen_anchor) continue;
         if (!ecs_is_alive(scene->world->world, entry->constraint_entity)) continue;
 
-        float x = entry->anchor_screen_x;
+        int stack_index = constraint_glyphs_compute_stack_index(state, scene, i);
+        const float stack_spacing_px = 18.0f;
+        float x = entry->anchor_screen_x + (float)stack_index * stack_spacing_px;
         float y = entry->anchor_screen_y;
         if (x < viewport_x || x > (viewport_x + viewport_width) ||
             y < viewport_y || y > (viewport_y + viewport_height)) {
@@ -274,19 +394,8 @@ static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *stat
 
         if (constraint_comp_is_dimensional(constraint)) {
             char value_text[64];
-            snprintf(value_text, sizeof(value_text), "%.6f", constraint->value);
-            int text_len = (int)strlen(value_text);
-            while (text_len > 0 && value_text[text_len - 1] == '0') {
-                value_text[text_len - 1] = '\0';
-                text_len--;
-            }
-            if (text_len > 0 && value_text[text_len - 1] == '.') {
-                value_text[text_len - 1] = '\0';
-            }
-            if (value_text[0] == '\0') {
-                strncpy(value_text, "0", sizeof(value_text) - 1);
-                value_text[sizeof(value_text) - 1] = '\0';
-            }
+            uint8_t decimals = constraint->display_decimals;
+            constraint_format_value(value_text, sizeof(value_text), constraint->value, decimals);
 
             ImVec2_c text_size = igCalcTextSize(value_text, NULL, false, -1.0f);
             float bg_w = text_size.x + 16.0f;

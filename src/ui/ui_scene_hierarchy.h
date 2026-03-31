@@ -1223,9 +1223,20 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             igCheckbox("Clear on Load", &state->clear_on_load);
             igSeparator();
             if (igMenuItem_Bool("Clear Scene", NULL, false, state->cache_count > 0)) {
-                // Clear undo history when clearing scene
-                if (state->undo_redo) {
-                    undo_redo_clear(state->undo_redo);
+                if (state->undo_redo && state->cache_count > 0) {
+                    ecs_entity_t *to_delete = (ecs_entity_t*)malloc(sizeof(ecs_entity_t) * (size_t)state->cache_count);
+                    int delete_count = 0;
+                    if (to_delete) {
+                        for (int i = 0; i < state->cache_count; i++) {
+                            ecs_entity_t e = state->cache[i].entity;
+                            if (e == 0 || !ecs_is_alive(state->scene->world->world, e)) continue;
+                            to_delete[delete_count++] = e;
+                        }
+                        if (delete_count > 0) {
+                            undo_cmd_bulk_delete_entities(state->undo_redo, to_delete, delete_count);
+                        }
+                        free(to_delete);
+                    }
                 }
                 // Clear all entities
                 for (int i = state->cache_count - 1; i >= 0; i--) {
@@ -2272,6 +2283,11 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     int point_count = ecs_scene_point_count(state->scene);
     igText("Total: %d lines, %d points", line_count, point_count);
 
+    igSeparator();
+    // Draw lights section before the main scene tree/list.
+    ui_scene_hierarchy_draw_lights_section(state);
+    igSeparator();
+
     // Filter input
     igSetNextItemWidth(-1);  // Full width
     bool filter_changed = igInputTextWithHint(
@@ -2464,11 +2480,6 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     if (entity_deleted) {
         state->cache_dirty = true;
     }
-
-    igSeparator();
-
-    // Draw lights section (separate from geometry entities)
-    ui_scene_hierarchy_draw_lights_section(state);
 
     // Drop target at bottom of list: larger area for easy unparenting
     // This fills the remaining space in the window

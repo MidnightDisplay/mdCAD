@@ -33,6 +33,8 @@ typedef struct {
     selection_buffer_t *selection;
     ecs_world_state_t *world;
     undo_redo_t *undo_redo;  // Optional, can be NULL
+    ecs_entity_t active_sketch;
+    bool active_sketch_workspace_open;
 
     // Cached values for drag operations (to capture old value at drag start)
     ecs_entity_t editing_entity;
@@ -58,6 +60,8 @@ static inline void ui_entity_inspector_init(ui_entity_inspector_state_t *state,
     state->selection = selection;
     state->world = world;
     state->undo_redo = NULL;
+    state->active_sketch = 0;
+    state->active_sketch_workspace_open = false;
 }
 
 static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t *state,
@@ -157,6 +161,541 @@ static inline bool ui_constraint_text_matches(const char *haystack, const char *
     lower_need[nlen] = '\0';
 
     return strstr(lower_hay, lower_need) != NULL;
+}
+
+static inline uint8_t ui_constraint_display_decimals(const ConstraintComp *constraint) {
+    if (!constraint) return 0;
+    return constraint->display_decimals;
+}
+
+static inline void ui_constraint_value_format(const ConstraintComp *constraint,
+                                              char *out_fmt, size_t out_fmt_size) {
+    constraint_build_float_format(out_fmt, out_fmt_size, ui_constraint_display_decimals(constraint));
+}
+
+static inline void ui_constraint_value_text(const ConstraintComp *constraint,
+                                            char *out_text, size_t out_text_size) {
+    if (!constraint || !out_text || out_text_size == 0) return;
+    constraint_format_value(out_text, out_text_size,
+                            constraint->value, ui_constraint_display_decimals(constraint));
+}
+
+static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_inspector_state_t *state,
+                                                                     ecs_entity_t e,
+                                                                     SketchComp **sketch_ref,
+                                                                     ecs_scene_t *scene,
+                                                                     bool as_workspace_window) {
+    ecs_world_state_t *w = state->world;
+    SketchComp *sketch = sketch_ref ? *sketch_ref : NULL;
+    bool section_changed = false;
+    static ecs_entity_t gm_selected_entities[UI_GEOMETRY_MANAGER_MAX_ROWS] = {0};
+    static int gm_selected_count = 0;
+    static ecs_entity_t gm_bound_sketch = 0;
+    static int gm_delete_pending_count = 0;
+
+    if (!sketch) return false;
+    if (!as_workspace_window && !igCollapsingHeader_TreeNodeFlags("GeometryManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return false;
+    }
+    if (as_workspace_window) {
+        igTextDisabled("GeometryManager");
+        igSeparator();
+    }
+
+    if (gm_bound_sketch != e) {
+        gm_bound_sketch = e;
+        gm_selected_count = 0;
+    }
+
+    ecs_entity_t geometry_rows[UI_GEOMETRY_MANAGER_MAX_ROWS];
+    int geometry_row_count = 0;
+    ecs_iter_t child_it = ecs_children(w->world, e);
+    while (ecs_children_next(&child_it)) {
+        for (int i = 0; i < child_it.count; i++) {
+            ecs_entity_t child = child_it.entities[i];
+            if (!ecs_world_get_geometry(w, child)) {
+                continue;
+            }
+            if (geometry_row_count < UI_GEOMETRY_MANAGER_MAX_ROWS) {
+                geometry_rows[geometry_row_count++] = child;
+            }
+        }
+    }
+
+    for (int i = gm_selected_count - 1; i >= 0; i--) {
+        if (!ui_geometry_manager_contains(geometry_rows, geometry_row_count, gm_selected_entities[i])) {
+            gm_selected_entities[i] = gm_selected_entities[gm_selected_count - 1];
+            gm_selected_count--;
+        }
+    }
+
+    igTextDisabled("Add geometry");
+    igBeginDisabled(scene == NULL);
+    if (igButton("Add Point##geometry_manager_add_point", (ImVec2){0, 0})) {
+        ecs_entity_t created = scene_add_point_to_sketch(scene, e,
+            vec3_make(0.0f, 0.0f, 0.0f), sketch->color, 0.06f);
+        if (created != 0) {
+            if (state->undo_redo) {
+                undo_cmd_create_entity(state->undo_redo, created);
+            }
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+            gm_selected_entities[0] = created;
+            gm_selected_count = 1;
+            section_changed = true;
+        }
+    }
+    igSameLine(0, 8);
+    if (igButton("Add Line##geometry_manager_add_line", (ImVec2){0, 0})) {
+        ecs_entity_t created = scene_add_line_to_sketch(scene, e,
+            vec3_make(-1.0f, 0.0f, 0.0f),
+            vec3_make(1.0f, 0.0f, 0.0f),
+            sketch->color, 0.03f);
+        if (created != 0) {
+            if (state->undo_redo) {
+                undo_cmd_create_entity(state->undo_redo, created);
+            }
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+            gm_selected_entities[0] = created;
+            gm_selected_count = 1;
+            section_changed = true;
+        }
+    }
+    igSameLine(0, 8);
+    if (igButton("Add Arc##geometry_manager_add_arc", (ImVec2){0, 0})) {
+        ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
+            vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f,
+            vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+        if (created != 0) {
+            if (state->undo_redo) {
+                undo_cmd_create_entity(state->undo_redo, created);
+            }
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+            gm_selected_entities[0] = created;
+            gm_selected_count = 1;
+            section_changed = true;
+        }
+    }
+    igSameLine(0, 8);
+    if (igButton("Add Circle##geometry_manager_add_circle", (ImVec2){0, 0})) {
+        ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
+            vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 6.2831853f,
+            vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+        if (created != 0) {
+            if (state->undo_redo) {
+                undo_cmd_create_entity(state->undo_redo, created);
+            }
+            scene_refresh_sketch_metadata(scene, e);
+            sketch = ecs_world_get_sketch(w, e);
+            gm_selected_entities[0] = created;
+            gm_selected_count = 1;
+            section_changed = true;
+        }
+    }
+    igEndDisabled();
+    if (scene == NULL) {
+        igTextDisabled("GeometryManager add controls require scene context.");
+    }
+    igDummy((ImVec2){0.0f, 8.0f});
+
+    if (geometry_row_count == 0) {
+        igTextDisabled("No geometry in this sketch");
+        igTextWrapped("Add Point, Line, or Arc/Circle from Add Entity or GeometryManager controls to start defining this sketch.");
+    } else {
+        for (int row = 0; row < geometry_row_count; row++) {
+            ecs_entity_t child = geometry_rows[row];
+            GeometryComp *child_geom = ecs_world_get_geometry(w, child);
+            if (!child_geom) continue;
+
+            LabelComp *child_label = ecs_world_get_label(w, child);
+            SketchGeometryStateComp *child_state = ecs_world_get_sketch_geometry_state(w, child);
+            SketchGeometryStateComp effective_state = child_state ? *child_state : sketch_geometry_state_comp_default();
+            const char *type_name = geometry_type_name(child_geom->type);
+            const char *row_name = (child_label && child_label->name[0] != '\0') ? child_label->name : NULL;
+            const char *fixed_label = sketch_geometry_state_label(effective_state);
+
+            char row_text[256];
+            if (row_name) {
+                snprintf(row_text, sizeof(row_text), "%s | %s | %s##geom_row_%llu",
+                    type_name, row_name, fixed_label, (unsigned long long)child);
+            } else {
+                snprintf(row_text, sizeof(row_text), "%s | #%llu | %s##geom_row_%llu",
+                    type_name, (unsigned long long)child, fixed_label, (unsigned long long)child);
+            }
+
+            bool selected = ui_geometry_manager_contains(gm_selected_entities, gm_selected_count, child);
+            if (igSelectable_Bool(row_text, selected, 0, (ImVec2){0.0f, 0.0f})) {
+                ImGuiIO *io = igGetIO_Nil();
+                ui_geometry_manager_handle_click(
+                    gm_selected_entities,
+                    &gm_selected_count,
+                    child,
+                    io->KeyShift,
+                    io->KeyCtrl
+                );
+            }
+        }
+    }
+
+    igDummy((ImVec2){0.0f, 8.0f});
+    igTextDisabled("Selected rows: %d", gm_selected_count);
+
+    igBeginDisabled(gm_selected_count <= 0);
+    if (igButton("Fix##geometry_manager_bulk_fix", (ImVec2){0, 0})) {
+        if (gm_selected_count > 0) {
+            bool *old_fixed = NULL;
+            if (state->undo_redo) {
+                old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
+            }
+
+            ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+            int action_count = 0;
+            for (int i = 0; i < gm_selected_count; i++) {
+                ecs_entity_t target = gm_selected_entities[i];
+                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+
+                SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
+                if (!row_state) {
+                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                    ecs_world_set_sketch_geometry_state(w, target, &init_state);
+                    row_state = ecs_world_get_sketch_geometry_state(w, target);
+                }
+                if (!row_state) continue;
+
+                if (old_fixed) old_fixed[action_count] = row_state->fixed;
+                row_state->fixed = true;
+                action_entities[action_count++] = target;
+            }
+
+            if (state->undo_redo && action_count > 0 && old_fixed) {
+                undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, true);
+            }
+            if (old_fixed) free(old_fixed);
+
+            if (scene) {
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                section_changed = true;
+            }
+        }
+    }
+    igEndDisabled();
+    igSameLine(0, 8);
+    igBeginDisabled(gm_selected_count <= 0);
+    if (igButton("Unfix##geometry_manager_bulk_unfix", (ImVec2){0, 0})) {
+        if (gm_selected_count > 0) {
+            bool *old_fixed = NULL;
+            if (state->undo_redo) {
+                old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
+            }
+
+            ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+            int action_count = 0;
+            for (int i = 0; i < gm_selected_count; i++) {
+                ecs_entity_t target = gm_selected_entities[i];
+                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+
+                SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
+                if (!row_state) {
+                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+                    ecs_world_set_sketch_geometry_state(w, target, &init_state);
+                    row_state = ecs_world_get_sketch_geometry_state(w, target);
+                }
+                if (!row_state) continue;
+
+                if (old_fixed) old_fixed[action_count] = row_state->fixed;
+                row_state->fixed = false;
+                action_entities[action_count++] = target;
+            }
+
+            if (state->undo_redo && action_count > 0 && old_fixed) {
+                undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, false);
+            }
+            if (old_fixed) free(old_fixed);
+
+            if (scene) {
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                section_changed = true;
+            }
+        }
+    }
+    igEndDisabled();
+    igSameLine(0, 8);
+    igBeginDisabled(gm_selected_count <= 0);
+    if (igButton("Delete##geometry_manager_bulk_delete", (ImVec2){0, 0})) {
+        if (gm_selected_count > 0) {
+            gm_delete_pending_count = gm_selected_count;
+            igOpenPopup_Str("Delete Geometry##geometry_manager_delete_popup", 0);
+        }
+    }
+    igEndDisabled();
+
+    if (igBeginPopupModal("Delete Geometry##geometry_manager_delete_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (gm_delete_pending_count > 1) {
+            igTextWrapped("Delete %d selected geometry items from this sketch? This will be one undo step.", gm_delete_pending_count);
+        } else {
+            igTextWrapped("Delete selected geometry from this sketch? This action can be undone in one step.");
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        if (igButton("Delete##geometry_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
+            ecs_entity_t delete_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+            int delete_count = 0;
+            for (int i = 0; i < gm_selected_count; i++) {
+                ecs_entity_t target = gm_selected_entities[i];
+                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+                delete_entities[delete_count++] = target;
+            }
+
+            if (state->undo_redo && delete_count > 0) {
+                undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
+            }
+
+            for (int i = 0; i < delete_count; i++) {
+                if (scene) {
+                    scene_remove_entity(scene, delete_entities[i]);
+                } else {
+                    ecs_delete(w->world, delete_entities[i]);
+                }
+            }
+
+            gm_selected_count = 0;
+            gm_delete_pending_count = 0;
+
+            if (scene) {
+                scene_refresh_sketch_metadata(scene, e);
+                sketch = ecs_world_get_sketch(w, e);
+                section_changed = true;
+            }
+            igCloseCurrentPopup();
+        }
+        igSameLine(0, 8);
+        if (igButton("Cancel##geometry_manager_cancel_delete", (ImVec2){120.0f, 0.0f})) {
+            gm_delete_pending_count = 0;
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+
+    if (sketch_ref) *sketch_ref = sketch;
+    return section_changed;
+}
+
+static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_inspector_state_t *state,
+                                                                       ecs_entity_t e,
+                                                                       SketchComp **sketch_ref,
+                                                                       ecs_scene_t *scene,
+                                                                       bool as_workspace_window) {
+    ecs_world_state_t *w = state->world;
+    SketchComp *sketch = sketch_ref ? *sketch_ref : NULL;
+    bool section_changed = false;
+    static int cm_type_filter = 0;
+    static char cm_search_filter[128] = "";
+    static ecs_entity_t cm_delete_pending_constraint = 0;
+
+    if (!sketch) return false;
+    if (!as_workspace_window && !igCollapsingHeader_TreeNodeFlags("ConstraintManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return false;
+    }
+    if (as_workspace_window) {
+        igTextDisabled("ConstraintManager");
+        igSeparator();
+    }
+
+    ecs_entity_t constraint_rows[UI_CONSTRAINT_MANAGER_MAX_ROWS];
+    int constraint_row_count = 0;
+    ecs_iter_t child_it = ecs_children(w->world, e);
+    while (ecs_children_next(&child_it)) {
+        for (int i = 0; i < child_it.count; i++) {
+            ecs_entity_t child = child_it.entities[i];
+            if (!ecs_world_get_constraint(w, child)) continue;
+            if (constraint_row_count < UI_CONSTRAINT_MANAGER_MAX_ROWS) {
+                constraint_rows[constraint_row_count++] = child;
+            }
+        }
+    }
+
+    static const char *constraint_type_filter_items[] = {
+        "All",
+        "Fixed",
+        "Coincident",
+        "Collinear",
+        "Parallel",
+        "Perpendicular",
+        "Along X",
+        "Along Y",
+        "Along Z",
+        "Coradial",
+        "Concentric",
+        "Length",
+        "Angle",
+        "Tangential"
+    };
+
+    igTextDisabled("Filter");
+    igSetNextItemWidth(160.0f);
+    igCombo_Str_arr("Type##constraint_manager_type_filter",
+                    &cm_type_filter,
+                    constraint_type_filter_items,
+                    (int)(sizeof(constraint_type_filter_items) / sizeof(constraint_type_filter_items[0])),
+                    -1);
+    igSameLine(0, 8);
+    igSetNextItemWidth(-1.0f);
+    igInputTextWithHint("##constraint_manager_search_filter",
+                        "Search name or description",
+                        cm_search_filter,
+                        sizeof(cm_search_filter),
+                        0,
+                        NULL,
+                        NULL);
+    igDummy((ImVec2){0.0f, 8.0f});
+
+    if (constraint_row_count == 0) {
+        igTextDisabled("No constraints yet");
+        igTextWrapped("Select sketch geometry, press C to open applicable constraints, then apply one to define sketch behavior.");
+    } else {
+        for (int row = 0; row < constraint_row_count; row++) {
+            ecs_entity_t c_e = constraint_rows[row];
+            ConstraintComp *constraint = ecs_world_get_constraint(w, c_e);
+            if (!constraint) continue;
+
+            if (cm_type_filter > 0) {
+                constraint_type_t selected_type = (constraint_type_t)(cm_type_filter - 1);
+                if (constraint->type != selected_type) {
+                    continue;
+                }
+            }
+
+            LabelComp *c_label = ecs_world_get_label(w, c_e);
+            const char *row_name = (c_label && c_label->name[0] != '\0') ? c_label->name : NULL;
+            const char *row_desc = (c_label && c_label->description[0] != '\0') ? c_label->description : "";
+            if (!ui_constraint_text_matches(row_name, cm_search_filter) &&
+                !ui_constraint_text_matches(row_desc, cm_search_filter)) {
+                continue;
+            }
+
+            char participants_text[256];
+            participants_text[0] = '\0';
+            for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
+                ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
+                LabelComp *p_label = ecs_world_get_label(w, p);
+                char entry[80];
+                if (p_label && p_label->name[0] != '\0') {
+                    snprintf(entry, sizeof(entry), "%s", p_label->name);
+                } else {
+                    snprintf(entry, sizeof(entry), "#%llu", (unsigned long long)p);
+                }
+                if (participants_text[0] != '\0') {
+                    strncat(participants_text, ", ", sizeof(participants_text) - strlen(participants_text) - 1);
+                }
+                strncat(participants_text, entry, sizeof(participants_text) - strlen(participants_text) - 1);
+            }
+
+            char value_text[64];
+            if (constraint_type_is_dimensional(constraint->type) && constraint->has_value) {
+                char numeric[64];
+                ui_constraint_value_text(constraint, numeric, sizeof(numeric));
+                snprintf(value_text, sizeof(value_text), "%s%s",
+                         numeric, constraint->driven ? " (Driven)" : "");
+            } else {
+                snprintf(value_text, sizeof(value_text), "%s",
+                         constraint_type_is_dimensional(constraint->type) ? "Unset" : "-");
+            }
+
+            const char *type_name = constraint_type_display_name(constraint->type);
+            char row_text[640];
+            if (row_name) {
+                snprintf(row_text, sizeof(row_text), "%s | %s | %s | %s##constraint_row_%llu",
+                         type_name, row_name, value_text, participants_text, (unsigned long long)c_e);
+            } else {
+                snprintf(row_text, sizeof(row_text), "%s | #%llu | %s | %s##constraint_row_%llu",
+                         type_name, (unsigned long long)c_e, value_text, participants_text, (unsigned long long)c_e);
+            }
+
+            bool row_selected = false;
+            if (constraint->participant_count > 0) {
+                row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
+            }
+            if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
+                selection_clear(state->selection);
+                for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
+                    ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
+                    if (ecs_is_alive(w->world, p)) {
+                        selection_add(state->selection, p);
+                    }
+                }
+            }
+
+            if (constraint_type_is_dimensional(constraint->type)) {
+                char value_id[96];
+                snprintf(value_id, sizeof(value_id), "Value##constraint_value_%llu", (unsigned long long)c_e);
+                float edit_value = constraint->value;
+                char value_fmt[16];
+                ui_constraint_value_format(constraint, value_fmt, sizeof(value_fmt));
+                igSetNextItemWidth(140.0f);
+                if (igInputFloat(value_id, &edit_value, 0.1f, 1.0f, value_fmt,
+                                 ImGuiInputTextFlags_CharsDecimal)) {
+                    if (scene) {
+                        scene_constraint_set_dimensional_value(scene, c_e, edit_value, constraint->driven);
+                        section_changed = true;
+                    }
+                }
+                igSameLine(0, 8);
+                char driven_id[96];
+                snprintf(driven_id, sizeof(driven_id), "Driven##constraint_driven_%llu", (unsigned long long)c_e);
+                bool driven = constraint->driven;
+                if (igCheckbox(driven_id, &driven)) {
+                    if (scene) {
+                        scene_constraint_set_dimensional_value(scene, c_e, constraint->value, driven);
+                        section_changed = true;
+                    }
+                }
+                if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                    igSetTooltip("Driven constraints remain visible/readable but do not drive solve equations.");
+                }
+                igSameLine(0, 8);
+            }
+
+            char delete_id[96];
+            snprintf(delete_id, sizeof(delete_id), "Delete##constraint_delete_%llu", (unsigned long long)c_e);
+            igPushStyleColor_Vec4(ImGuiCol_Button, (ImVec4){0.906f, 0.510f, 0.518f, 1.000f});
+            igPushStyleColor_Vec4(ImGuiCol_ButtonHovered, (ImVec4){0.906f, 0.510f, 0.518f, 0.860f});
+            igPushStyleColor_Vec4(ImGuiCol_ButtonActive, (ImVec4){0.906f, 0.510f, 0.518f, 0.780f});
+            if (igButton(delete_id, (ImVec2){80.0f, 0.0f})) {
+                cm_delete_pending_constraint = c_e;
+                igOpenPopup_Str("Delete Constraint##constraint_manager_delete_popup", 0);
+            }
+            igPopStyleColor(3);
+        }
+    }
+
+    if (igBeginPopupModal("Delete Constraint##constraint_manager_delete_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        igTextWrapped("Delete selected constraint? Participating geometry will remain; this only removes the constraint.");
+        igDummy((ImVec2){0.0f, 8.0f});
+        if (igButton("Delete##constraint_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
+            if (scene && cm_delete_pending_constraint != 0) {
+                if (scene_remove_constraint(scene, cm_delete_pending_constraint)) {
+                    selection_clear(state->selection);
+                    section_changed = true;
+                }
+                sketch = ecs_world_get_sketch(w, e);
+            }
+            cm_delete_pending_constraint = 0;
+            igCloseCurrentPopup();
+        }
+        igSameLine(0, 8);
+        if (igButton("Cancel##constraint_manager_cancel_delete", (ImVec2){120.0f, 0.0f})) {
+            cm_delete_pending_constraint = 0;
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+
+    if (sketch_ref) *sketch_ref = sketch;
+    return section_changed;
 }
 
 //------------------------------------------------------------------------------
@@ -300,9 +839,27 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igDummy((ImVec2){0.0f, 8.0f});
         igTextDisabled("Color policy");
         igTextWrapped("Sketch color applies by default; geometry with explicit non-black RGB color overrides inherited sketch color.");
+
+        bool is_active_sketch = (state->active_sketch == e);
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Workspace");
+        igText("Sketch workspace: %s", is_active_sketch ? "Active" : "Inactive");
+        if (igButton(is_active_sketch ? "Deactivate Sketch##sketch_workspace_toggle"
+                                      : "Activate Sketch##sketch_workspace_toggle",
+                     (ImVec2){0, 0})) {
+            if (is_active_sketch) {
+                state->active_sketch = 0;
+                state->active_sketch_workspace_open = false;
+            } else {
+                state->active_sketch = e;
+                state->active_sketch_workspace_open = true;
+            }
+        }
     }
 
-    if (sketch && igCollapsingHeader_TreeNodeFlags("GeometryManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (sketch &&
+        (state->active_sketch == 0 || state->active_sketch != e) &&
+        igCollapsingHeader_TreeNodeFlags("GeometryManager", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (gm_bound_sketch != e) {
             gm_bound_sketch = e;
             gm_selected_count = 0;
@@ -575,7 +1132,9 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
     }
 
-    if (sketch && igCollapsingHeader_TreeNodeFlags("ConstraintManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (sketch &&
+        (state->active_sketch == 0 || state->active_sketch != e) &&
+        igCollapsingHeader_TreeNodeFlags("ConstraintManager", ImGuiTreeNodeFlags_DefaultOpen)) {
         ecs_entity_t constraint_rows[UI_CONSTRAINT_MANAGER_MAX_ROWS];
         int constraint_row_count = 0;
         ecs_iter_t child_it = ecs_children(w->world, e);
@@ -667,9 +1226,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
                 char value_text[64];
                 if (constraint_type_is_dimensional(constraint->type) && constraint->has_value) {
-                    snprintf(value_text, sizeof(value_text), "%.3f%s",
-                             constraint->value,
-                             constraint->driven ? " (Driven)" : "");
+                    char numeric[64];
+                    ui_constraint_value_text(constraint, numeric, sizeof(numeric));
+                    snprintf(value_text, sizeof(value_text), "%s%s",
+                             numeric, constraint->driven ? " (Driven)" : "");
                 } else {
                     snprintf(value_text, sizeof(value_text), "%s",
                              constraint_type_is_dimensional(constraint->type) ? "Unset" : "-");
@@ -703,8 +1263,11 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     char value_id[96];
                     snprintf(value_id, sizeof(value_id), "Value##constraint_value_%llu", (unsigned long long)c_e);
                     float edit_value = constraint->value;
+                    char value_fmt[16];
+                    ui_constraint_value_format(constraint, value_fmt, sizeof(value_fmt));
                     igSetNextItemWidth(140.0f);
-                    if (igInputFloat(value_id, &edit_value, 0.1f, 1.0f, "%.4f", 0)) {
+                    if (igInputFloat(value_id, &edit_value, 0.1f, 1.0f, value_fmt,
+                                     ImGuiInputTextFlags_CharsDecimal)) {
                         if (scene) {
                             scene_constraint_set_dimensional_value(scene, c_e, edit_value, constraint->driven);
                         }
@@ -759,8 +1322,155 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
     }
 
-    // Geometry section
+    // SketchGeometry section (geometry-side linked constraint management)
     GeometryComp *g = ecs_world_get_geometry(w, e);
+    if (g && igCollapsingHeader_TreeNodeFlags("SketchGeometry", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ConstraintParticipantComp *linked_refs = ecs_world_get_constraint_participant(w, e);
+        uint32_t linked_count = linked_refs ? linked_refs->constraint_count : 0;
+        igText("Linked constraints: %u", linked_count);
+
+        ecs_entity_t delete_constraint_entity = 0;
+        if (!linked_refs || linked_refs->constraint_count == 0) {
+            igTextDisabled("No linked constraints");
+        } else {
+            for (uint32_t ci = 0; ci < linked_refs->constraint_count; ci++) {
+                ecs_entity_t linked_constraint = (ecs_entity_t)linked_refs->constraints[ci];
+                if (linked_constraint == 0 || !ecs_is_alive(w->world, linked_constraint)) continue;
+
+                ConstraintComp *linked = ecs_world_get_constraint(w, linked_constraint);
+                if (!linked) continue;
+
+                LabelComp *linked_label = ecs_world_get_label(w, linked_constraint);
+                char linked_name[160];
+                if (linked_label && linked_label->name[0] != '\0') {
+                    snprintf(linked_name, sizeof(linked_name), "%s", linked_label->name);
+                } else {
+                    snprintf(linked_name, sizeof(linked_name), "#%llu", (unsigned long long)linked_constraint);
+                }
+
+                igPushID_Int((int)ci);
+                igText("%s (%s)", linked_name, constraint_type_display_name(linked->type));
+                igSameLine(0, 8);
+                if (igSmallButton("Select")) {
+                    selection_clear(state->selection);
+                    selection_add(state->selection, linked_constraint);
+                }
+
+                if (constraint_type_is_dimensional(linked->type)) {
+                    float edit_value = linked->value;
+                    char value_fmt[16];
+                    ui_constraint_value_format(linked, value_fmt, sizeof(value_fmt));
+                    igSameLine(0, 8);
+                    igSetNextItemWidth(110.0f);
+                    if (igInputFloat("##linked_constraint_value", &edit_value, 0.1f, 1.0f, value_fmt,
+                                     ImGuiInputTextFlags_CharsDecimal)) {
+                        if (scene) {
+                            scene_constraint_set_dimensional_value(scene, linked_constraint, edit_value, linked->driven);
+                        }
+                    }
+                }
+
+                igSameLine(0, 8);
+                igBeginDisabled(scene == NULL);
+                if (igSmallButton("Delete")) {
+                    delete_constraint_entity = linked_constraint;
+                }
+                igEndDisabled();
+                igPopID();
+
+                if (delete_constraint_entity != 0) {
+                    break;
+                }
+            }
+        }
+
+        if (delete_constraint_entity != 0 && scene) {
+            scene_remove_constraint(scene, delete_constraint_entity);
+        }
+    }
+
+    // SketchConstraint section (constraint-side participant management)
+    ConstraintComp *constraint_entity = ecs_world_get_constraint(w, e);
+    if (constraint_entity &&
+        igCollapsingHeader_TreeNodeFlags("SketchConstraint", ImGuiTreeNodeFlags_DefaultOpen)) {
+        igText("Type: %s", constraint_type_display_name(constraint_entity->type));
+        igText("Participants: %u", constraint_entity->participant_count);
+
+        if (constraint_type_is_dimensional(constraint_entity->type)) {
+            float edit_value = constraint_entity->value;
+            char value_fmt[16];
+            ui_constraint_value_format(constraint_entity, value_fmt, sizeof(value_fmt));
+            igSetNextItemWidth(140.0f);
+            if (igInputFloat("Value##selected_constraint_value", &edit_value, 0.1f, 1.0f, value_fmt,
+                             ImGuiInputTextFlags_CharsDecimal)) {
+                if (scene) {
+                    scene_constraint_set_dimensional_value(scene, e, edit_value, constraint_entity->driven);
+                }
+            }
+            igSameLine(0, 8);
+            bool driven = constraint_entity->driven;
+            if (igCheckbox("Driven##selected_constraint_driven", &driven)) {
+                if (scene) {
+                    scene_constraint_set_dimensional_value(scene, e, constraint_entity->value, driven);
+                }
+            }
+        }
+
+        uint32_t min_participants = constraint_type_min_participants(constraint_entity->type);
+        ecs_entity_t remove_participant_entity = 0;
+        for (uint32_t pi = 0; pi < constraint_entity->participant_count; pi++) {
+            ecs_entity_t participant = (ecs_entity_t)constraint_entity->participants[pi];
+            if (participant == 0 || !ecs_is_alive(w->world, participant)) continue;
+
+            LabelComp *p_label = ecs_world_get_label(w, participant);
+            char participant_name[160];
+            if (p_label && p_label->name[0] != '\0') {
+                snprintf(participant_name, sizeof(participant_name), "%s", p_label->name);
+            } else {
+                snprintf(participant_name, sizeof(participant_name), "#%llu", (unsigned long long)participant);
+            }
+
+            igPushID_Int((int)pi + 10000);
+            igText("%s", participant_name);
+            igSameLine(0, 8);
+            if (igSmallButton("Select")) {
+                selection_clear(state->selection);
+                selection_add(state->selection, participant);
+            }
+
+            bool can_remove_participant = scene != NULL && constraint_entity->participant_count > min_participants;
+            igSameLine(0, 8);
+            igBeginDisabled(!can_remove_participant);
+            if (igSmallButton("Remove")) {
+                remove_participant_entity = participant;
+            }
+            igEndDisabled();
+            igPopID();
+
+            if (remove_participant_entity != 0) {
+                break;
+            }
+        }
+
+        if (remove_participant_entity != 0 && scene) {
+            scene_constraint_remove_participant(scene, e, remove_participant_entity);
+            if (!ecs_is_alive(w->world, e)) {
+                selection_clear(state->selection);
+                return;
+            }
+        }
+
+        igBeginDisabled(scene == NULL);
+        if (igButton("Delete Constraint##selected_constraint_delete", (ImVec2){0, 0})) {
+            scene_remove_constraint(scene, e);
+            selection_clear(state->selection);
+            igEndDisabled();
+            return;
+        }
+        igEndDisabled();
+    }
+
+    // Geometry section
     if (g && igCollapsingHeader_TreeNodeFlags("Geometry", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool changed = false;
 
@@ -1215,6 +1925,53 @@ static inline void ui_entity_inspector_draw_multi(ui_entity_inspector_state_t *s
 //------------------------------------------------------------------------------
 
 static inline void ui_entity_inspector_draw(ui_entity_inspector_state_t *state) {
+    if (state->active_sketch != 0 && !ecs_is_alive(state->world->world, state->active_sketch)) {
+        state->active_sketch = 0;
+        state->active_sketch_workspace_open = false;
+    }
+
+    if (state->active_sketch != 0 && state->active_sketch_workspace_open) {
+        bool open = true;
+        igSetNextWindowSize((ImVec2){760.0f, 560.0f}, ImGuiCond_FirstUseEver);
+        if (igBegin("Active Sketch Workspace", &open, ImGuiWindowFlags_None)) {
+            if (!ecs_is_alive(state->world->world, state->active_sketch)) {
+                igTextDisabled("Active sketch no longer exists.");
+                state->active_sketch = 0;
+                state->active_sketch_workspace_open = false;
+            } else {
+                ecs_entity_t sketch_entity = state->active_sketch;
+                ecs_scene_t *scene = NULL;
+                if (state->undo_redo && state->undo_redo->scene) {
+                    scene = (ecs_scene_t*)state->undo_redo->scene;
+                }
+
+                SketchComp *active_sketch = ecs_world_get_sketch(state->world, sketch_entity);
+                LabelComp *active_label = ecs_world_get_label(state->world, sketch_entity);
+                const char *active_name = (active_label && active_label->name[0] != '\0')
+                    ? active_label->name : "Sketch";
+                igText("Active sketch: %s (#%llu)", active_name, (unsigned long long)sketch_entity);
+
+                if (scene) {
+                    scene_refresh_sketch_metadata(scene, sketch_entity);
+                    active_sketch = ecs_world_get_sketch(state->world, sketch_entity);
+                }
+
+                if (active_sketch) {
+                    ui_entity_inspector_draw_sketch_geometry_manager(state, sketch_entity, &active_sketch, scene, true);
+                    igDummy((ImVec2){0.0f, 10.0f});
+                    ui_entity_inspector_draw_sketch_constraint_manager(state, sketch_entity, &active_sketch, scene, true);
+                } else {
+                    igTextDisabled("Active entity is not a sketch.");
+                }
+            }
+        }
+        igEnd();
+        if (!open) {
+            state->active_sketch_workspace_open = false;
+            state->active_sketch = 0;
+        }
+    }
+
     if (!igBegin("Entity Inspector", NULL, 0)) {
         igEnd();
         return;
