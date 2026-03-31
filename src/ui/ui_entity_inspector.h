@@ -13,14 +13,17 @@
 #include "cimgui.h"
 #include "../selection.h"
 #include "../ecs/ecs_world.h"
+#include "../constraints/constraint_types.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
 #include "../math/math_undo_editor.h"
 #include "../undo_redo_exec.h"
+#include <ctype.h>
 #include <float.h>
 #include <stdlib.h>
+#include <string.h>
 
 //------------------------------------------------------------------------------
 // Types
@@ -63,6 +66,7 @@ static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t
 }
 
 #define UI_GEOMETRY_MANAGER_MAX_ROWS 2048
+#define UI_CONSTRAINT_MANAGER_MAX_ROWS 2048
 
 static inline bool ui_geometry_manager_contains(const ecs_entity_t *entities, int count, ecs_entity_t target) {
     for (int i = 0; i < count; i++) {
@@ -131,6 +135,30 @@ static inline void ui_geometry_manager_handle_click(ecs_entity_t *selection,
     }
 }
 
+static inline bool ui_constraint_text_matches(const char *haystack, const char *needle) {
+    if (!needle || needle[0] == '\0') return true;
+    if (!haystack) return false;
+
+    char lower_hay[512];
+    char lower_need[128];
+
+    size_t hlen = strlen(haystack);
+    if (hlen >= sizeof(lower_hay)) hlen = sizeof(lower_hay) - 1;
+    for (size_t i = 0; i < hlen; i++) {
+        lower_hay[i] = (char)tolower((unsigned char)haystack[i]);
+    }
+    lower_hay[hlen] = '\0';
+
+    size_t nlen = strlen(needle);
+    if (nlen >= sizeof(lower_need)) nlen = sizeof(lower_need) - 1;
+    for (size_t i = 0; i < nlen; i++) {
+        lower_need[i] = (char)tolower((unsigned char)needle[i]);
+    }
+    lower_need[nlen] = '\0';
+
+    return strstr(lower_hay, lower_need) != NULL;
+}
+
 //------------------------------------------------------------------------------
 // Internal: Draw single entity inspector
 //------------------------------------------------------------------------------
@@ -154,6 +182,9 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     static int gm_selected_count = 0;
     static ecs_entity_t gm_bound_sketch = 0;
     static int gm_delete_pending_count = 0;
+    static int cm_type_filter = 0;
+    static char cm_search_filter[128] = "";
+    static ecs_entity_t cm_delete_pending_constraint = 0;
 
     SketchComp *sketch = ecs_world_get_sketch(w, e);
     ecs_scene_t *scene = NULL;
@@ -538,6 +569,189 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             igSameLine(0, 8);
             if (igButton("Cancel##geometry_manager_cancel_delete", (ImVec2){120.0f, 0.0f})) {
                 gm_delete_pending_count = 0;
+                igCloseCurrentPopup();
+            }
+            igEndPopup();
+        }
+    }
+
+    if (sketch && igCollapsingHeader_TreeNodeFlags("ConstraintManager", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ecs_entity_t constraint_rows[UI_CONSTRAINT_MANAGER_MAX_ROWS];
+        int constraint_row_count = 0;
+        ecs_iter_t child_it = ecs_children(w->world, e);
+        while (ecs_children_next(&child_it)) {
+            for (int i = 0; i < child_it.count; i++) {
+                ecs_entity_t child = child_it.entities[i];
+                if (!ecs_world_get_constraint(w, child)) continue;
+                if (constraint_row_count < UI_CONSTRAINT_MANAGER_MAX_ROWS) {
+                    constraint_rows[constraint_row_count++] = child;
+                }
+            }
+        }
+
+        static const char *constraint_type_filter_items[] = {
+            "All",
+            "Fixed",
+            "Coincident",
+            "Collinear",
+            "Parallel",
+            "Perpendicular",
+            "Along X",
+            "Along Y",
+            "Along Z",
+            "Coradial",
+            "Concentric",
+            "Length",
+            "Angle",
+            "Tangential"
+        };
+
+        igTextDisabled("Filter");
+        igSetNextItemWidth(160.0f);
+        igCombo_Str_arr("Type##constraint_manager_type_filter",
+                        &cm_type_filter,
+                        constraint_type_filter_items,
+                        (int)(sizeof(constraint_type_filter_items) / sizeof(constraint_type_filter_items[0])),
+                        -1);
+        igSameLine(0, 8);
+        igSetNextItemWidth(-1.0f);
+        igInputTextWithHint("##constraint_manager_search_filter",
+                            "Search name or description",
+                            cm_search_filter,
+                            sizeof(cm_search_filter),
+                            0,
+                            NULL,
+                            NULL);
+        igDummy((ImVec2){0.0f, 8.0f});
+
+        if (constraint_row_count == 0) {
+            igTextDisabled("No constraints yet");
+            igTextWrapped("Select sketch geometry, press C to open applicable constraints, then apply one to define sketch behavior.");
+        } else {
+            for (int row = 0; row < constraint_row_count; row++) {
+                ecs_entity_t c_e = constraint_rows[row];
+                ConstraintComp *constraint = ecs_world_get_constraint(w, c_e);
+                if (!constraint) continue;
+
+                if (cm_type_filter > 0) {
+                    constraint_type_t selected_type = (constraint_type_t)(cm_type_filter - 1);
+                    if (constraint->type != selected_type) {
+                        continue;
+                    }
+                }
+
+                LabelComp *c_label = ecs_world_get_label(w, c_e);
+                const char *row_name = (c_label && c_label->name[0] != '\0') ? c_label->name : NULL;
+                const char *row_desc = (c_label && c_label->description[0] != '\0') ? c_label->description : "";
+                if (!ui_constraint_text_matches(row_name, cm_search_filter) &&
+                    !ui_constraint_text_matches(row_desc, cm_search_filter)) {
+                    continue;
+                }
+
+                char participants_text[256];
+                participants_text[0] = '\0';
+                for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
+                    ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
+                    LabelComp *p_label = ecs_world_get_label(w, p);
+                    char entry[80];
+                    if (p_label && p_label->name[0] != '\0') {
+                        snprintf(entry, sizeof(entry), "%s", p_label->name);
+                    } else {
+                        snprintf(entry, sizeof(entry), "#%llu", (unsigned long long)p);
+                    }
+                    if (participants_text[0] != '\0') {
+                        strncat(participants_text, ", ", sizeof(participants_text) - strlen(participants_text) - 1);
+                    }
+                    strncat(participants_text, entry, sizeof(participants_text) - strlen(participants_text) - 1);
+                }
+
+                char value_text[64];
+                if (constraint_type_is_dimensional(constraint->type) && constraint->has_value) {
+                    snprintf(value_text, sizeof(value_text), "%.3f%s",
+                             constraint->value,
+                             constraint->driven ? " (Driven)" : "");
+                } else {
+                    snprintf(value_text, sizeof(value_text), "%s",
+                             constraint_type_is_dimensional(constraint->type) ? "Unset" : "-");
+                }
+
+                const char *type_name = constraint_type_display_name(constraint->type);
+                char row_text[640];
+                if (row_name) {
+                    snprintf(row_text, sizeof(row_text), "%s | %s | %s | %s##constraint_row_%llu",
+                             type_name, row_name, value_text, participants_text, (unsigned long long)c_e);
+                } else {
+                    snprintf(row_text, sizeof(row_text), "%s | #%llu | %s | %s##constraint_row_%llu",
+                             type_name, (unsigned long long)c_e, value_text, participants_text, (unsigned long long)c_e);
+                }
+
+                bool row_selected = false;
+                if (constraint->participant_count > 0) {
+                    row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
+                }
+                if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
+                    selection_clear(state->selection);
+                    for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
+                        ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
+                        if (ecs_is_alive(w->world, p)) {
+                            selection_add(state->selection, p);
+                        }
+                    }
+                }
+
+                if (constraint_type_is_dimensional(constraint->type)) {
+                    char value_id[96];
+                    snprintf(value_id, sizeof(value_id), "Value##constraint_value_%llu", (unsigned long long)c_e);
+                    float edit_value = constraint->value;
+                    igSetNextItemWidth(140.0f);
+                    if (igInputFloat(value_id, &edit_value, 0.1f, 1.0f, "%.4f", 0)) {
+                        if (scene) {
+                            scene_constraint_set_dimensional_value(scene, c_e, edit_value, constraint->driven);
+                        }
+                    }
+                    igSameLine(0, 8);
+                    char driven_id[96];
+                    snprintf(driven_id, sizeof(driven_id), "Driven##constraint_driven_%llu", (unsigned long long)c_e);
+                    bool driven = constraint->driven;
+                    if (igCheckbox(driven_id, &driven)) {
+                        if (scene) {
+                            scene_constraint_set_dimensional_value(scene, c_e, constraint->value, driven);
+                        }
+                    }
+                    if (igIsItemHovered(ImGuiHoveredFlags_None)) {
+                        igSetTooltip("Driven constraints remain visible/readable but do not drive solve equations.");
+                    }
+                    igSameLine(0, 8);
+                }
+
+                char delete_id[96];
+                snprintf(delete_id, sizeof(delete_id), "Delete##constraint_delete_%llu", (unsigned long long)c_e);
+                igPushStyleColor_Vec4(ImGuiCol_Button, (ImVec4){0.906f, 0.510f, 0.518f, 1.000f});
+                igPushStyleColor_Vec4(ImGuiCol_ButtonHovered, (ImVec4){0.906f, 0.510f, 0.518f, 0.860f});
+                igPushStyleColor_Vec4(ImGuiCol_ButtonActive, (ImVec4){0.906f, 0.510f, 0.518f, 0.780f});
+                if (igButton(delete_id, (ImVec2){80.0f, 0.0f})) {
+                    cm_delete_pending_constraint = c_e;
+                    igOpenPopup_Str("Delete Constraint##constraint_manager_delete_popup", 0);
+                }
+                igPopStyleColor(3);
+            }
+        }
+
+        if (igBeginPopupModal("Delete Constraint##constraint_manager_delete_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            igTextWrapped("Delete selected constraint? Participating geometry will remain; this only removes the constraint.");
+            igDummy((ImVec2){0.0f, 8.0f});
+            if (igButton("Delete##constraint_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
+                if (scene && cm_delete_pending_constraint != 0) {
+                    scene_remove_constraint(scene, cm_delete_pending_constraint);
+                    scene_refresh_sketch_metadata(scene, e);
+                    sketch = ecs_world_get_sketch(w, e);
+                }
+                cm_delete_pending_constraint = 0;
+                igCloseCurrentPopup();
+            }
+            igSameLine(0, 8);
+            if (igButton("Cancel##constraint_manager_cancel_delete", (ImVec2){120.0f, 0.0f})) {
+                cm_delete_pending_constraint = 0;
                 igCloseCurrentPopup();
             }
             igEndPopup();
