@@ -46,7 +46,11 @@ Plans:
   3. User can hover/select constraints from constant-screen-size viewport glyphs anchored to constrained geometry.
   4. User can select any constraint and immediately see all participating geometry/sub-entities highlighted.
   5. User can create, view, and edit LENGTH/ANGLE constraints from viewport dimensions and ConstraintManager with mirrored values, and can mark them as driven.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 11-01-PLAN.md — Add constraint ECS contracts, naming counters, and scene lifecycle helpers.
+- [ ] 11-02-PLAN.md — Implement ConstraintManager list/filter/select/delete and dimensional/driven editing.
+- [ ] 11-03-PLAN.md — Wire C-key in-context menu, constraint glyph picking, and dimension popup UX.
 **UI hint**: yes
 
 ### Phase 12: Solver Control & Constrained Interaction
