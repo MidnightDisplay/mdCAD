@@ -13,6 +13,8 @@
 #include "../components/light_comp.h"
 #include "../components/sketch_comp.h"
 #include "../components/sketch_geometry_state_comp.h"
+#include "../components/constraint_comp.h"
+#include "../components/constraint_participant_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -31,6 +33,8 @@ typedef struct {
     ecs_entity_t LightComp_id;
     ecs_entity_t SketchComp_id;
     ecs_entity_t SketchGeometryStateComp_id;
+    ecs_entity_t ConstraintComp_id;
+    ecs_entity_t ConstraintParticipantComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -53,8 +57,8 @@ static inline uint32_t ecs_world_alloc_pick_id(ecs_world_state_t *s) {
     if (s->free_pick_count > 0) {
         return s->free_pick_ids[--s->free_pick_count];
     }
-    // Cap below reserved gizmo range
-    if (s->next_pick_id >= GIZMO_PICK_RESERVED_START) return 0;
+    // Cap below reserved overlay ranges (constraint glyphs + gizmo/vertex handles)
+    if (s->next_pick_id >= CONSTRAINT_GLYPH_PICK_BASE) return 0;
     // Allocate new ID
     return s->next_pick_id++;
 }
@@ -126,6 +130,18 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "SketchGeometryStateComp" }),
         .type.size = sizeof(SketchGeometryStateComp),
         .type.alignment = ECS_ALIGNOF(SketchGeometryStateComp)
+    });
+
+    s->ConstraintComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "ConstraintComp" }),
+        .type.size = sizeof(ConstraintComp),
+        .type.alignment = ECS_ALIGNOF(ConstraintComp)
+    });
+
+    s->ConstraintParticipantComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "ConstraintParticipantComp" }),
+        .type.size = sizeof(ConstraintParticipantComp),
+        .type.alignment = ECS_ALIGNOF(ConstraintParticipantComp)
     });
 
     // Register tag components (zero-size)
@@ -293,6 +309,23 @@ static inline SketchGeometryStateComp* ecs_world_get_sketch_geometry_state(ecs_w
 static inline void ecs_world_set_sketch_geometry_state(ecs_world_state_t *s, ecs_entity_t e,
                                                         const SketchGeometryStateComp *state) {
     ecs_set_id(s->world, e, s->SketchGeometryStateComp_id, sizeof(SketchGeometryStateComp), state);
+}
+
+static inline ConstraintComp* ecs_world_get_constraint(ecs_world_state_t *s, ecs_entity_t e) {
+    return (ConstraintComp*)ecs_get_id(s->world, e, s->ConstraintComp_id);
+}
+
+static inline void ecs_world_set_constraint(ecs_world_state_t *s, ecs_entity_t e, const ConstraintComp *constraint) {
+    ecs_set_id(s->world, e, s->ConstraintComp_id, sizeof(ConstraintComp), constraint);
+}
+
+static inline ConstraintParticipantComp* ecs_world_get_constraint_participant(ecs_world_state_t *s, ecs_entity_t e) {
+    return (ConstraintParticipantComp*)ecs_get_id(s->world, e, s->ConstraintParticipantComp_id);
+}
+
+static inline void ecs_world_set_constraint_participant(ecs_world_state_t *s, ecs_entity_t e,
+                                                         const ConstraintParticipantComp *participant) {
+    ecs_set_id(s->world, e, s->ConstraintParticipantComp_id, sizeof(ConstraintParticipantComp), participant);
 }
 
 //------------------------------------------------------------------------------

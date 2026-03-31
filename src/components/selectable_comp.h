@@ -8,8 +8,12 @@
 #include <stdbool.h>
 
 //------------------------------------------------------------------------------
-// Reserved pick ID ranges (top of 24-bit range for gizmo system)
+// Reserved pick ID ranges (top of 24-bit range)
 //------------------------------------------------------------------------------
+#define CONSTRAINT_GLYPH_PICK_BASE   16764000u   // 3200 IDs: constraint glyph overlays
+#define CONSTRAINT_GLYPH_PICK_MAX    3200u
+#define CONSTRAINT_GLYPH_PICK_END    (CONSTRAINT_GLYPH_PICK_BASE + CONSTRAINT_GLYPH_PICK_MAX - 1u)
+
 #define GIZMO_PICK_RESERVED_START  16767200u   // Everything >= this is gizmo territory
 #define GIZMO_HANDLE_BASE          16767200u   // 16 IDs: transform gizmo handles (16767200-16767215)
 #define GIZMO_HANDLE_COUNT         16

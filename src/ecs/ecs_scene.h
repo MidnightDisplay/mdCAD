@@ -15,7 +15,10 @@
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include "../components/constraint_comp.h"
+#include "../components/constraint_participant_comp.h"
 #include <string.h>
+#include <stdio.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -159,7 +162,15 @@ typedef struct {
 
     // Visibility flag for ECS rendering
     bool visible;
+    uint32_t next_sketch_name_index;
 } ecs_scene_t;
+
+//------------------------------------------------------------------------------
+// Forward declarations
+//------------------------------------------------------------------------------
+
+static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e);
+static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_t sketch);
 
 //------------------------------------------------------------------------------
 // Scene Initialization
@@ -168,6 +179,7 @@ typedef struct {
 static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) {
     scene->world = world;
     scene->visible = true;
+    scene->next_sketch_name_index = 1;
     geometry_batch_manager_init(&scene->batches);
 }
 
@@ -968,6 +980,20 @@ static inline int scene_collect_lights(ecs_scene_t *scene,
 // Entity Deletion
 //------------------------------------------------------------------------------
 
+static inline void scene_constraint_unlink_participants(ecs_scene_t *scene,
+                                                        const ConstraintComp *constraint,
+                                                        ecs_entity_t constraint_entity) {
+    if (!constraint || constraint_entity == 0) return;
+    for (uint32_t i = 0; i < constraint->participant_count; i++) {
+        ecs_entity_t participant = (ecs_entity_t)constraint->participants[i];
+        if (!ecs_is_alive(scene->world->world, participant)) continue;
+        ConstraintParticipantComp *refs =
+            ecs_world_get_constraint_participant(scene->world, participant);
+        if (!refs) continue;
+        constraint_participant_remove(refs, (uint64_t)constraint_entity);
+    }
+}
+
 // Internal helper to free instance slots for an entity (without deleting from ECS)
 static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
     RenderableComp *r = ecs_world_get_renderable(scene->world, e);
@@ -1018,6 +1044,7 @@ static inline void scene_free_entity_slots(ecs_scene_t *scene, ecs_entity_t e) {
 // Recursively remove an entity and all its children
 static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
     if (!ecs_is_alive(scene->world->world, e)) return;
+    ecs_entity_t parent = ecs_world_get_parent(scene->world, e);
 
     // First, recursively delete all children
     // We need to collect children first because deleting modifies the hierarchy
@@ -1032,11 +1059,21 @@ static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
         }
     }
 
+    // Keep constraint participant links coherent when deleting constraint entities.
+    ConstraintComp *constraint = ecs_world_get_constraint(scene->world, e);
+    if (constraint) {
+        scene_constraint_unlink_participants(scene, constraint, e);
+    }
+
     // Free this entity's instance buffer slots
     scene_free_entity_slots(scene, e);
 
     // Delete entity (also frees pick ID and geometry allocations)
     ecs_world_delete_entity(scene->world, e);
+
+    if (parent != 0 && ecs_is_alive(scene->world->world, parent) && scene_is_sketch(scene, parent)) {
+        scene_refresh_sketch_metadata(scene, parent);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -1060,10 +1097,127 @@ static inline ecs_entity_t scene_add_anchor(ecs_scene_t *scene,
 }
 
 // Create a sketch container entity
+static inline bool scene_should_autoname_sketch(const char *name) {
+    return !name || name[0] == '\0' || strcmp(name, "Sketch") == 0;
+}
+
+static inline const char* scene_geometry_name_prefix(geometry_type_t type) {
+    switch (type) {
+        case GEOM_POINT: return "Point";
+        case GEOM_LINE: return "Line";
+        case GEOM_POLYLINE: return "Polyline";
+        case GEOM_ARC: return "Arc";
+        case GEOM_POLYGON: return "Polygon";
+        case GEOM_HELIX: return "Helix";
+        case GEOM_BEZIER: return "Bezier";
+        case GEOM_POINT_CLOUD: return "PointCloud";
+        case GEOM_TRIANGLE: return "Triangle";
+        case GEOM_MESH: return "Mesh";
+        default: return "Geometry";
+    }
+}
+
+static inline const char* scene_constraint_name_prefix(constraint_type_t type) {
+    switch (type) {
+        case CONSTRAINT_FIXED: return "Fixed";
+        case CONSTRAINT_COINCIDENT: return "Coincident";
+        case CONSTRAINT_COLLINEAR: return "Collinear";
+        case CONSTRAINT_PARALLEL: return "Parallel";
+        case CONSTRAINT_PERPENDICULAR: return "Perpendicular";
+        case CONSTRAINT_ALONG_X: return "AlongX";
+        case CONSTRAINT_ALONG_Y: return "AlongY";
+        case CONSTRAINT_ALONG_Z: return "AlongZ";
+        case CONSTRAINT_CORADIAL: return "Coradial";
+        case CONSTRAINT_CONCENTRIC: return "Concentric";
+        case CONSTRAINT_LENGTH: return "Length";
+        case CONSTRAINT_ANGLE: return "Angle";
+        case CONSTRAINT_TANGENTIAL: return "Tangential";
+        default: return "Constraint";
+    }
+}
+
+static inline void scene_sketch_name_fallback(ecs_scene_t *scene, char *out_name, size_t out_size) {
+    snprintf(out_name, out_size, "Sketch_%u", scene->next_sketch_name_index++);
+}
+
+static inline void scene_get_sketch_label_name(ecs_scene_t *scene, ecs_entity_t sketch,
+                                               char *out_name, size_t out_size) {
+    if (!out_name || out_size == 0) return;
+    out_name[0] = '\0';
+
+    LabelComp *label = ecs_world_get_label(scene->world, sketch);
+    if (label && label->name[0] != '\0') {
+        strncpy(out_name, label->name, out_size - 1);
+        out_name[out_size - 1] = '\0';
+        return;
+    }
+
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (sk && sk->next_geometry_name_index[GEOM_POINT] > 0) {
+        strncpy(out_name, "Sketch", out_size - 1);
+        out_name[out_size - 1] = '\0';
+        return;
+    }
+
+    strncpy(out_name, "Sketch", out_size - 1);
+    out_name[out_size - 1] = '\0';
+}
+
+static inline void scene_set_geometry_default_label(ecs_scene_t *scene, ecs_entity_t sketch,
+                                                    ecs_entity_t geometry_entity, geometry_type_t type) {
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return;
+    if (type < 0 || type >= GEOM_TYPE_COUNT) return;
+
+    LabelComp *existing = ecs_world_get_label(scene->world, geometry_entity);
+    if (existing && existing->name[0] != '\0') {
+        return;
+    }
+
+    uint32_t index = ++sk->next_geometry_name_index[type];
+    const char *prefix = scene_geometry_name_prefix(type);
+    char sketch_name[LABEL_NAME_MAX];
+    char name[LABEL_NAME_MAX];
+    scene_get_sketch_label_name(scene, sketch, sketch_name, sizeof(sketch_name));
+    snprintf(name, sizeof(name), "%s_%u", prefix, index);
+
+    LabelComp label = label_comp_make(name, sketch_name);
+    ecs_world_set_label(scene->world, geometry_entity, &label);
+}
+
+static inline void scene_set_constraint_default_label(ecs_scene_t *scene, ecs_entity_t sketch,
+                                                      ecs_entity_t constraint_entity, constraint_type_t type) {
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return;
+    if (type < 0 || type >= CONSTRAINT_TYPE_COUNT) return;
+
+    LabelComp *existing = ecs_world_get_label(scene->world, constraint_entity);
+    if (existing && existing->name[0] != '\0') {
+        return;
+    }
+
+    uint32_t index = ++sk->next_constraint_name_index[type];
+    const char *prefix = scene_constraint_name_prefix(type);
+    char sketch_name[LABEL_NAME_MAX];
+    char name[LABEL_NAME_MAX];
+    scene_get_sketch_label_name(scene, sketch, sketch_name, sizeof(sketch_name));
+    snprintf(name, sizeof(name), "%s_%u", prefix, index);
+
+    LabelComp label = label_comp_make(name, sketch_name);
+    ecs_world_set_label(scene->world, constraint_entity, &label);
+}
+
 static inline ecs_entity_t scene_add_sketch(ecs_scene_t *scene,
                                             const char *name, const char *desc,
                                             vec4_t sketch_color) {
-    ecs_entity_t sketch = scene_add_anchor(scene, name ? name : "Sketch", desc ? desc : "");
+    char auto_name[LABEL_NAME_MAX];
+    const char *resolved_name = name;
+    if (scene_should_autoname_sketch(name)) {
+        scene_sketch_name_fallback(scene, auto_name, sizeof(auto_name));
+        resolved_name = auto_name;
+    }
+
+    ecs_entity_t sketch = scene_add_anchor(scene, resolved_name ? resolved_name : "Sketch", desc ? desc : "");
     if (sketch == 0) return 0;
 
     SketchComp sketch_comp = sketch_comp_default();
@@ -1093,6 +1247,11 @@ static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
         ecs_world_set_sketch_geometry_state(scene->world, geometry_entity, &init_state);
     }
 
+    GeometryComp *g = ecs_world_get_geometry(scene->world, geometry_entity);
+    if (g) {
+        scene_set_geometry_default_label(scene, sketch, geometry_entity, g->type);
+    }
+
     return true;
 }
 
@@ -1120,9 +1279,9 @@ static inline ecs_entity_t scene_add_line_to_sketch(ecs_scene_t *scene, ecs_enti
 }
 
 static inline ecs_entity_t scene_add_arc_to_sketch(ecs_scene_t *scene, ecs_entity_t sketch,
-                                                   vec3_t center, float radius,
-                                                   float start_angle, float end_angle,
-                                                   vec3_t normal, vec4_t color, float width) {
+                                                    vec3_t center, float radius,
+                                                    float start_angle, float end_angle,
+                                                    vec3_t normal, vec4_t color, float width) {
     ecs_entity_t e = scene_add_arc(scene, center, radius, start_angle, end_angle, normal, color, width);
     if (e == 0) return 0;
     if (!scene_attach_geometry_to_sketch(scene, sketch, e)) {
@@ -1130,6 +1289,88 @@ static inline ecs_entity_t scene_add_arc_to_sketch(ecs_scene_t *scene, ecs_entit
         return 0;
     }
     return e;
+}
+
+static inline bool scene_is_constraint_entity(ecs_scene_t *scene, ecs_entity_t e) {
+    return ecs_world_get_constraint(scene->world, e) != NULL;
+}
+
+static inline int scene_count_sketch_constraints(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene_is_sketch(scene, sketch)) return 0;
+
+    int count = 0;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            if (ecs_world_get_constraint(scene->world, it.entities[i])) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
+                                                          ecs_entity_t sketch,
+                                                          constraint_type_t type,
+                                                          const ecs_entity_t *participants,
+                                                          uint32_t participant_count,
+                                                          float value,
+                                                          bool driven) {
+    if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
+    if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
+
+    uint64_t participant_ids[CONSTRAINT_MAX_PARTICIPANTS];
+    for (uint32_t i = 0; i < participant_count; i++) {
+        ecs_entity_t p = participants[i];
+        if (!ecs_is_alive(scene->world->world, p)) return 0;
+        if (!ecs_world_get_geometry(scene->world, p)) return 0;
+        if (ecs_world_get_parent(scene->world, p) != sketch) return 0;
+        participant_ids[i] = (uint64_t)p;
+    }
+
+    ecs_entity_t constraint_e = scene_add_anchor(scene, "", "");
+    if (constraint_e == 0) return 0;
+
+    ConstraintComp constraint = constraint_comp_make(type, participant_ids, participant_count, value, driven);
+    ecs_world_set_constraint(scene->world, constraint_e, &constraint);
+    scene_set_parent(scene, constraint_e, sketch);
+    scene_set_constraint_default_label(scene, sketch, constraint_e, type);
+
+    for (uint32_t i = 0; i < participant_count; i++) {
+        ecs_entity_t p = participants[i];
+        ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, p);
+        if (!refs) {
+            ConstraintParticipantComp init_refs = constraint_participant_comp_default();
+            ecs_world_set_constraint_participant(scene->world, p, &init_refs);
+            refs = ecs_world_get_constraint_participant(scene->world, p);
+        }
+        if (!refs || !constraint_participant_add(refs, (uint64_t)constraint_e)) {
+            scene_remove_entity(scene, constraint_e);
+            return 0;
+        }
+    }
+
+    scene_refresh_sketch_metadata(scene, sketch);
+    return constraint_e;
+}
+
+static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
+                                                          ecs_entity_t constraint_entity,
+                                                          float value,
+                                                          bool driven) {
+    ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_entity);
+    if (!constraint || !constraint_comp_is_dimensional(constraint)) return false;
+    constraint->has_value = true;
+    constraint->value = value;
+    constraint->driven = driven;
+    return true;
+}
+
+static inline bool scene_remove_constraint(ecs_scene_t *scene, ecs_entity_t constraint_entity) {
+    if (!scene_is_constraint_entity(scene, constraint_entity)) return false;
+    scene_remove_entity(scene, constraint_entity);
+    return true;
 }
 
 // Batch-parent all children to a single parent
@@ -1208,6 +1449,7 @@ static inline int scene_count_sketch_fixed_geometry(ecs_scene_t *scene, ecs_enti
 static inline int scene_get_sketch_constraint_count(ecs_scene_t *scene, ecs_entity_t sketch) {
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return 0;
+    sk->constraint_count = scene_count_sketch_constraints(scene, sketch);
     return sk->constraint_count;
 }
 
@@ -1245,6 +1487,7 @@ static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_
 
     sk->geometry_count = scene_count_sketch_geometry(scene, sketch);
     sk->fixed_geometry_count = scene_count_sketch_fixed_geometry(scene, sketch);
+    sk->constraint_count = scene_count_sketch_constraints(scene, sketch);
     sk->status = scene_derive_sketch_status(scene, sketch);
 }
 

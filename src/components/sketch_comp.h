@@ -5,6 +5,8 @@
 #define SKETCH_COMP_H
 
 #include "component_types.h"
+#include "geometry_comp.h"
+#include "constraint_comp.h"
 #include <math.h>
 #include <stdbool.h>
 
@@ -20,7 +22,9 @@ typedef struct {
     vec4_t color;               // Sketch-level inherited color
     int geometry_count;         // Derived from sketch-owned geometry children
     int fixed_geometry_count;   // Derived from sketch-owned geometry state
-    int constraint_count;       // Placeholder count contract for Phase 10
+    int constraint_count;       // Derived from sketch-owned constraint children
+    uint32_t next_geometry_name_index[GEOM_TYPE_COUNT];
+    uint32_t next_constraint_name_index[CONSTRAINT_TYPE_COUNT];
 } SketchComp;
 
 static inline SketchComp sketch_comp_default(void) {
