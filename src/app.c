@@ -320,6 +320,12 @@ static void mdcad_draw_constraint_dimension_popup(void) {
                  &state.constraint_dimension_popup_value, 0.1f, 1.0f, "%.4f", 0);
 
     bool close_popup = false;
+    if (state.constraint_dimension_popup_open &&
+        igIsMouseClicked_Bool(ImGuiMouseButton_Left, false) &&
+        !igIsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) {
+        close_popup = true;
+    }
+
     if (igButton("Accept##constraint_dimension_popup_accept", (ImVec2){100.0f, 0.0f})) {
         scene_constraint_set_dimensional_value(
             &state.ecs_scene,

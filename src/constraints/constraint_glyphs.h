@@ -247,6 +247,7 @@ static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *stat
     for (int i = 0; i < state->count; i++) {
         const constraint_glyph_entry_t *entry = &state->entries[i];
         if (!entry->has_screen_anchor) continue;
+        if (!ecs_is_alive(scene->world->world, entry->constraint_entity)) continue;
 
         float x = entry->anchor_screen_x;
         float y = entry->anchor_screen_y;
@@ -262,19 +263,38 @@ static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *stat
         const ImU32 stroke = hovered ? hover_color : glyph_color;
         const float radius = hovered ? 7.5f : 6.0f;
         const float thickness = hovered ? 2.5f : 2.0f;
+        const bool singular = (constraint->participant_count <= 1);
+        const float y_offset = singular ? -(radius * 2.0f) : 0.0f;
+        const float cx = x;
+        const float cy = y + y_offset;
 
-        ImDrawList_AddCircle(draw_list, (ImVec2_c){x, y}, radius, stroke, 20, thickness);
-        ImDrawList_AddLine(draw_list, (ImVec2_c){x - 4.0f, y}, (ImVec2_c){x + 4.0f, y}, stroke, thickness);
-        ImDrawList_AddLine(draw_list, (ImVec2_c){x, y - 4.0f}, (ImVec2_c){x, y + 4.0f}, stroke, thickness);
+        ImDrawList_AddCircle(draw_list, (ImVec2_c){cx, cy}, radius, stroke, 20, thickness);
+        ImDrawList_AddLine(draw_list, (ImVec2_c){cx - 4.0f, cy}, (ImVec2_c){cx + 4.0f, cy}, stroke, thickness);
+        ImDrawList_AddLine(draw_list, (ImVec2_c){cx, cy - 4.0f}, (ImVec2_c){cx, cy + 4.0f}, stroke, thickness);
 
         if (constraint_comp_is_dimensional(constraint)) {
             char value_text[64];
-            snprintf(value_text, sizeof(value_text), "%.3g", constraint->value);
+            snprintf(value_text, sizeof(value_text), "%.6f", constraint->value);
+            int text_len = (int)strlen(value_text);
+            while (text_len > 0 && value_text[text_len - 1] == '0') {
+                value_text[text_len - 1] = '\0';
+                text_len--;
+            }
+            if (text_len > 0 && value_text[text_len - 1] == '.') {
+                value_text[text_len - 1] = '\0';
+            }
+            if (value_text[0] == '\0') {
+                strncpy(value_text, "0", sizeof(value_text) - 1);
+                value_text[sizeof(value_text) - 1] = '\0';
+            }
 
-            ImVec2_c bg_min = { x + 10.0f, y - 9.0f };
-            ImVec2_c bg_max = { x + 52.0f, y + 9.0f };
+            ImVec2_c text_size = igCalcTextSize(value_text, NULL, false, -1.0f);
+            float bg_w = text_size.x + 16.0f;
+            if (bg_w < 42.0f) bg_w = 42.0f;
+            ImVec2_c bg_min = { cx + 10.0f, cy - 9.0f };
+            ImVec2_c bg_max = { bg_min.x + bg_w, cy + 9.0f };
             ImDrawList_AddRectFilled(draw_list, bg_min, bg_max, dim_bg_color, 4.0f, 0);
-            ImDrawList_AddText_Vec2(draw_list, (ImVec2_c){x + 14.0f, y - 6.5f}, dim_text_color, value_text, NULL);
+            ImDrawList_AddText_Vec2(draw_list, (ImVec2_c){bg_min.x + 8.0f, bg_min.y + 2.5f}, dim_text_color, value_text, NULL);
         }
     }
 

@@ -1292,6 +1292,8 @@ static inline ecs_entity_t scene_add_arc_to_sketch(ecs_scene_t *scene, ecs_entit
 }
 
 static inline bool scene_is_constraint_entity(ecs_scene_t *scene, ecs_entity_t e) {
+    if (!scene || e == 0) return false;
+    if (!ecs_is_alive(scene->world->world, e)) return false;
     return ecs_world_get_constraint(scene->world, e) != NULL;
 }
 
@@ -1368,6 +1370,8 @@ static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
 }
 
 static inline bool scene_remove_constraint(ecs_scene_t *scene, ecs_entity_t constraint_entity) {
+    if (!scene || constraint_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, constraint_entity)) return false;
     if (!scene_is_constraint_entity(scene, constraint_entity)) return false;
     scene_remove_entity(scene, constraint_entity);
     return true;

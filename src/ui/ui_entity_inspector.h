@@ -742,8 +742,9 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             igDummy((ImVec2){0.0f, 8.0f});
             if (igButton("Delete##constraint_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
                 if (scene && cm_delete_pending_constraint != 0) {
-                    scene_remove_constraint(scene, cm_delete_pending_constraint);
-                    scene_refresh_sketch_metadata(scene, e);
+                    if (scene_remove_constraint(scene, cm_delete_pending_constraint)) {
+                        selection_clear(state->selection);
+                    }
                     sketch = ecs_world_get_sketch(w, e);
                 }
                 cm_delete_pending_constraint = 0;
