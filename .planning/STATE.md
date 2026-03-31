@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 11 plans verified
-last_updated: "2026-03-31T11:01:14.175Z"
-last_activity: 2026-03-30
+status: executing
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-03-31T11:36:41.274Z"
+last_activity: 2026-03-31
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 10 — sketch-foundations-managers
+**Current focus:** Phase 11 — constraint-authoring-ux
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-03-30
+Phase: 11 (constraint-authoring-ux) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-03-31
 
 ## Milestone Scope
 
@@ -48,6 +48,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 10 P01 | 2min | 3 tasks | 6 files |
 | Phase 10 P02 | 6h 36m | 3 tasks | 2 files |
 | Phase 10 P03 | 15m | 3 tasks | 3 files |
+| Phase 11 P02 | 7min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -62,6 +63,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 10]: Deferred fix/unfix controls and atomic bulk undo UX gap to 10-03 (SKCH-03 scope).
 - [Phase 10]: Closed 10-03 after explicit user approval of SKCH-03 checkpoint verification.
 - [Phase 10]: Consolidated GeometryManager interactions in Entity Inspector; removed duplicate Scene Hierarchy manager block.
+- [Phase 11]: Centralized v1.2 constraint legality and display helpers in src/constraints/constraint_types.h for shared inspector/menu usage.
+- [Phase 11]: ConstraintManager row selection now routes through selection buffer to highlight all participant geometry immediately.
 
 ## Blockers
 
@@ -69,6 +72,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-03-31T11:01:14.172Z
-**Stopped At:** Phase 11 plans verified
-**Resume File:** .planning/phases/11-constraint-authoring-ux/11-01-PLAN.md
+**Last Date:** 2026-03-31T11:36:41.271Z
+**Stopped At:** Completed 11-02-PLAN.md
+**Resume File:** None

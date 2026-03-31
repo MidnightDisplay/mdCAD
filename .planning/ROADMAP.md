@@ -49,7 +49,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [ ] 11-01-PLAN.md — Add constraint ECS contracts, naming counters, and scene lifecycle helpers.
-- [ ] 11-02-PLAN.md — Implement ConstraintManager list/filter/select/delete and dimensional/driven editing.
+- [x] 11-02-PLAN.md — Implement ConstraintManager list/filter/select/delete and dimensional/driven editing.
 - [ ] 11-03-PLAN.md — Wire C-key in-context menu, constraint glyph picking, and dimension popup UX.
 **UI hint**: yes
 
@@ -105,7 +105,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
-| 11. Constraint Authoring UX | 0/TBD | Not started | - |
+| 11. Constraint Authoring UX | 1/3 | In Progress|  |
 | 12. Solver Control & Constrained Interaction | 0/TBD | Not started | - |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
