@@ -37,6 +37,8 @@
 #include "ui/ui_scene_hierarchy.h"  // Includes undo_redo_exec.h
 #include "ui/ui_slot_buffer_debug.h"
 #include "ui/ui_fps_debug.h"
+#include "constraints/constraint_types.h"
+#include "constraints/constraint_glyphs.h"
 
 // Gizmo system
 #include "gizmo/gizmo.h"
@@ -100,6 +102,21 @@ static struct {
     vec3_t *gizmo_drag_start_vertices;
     int *gizmo_drag_vertex_indices;
     int gizmo_drag_vertex_count;
+
+    // Constraint authoring UX
+    constraint_glyph_state_t constraint_glyphs;
+    bool constraint_menu_open;
+    bool constraint_menu_open_request;
+    ImVec2 constraint_menu_anchor;
+    ecs_entity_t constraint_menu_sketch;
+    ecs_entity_t constraint_menu_participants[CONSTRAINT_MAX_PARTICIPANTS];
+    uint32_t constraint_menu_participant_count;
+    constraint_selection_signature_t constraint_menu_signature;
+    ecs_entity_t selected_constraint_entity;
+    bool constraint_dimension_popup_open_request;
+    ecs_entity_t constraint_dimension_popup_constraint;
+    float constraint_dimension_popup_value;
+    bool constraint_dimension_popup_open;
 } state;
 
 static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
@@ -107,6 +124,224 @@ static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
 
     memcpy(bridge.m, matrix.raw, sizeof(bridge.m));
     return bridge;
+}
+
+static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
+                                             selection_buffer_t *selection,
+                                             ecs_entity_t *out_sketch,
+                                             ecs_entity_t *out_participants,
+                                             uint32_t *out_participant_count,
+                                             constraint_selection_signature_t *out_sig) {
+    if (!scene || !selection || !out_sketch || !out_participants || !out_participant_count || !out_sig) {
+        return false;
+    }
+
+    *out_sketch = 0;
+    *out_participant_count = 0;
+    memset(out_sig, 0, sizeof(*out_sig));
+
+    for (int i = 0; i < selection->count; i++) {
+        ecs_entity_t selected = selection->entities[i];
+        if (!ecs_is_alive(scene->world->world, selected)) continue;
+
+        if (scene_is_sketch(scene, selected)) {
+            if (*out_sketch == 0) {
+                *out_sketch = selected;
+            } else if (*out_sketch != selected) {
+                return false;
+            }
+            continue;
+        }
+
+        GeometryComp *g = ecs_world_get_geometry(scene->world, selected);
+        if (!g) {
+            return false;
+        }
+
+        ecs_entity_t parent = scene_get_parent(scene, selected);
+        if (!scene_is_sketch(scene, parent)) {
+            return false;
+        }
+        if (*out_sketch == 0) {
+            *out_sketch = parent;
+        } else if (*out_sketch != parent) {
+            return false;
+        }
+
+        bool already_added = false;
+        for (uint32_t p = 0; p < *out_participant_count; p++) {
+            if (out_participants[p] == selected) {
+                already_added = true;
+                break;
+            }
+        }
+        if (already_added) continue;
+        if (*out_participant_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
+
+        out_participants[*out_participant_count] = selected;
+        out_sig->geometry_types[*out_participant_count] = g->type;
+        out_sig->roles[*out_participant_count] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        (*out_participant_count)++;
+        out_sig->count = *out_participant_count;
+    }
+
+    return *out_sketch != 0;
+}
+
+static void mdcad_select_constraint_participants(ecs_scene_t *scene,
+                                                 selection_buffer_t *selection,
+                                                 ecs_entity_t constraint_entity) {
+    if (!scene || !selection || constraint_entity == 0) return;
+    ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_entity);
+    if (!constraint) return;
+
+    selection_clear(selection);
+    for (uint32_t i = 0; i < constraint->participant_count; i++) {
+        ecs_entity_t participant = (ecs_entity_t)constraint->participants[i];
+        if (ecs_is_alive(scene->world->world, participant)) {
+            selection_add(selection, participant);
+        }
+    }
+}
+
+static void mdcad_draw_constraint_context_menu(void) {
+    if (!state.constraint_menu_open_request && !state.constraint_menu_open) return;
+
+    if (state.constraint_menu_open_request) {
+        state.constraint_menu_open = true;
+        state.constraint_menu_open_request = false;
+    }
+
+    if (!state.constraint_menu_open) return;
+    if (!ecs_is_alive(state.ecs_world.world, state.constraint_menu_sketch)) {
+        state.constraint_menu_open = false;
+        return;
+    }
+
+    igSetNextWindowPos(state.constraint_menu_anchor, ImGuiCond_Appearing, (ImVec2){0.0f, 0.0f});
+    if (!igBegin("Constraint Menu##constraint_context_menu", &state.constraint_menu_open,
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings)) {
+        igEnd();
+        return;
+    }
+
+    bool applied = false;
+    int legal_count = 0;
+    for (int t = 0; t < CONSTRAINT_TYPE_COUNT; t++) {
+        constraint_type_t type = (constraint_type_t)t;
+        if (!constraint_type_is_selection_legal(&state.constraint_menu_signature, type)) continue;
+        legal_count++;
+
+        if (igMenuItem_Bool(constraint_type_display_name(type), NULL, false, true)) {
+            float initial_value = (type == CONSTRAINT_ANGLE) ? 90.0f : 1.0f;
+            ecs_entity_t created = scene_add_constraint_to_sketch(
+                &state.ecs_scene,
+                state.constraint_menu_sketch,
+                type,
+                state.constraint_menu_participants,
+                state.constraint_menu_participant_count,
+                initial_value,
+                false);
+            if (created != 0) {
+                undo_cmd_create_entity(&state.undo_redo, created);
+                state.selected_constraint_entity = created;
+                if (constraint_type_is_dimensional(type)) {
+                    const constraint_glyph_entry_t *glyph = constraint_glyphs_find_by_constraint(&state.constraint_glyphs, created);
+                    if (glyph && glyph->has_screen_anchor) {
+                        state.constraint_menu_anchor = (ImVec2){ glyph->anchor_screen_x, glyph->anchor_screen_y };
+                    }
+                }
+                mdcad_select_constraint_participants(&state.ecs_scene, &state.selection, created);
+                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                applied = true;
+            }
+        }
+    }
+
+    if (legal_count == 0) {
+        if (state.constraint_menu_participant_count == 0) {
+            igTextDisabled("Select sketch geometry to apply constraints.");
+        } else {
+            igTextDisabled("No applicable constraints for current selection.");
+        }
+    }
+
+    if (igIsKeyPressed_Bool(ImGuiKey_Escape, false)) {
+        state.constraint_menu_open = false;
+    }
+    if (applied) {
+        state.constraint_menu_open = false;
+    }
+
+    igEnd();
+}
+
+static void mdcad_draw_constraint_dimension_popup(void) {
+    if (!state.constraint_dimension_popup_open_request && !state.constraint_dimension_popup_open) return;
+
+    if (state.constraint_dimension_popup_open_request) {
+        state.constraint_dimension_popup_open = true;
+        state.constraint_dimension_popup_open_request = false;
+    }
+    if (!state.constraint_dimension_popup_open) return;
+
+    if (!ecs_is_alive(state.ecs_world.world, state.constraint_dimension_popup_constraint)) {
+        state.constraint_dimension_popup_open = false;
+        state.constraint_dimension_popup_constraint = 0;
+        return;
+    }
+
+    ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, state.constraint_dimension_popup_constraint);
+    if (!constraint || !constraint_type_is_dimensional(constraint->type)) {
+        state.constraint_dimension_popup_open = false;
+        state.constraint_dimension_popup_constraint = 0;
+        return;
+    }
+
+    ImVec2 popup_anchor = state.constraint_menu_anchor;
+    float glyph_x = 0.0f;
+    float glyph_y = 0.0f;
+    if (constraint_glyphs_get_screen_anchor(&state.constraint_glyphs, state.constraint_dimension_popup_constraint, &glyph_x, &glyph_y)) {
+        popup_anchor.x = glyph_x + 16.0f;
+        popup_anchor.y = glyph_y + 16.0f;
+    }
+
+    igSetNextWindowPos(popup_anchor, ImGuiCond_Appearing, (ImVec2){0.0f, 0.0f});
+    if (!igBegin("Edit Dimension##constraint_dimension_popup",
+                 &state.constraint_dimension_popup_open,
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings)) {
+        igEnd();
+        return;
+    }
+
+    igText("%s", constraint_type_display_name(constraint->type));
+    igSetNextItemWidth(180.0f);
+    igInputFloat("Value##constraint_dimension_popup_value",
+                 &state.constraint_dimension_popup_value, 0.1f, 1.0f, "%.4f", 0);
+
+    bool close_popup = false;
+    if (igButton("Accept##constraint_dimension_popup_accept", (ImVec2){100.0f, 0.0f})) {
+        scene_constraint_set_dimensional_value(
+            &state.ecs_scene,
+            state.constraint_dimension_popup_constraint,
+            state.constraint_dimension_popup_value,
+            constraint->driven);
+        close_popup = true;
+    }
+    igSameLine(0, 8);
+    if (igButton("Cancel##constraint_dimension_popup_cancel", (ImVec2){100.0f, 0.0f})) {
+        close_popup = true;
+    }
+    if (igIsKeyPressed_Bool(ImGuiKey_Escape, false)) {
+        close_popup = true;
+    }
+
+    if (close_popup) {
+        state.constraint_dimension_popup_open = false;
+        state.constraint_dimension_popup_constraint = 0;
+    }
+
+    igEnd();
 }
 
 //------------------------------------------------------------------------------
@@ -209,6 +444,17 @@ static void init(void) {
 
     // Initialize gizmo system
     gizmo_init(&state.gizmo);
+    constraint_glyphs_init(&state.constraint_glyphs);
+    state.constraint_menu_open = false;
+    state.constraint_menu_open_request = false;
+    state.constraint_menu_sketch = 0;
+    state.constraint_menu_participant_count = 0;
+    memset(&state.constraint_menu_signature, 0, sizeof(state.constraint_menu_signature));
+    state.selected_constraint_entity = 0;
+    state.constraint_dimension_popup_open_request = false;
+    state.constraint_dimension_popup_open = false;
+    state.constraint_dimension_popup_constraint = 0;
+    state.constraint_dimension_popup_value = 0.0f;
 
     // Create test ECS entities using the scene API
     {
@@ -382,6 +628,9 @@ static void frame(void) {
         ui_fps_debug_draw(&state.fps_debug);
     }
 
+    mdcad_draw_constraint_context_menu();
+    mdcad_draw_constraint_dimension_popup();
+
     // Handle keyboard shortcuts when no text input has focus
     if (!io->WantCaptureKeyboard) {
         // Undo: Ctrl+Z
@@ -404,6 +653,26 @@ static void frame(void) {
             gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
                 ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
             gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
+        }
+
+        // C: open context-aware constraint authoring menu at cursor
+        if (igIsKeyPressed_Bool(ImGuiKey_C, false)) {
+            ecs_entity_t sketch = 0;
+            ecs_entity_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+            uint32_t participant_count = 0;
+            constraint_selection_signature_t signature;
+
+            if (mdcad_collect_constraint_context(
+                    &state.ecs_scene, &state.selection,
+                    &sketch, participants, &participant_count, &signature)) {
+                state.constraint_menu_sketch = sketch;
+                state.constraint_menu_participant_count = participant_count;
+                memcpy(state.constraint_menu_participants, participants, sizeof(participants));
+                state.constraint_menu_signature = signature;
+                state.constraint_menu_anchor = io->MousePos;
+                state.constraint_menu_open_request = true;
+                state.constraint_menu_open = false;
+            }
         }
 
         // Delete: Delete or Backspace (macOS) deletes selected entities
@@ -572,6 +841,13 @@ static void frame(void) {
                 }
                 // Add gizmo handles + vertex handles to pick buffer
                 gizmo_populate_pick_buffer(&state.gizmo, &state.pick_buffer, &state.ecs_scene);
+                vec3_t cam_eye = orbit_camera_get_eye_position(&state.camera);
+                constraint_glyphs_populate_pick_buffer(&state.constraint_glyphs, &state.ecs_scene, &state.pick_buffer,
+                                                       cam_eye, 0.785398f);
+                constraint_glyphs_update_screen_anchors(&state.constraint_glyphs,
+                    view_legacy, proj_legacy,
+                    state.viewport.window_pos_x, state.viewport.window_pos_y,
+                    (float)state.viewport.content_width, (float)state.viewport.content_height);
 
                 // Render pick pass
                 pick_buffer_render(&state.pick_buffer, view_legacy, proj_legacy);
@@ -584,9 +860,13 @@ static void frame(void) {
             }
 
             uint32_t pick_id = pick_buffer_get_hovered_id(&state.pick_buffer);
+            constraint_glyphs_handle_hover(&state.constraint_glyphs, pick_id);
 
-            // Route hover: gizmo handles first, then vertices, then entities
-            if (pick_id >= GIZMO_PICK_RESERVED_START) {
+            // Route hover: constraint glyphs, then gizmo handles/vertices, then entities
+            if (constraint_glyphs_is_pick_id(pick_id)) {
+                gizmo_handle_hover(&state.gizmo, 0);
+                ecs_scene_update_hover(&state.ecs_scene, &state.pick_buffer);
+            } else if (pick_id >= GIZMO_PICK_RESERVED_START) {
                 // Gizmo handle or vertex handle
                 gizmo_handle_hover(&state.gizmo, pick_id);
                 // Clear ECS hover
@@ -648,11 +928,29 @@ static void frame(void) {
                                                   state.viewport.shift_held,
                                                   state.viewport.ctrl_held);
                     } else if (state.viewport.clicked) {
-                        // Normal entity click
-                        ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
-                        selection_handle_click(&state.selection, clicked_entity,
-                                                state.viewport.shift_held,
-                                                state.viewport.ctrl_held);
+                        if (constraint_glyphs_is_pick_id(pick_id)) {
+                            ecs_entity_t clicked_constraint =
+                                constraint_glyphs_constraint_from_pick_id(&state.constraint_glyphs, pick_id);
+                            if (clicked_constraint != 0) {
+                                state.selected_constraint_entity = clicked_constraint;
+                                mdcad_select_constraint_participants(&state.ecs_scene, &state.selection, clicked_constraint);
+
+                                ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, clicked_constraint);
+                                if (constraint && constraint_type_is_dimensional(constraint->type) &&
+                                    igIsMouseDoubleClicked_Nil(ImGuiMouseButton_Left)) {
+                                    state.constraint_dimension_popup_constraint = clicked_constraint;
+                                    state.constraint_dimension_popup_value = constraint->value;
+                                    state.constraint_dimension_popup_open_request = true;
+                                    state.constraint_dimension_popup_open = false;
+                                }
+                            }
+                        } else {
+                            // Normal entity click
+                            ecs_entity_t clicked_entity = ecs_scene_find_entity_by_pick_id(&state.ecs_scene, pick_id);
+                            selection_handle_click(&state.selection, clicked_entity,
+                                                    state.viewport.shift_held,
+                                                    state.viewport.ctrl_held);
+                        }
                         // If selection changed while in geometry mode, update vertex mode
                         if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE) {
                             gizmo_set_edit_mode(&state.gizmo, GIZMO_GEOMETRY_MODE,

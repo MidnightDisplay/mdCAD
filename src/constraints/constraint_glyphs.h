@@ -1,0 +1,223 @@
+//------------------------------------------------------------------------------
+// constraint_glyphs.h - Constraint glyph pick overlay helpers (header-only)
+//------------------------------------------------------------------------------
+#ifndef CONSTRAINT_GLYPHS_H
+#define CONSTRAINT_GLYPHS_H
+
+#include "../ecs/ecs_scene.h"
+#include "../gpu/pick_buffer.h"
+#include "../components/component_types.h"
+#include <math.h>
+#include <string.h>
+
+#define CONSTRAINT_GLYPHS_MAX 1024
+
+typedef struct {
+    uint32_t pick_id;
+    ecs_entity_t constraint_entity;
+    vec3_t anchor_world;
+    float anchor_screen_x;
+    float anchor_screen_y;
+    bool has_screen_anchor;
+} constraint_glyph_entry_t;
+
+typedef struct {
+    constraint_glyph_entry_t entries[CONSTRAINT_GLYPHS_MAX];
+    int count;
+    ecs_entity_t hovered_constraint;
+} constraint_glyph_state_t;
+
+static inline void constraint_glyphs_init(constraint_glyph_state_t *state) {
+    if (!state) return;
+    memset(state, 0, sizeof(*state));
+}
+
+static inline void constraint_glyphs_begin_frame(constraint_glyph_state_t *state) {
+    if (!state) return;
+    state->count = 0;
+    state->hovered_constraint = 0;
+}
+
+static inline bool constraint_glyphs_is_pick_id(uint32_t pick_id) {
+    return pick_id >= CONSTRAINT_GLYPH_PICK_BASE && pick_id <= CONSTRAINT_GLYPH_PICK_END;
+}
+
+static inline const constraint_glyph_entry_t* constraint_glyphs_find_by_pick_id(
+    const constraint_glyph_state_t *state, uint32_t pick_id) {
+    if (!state || !constraint_glyphs_is_pick_id(pick_id)) return NULL;
+    for (int i = 0; i < state->count; i++) {
+        if (state->entries[i].pick_id == pick_id) {
+            return &state->entries[i];
+        }
+    }
+    return NULL;
+}
+
+static inline const constraint_glyph_entry_t* constraint_glyphs_find_by_constraint(
+    const constraint_glyph_state_t *state, ecs_entity_t constraint_entity) {
+    if (!state || constraint_entity == 0) return NULL;
+    for (int i = 0; i < state->count; i++) {
+        if (state->entries[i].constraint_entity == constraint_entity) {
+            return &state->entries[i];
+        }
+    }
+    return NULL;
+}
+
+static inline ecs_entity_t constraint_glyphs_constraint_from_pick_id(
+    const constraint_glyph_state_t *state, uint32_t pick_id) {
+    const constraint_glyph_entry_t *entry = constraint_glyphs_find_by_pick_id(state, pick_id);
+    return entry ? entry->constraint_entity : 0;
+}
+
+static inline bool constraint_glyphs_get_screen_anchor(
+    const constraint_glyph_state_t *state, ecs_entity_t constraint_entity, float *x, float *y) {
+    const constraint_glyph_entry_t *entry = constraint_glyphs_find_by_constraint(state, constraint_entity);
+    if (!entry || !entry->has_screen_anchor || !x || !y) return false;
+    *x = entry->anchor_screen_x;
+    *y = entry->anchor_screen_y;
+    return true;
+}
+
+static inline bool constraint_glyphs_geometry_anchor_world(ecs_scene_t *scene,
+                                                           ecs_entity_t geometry_entity,
+                                                           vec3_t *out_anchor) {
+    if (!scene || !out_anchor || geometry_entity == 0) return false;
+
+    GeometryComp *g = ecs_world_get_geometry(scene->world, geometry_entity);
+    TransformComp *t = ecs_world_get_transform(scene->world, geometry_entity);
+    if (!g || !t) return false;
+
+    vec3_t local_anchor = vec3_make(0.0f, 0.0f, 0.0f);
+    switch (g->type) {
+        case GEOM_POINT:
+            local_anchor = g->data.point.point;
+            break;
+        case GEOM_LINE:
+            local_anchor = vec3_scale(vec3_add(g->data.line.a, g->data.line.b), 0.5f);
+            break;
+        case GEOM_ARC:
+            local_anchor = g->data.arc.center;
+            break;
+        default:
+            return false;
+    }
+
+    *out_anchor = ecs_scene_transform_point_world(&t->world_matrix, local_anchor);
+    return true;
+}
+
+static inline bool constraint_glyphs_constraint_anchor_world(ecs_scene_t *scene,
+                                                             ecs_entity_t constraint_entity,
+                                                             const ConstraintComp *constraint,
+                                                             vec3_t *out_anchor) {
+    if (!scene || !constraint || !out_anchor || constraint_entity == 0) return false;
+    if (constraint->participant_count == 0) return false;
+
+    vec3_t sum = vec3_make(0.0f, 0.0f, 0.0f);
+    int valid_count = 0;
+    for (uint32_t i = 0; i < constraint->participant_count; i++) {
+        ecs_entity_t participant = (ecs_entity_t)constraint->participants[i];
+        vec3_t participant_anchor;
+        if (constraint_glyphs_geometry_anchor_world(scene, participant, &participant_anchor)) {
+            sum = vec3_add(sum, participant_anchor);
+            valid_count++;
+        }
+    }
+
+    if (valid_count == 0) return false;
+    *out_anchor = vec3_scale(sum, 1.0f / (float)valid_count);
+    return true;
+}
+
+static inline void constraint_glyphs_populate_pick_buffer(constraint_glyph_state_t *state,
+                                                          ecs_scene_t *scene,
+                                                          pick_buffer_t *pick_buffer,
+                                                          vec3_t camera_position,
+                                                          float camera_fov_radians) {
+    if (!state || !scene || !pick_buffer) return;
+
+    constraint_glyphs_begin_frame(state);
+    ecs_world_state_t *world = scene->world;
+
+    ecs_query_t *query = ecs_query(world->world, {
+        .terms = {
+            { .id = world->ConstraintComp_id }
+        }
+    });
+
+    ecs_iter_t it = ecs_query_iter(world->world, query);
+    while (ecs_query_next(&it)) {
+        ConstraintComp *constraints = ecs_field(&it, ConstraintComp, 0);
+        for (int i = 0; i < it.count; i++) {
+            if (state->count >= CONSTRAINT_GLYPHS_MAX) {
+                ecs_iter_fini(&it);
+                break;
+            }
+
+            ecs_entity_t constraint_entity = it.entities[i];
+            ConstraintComp *constraint = &constraints[i];
+            vec3_t anchor_world;
+            if (!constraint_glyphs_constraint_anchor_world(scene, constraint_entity, constraint, &anchor_world)) {
+                continue;
+            }
+
+            uint32_t pick_id = CONSTRAINT_GLYPH_PICK_BASE + (uint32_t)state->count;
+            if (!constraint_glyphs_is_pick_id(pick_id)) {
+                ecs_iter_fini(&it);
+                break;
+            }
+
+            constraint_glyph_entry_t *entry = &state->entries[state->count++];
+            entry->pick_id = pick_id;
+            entry->constraint_entity = constraint_entity;
+            entry->anchor_world = anchor_world;
+            entry->has_screen_anchor = false;
+
+            // Keep glyph hit target approximately constant on screen across zoom.
+            float dist = vec3_length(vec3_sub(camera_position, anchor_world));
+            float glyph_world_size = dist * tanf(camera_fov_radians * 0.5f) * 0.02f;
+            if (glyph_world_size < 0.005f) glyph_world_size = 0.005f;
+            pick_buffer_add_overlay_point(pick_buffer, anchor_world, pick_id);
+            pick_buffer_add_overlay_line(pick_buffer,
+                vec3_add(anchor_world, vec3_make(-glyph_world_size, 0.0f, 0.0f)),
+                vec3_add(anchor_world, vec3_make( glyph_world_size, 0.0f, 0.0f)),
+                pick_id);
+            pick_buffer_add_overlay_line(pick_buffer,
+                vec3_add(anchor_world, vec3_make(0.0f, -glyph_world_size, 0.0f)),
+                vec3_add(anchor_world, vec3_make(0.0f,  glyph_world_size, 0.0f)),
+                pick_id);
+        }
+    }
+    ecs_query_fini(query);
+}
+
+static inline void constraint_glyphs_update_screen_anchors(constraint_glyph_state_t *state,
+                                                           mat4_t view,
+                                                           mat4_t proj,
+                                                           float viewport_x,
+                                                           float viewport_y,
+                                                           float viewport_width,
+                                                           float viewport_height) {
+    if (!state || viewport_width <= 0.0f || viewport_height <= 0.0f) return;
+
+    mat4_t vp = mat4_mul(proj, view);
+    for (int i = 0; i < state->count; i++) {
+        float ndc_x = 0.0f;
+        float ndc_y = 0.0f;
+        if (!clip_space_project(vp, state->entries[i].anchor_world, &ndc_x, &ndc_y)) {
+            state->entries[i].has_screen_anchor = false;
+            continue;
+        }
+        state->entries[i].anchor_screen_x = viewport_x + (ndc_x * 0.5f + 0.5f) * viewport_width;
+        state->entries[i].anchor_screen_y = viewport_y + (-ndc_y * 0.5f + 0.5f) * viewport_height;
+        state->entries[i].has_screen_anchor = true;
+    }
+}
+
+static inline void constraint_glyphs_handle_hover(constraint_glyph_state_t *state, uint32_t pick_id) {
+    if (!state) return;
+    state->hovered_constraint = constraint_glyphs_constraint_from_pick_id(state, pick_id);
+}
+
+#endif // CONSTRAINT_GLYPHS_H
