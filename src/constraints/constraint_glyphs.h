@@ -7,8 +7,11 @@
 #include "../ecs/ecs_scene.h"
 #include "../gpu/pick_buffer.h"
 #include "../components/component_types.h"
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#include "cimgui.h"
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 #define CONSTRAINT_GLYPHS_MAX 1024
 
@@ -218,6 +221,64 @@ static inline void constraint_glyphs_update_screen_anchors(constraint_glyph_stat
 static inline void constraint_glyphs_handle_hover(constraint_glyph_state_t *state, uint32_t pick_id) {
     if (!state) return;
     state->hovered_constraint = constraint_glyphs_constraint_from_pick_id(state, pick_id);
+}
+
+static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *state,
+                                                  ecs_scene_t *scene,
+                                                  float viewport_x,
+                                                  float viewport_y,
+                                                  float viewport_width,
+                                                  float viewport_height) {
+    if (!state || !scene || viewport_width <= 0.0f || viewport_height <= 0.0f) return;
+    ImGuiViewport *main_viewport = igGetMainViewport();
+    if (!main_viewport) return;
+    ImDrawList *draw_list = igGetForegroundDrawList_ViewportPtr(main_viewport);
+    if (!draw_list) return;
+
+    ImVec2_c clip_min = { viewport_x, viewport_y };
+    ImVec2_c clip_max = { viewport_x + viewport_width, viewport_y + viewport_height };
+    ImDrawList_PushClipRect(draw_list, clip_min, clip_max, true);
+
+    const ImU32 glyph_color = igGetColorU32_Vec4((ImVec4_c){0.95f, 0.95f, 0.95f, 0.90f});
+    const ImU32 hover_color = igGetColorU32_Vec4((ImVec4_c){1.00f, 0.85f, 0.15f, 1.00f});
+    const ImU32 dim_bg_color = igGetColorU32_Vec4((ImVec4_c){0.08f, 0.08f, 0.10f, 0.90f});
+    const ImU32 dim_text_color = igGetColorU32_Vec4((ImVec4_c){0.95f, 0.95f, 0.95f, 1.00f});
+
+    for (int i = 0; i < state->count; i++) {
+        const constraint_glyph_entry_t *entry = &state->entries[i];
+        if (!entry->has_screen_anchor) continue;
+
+        float x = entry->anchor_screen_x;
+        float y = entry->anchor_screen_y;
+        if (x < viewport_x || x > (viewport_x + viewport_width) ||
+            y < viewport_y || y > (viewport_y + viewport_height)) {
+            continue;
+        }
+
+        ConstraintComp *constraint = ecs_world_get_constraint(scene->world, entry->constraint_entity);
+        if (!constraint) continue;
+
+        const bool hovered = (state->hovered_constraint == entry->constraint_entity);
+        const ImU32 stroke = hovered ? hover_color : glyph_color;
+        const float radius = hovered ? 7.5f : 6.0f;
+        const float thickness = hovered ? 2.5f : 2.0f;
+
+        ImDrawList_AddCircle(draw_list, (ImVec2_c){x, y}, radius, stroke, 20, thickness);
+        ImDrawList_AddLine(draw_list, (ImVec2_c){x - 4.0f, y}, (ImVec2_c){x + 4.0f, y}, stroke, thickness);
+        ImDrawList_AddLine(draw_list, (ImVec2_c){x, y - 4.0f}, (ImVec2_c){x, y + 4.0f}, stroke, thickness);
+
+        if (constraint_comp_is_dimensional(constraint)) {
+            char value_text[64];
+            snprintf(value_text, sizeof(value_text), "%.3g", constraint->value);
+
+            ImVec2_c bg_min = { x + 10.0f, y - 9.0f };
+            ImVec2_c bg_max = { x + 52.0f, y + 9.0f };
+            ImDrawList_AddRectFilled(draw_list, bg_min, bg_max, dim_bg_color, 4.0f, 0);
+            ImDrawList_AddText_Vec2(draw_list, (ImVec2_c){x + 14.0f, y - 6.5f}, dim_text_color, value_text, NULL);
+        }
+    }
+
+    ImDrawList_PopClipRect(draw_list);
 }
 
 #endif // CONSTRAINT_GLYPHS_H

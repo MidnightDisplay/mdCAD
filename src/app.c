@@ -747,6 +747,10 @@ static void frame(void) {
     mat4_t proj_legacy = mdcad_mat4_bridge_from_cglm(proj);
     mat4_t vp_legacy = mdcad_mat4_bridge_from_cglm(vp);
     mat4_t mvp_legacy = mdcad_mat4_bridge_from_cglm(mvp);
+    constraint_glyphs_update_screen_anchors(&state.constraint_glyphs,
+        view_legacy, proj_legacy,
+        state.viewport.window_pos_x, state.viewport.window_pos_y,
+        (float)state.viewport.content_width, (float)state.viewport.content_height);
 
     // Offscreen pass - render visible objects
     sg_begin_pass(&(sg_pass){
@@ -1046,6 +1050,10 @@ static void frame(void) {
             }
         }
     }
+
+    constraint_glyphs_draw_overlay(&state.constraint_glyphs, &state.ecs_scene,
+        state.viewport.window_pos_x, state.viewport.window_pos_y,
+        (float)state.viewport.content_width, (float)state.viewport.content_height);
 
     //=== MAIN PASS - RENDER IMGUI ===
     sg_begin_pass(&(sg_pass){

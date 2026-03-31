@@ -100,6 +100,27 @@ static inline void json_write_vec4(json_builder_t *b, vec4_t v) {
     json_builder_appendf(b, "[%.6g, %.6g, %.6g, %.6g]", v.x, v.y, v.z, v.w);
 }
 
+static inline void json_write_string_escaped(json_builder_t *b, const char *str) {
+    json_builder_append(b, "\"");
+    if (str) {
+        for (const char *c = str; *c; c++) {
+            switch (*c) {
+                case '\"': json_builder_append(b, "\\\""); break;
+                case '\\': json_builder_append(b, "\\\\"); break;
+                case '\n': json_builder_append(b, "\\n"); break;
+                case '\r': json_builder_append(b, "\\r"); break;
+                case '\t': json_builder_append(b, "\\t"); break;
+                default: {
+                    char ch[2] = { *c, '\0' };
+                    json_builder_append(b, ch);
+                    break;
+                }
+            }
+        }
+    }
+    json_builder_append(b, "\"");
+}
+
 static inline vec3_t scene_ser_vec3(float x, float y, float z) {
     vec3s value = (vec3s){ { x, y, z } };
     return (vec3_t){ value.x, value.y, value.z };
@@ -156,8 +177,15 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     TransformComp *t = ecs_world_get_transform(w, e);
     GeometryComp *g = ecs_world_get_geometry(w, e);
     RenderableComp *r = ecs_world_get_renderable(w, e);
+    LabelComp *label = ecs_world_get_label(w, e);
+    SketchComp *sketch = ecs_world_get_sketch(w, e);
+    SketchGeometryStateComp *sketch_state = ecs_world_get_sketch_geometry_state(w, e);
+    ConstraintComp *constraint = ecs_world_get_constraint(w, e);
 
-    if (!t || !g) return;  // Skip entities without required components
+    // Only serialize entities that contribute to persisted scene state.
+    // This keeps transient anchor entities out of save files.
+    if (!t) return;
+    if (!g && !sketch && !constraint) return;
 
     ecs_entity_t parent = ecs_world_get_parent(w, e);
 
@@ -176,9 +204,10 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         json_builder_append(b, "\"parent\": null,\n");
     }
 
-    // Components
+    // Components (optional, order-stable for readability)
     json_write_indent(b, depth + 1);
     json_builder_append(b, "\"components\": {\n");
+    bool wrote_component = false;
 
     // Transform component
     json_write_indent(b, depth + 2);
@@ -196,209 +225,303 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     json_write_vec3(b, t->scale);
     json_builder_append(b, "\n");
     json_write_indent(b, depth + 2);
-    json_builder_append(b, "},\n");
+    json_builder_append(b, "}");
+    wrote_component = true;
 
     // Geometry component
-    json_write_indent(b, depth + 2);
-    json_builder_append(b, "\"geometry\": {\n");
-    json_write_indent(b, depth + 3);
-    json_builder_appendf(b, "\"type\": \"%s\",\n", scene_geom_type_to_string(g->type));
-    json_write_indent(b, depth + 3);
-    json_builder_append(b, "\"color\": ");
-    json_write_vec4(b, g->color);
-    json_builder_append(b, ",\n");
-    json_write_indent(b, depth + 3);
-    json_builder_appendf(b, "\"line_width\": %.6g,\n", g->line_width);
-    json_write_indent(b, depth + 3);
-    json_builder_appendf(b, "\"point_size\": %.6g,\n", g->point_size);
+    if (g) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"geometry\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"type\": \"%s\",\n", scene_geom_type_to_string(g->type));
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"color\": ");
+        json_write_vec4(b, g->color);
+        json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"line_width\": %.6g,\n", g->line_width);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"point_size\": %.6g,\n", g->point_size);
 
-    // Type-specific data
-    switch (g->type) {
-        case GEOM_POINT:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"point\": ");
-            json_write_vec3(b, g->data.point.point);
-            json_builder_append(b, "\n");
-            break;
+        // Type-specific data
+        switch (g->type) {
+            case GEOM_POINT:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"point\": ");
+                json_write_vec3(b, g->data.point.point);
+                json_builder_append(b, "\n");
+                break;
 
-        case GEOM_LINE:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"a\": ");
-            json_write_vec3(b, g->data.line.a);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"b\": ");
-            json_write_vec3(b, g->data.line.b);
-            json_builder_append(b, "\n");
-            break;
+            case GEOM_LINE:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"a\": ");
+                json_write_vec3(b, g->data.line.a);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"b\": ");
+                json_write_vec3(b, g->data.line.b);
+                json_builder_append(b, "\n");
+                break;
 
-        case GEOM_POLYLINE:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"points\": [\n");
-            for (int i = 0; i < g->data.polyline.count; i++) {
-                json_write_indent(b, depth + 4);
-                json_write_vec3(b, g->data.polyline.points[i]);
-                if (i < g->data.polyline.count - 1) {
-                    json_builder_append(b, ",");
+            case GEOM_POLYLINE:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"points\": [\n");
+                for (int i = 0; i < g->data.polyline.count; i++) {
+                    json_write_indent(b, depth + 4);
+                    json_write_vec3(b, g->data.polyline.points[i]);
+                    if (i < g->data.polyline.count - 1) {
+                        json_builder_append(b, ",");
+                    }
+                    json_builder_append(b, "\n");
+                }
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "]\n");
+                break;
+
+            case GEOM_POLYGON:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"points\": [\n");
+                for (int i = 0; i < g->data.polygon.count; i++) {
+                    json_write_indent(b, depth + 4);
+                    json_write_vec3(b, g->data.polygon.points[i]);
+                    if (i < g->data.polygon.count - 1) {
+                        json_builder_append(b, ",");
+                    }
+                    json_builder_append(b, "\n");
+                }
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "]\n");
+                break;
+
+            case GEOM_ARC:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"center\": ");
+                json_write_vec3(b, g->data.arc.center);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"radius\": %.6g,\n", g->data.arc.radius);
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"start_angle\": %.6g,\n", g->data.arc.start_angle);
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"end_angle\": %.6g,\n", g->data.arc.end_angle);
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"normal\": ");
+                json_write_vec3(b, g->data.arc.normal);
+                json_builder_append(b, "\n");
+                break;
+
+            case GEOM_BEZIER:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"p0\": ");
+                json_write_vec3(b, g->data.bezier.p0);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"p1\": ");
+                json_write_vec3(b, g->data.bezier.p1);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"p2\": ");
+                json_write_vec3(b, g->data.bezier.p2);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"p3\": ");
+                json_write_vec3(b, g->data.bezier.p3);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"segments\": %d\n", g->data.bezier.segments);
+                break;
+
+            case GEOM_HELIX:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"axis_start\": ");
+                json_write_vec3(b, g->data.helix.axis_start);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"axis_end\": ");
+                json_write_vec3(b, g->data.helix.axis_end);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"radius\": %.6g,\n", g->data.helix.radius);
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"turns\": %.6g,\n", g->data.helix.turns);
+                json_write_indent(b, depth + 3);
+                json_builder_appendf(b, "\"segments\": %d\n", g->data.helix.segments);
+                break;
+
+            case GEOM_TRIANGLE:
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"a\": ");
+                json_write_vec3(b, g->data.triangle.a);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"b\": ");
+                json_write_vec3(b, g->data.triangle.b);
+                json_builder_append(b, ",\n");
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"c\": ");
+                json_write_vec3(b, g->data.triangle.c);
+                if (g->data.triangle.has_vertex_colors) {
+                    json_builder_append(b, ",\n");
+                    json_write_indent(b, depth + 3);
+                    json_builder_append(b, "\"color_a\": ");
+                    json_write_vec4(b, g->data.triangle.color_a);
+                    json_builder_append(b, ",\n");
+                    json_write_indent(b, depth + 3);
+                    json_builder_append(b, "\"color_b\": ");
+                    json_write_vec4(b, g->data.triangle.color_b);
+                    json_builder_append(b, ",\n");
+                    json_write_indent(b, depth + 3);
+                    json_builder_append(b, "\"color_c\": ");
+                    json_write_vec4(b, g->data.triangle.color_c);
                 }
                 json_builder_append(b, "\n");
-            }
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "]\n");
-            break;
+                break;
 
-        case GEOM_POLYGON:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"points\": [\n");
-            for (int i = 0; i < g->data.polygon.count; i++) {
-                json_write_indent(b, depth + 4);
-                json_write_vec3(b, g->data.polygon.points[i]);
-                if (i < g->data.polygon.count - 1) {
-                    json_builder_append(b, ",");
-                }
-                json_builder_append(b, "\n");
-            }
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "]\n");
-            break;
-
-        case GEOM_ARC:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"center\": ");
-            json_write_vec3(b, g->data.arc.center);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"radius\": %.6g,\n", g->data.arc.radius);
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"start_angle\": %.6g,\n", g->data.arc.start_angle);
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"end_angle\": %.6g,\n", g->data.arc.end_angle);
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"normal\": ");
-            json_write_vec3(b, g->data.arc.normal);
-            json_builder_append(b, "\n");
-            break;
-
-        case GEOM_BEZIER:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"p0\": ");
-            json_write_vec3(b, g->data.bezier.p0);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"p1\": ");
-            json_write_vec3(b, g->data.bezier.p1);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"p2\": ");
-            json_write_vec3(b, g->data.bezier.p2);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"p3\": ");
-            json_write_vec3(b, g->data.bezier.p3);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"segments\": %d\n", g->data.bezier.segments);
-            break;
-
-        case GEOM_HELIX:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"axis_start\": ");
-            json_write_vec3(b, g->data.helix.axis_start);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"axis_end\": ");
-            json_write_vec3(b, g->data.helix.axis_end);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"radius\": %.6g,\n", g->data.helix.radius);
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"turns\": %.6g,\n", g->data.helix.turns);
-            json_write_indent(b, depth + 3);
-            json_builder_appendf(b, "\"segments\": %d\n", g->data.helix.segments);
-            break;
-
-        case GEOM_TRIANGLE:
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"a\": ");
-            json_write_vec3(b, g->data.triangle.a);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"b\": ");
-            json_write_vec3(b, g->data.triangle.b);
-            json_builder_append(b, ",\n");
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"c\": ");
-            json_write_vec3(b, g->data.triangle.c);
-            if (g->data.triangle.has_vertex_colors) {
-                json_builder_append(b, ",\n");
+            case GEOM_MESH:
+                // Vertices array
                 json_write_indent(b, depth + 3);
-                json_builder_append(b, "\"color_a\": ");
-                json_write_vec4(b, g->data.triangle.color_a);
-                json_builder_append(b, ",\n");
-                json_write_indent(b, depth + 3);
-                json_builder_append(b, "\"color_b\": ");
-                json_write_vec4(b, g->data.triangle.color_b);
-                json_builder_append(b, ",\n");
-                json_write_indent(b, depth + 3);
-                json_builder_append(b, "\"color_c\": ");
-                json_write_vec4(b, g->data.triangle.color_c);
-            }
-            json_builder_append(b, "\n");
-            break;
-
-        case GEOM_MESH:
-            // Vertices array
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"vertices\": [\n");
-            for (int i = 0; i < g->data.mesh.vertex_count; i++) {
-                json_write_indent(b, depth + 4);
-                json_write_vec3(b, g->data.mesh.vertices[i]);
-                if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
-                json_builder_append(b, "\n");
-            }
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "],\n");
-            // Indices array
-            json_write_indent(b, depth + 3);
-            json_builder_append(b, "\"indices\": [");
-            for (int i = 0; i < g->data.mesh.index_count; i++) {
-                if (i > 0) json_builder_append(b, ", ");
-                json_builder_appendf(b, "%u", g->data.mesh.indices[i]);
-            }
-            json_builder_append(b, "]");
-            // Per-vertex colors (optional)
-            if (g->data.mesh.vertex_colors) {
-                json_builder_append(b, ",\n");
-                json_write_indent(b, depth + 3);
-                json_builder_append(b, "\"vertex_colors\": [\n");
+                json_builder_append(b, "\"vertices\": [\n");
                 for (int i = 0; i < g->data.mesh.vertex_count; i++) {
                     json_write_indent(b, depth + 4);
-                    json_write_vec4(b, g->data.mesh.vertex_colors[i]);
+                    json_write_vec3(b, g->data.mesh.vertices[i]);
                     if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
                     json_builder_append(b, "\n");
                 }
                 json_write_indent(b, depth + 3);
+                json_builder_append(b, "],\n");
+                // Indices array
+                json_write_indent(b, depth + 3);
+                json_builder_append(b, "\"indices\": [");
+                for (int i = 0; i < g->data.mesh.index_count; i++) {
+                    if (i > 0) json_builder_append(b, ", ");
+                    json_builder_appendf(b, "%u", g->data.mesh.indices[i]);
+                }
                 json_builder_append(b, "]");
-            }
-            json_builder_append(b, "\n");
-            break;
+                // Per-vertex colors (optional)
+                if (g->data.mesh.vertex_colors) {
+                    json_builder_append(b, ",\n");
+                    json_write_indent(b, depth + 3);
+                    json_builder_append(b, "\"vertex_colors\": [\n");
+                    for (int i = 0; i < g->data.mesh.vertex_count; i++) {
+                        json_write_indent(b, depth + 4);
+                        json_write_vec4(b, g->data.mesh.vertex_colors[i]);
+                        if (i < g->data.mesh.vertex_count - 1) json_builder_append(b, ",");
+                        json_builder_append(b, "\n");
+                    }
+                    json_write_indent(b, depth + 3);
+                    json_builder_append(b, "]");
+                }
+                json_builder_append(b, "\n");
+                break;
 
-        default:
-            break;
+            default:
+                break;
+        }
+
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
     }
 
-    json_write_indent(b, depth + 2);
-    json_builder_append(b, "},\n");
+    if (r) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"renderable\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"visible\": %s,\n", r->visible ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"layer\": %d\n", r->layer);
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
 
-    // Renderable component (just visibility and layer)
-    json_write_indent(b, depth + 2);
-    json_builder_append(b, "\"renderable\": {\n");
-    json_write_indent(b, depth + 3);
-    json_builder_appendf(b, "\"visible\": %s,\n", r && r->visible ? "true" : "false");
-    json_write_indent(b, depth + 3);
-    json_builder_appendf(b, "\"layer\": %d\n", r ? r->layer : 0);
-    json_write_indent(b, depth + 2);
-    json_builder_append(b, "}\n");
+    if (label) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"label\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"name\": ");
+        json_write_string_escaped(b, label->name);
+        json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"description\": ");
+        json_write_string_escaped(b, label->description);
+        json_builder_append(b, "\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
+    if (sketch) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"sketch\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"status\": %d,\n", (int)sketch->status);
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"color\": ");
+        json_write_vec4(b, sketch->color);
+        json_builder_append(b, ",\n");
+
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"next_geometry_name_index\": [");
+        for (int i = 0; i < GEOM_TYPE_COUNT; i++) {
+            if (i > 0) json_builder_append(b, ", ");
+            json_builder_appendf(b, "%u", sketch->next_geometry_name_index[i]);
+        }
+        json_builder_append(b, "],\n");
+
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"next_constraint_name_index\": [");
+        for (int i = 0; i < CONSTRAINT_TYPE_COUNT; i++) {
+            if (i > 0) json_builder_append(b, ", ");
+            json_builder_appendf(b, "%u", sketch->next_constraint_name_index[i]);
+        }
+        json_builder_append(b, "]\n");
+
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
+    if (sketch_state) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"sketch_geometry_state\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"fixed\": %s\n", sketch_state->fixed ? "true" : "false");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
+    if (constraint) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"constraint\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"type\": %d,\n", (int)constraint->type);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"has_value\": %s,\n", constraint->has_value ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"driven\": %s,\n", constraint->driven ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"value\": %.6g,\n", constraint->value);
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"participants\": [");
+        for (uint32_t i = 0; i < constraint->participant_count; i++) {
+            if (i > 0) json_builder_append(b, ", ");
+            json_builder_appendf(b, "%llu", (unsigned long long)constraint->participants[i]);
+        }
+        json_builder_append(b, "]\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
+    json_builder_append(b, "\n");
 
     json_write_indent(b, depth + 1);
     json_builder_append(b, "}\n");
@@ -461,6 +584,25 @@ static inline void scene_write_light_json(json_builder_t *b, ecs_scene_t *scene,
     json_builder_append(b, "}");
 }
 
+static inline bool scene_entity_list_contains(const ecs_entity_t *entities, int count, ecs_entity_t e) {
+    if (!entities || e == 0) return false;
+    for (int i = 0; i < count; i++) {
+        if (entities[i] == e) return true;
+    }
+    return false;
+}
+
+static inline void scene_entity_list_push_unique(ecs_entity_t **entities, int *count, int *capacity, ecs_entity_t e) {
+    if (!entities || !count || !capacity || e == 0) return;
+    if (scene_entity_list_contains(*entities, *count, e)) return;
+
+    if (*count >= *capacity) {
+        *capacity = (*capacity) ? (*capacity * 2) : 64;
+        *entities = (ecs_entity_t*)realloc(*entities, (*capacity) * sizeof(ecs_entity_t));
+    }
+    (*entities)[(*count)++] = e;
+}
+
 // Save scene to JSON string (caller must free returned string)
 static inline char* scene_save_to_string(ecs_scene_t *scene) {
     json_builder_t b;
@@ -474,29 +616,34 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     json_builder_appendf(&b, "  \"version\": %d,\n", SCENE_JSON_VERSION);
     json_builder_append(&b, "  \"entities\": [\n");
 
-    // Query all entities with GeometryComp
-    ecs_query_t *q = ecs_query(w->world, {
-        .terms = {
-            { .id = w->GeometryComp_id }
-        }
-    });
-
-    // Collect geometry entities
+    // Collect all persisted scene entities:
+    // - Geometry entities
+    // - Sketch anchors
+    // - Constraint anchors
     ecs_entity_t *entities = NULL;
     int entity_count = 0;
     int entity_capacity = 0;
+    ecs_entity_t persisted_component_ids[3] = {
+        w->GeometryComp_id,
+        w->SketchComp_id,
+        w->ConstraintComp_id
+    };
 
-    ecs_iter_t it = ecs_query_iter(w->world, q);
-    while (ecs_query_next(&it)) {
-        for (int i = 0; i < it.count; i++) {
-            if (entity_count >= entity_capacity) {
-                entity_capacity = entity_capacity ? entity_capacity * 2 : 64;
-                entities = (ecs_entity_t*)realloc(entities, entity_capacity * sizeof(ecs_entity_t));
+    for (int c = 0; c < 3; c++) {
+        ecs_query_t *q = ecs_query(w->world, {
+            .terms = {
+                { .id = persisted_component_ids[c] }
             }
-            entities[entity_count++] = it.entities[i];
+        });
+
+        ecs_iter_t it = ecs_query_iter(w->world, q);
+        while (ecs_query_next(&it)) {
+            for (int i = 0; i < it.count; i++) {
+                scene_entity_list_push_unique(&entities, &entity_count, &entity_capacity, it.entities[i]);
+            }
         }
+        ecs_query_fini(q);
     }
-    ecs_query_fini(q);
 
     // Also collect light entities
     ecs_query_t *lq = ecs_query(w->world, {
@@ -1012,6 +1159,14 @@ typedef struct {
     uint64_t parent_old_id;    // Parent ID from file (0 if no parent)
     ecs_entity_t new_entity;   // Created entity in scene
 
+    bool has_transform;
+    bool has_geometry;
+    bool has_renderable;
+    bool has_label;
+    bool has_sketch;
+    bool has_sketch_geometry_state;
+    bool has_constraint;
+
     // Transform
     vec3_t position;
     vec3_t rotation;
@@ -1049,6 +1204,16 @@ typedef struct {
     // Renderable
     bool visible;
     int layer;
+
+    // Label
+    LabelComp label;
+
+    // Sketch
+    SketchComp sketch;
+    SketchGeometryStateComp sketch_geometry_state;
+
+    // Constraint
+    ConstraintComp constraint;
 
     // Light (when is_light is true, geometry fields are unused)
     bool is_light;
@@ -1096,6 +1261,7 @@ static inline bool json_parse_transform(json_parser_t *p, loaded_entity_t *ent) 
         }
     }
 
+    ent->has_transform = true;
     return json_next_token(p);  // Skip }
 }
 
@@ -1244,6 +1410,7 @@ static inline bool json_parse_geometry(json_parser_t *p, loaded_entity_t *ent) {
         }
     }
 
+    ent->has_geometry = true;
     return json_next_token(p);  // Skip }
 }
 
@@ -1277,6 +1444,227 @@ static inline bool json_parse_renderable(json_parser_t *p, loaded_entity_t *ent)
             if (p->token != JSON_TOK_NUMBER) return false;
             ent->layer = (int)p->num_value;
             if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    ent->has_renderable = true;
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
+// Parse Label Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_label(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->label = label_comp_default();
+    ent->has_label = true;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "name") == 0) {
+            if (p->token != JSON_TOK_STRING) return false;
+            strncpy(ent->label.name, p->str_value, LABEL_NAME_MAX - 1);
+            ent->label.name[LABEL_NAME_MAX - 1] = '\0';
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "description") == 0) {
+            if (p->token != JSON_TOK_STRING) return false;
+            strncpy(ent->label.description, p->str_value, LABEL_DESC_MAX - 1);
+            ent->label.description[LABEL_DESC_MAX - 1] = '\0';
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
+// Parse Sketch Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_uint32_array_fixed(json_parser_t *p, uint32_t *out_values, int out_count) {
+    if (!out_values || out_count <= 0) return false;
+    if (p->token != JSON_TOK_LBRACKET) return false;
+
+    for (int i = 0; i < out_count; i++) out_values[i] = 0;
+
+    if (!json_next_token(p)) return false;
+    int i = 0;
+    while (p->token != JSON_TOK_RBRACKET) {
+        if (p->token != JSON_TOK_NUMBER) return false;
+        if (i < out_count) {
+            out_values[i] = (uint32_t)p->num_value;
+        }
+        i++;
+
+        if (!json_next_token(p)) return false;
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip ]
+}
+
+static inline bool json_parse_sketch(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->sketch = sketch_comp_default();
+    ent->has_sketch = true;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "status") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            int status = (int)p->num_value;
+            if (status < (int)SKETCH_STATUS_SOLVED || status > (int)SKETCH_STATUS_ERROR) {
+                status = (int)SKETCH_STATUS_LOOSE;
+            }
+            ent->sketch.status = (sketch_status_t)status;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "color") == 0) {
+            if (!json_parse_vec4(p, &ent->sketch.color)) return false;
+        } else if (strcmp(key, "next_geometry_name_index") == 0) {
+            if (!json_parse_uint32_array_fixed(p, ent->sketch.next_geometry_name_index, GEOM_TYPE_COUNT)) return false;
+        } else if (strcmp(key, "next_constraint_name_index") == 0) {
+            if (!json_parse_uint32_array_fixed(p, ent->sketch.next_constraint_name_index, CONSTRAINT_TYPE_COUNT)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
+// Parse Sketch Geometry State Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_sketch_geometry_state(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->has_sketch_geometry_state = true;
+    ent->sketch_geometry_state = sketch_geometry_state_comp_default();
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "fixed") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->sketch_geometry_state.fixed = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
+// Parse Constraint Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->constraint = constraint_comp_default();
+    ent->has_constraint = true;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "type") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            int type = (int)p->num_value;
+            if (type < 0 || type >= CONSTRAINT_TYPE_COUNT) return false;
+            ent->constraint.type = (constraint_type_t)type;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "has_value") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->constraint.has_value = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "driven") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->constraint.driven = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "value") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->constraint.value = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "participants") == 0) {
+            if (p->token != JSON_TOK_LBRACKET) return false;
+            ent->constraint.participant_count = 0;
+            if (!json_next_token(p)) return false;
+            while (p->token != JSON_TOK_RBRACKET) {
+                if (p->token != JSON_TOK_NUMBER) return false;
+                if (ent->constraint.participant_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
+                ent->constraint.participants[ent->constraint.participant_count++] = (uint64_t)p->num_value;
+                if (!json_next_token(p)) return false;
+                if (p->token == JSON_TOK_COMMA) {
+                    if (!json_next_token(p)) return false;
+                }
+            }
+            if (!json_next_token(p)) return false;  // Skip ]
         } else {
             if (!json_skip_value(p)) return false;
         }
@@ -1393,6 +1781,14 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
                     if (!json_parse_geometry(p, ent)) return false;
                 } else if (strcmp(comp_key, "renderable") == 0) {
                     if (!json_parse_renderable(p, ent)) return false;
+                } else if (strcmp(comp_key, "label") == 0) {
+                    if (!json_parse_label(p, ent)) return false;
+                } else if (strcmp(comp_key, "sketch") == 0) {
+                    if (!json_parse_sketch(p, ent)) return false;
+                } else if (strcmp(comp_key, "sketch_geometry_state") == 0) {
+                    if (!json_parse_sketch_geometry_state(p, ent)) return false;
+                } else if (strcmp(comp_key, "constraint") == 0) {
+                    if (!json_parse_constraint(p, ent)) return false;
                 } else if (strcmp(comp_key, "light") == 0) {
                     if (!json_parse_light(p, ent)) return false;
                 } else {
@@ -1433,6 +1829,48 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             e = scene_add_point_light(scene, ent->position, ent->light_color, ent->light_intensity);
         }
         return e;
+    }
+
+    // Handle sketch anchor entities (non-geometry)
+    if (ent->has_sketch && !ent->has_geometry && !ent->has_constraint) {
+        const char *label_name = (ent->has_label && ent->label.name[0] != '\0') ? ent->label.name : "Sketch";
+        const char *label_desc = ent->has_label ? ent->label.description : "";
+        e = scene_add_anchor(scene, label_name, label_desc);
+        if (e == 0) return 0;
+
+        ecs_world_set_sketch(scene->world, e, &ent->sketch);
+
+        TransformComp *t = ecs_world_get_transform(scene->world, e);
+        if (t) {
+            t->position = ent->position;
+            t->rotation = ent->rotation;
+            t->scale = ent->scale;
+            t->dirty = true;
+        }
+        return e;
+    }
+
+    // Handle constraint anchor entities (non-geometry)
+    if (ent->has_constraint && !ent->has_geometry) {
+        const char *label_name = (ent->has_label && ent->label.name[0] != '\0') ? ent->label.name : "";
+        const char *label_desc = ent->has_label ? ent->label.description : "";
+        e = scene_add_anchor(scene, label_name, label_desc);
+        if (e == 0) return 0;
+
+        ecs_world_set_constraint(scene->world, e, &ent->constraint);
+
+        TransformComp *t = ecs_world_get_transform(scene->world, e);
+        if (t) {
+            t->position = ent->position;
+            t->rotation = ent->rotation;
+            t->scale = ent->scale;
+            t->dirty = true;
+        }
+        return e;
+    }
+
+    if (!ent->has_geometry) {
+        return 0;
     }
 
     switch (ent->geom_type) {
@@ -1536,6 +1974,13 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             r->visible = ent->visible;
             r->layer = ent->layer;
             r->instance_dirty = true;
+        }
+
+        if (ent->has_label) {
+            ecs_world_set_label(scene->world, e, &ent->label);
+        }
+        if (ent->has_sketch_geometry_state) {
+            ecs_world_set_sketch_geometry_state(scene->world, e, &ent->sketch_geometry_state);
         }
     }
 
@@ -1644,44 +2089,46 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         }
     }
 
-    // Check version
-    if (!has_format || !has_version || version != SCENE_JSON_VERSION) {
+    // Check version (allow loading older scene versions for backward compatibility).
+    if (!has_format || !has_version || version <= 0 || version > SCENE_JSON_VERSION) {
         free(entities);
         return -1;
     }
 
     // Clear existing scene if requested
     if (clear_existing) {
-        // Query all existing entities with GeometryComp and delete them
         ecs_world_state_t *w = scene->world;
-        ecs_query_t *q = ecs_query(w->world, {
-            .terms = {{ .id = w->GeometryComp_id }}
-        });
 
-        // Collect entities to delete (can't delete during iteration)
         ecs_entity_t *to_delete = NULL;
         int delete_count = 0;
         int delete_capacity = 0;
+        ecs_entity_t clear_components[3] = {
+            w->GeometryComp_id,
+            w->SketchComp_id,
+            w->ConstraintComp_id
+        };
 
-        ecs_iter_t it = ecs_query_iter(w->world, q);
-        while (ecs_query_next(&it)) {
-            for (int i = 0; i < it.count; i++) {
-                if (delete_count >= delete_capacity) {
-                    delete_capacity = delete_capacity ? delete_capacity * 2 : 64;
-                    to_delete = (ecs_entity_t*)realloc(to_delete, delete_capacity * sizeof(ecs_entity_t));
+        // Collect all persisted non-light entities (unique) and delete via scene API.
+        for (int c = 0; c < 3; c++) {
+            ecs_query_t *q = ecs_query(w->world, {
+                .terms = {{ .id = clear_components[c] }}
+            });
+
+            ecs_iter_t it = ecs_query_iter(w->world, q);
+            while (ecs_query_next(&it)) {
+                for (int i = 0; i < it.count; i++) {
+                    scene_entity_list_push_unique(&to_delete, &delete_count, &delete_capacity, it.entities[i]);
                 }
-                to_delete[delete_count++] = it.entities[i];
             }
+            ecs_query_fini(q);
         }
-        ecs_query_fini(q);
 
-        // Delete collected entities
         for (int i = 0; i < delete_count; i++) {
             scene_remove_entity(scene, to_delete[i]);
         }
         free(to_delete);
 
-        // Also delete light entities (they don't have GeometryComp)
+        // Delete all lights.
         ecs_query_t *lq = ecs_query(w->world, {
             .terms = {{ .id = w->LightComp_id }}
         });
@@ -1736,6 +2183,35 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         }
         free(load_children);
         free(load_parents);
+    }
+
+    // Rebuild participant back-references on geometry after all entities exist.
+    // This guarantees ConstraintParticipantComp consistency regardless of load order.
+    for (int i = 0; i < entity_count; i++) {
+        if (!entities[i].has_constraint || entities[i].new_entity == 0) continue;
+        ConstraintComp *constraint = ecs_world_get_constraint(scene->world, entities[i].new_entity);
+        if (!constraint) continue;
+        for (uint32_t p_idx = 0; p_idx < constraint->participant_count; p_idx++) {
+            ecs_entity_t participant = scene_find_new_entity(entities, entity_count, constraint->participants[p_idx]);
+            if (participant == 0) continue;
+            ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, participant);
+            if (!refs) {
+                ConstraintParticipantComp init_refs = constraint_participant_comp_default();
+                ecs_world_set_constraint_participant(scene->world, participant, &init_refs);
+                refs = ecs_world_get_constraint_participant(scene->world, participant);
+            }
+            if (refs) {
+                constraint_participant_add(refs, (uint64_t)entities[i].new_entity);
+                // Rewrite participants to current entity IDs so scene state is fully normalized.
+                constraint->participants[p_idx] = (uint64_t)participant;
+            }
+        }
+    }
+
+    // Recompute sketch metadata after hierarchy + constraints are restored.
+    for (int i = 0; i < entity_count; i++) {
+        if (!entities[i].has_sketch || entities[i].new_entity == 0) continue;
+        scene_refresh_sketch_metadata(scene, entities[i].new_entity);
     }
 
     // Free loaded entity data
