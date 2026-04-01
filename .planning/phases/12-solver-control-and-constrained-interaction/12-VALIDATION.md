@@ -38,11 +38,10 @@ created: 2026-04-01
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 12-01-01 | 01 | 1 | SOLV-01 | manual + gate | `cmake --build build-vulkan --config Release --target mdCAD && ctest --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
-| 12-01-02 | 01 | 1 | SOLV-02 | manual + gate | same as above | ✅ | ⬜ pending |
-| 12-02-01 | 02 | 2 | SOLV-03 | manual + gate | same as above | ✅ | ⬜ pending |
-| 12-02-02 | 02 | 2 | SOLV-04 | manual + gate | same as above | ✅ | ⬜ pending |
-| 12-03-01 | 03 | 3 | API-03 | manual + gate | same as above | ✅ | ⬜ pending |
+| 12-01-01 | 01 | 1 | SOLV-01 | targeted smoke + manual + gate | `grep -n "auto_solve_enabled\|scene_solver_\|INFO\|WARNING\|ERROR" src/components/sketch_comp.h src/ecs/ecs_scene.h` | ✅ | ⬜ pending |
+| 12-01-02 | 01 | 1 | SOLV-02 | targeted smoke + manual + gate | `grep -n "Recalculate Sketch\|Clear Diagnostics History\|INFO\|WARNING\|ERROR\|backend" src/ui/ui_entity_inspector.h` | ✅ | ⬜ pending |
+| 12-02-01 | 02 | 2 | SOLV-03 | targeted smoke + manual + gate | `grep -n "implicat\|scene_solver_can_apply_drag\|projected\|first\|success" src/ecs/ecs_scene.h` | ✅ | ⬜ pending |
+| 12-02-02 | 02 | 2 | SOLV-04, API-03 | targeted smoke + manual + gate | `grep -n "Movement blocked by active constraints\.\|Drag rejected: active constraints make this move invalid\.\|constraint_selection_apply_participants\|scene_solver_can_apply_drag" src/app.c` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
