@@ -20,6 +20,7 @@
 #include "../constraints/constraint_types.h"
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -164,6 +165,8 @@ typedef struct {
     // Visibility flag for ECS rendering
     bool visible;
     uint32_t next_sketch_name_index;
+    uint32_t solver_backend_id;
+    const char *solver_backend_name;
 } ecs_scene_t;
 
 //------------------------------------------------------------------------------
@@ -173,6 +176,23 @@ typedef struct {
 static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e);
 static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e);
+static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
+static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
+static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
+static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,
+                                               sketch_solver_diagnostic_severity_t severity,
+                                               const char *timestamp,
+                                               const char *message,
+                                               ecs_entity_t implicated_constraint);
+static inline bool scene_solver_clear_diagnostics(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline int scene_solver_diagnostic_count(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline const sketch_solver_diagnostic_t* scene_solver_diagnostic_at(ecs_scene_t *scene,
+                                                                           ecs_entity_t sketch,
+                                                                           int index);
+static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sketch, sketch_status_t status);
+static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagnostic_severity_t severity);
 
 //------------------------------------------------------------------------------
 // Scene Initialization
@@ -182,6 +202,8 @@ static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) 
     scene->world = world;
     scene->visible = true;
     scene->next_sketch_name_index = 1;
+    scene->solver_backend_id = 1;
+    scene->solver_backend_name = "ConstraintSketchSolverV1";
     geometry_batch_manager_init(&scene->batches);
 }
 
@@ -1300,6 +1322,7 @@ static inline ecs_entity_t scene_add_sketch(ecs_scene_t *scene,
 
     SketchComp sketch_comp = sketch_comp_default();
     sketch_comp.color = sketch_color;
+    sketch_comp.solver_backend_id = scene_solver_backend_id(scene);
     ecs_world_set_sketch(scene->world, sketch, &sketch_comp);
 
     return sketch;
@@ -1329,6 +1352,8 @@ static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
     if (g) {
         scene_set_geometry_default_label(scene, sketch, geometry_entity, g->type);
     }
+
+    scene_solver_request_auto(scene, sketch);
 
     return true;
 }
@@ -1443,6 +1468,7 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
     }
 
     scene_refresh_sketch_metadata(scene, sketch);
+    scene_solver_request_auto(scene, sketch);
     return constraint_e;
 }
 
@@ -1459,6 +1485,11 @@ static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
     constraint->value = constraint_round_to_decimals(value, inferred_decimals);
     constraint->driven = driven;
     constraint->display_decimals = inferred_decimals;
+
+    ecs_entity_t sketch = ecs_world_get_parent(scene->world, constraint_entity);
+    if (scene_is_sketch(scene, sketch)) {
+        scene_solver_request_auto(scene, sketch);
+    }
     return true;
 }
 
@@ -1466,8 +1497,140 @@ static inline bool scene_remove_constraint(ecs_scene_t *scene, ecs_entity_t cons
     if (!scene || constraint_entity == 0) return false;
     if (!ecs_is_alive(scene->world->world, constraint_entity)) return false;
     if (!scene_is_constraint_entity(scene, constraint_entity)) return false;
+    ecs_entity_t sketch = ecs_world_get_parent(scene->world, constraint_entity);
     scene_remove_entity(scene, constraint_entity);
+    if (scene_is_sketch(scene, sketch)) {
+        scene_solver_request_auto(scene, sketch);
+    }
     return true;
+}
+
+static inline const char* scene_solver_backend_name(const ecs_scene_t *scene) {
+    if (!scene || !scene->solver_backend_name || scene->solver_backend_name[0] == '\0') {
+        return "ConstraintSketchSolverV1";
+    }
+    return scene->solver_backend_name;
+}
+
+static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene) {
+    if (!scene || scene->solver_backend_id == 0) {
+        return 1;
+    }
+    return scene->solver_backend_id;
+}
+
+static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->auto_solve_enabled = enabled;
+    if (!enabled) {
+        sk->auto_solve_pending = false;
+    }
+    return true;
+}
+
+static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    if (!sk->auto_solve_enabled) return false;
+
+    if (!sk->auto_solve_pending) {
+        sk->auto_solve_pending = true;
+        sk->solve_request_serial++;
+    }
+    return true;
+}
+
+static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+
+    sk->auto_solve_pending = false;
+    sk->solve_request_serial++;
+    sk->solve_completed_serial = sk->solve_request_serial;
+    sk->last_solve_timestamp_ms = (uint64_t)time(NULL) * 1000ULL;
+    sk->solver_backend_id = scene_solver_backend_id(scene);
+    sk->status = scene_derive_sketch_status(scene, sketch);
+    return true;
+}
+
+static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,
+                                               sketch_solver_diagnostic_severity_t severity,
+                                               const char *timestamp,
+                                               const char *message,
+                                               ecs_entity_t implicated_constraint) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+
+    uint32_t write_index = sk->diagnostics_head;
+    sketch_solver_diagnostic_t *diag = &sk->diagnostics[write_index];
+    memset(diag, 0, sizeof(*diag));
+    diag->severity = severity;
+    diag->implicated_constraint = (uint64_t)implicated_constraint;
+    if (timestamp) {
+        snprintf(diag->timestamp, sizeof(diag->timestamp), "%s", timestamp);
+    }
+    if (message) {
+        snprintf(diag->message, sizeof(diag->message), "%s", message);
+    }
+
+    sk->diagnostics_head = (sk->diagnostics_head + 1U) % SKETCH_SOLVER_DIAGNOSTICS_MAX;
+    if (sk->diagnostics_count < SKETCH_SOLVER_DIAGNOSTICS_MAX) {
+        sk->diagnostics_count++;
+    }
+    return true;
+}
+
+static inline bool scene_solver_clear_diagnostics(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->diagnostics_count = 0;
+    sk->diagnostics_head = 0;
+    return true;
+}
+
+static inline int scene_solver_diagnostic_count(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return 0;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return 0;
+    return (int)sk->diagnostics_count;
+}
+
+static inline const sketch_solver_diagnostic_t* scene_solver_diagnostic_at(ecs_scene_t *scene,
+                                                                           ecs_entity_t sketch,
+                                                                           int index) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return NULL;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return NULL;
+    if (index < 0 || index >= (int)sk->diagnostics_count) return NULL;
+
+    uint32_t oldest = (sk->diagnostics_count < SKETCH_SOLVER_DIAGNOSTICS_MAX)
+        ? 0
+        : sk->diagnostics_head;
+    uint32_t slot = (oldest + (uint32_t)index) % SKETCH_SOLVER_DIAGNOSTICS_MAX;
+    return &sk->diagnostics[slot];
+}
+
+static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sketch, sketch_status_t status) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->status = status;
+    return true;
+}
+
+static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagnostic_severity_t severity) {
+    switch (severity) {
+        case SKETCH_SOLVER_DIAG_INFO: return "INFO";
+        case SKETCH_SOLVER_DIAG_WARNING: return "WARNING";
+        case SKETCH_SOLVER_DIAG_ERROR: return "ERROR";
+        default: return "ERROR";
+    }
 }
 
 // Batch-parent all children to a single parent
@@ -1585,7 +1748,9 @@ static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_
     sk->geometry_count = scene_count_sketch_geometry(scene, sketch);
     sk->fixed_geometry_count = scene_count_sketch_fixed_geometry(scene, sketch);
     sk->constraint_count = scene_count_sketch_constraints(scene, sketch);
-    sk->status = scene_derive_sketch_status(scene, sketch);
+    if (sk->solve_completed_serial == 0) {
+        sk->status = scene_derive_sketch_status(scene, sketch);
+    }
 }
 
 //------------------------------------------------------------------------------
