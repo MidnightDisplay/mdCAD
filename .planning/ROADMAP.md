@@ -64,10 +64,11 @@ Plans:
   3. User can see which single solver backend type is active for v1.2 in sketch solver controls.
   4. User can identify implicated constraints/geometries when solve is invalid or fails.
   5. User manipulation/gizmo transforms respect active constraints during interaction.
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
 - [x] 12-01-PLAN.md — Implement per-sketch solver controls, status/diagnostics pipeline, and fixed backend display.
 - [x] 12-02-PLAN.md — Implement failure implication highlighting/focus and constraint-respecting gizmo drag behavior.
+- [x] 12-03-PLAN.md — Close verification gap by wiring clear-on-success implication lifecycle in active recalculate path.
 **UI hint**: yes
 
 ### Phase 13: Script Round-Trip Baseline
@@ -123,7 +124,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
-| 12. Solver Control & Constrained Interaction | 2/2 | Complete   | 2026-04-01 |
+| 12. Solver Control & Constrained Interaction | 3/3 | Complete   | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |

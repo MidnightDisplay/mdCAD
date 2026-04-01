@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: verifying
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-04-01T16:39:54.596Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-04-01T17:06:38.662Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 11
+  completed_plans: 11
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 12 (solver-control-and-constrained-interaction) — EXECUTING
-Plan: 2 of 2
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-01
 
@@ -53,6 +53,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 16 P02 | 15min | 2 tasks | 2 files |
 | Phase 12-solver-control-and-constrained-interaction P01 | 36min | 2 tasks | 3 files |
 | Phase 12-solver-control-and-constrained-interaction P02 | 398s | 2 tasks | 4 files |
+| Phase 12-solver-control-and-constrained-interaction P03 | 184s | 2 tasks | 1 files |
 
 ## Decisions
 
@@ -77,6 +78,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 12-solver-control-and-constrained-interaction]: Use per-sketch diagnostics ring buffer capped at 100 entries with explicit clear action only.
 - [Phase 12-solver-control-and-constrained-interaction]: Keep drag feasibility and implication payload ownership in scene_solver_* APIs so app loop only consumes decision contracts.
 - [Phase 12-solver-control-and-constrained-interaction]: Route blocked drag focus/highlighting through constraint_selection_apply_participants to preserve Phase 16 parity.
+- [Phase 12-solver-control-and-constrained-interaction]: Use scene_solver_apply_status as sole recalculate status sink to enforce clear-on-success lifecycle.
+- [Phase 12-solver-control-and-constrained-interaction]: Add solved-path debug assertion against scene_solver_failure_implication active state as regression guard.
 
 ## Blockers
 
@@ -84,6 +87,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T16:39:54.593Z
-**Stopped At:** Completed 12-02-PLAN.md
+**Last Date:** 2026-04-01T17:06:38.659Z
+**Stopped At:** Completed 12-03-PLAN.md
 **Resume File:** None
