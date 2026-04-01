@@ -18,7 +18,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 - [ ] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime.
 - [ ] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional.
 - [ ] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance.
-- [ ] **Phase 16: Constraint UX Closure & Verification** - Teams close Phase 11 audit gaps, harden glyph-selection highlighting behavior, and produce complete verification evidence.
+- [x] **Phase 16: Constraint UX Closure & Verification** - Teams close Phase 11 audit gaps, harden glyph-selection highlighting behavior, and produce complete verification evidence. (completed 2026-04-01)
 
 ## Phase Details
 
@@ -67,7 +67,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 16-01-PLAN.md — Unify glyph and manager participant highlighting through a shared selection helper.
-- [ ] 16-02-PLAN.md — Create Phase 11 verification artifact and upgrade validation to compliant scope.
+- [x] 16-02-PLAN.md — Create Phase 11 verification artifact and upgrade validation to compliant scope.
 **UI hint**: yes
 
 ### Phase 13: Script Round-Trip Baseline
@@ -127,4 +127,4 @@ Plans:
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
-| 16. Constraint UX Closure & Verification | 1/2 | In Progress|  |
+| 16. Constraint UX Closure & Verification | 2/2 | Complete   | 2026-04-01 |

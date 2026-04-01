@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: executing
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-04-01T14:42:12.109Z"
+status: verifying
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-01T14:48:01.446Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 Phase: 16 (constraint-ux-closure-and-verification) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-01
 
 ## Milestone Scope
@@ -50,6 +50,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 10 P03 | 15m | 3 tasks | 3 files |
 | Phase 11 P02 | 7min | 2 tasks | 2 files |
 | Phase 16 P01 | 2m | 2 tasks | 3 files |
+| Phase 16 P02 | 15min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -68,6 +69,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 11]: ConstraintManager row selection now routes through selection buffer to highlight all participant geometry immediately.
 - [Phase 16]: Use shared constraint_selection_apply_participants helper so glyph and manager clicks produce identical participant highlighting.
 - [Phase 16]: Preserve selected_constraint_entity and dimensional popup double-click behavior while unifying selection path.
+- [Phase 16]: Recorded canonical keybinding mapping: C opens constraint menu; Tab toggles gizmo mode without runtime changes.
+- [Phase 16]: Validation evidence now requires explicit combined Windows MSVC+Vulkan build+ctest command output per requirement/manual row.
 
 ## Blockers
 
@@ -75,6 +78,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T14:42:12.105Z
-**Stopped At:** Completed 16-01-PLAN.md
+**Last Date:** 2026-04-01T14:48:01.442Z
+**Stopped At:** Completed 16-02-PLAN.md
 **Resume File:** None

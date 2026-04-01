@@ -16,11 +16,11 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 ### Constraint Authoring
 
-- [ ] **CONS-01**: User can apply the initial constraint set (`FIXED`, `COINCIDENT`, `COLLINEAR`, `PARALLEL`, `PERPENDICULAR`, `ALONG X`, `ALONG Y`, `ALONG Z`, `CORADIAL`, `CONCENTRIC`, `LENGTH`, `ANGLE`, `TANGENTIAL`) to geometrically legal entity types.
-- [ ] **CONS-02**: User can open a Tab-triggered in-context constraint menu that lists only currently applicable constraints and auto-hides after applying one.
+- [x] **CONS-01**: User can apply the initial constraint set (`FIXED`, `COINCIDENT`, `COLLINEAR`, `PARALLEL`, `PERPENDICULAR`, `ALONG X`, `ALONG Y`, `ALONG Z`, `CORADIAL`, `CONCENTRIC`, `LENGTH`, `ANGLE`, `TANGENTIAL`) to geometrically legal entity types.
+- [x] **CONS-02**: User can open a Tab-triggered in-context constraint menu that lists only currently applicable constraints and auto-hides after applying one.
 - [x] **CONS-03**: User can hover and select constraints through constant-screen-size viewport glyphs anchored to constrained geometry/sub-geometry.
-- [ ] **CONS-04**: User can create, view, and edit `LENGTH`/`ANGLE` constraints both from viewport dimensions and ConstraintManager with mirrored values.
-- [ ] **CONS-05**: User can mark `LENGTH`/`ANGLE` constraints as driven so they remain visible/readable but do not drive solver equations.
+- [x] **CONS-04**: User can create, view, and edit `LENGTH`/`ANGLE` constraints both from viewport dimensions and ConstraintManager with mirrored values.
+- [x] **CONS-05**: User can mark `LENGTH`/`ANGLE` constraints as driven so they remain visible/readable but do not drive solver equations.
 
 ### Solver Control
 
@@ -81,11 +81,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKCH-02 | Phase 10 | Complete |
 | SKCH-03 | Phase 10 | Complete |
 | SKCH-04 | Phase 16 | Complete |
-| CONS-01 | Phase 16 | Pending |
-| CONS-02 | Phase 16 | Pending |
+| CONS-01 | Phase 16 | Complete |
+| CONS-02 | Phase 16 | Complete |
 | CONS-03 | Phase 16 | Complete |
-| CONS-04 | Phase 16 | Pending |
-| CONS-05 | Phase 16 | Pending |
+| CONS-04 | Phase 16 | Complete |
+| CONS-05 | Phase 16 | Complete |
 | SOLV-01 | Phase 12 | Pending |
 | SOLV-02 | Phase 12 | Pending |
 | SOLV-03 | Phase 12 | Pending |
