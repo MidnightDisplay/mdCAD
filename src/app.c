@@ -40,6 +40,7 @@
 #include "constraints/constraint_types.h"
 #include "constraints/constraint_glyphs.h"
 #include "constraints/constraint_selection.h"
+#include "scripting/sketch_script_emit.h"
 
 // Gizmo system
 #include "gizmo/gizmo.h"
@@ -120,7 +121,200 @@ static struct {
     bool constraint_dimension_popup_open;
     bool solver_drag_block_toast_active;
     uint64_t solver_drag_block_toast_expires_ms;
+    ecs_entity_t script_editor_sketch;
+    bool script_editor_open;
+    bool script_editor_initialized;
+    bool script_editor_has_unsaved_edits;
+    bool script_editor_close_pending;
+    bool script_editor_reset_pending;
+    bool script_editor_apply_requested;
+    bool script_editor_preview_ok;
+    uint64_t script_editor_last_seen_emit_revision;
+    char script_editor_text[16384];
+    char script_editor_committed_text[16384];
+    sketch_script_error_t script_editor_last_error;
 } state;
+
+static void mdcad_script_editor_clear_error(void) {
+    state.script_editor_last_error.line = 0;
+    state.script_editor_last_error.column = 0;
+    state.script_editor_last_error.message[0] = '\0';
+}
+
+static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool overwrite_text) {
+    if (sketch == 0) return false;
+    char emitted[sizeof(state.script_editor_committed_text)] = {0};
+    sketch_script_error_t emit_err = {0};
+    if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+        state.script_editor_last_error = emit_err;
+        return false;
+    }
+    snprintf(state.script_editor_committed_text, sizeof(state.script_editor_committed_text), "%s", emitted);
+    state.script_editor_committed_text[sizeof(state.script_editor_committed_text) - 1] = '\0';
+    if (overwrite_text) {
+        snprintf(state.script_editor_text, sizeof(state.script_editor_text), "%s", emitted);
+        state.script_editor_text[sizeof(state.script_editor_text) - 1] = '\0';
+        state.script_editor_has_unsaved_edits = false;
+    }
+    return true;
+}
+
+static void mdcad_script_editor_open_for_sketch(ecs_entity_t sketch) {
+    if (sketch == 0) return;
+    state.script_editor_sketch = sketch;
+    state.script_editor_open = true;
+    state.script_editor_initialized = true;
+    state.script_editor_close_pending = false;
+    state.script_editor_reset_pending = false;
+    state.script_editor_apply_requested = false;
+    state.script_editor_preview_ok = false;
+    state.script_editor_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
+    mdcad_script_editor_clear_error();
+    state.script_editor_text[0] = '\0';
+    state.script_editor_committed_text[0] = '\0';
+    mdcad_script_editor_load_emitted_script(sketch, true);
+}
+
+static void mdcad_draw_script_editor_window(void) {
+    ecs_entity_t requested_sketch = 0;
+    if (ui_entity_inspector_consume_script_editor_open_request(&state.entity_inspector, &requested_sketch)) {
+        mdcad_script_editor_open_for_sketch(requested_sketch);
+    }
+
+    if (!state.script_editor_open || state.script_editor_sketch == 0) return;
+    if (!ecs_is_alive(state.ecs_world.world, state.script_editor_sketch)) {
+        state.script_editor_open = false;
+        state.script_editor_sketch = 0;
+        return;
+    }
+
+    uint64_t current_revision = scene_script_emit_revision(&state.ecs_scene);
+    if (current_revision != state.script_editor_last_seen_emit_revision && !state.script_editor_has_unsaved_edits) {
+        state.script_editor_last_seen_emit_revision = current_revision;
+        mdcad_script_editor_load_emitted_script(state.script_editor_sketch, true);
+    }
+
+    bool open = state.script_editor_open;
+    igSetNextWindowSize((ImVec2){900.0f, 680.0f}, ImGuiCond_FirstUseEver);
+    if (igBegin("Script Editor", &open, ImGuiWindowFlags_None)) {
+        LabelComp *label = ecs_world_get_label(&state.ecs_world, state.script_editor_sketch);
+        const char *sketch_name = (label && label->name[0]) ? label->name : "Sketch";
+        igText("Sketch: %s (#%llu)", sketch_name, (unsigned long long)state.script_editor_sketch);
+        igDummy((ImVec2){0.0f, 8.0f});
+
+        bool edited = igInputTextMultiline("##script_editor_text",
+                                           state.script_editor_text,
+                                           sizeof(state.script_editor_text),
+                                           (ImVec2){-1.0f, 420.0f},
+                                           ImGuiInputTextFlags_AllowTabInput,
+                                           NULL,
+                                           NULL);
+        if (edited) {
+            state.script_editor_has_unsaved_edits = strcmp(state.script_editor_text, state.script_editor_committed_text) != 0;
+        }
+
+        sketch_script_error_t preview_error = {0};
+        state.script_editor_preview_ok = scene_script_preview_parse(&state.ecs_scene,
+                                                                    state.script_editor_sketch,
+                                                                    state.script_editor_text,
+                                                                    &preview_error);
+        if (!state.script_editor_preview_ok) {
+            state.script_editor_last_error = preview_error;
+        } else if (!state.script_editor_apply_requested) {
+            mdcad_script_editor_clear_error();
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Diagnostics");
+        if (state.script_editor_text[0] == '\0') {
+            igText("No script content yet");
+            igTextWrapped("Start by editing sketch geometry or constraints, then generated script will appear here.");
+        } else if (!state.script_editor_preview_ok) {
+            igTextWrapped("Script parse failed. Review diagnostics, fix highlighted lines, then run Apply Script again.");
+            igTextWrapped("%s", state.script_editor_last_error.message[0] ? state.script_editor_last_error.message : "Unknown parse error.");
+        } else {
+            igTextDisabled("Preview parse: OK");
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        if (igButton("Reset to Emitted Script##script_editor_reset", (ImVec2){220.0f, 0.0f})) {
+            if (state.script_editor_has_unsaved_edits) {
+                state.script_editor_reset_pending = true;
+                igOpenPopup_Str("Reset Script Editor##script_editor_reset_popup", 0);
+            } else {
+                mdcad_script_editor_load_emitted_script(state.script_editor_sketch, true);
+                mdcad_script_editor_clear_error();
+            }
+        }
+        igSameLine(0, 8);
+        igBeginDisabled(!state.script_editor_preview_ok);
+        if (igButton("Apply Script", (ImVec2){180.0f, 0.0f})) {
+            state.script_editor_apply_requested = true;
+            sketch_script_error_t apply_error = {0};
+            bool applied = scene_script_apply_commit(&state.ecs_scene,
+                                                     state.script_editor_sketch,
+                                                     state.script_editor_text,
+                                                     &apply_error);
+            if (applied) {
+                state.script_editor_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
+                mdcad_script_editor_load_emitted_script(state.script_editor_sketch, true);
+                mdcad_script_editor_clear_error();
+            } else {
+                state.script_editor_last_error = apply_error;
+            }
+        }
+        igEndDisabled();
+
+        if (igBeginPopupModal("Reset Script Editor##script_editor_reset_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            igTextWrapped("Discard current edits and restore last deterministic script output?");
+            igDummy((ImVec2){0.0f, 8.0f});
+            if (igButton("Reset##script_editor_reset_confirm", (ImVec2){160.0f, 0.0f})) {
+                mdcad_script_editor_load_emitted_script(state.script_editor_sketch, true);
+                mdcad_script_editor_clear_error();
+                state.script_editor_reset_pending = false;
+                igCloseCurrentPopup();
+            }
+            igSameLine(0, 8);
+            if (igButton("Cancel##script_editor_reset_cancel", (ImVec2){120.0f, 0.0f})) {
+                state.script_editor_reset_pending = false;
+                igCloseCurrentPopup();
+            }
+            igEndPopup();
+        }
+    }
+    igEnd();
+
+    state.script_editor_apply_requested = false;
+    if (!open) {
+        if (state.script_editor_has_unsaved_edits) {
+            state.script_editor_close_pending = true;
+            igOpenPopup_Str("Close Script Editor##script_editor_close_popup", 0);
+            state.script_editor_open = true;
+        } else {
+            state.script_editor_open = false;
+            state.script_editor_sketch = 0;
+        }
+    }
+
+    if (igBeginPopupModal("Close Script Editor##script_editor_close_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        igTextWrapped("Discard unapplied script edits and close the Script Editor?");
+        igDummy((ImVec2){0.0f, 8.0f});
+        if (igButton("Discard and Close##script_editor_close_confirm", (ImVec2){190.0f, 0.0f})) {
+            state.script_editor_open = false;
+            state.script_editor_sketch = 0;
+            state.script_editor_has_unsaved_edits = false;
+            state.script_editor_close_pending = false;
+            igCloseCurrentPopup();
+        }
+        igSameLine(0, 8);
+        if (igButton("Cancel##script_editor_close_cancel", (ImVec2){120.0f, 0.0f})) {
+            state.script_editor_close_pending = false;
+            state.script_editor_open = true;
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+}
 
 static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
     mat4_t bridge;
@@ -668,6 +862,18 @@ static void init(void) {
     state.constraint_dimension_popup_value = 0.0f;
     state.solver_drag_block_toast_active = false;
     state.solver_drag_block_toast_expires_ms = 0;
+    state.script_editor_sketch = 0;
+    state.script_editor_open = false;
+    state.script_editor_initialized = false;
+    state.script_editor_has_unsaved_edits = false;
+    state.script_editor_close_pending = false;
+    state.script_editor_reset_pending = false;
+    state.script_editor_apply_requested = false;
+    state.script_editor_preview_ok = false;
+    state.script_editor_last_seen_emit_revision = 0;
+    state.script_editor_text[0] = '\0';
+    state.script_editor_committed_text[0] = '\0';
+    mdcad_script_editor_clear_error();
 
     // Create test ECS entities using the scene API
     {
@@ -839,6 +1045,7 @@ static void frame(void) {
         ui_entity_inspector_draw(&state.entity_inspector);
         ui_scene_hierarchy_draw(&state.scene_hierarchy);
         ui_slot_buffer_debug_draw(&state.slot_buffer_debug);
+        mdcad_draw_script_editor_window();
 
         // Update and draw FPS debug (updates every frame, draws if visible)
         ui_fps_debug_update(&state.fps_debug);

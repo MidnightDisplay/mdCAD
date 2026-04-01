@@ -6,6 +6,7 @@
 #include "../scripting/sketch_script_parse.h"
 #include "../scripting/sketch_script_apply.h"
 #include "../scripting/sketch_script_emit.h"
+#include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -261,6 +262,128 @@ static int test_script_apply_commit_is_atomic_on_unresolved_reference(void) {
     return (geometry_before == geometry_after && constraints_before == constraints_after) ? 0 : 1;
 }
 
+static int test_script_preview_parse_preserves_committed_scene_on_failure(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *valid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, valid_script, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_before = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_before = scene_count_sketch_constraints(&scene, sketch);
+    const char *invalid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing\"} }\n"
+        "  }\n"
+        "}";
+    if (scene_script_preview_parse(&scene, sketch, invalid_script, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_after = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_after = scene_count_sketch_constraints(&scene, sketch);
+    ecs_world_shutdown(&world);
+    return (geometry_before == geometry_after && constraints_before == constraints_after) ? 0 : 1;
+}
+
+static int test_script_apply_commit_keeps_last_valid_scene_on_failure(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *valid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, valid_script, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char committed_script[4096] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, committed_script, sizeof(committed_script), &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *invalid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "  }\n"
+        "}";
+    if (scene_script_apply_commit(&scene, sketch, invalid_script, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char after_failed_apply[4096] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, after_failed_apply, sizeof(after_failed_apply), &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_shutdown(&world);
+    return strcmp(committed_script, after_failed_apply) == 0 ? 0 : 1;
+}
+
+static int test_script_editor_launch_request_is_exposed_from_inspector_state(void) {
+    selection_buffer_t selection = {0};
+    ecs_world_state_t world = {0};
+    ui_entity_inspector_state_t inspector = {0};
+    ui_entity_inspector_init(&inspector, &selection, &world);
+
+    ecs_entity_t requested = 0;
+    if (ui_entity_inspector_consume_script_editor_open_request(&inspector, &requested)) {
+        return 1;
+    }
+
+    ui_entity_inspector_request_script_editor(&inspector, (ecs_entity_t)42);
+    if (!ui_entity_inspector_consume_script_editor_open_request(&inspector, &requested)) {
+        return 1;
+    }
+    if (requested != (ecs_entity_t)42) {
+        return 1;
+    }
+    if (ui_entity_inspector_consume_script_editor_open_request(&inspector, &requested)) {
+        return 1;
+    }
+    return 0;
+}
+
 static int test_script_emit_orders_by_type_and_script_id(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -382,6 +505,9 @@ int main(void) {
     if (test_script_apply_reconstructs_supported_scope() != 0) return 1;
     if (test_script_apply_resolves_forward_references_two_pass() != 0) return 1;
     if (test_script_apply_commit_is_atomic_on_unresolved_reference() != 0) return 1;
+    if (test_script_preview_parse_preserves_committed_scene_on_failure() != 0) return 1;
+    if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
+    if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
     if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
     if (test_script_emit_noop_stability() != 0) return 1;
