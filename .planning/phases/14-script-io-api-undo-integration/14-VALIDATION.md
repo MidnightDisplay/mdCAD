@@ -2,7 +2,7 @@
 phase: 14
 slug: script-io-api-undo-integration
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-04-01
 ---
@@ -36,14 +36,14 @@ created: 2026-04-01
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 14-01-01 | 01 | 1 | SCRP-04 | integration | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | ✅ | ⬜ pending |
-| 14-01-02 | 01 | 1 | API-02 | integration/undo | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | ❌ W0 | ⬜ pending |
-| 14-02-01 | 02 | 2 | SCRP-05 | integration/UI contract | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | ❌ W0 | ⬜ pending |
-| 14-02-02 | 02 | 2 | API-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | ❌ W0 | ⬜ pending |
-| 14-03-01 | 03 | 3 | SCRP-05, API-02 | integration + manual UX gate | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | ❌ W0 | ⬜ pending |
-| 14-03-02 | 03 | 3 | SCRP-04, SCRP-05 | checkpoint:human-verify | `ctest --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
+| Task ID | Plan | Wave | Requirement | Test Type | Task-loop smoke (<60s) | Wave/phase gate | Wave-0 closure note | Status |
+|---------|------|------|-------------|-----------|--------------------------|-----------------|--------------------|--------|
+| 14-01-01 | 01 | 1 | SCRP-04 | integration | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | **Wave-0 closure task** for script transaction undo/redo tests | ⬜ pending |
+| 14-01-02 | 01 | 1 | API-02 | integration/undo | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | Depends on 14-01-01 closure in same plan | ⬜ pending |
+| 14-02-01 | 02 | 2 | SCRP-05 | integration/UI contract | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | **Wave-0-equivalent closure task** for numeric IO parse/emit/apply tests | ⬜ pending |
+| 14-02-02 | 02 | 2 | API-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | Depends on 14-02-01 closure in same plan | ⬜ pending |
+| 14-03-01 | 03 | 3 | SCRP-05, API-02 | integration + manual UX gate | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | **Wave-0-equivalent closure task** for inspector/app IO contract tests before UI gate | ⬜ pending |
+| 14-03-02 | 03 | 3 | SCRP-04, SCRP-05 | checkpoint:human-verify | `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` | `ctest --test-dir build-vulkan -C Release --output-on-failure` | Uses prior closure from 14-03-01 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,6 +54,8 @@ created: 2026-04-01
 - [ ] `src/tests/script_roundtrip_tests.c` — add script transaction undo/redo atomicity tests for `API-02`.
 - [ ] `src/tests/script_roundtrip_tests.c` — add parser/emit/apply tests for numeric `inputs/outputs` and `min/max/step`.
 - [ ] `src/tests/script_roundtrip_tests.c` (or adjacent native test target) — verify IO live edit path uses the same transactional pipeline as `Apply Script`.
+
+**Closure mapping note:** These are closed inside Phase 14 execution as Wave-0-equivalent prerequisite tasks at the start of each plan: 14-01 Task 1, 14-02 Task 1, and 14-03 Task 1. Later tasks in the same plans consume those closures before full-wave gating.
 
 ---
 
