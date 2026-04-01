@@ -1,10 +1,11 @@
 ---
 phase: 13
 slug: script-round-trip-baseline
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-01
+reviewed_at: 2026-04-01T00:00:00Z
 ---
 
 # Phase 13 — UI Design Contract
@@ -39,7 +40,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks in standalone editor |
 | 3xl | 64px | Full-window macro layout spacing (reserved) |
 
-Exceptions: keep existing 12px/6px ImGui style values where inherited from active app theme (`WindowPadding={12,12}`, `ItemSpacing={8,6}`) and keep existing 10px spacer between geometry and constraint managers for workspace parity (`igDummy({0,10})`), source: `src/ui/ui_theme.h`, `src/ui/ui_entity_inspector.h:2149`.
+Exceptions: none. This phase allows only the declared 4px-based tokens above. Replace legacy non-token values with nearest approved tokens during implementation: `ItemSpacing={8,6}` → `{8,8}` and `igDummy({0,10})` → `igDummy({0,8})` (or `{0,16}` when stronger section separation is needed). Keep `WindowPadding={12,12}` as-is only where inherited globally from app theme and not part of phase-specific layout spacing.
 
 ---
 
@@ -66,6 +67,18 @@ Notes: keep to exactly 4 sizes and 2 weights for this phase. This contract is pr
 | Destructive | #E78284 | Delete/clear/reset actions and destructive confirmations only (source: destructive button override in `src/ui/ui_entity_inspector.h`) |
 
 Accent reserved for: **Apply Script** button (commit-ready only), active script editor tab/header, selected diagnostics row, and focused parse-location jump controls. Do **not** use accent for neutral controls.
+
+---
+
+## Visual Hierarchy & Focal Point
+
+Primary focal point for the script editor screen is the **editable script text area**. Visual hierarchy order is fixed:
+1. **Script text editor (primary, highest emphasis)** — largest surface area and first keyboard focus target.
+2. **Diagnostics panel (secondary)** — directly associated with editor errors/warnings; visually grouped beneath or adjacent to editor.
+3. **Action row with Apply Script CTA (tertiary but high-contrast accent)** — persistent, easy to scan, accent reserved to the primary commit action.
+4. **Supporting managers/inspector controls (quaternary)** — neutral styling, lower emphasis than editing and diagnostics workflow.
+
+Implementation rule: if layout constraints require tradeoffs, preserve editor prominence first, then diagnostics legibility, then action discoverability.
 
 ---
 
