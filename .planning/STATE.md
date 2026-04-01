@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-04-01T16:29:52.821Z"
+status: verifying
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-04-01T16:39:54.596Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 Phase: 12 (solver-control-and-constrained-interaction) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-01
 
 ## Milestone Scope
@@ -52,6 +52,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 16 P01 | 2m | 2 tasks | 3 files |
 | Phase 16 P02 | 15min | 2 tasks | 2 files |
 | Phase 12-solver-control-and-constrained-interaction P01 | 36min | 2 tasks | 3 files |
+| Phase 12-solver-control-and-constrained-interaction P02 | 398s | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -74,6 +75,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 16]: Validation evidence now requires explicit combined Windows MSVC+Vulkan build+ctest command output per requirement/manual row.
 - [Phase 12-solver-control-and-constrained-interaction]: Keep solver runtime authority in scene_solver APIs and keep inspector as thin caller.
 - [Phase 12-solver-control-and-constrained-interaction]: Use per-sketch diagnostics ring buffer capped at 100 entries with explicit clear action only.
+- [Phase 12-solver-control-and-constrained-interaction]: Keep drag feasibility and implication payload ownership in scene_solver_* APIs so app loop only consumes decision contracts.
+- [Phase 12-solver-control-and-constrained-interaction]: Route blocked drag focus/highlighting through constraint_selection_apply_participants to preserve Phase 16 parity.
 
 ## Blockers
 
@@ -81,6 +84,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T16:29:52.818Z
-**Stopped At:** Completed 12-01-PLAN.md
+**Last Date:** 2026-04-01T16:39:54.593Z
+**Stopped At:** Completed 12-02-PLAN.md
 **Resume File:** None

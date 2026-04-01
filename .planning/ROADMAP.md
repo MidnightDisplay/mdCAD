@@ -14,7 +14,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 
 - [x] **Phase 10: Sketch Foundations & Managers** - Users can create sketches, attach/edit core geometry, and inspect sketch-level status. (completed 2026-03-30)
 - [ ] **Phase 11: Constraint Authoring UX** - Users can author, inspect, and edit legal constraints through manager and viewport workflows.
-- [ ] **Phase 12: Solver Control & Constrained Interaction** - Users can control solving, read diagnostics, and manipulate geometry with constraints respected.
+- [x] **Phase 12: Solver Control & Constrained Interaction** - Users can control solving, read diagnostics, and manipulate geometry with constraints respected. (completed 2026-04-01)
 - [ ] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime.
 - [ ] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional.
 - [ ] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance.
@@ -67,7 +67,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 12-01-PLAN.md — Implement per-sketch solver controls, status/diagnostics pipeline, and fixed backend display.
-- [ ] 12-02-PLAN.md — Implement failure implication highlighting/focus and constraint-respecting gizmo drag behavior.
+- [x] 12-02-PLAN.md — Implement failure implication highlighting/focus and constraint-respecting gizmo drag behavior.
 **UI hint**: yes
 
 ### Phase 13: Script Round-Trip Baseline
@@ -123,7 +123,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
-| 12. Solver Control & Constrained Interaction | 1/2 | In Progress|  |
+| 12. Solver Control & Constrained Interaction | 2/2 | Complete   | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |

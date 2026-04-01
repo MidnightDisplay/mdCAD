@@ -27,7 +27,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **SOLV-01**: User can toggle auto-solve per sketch and manually trigger solve recalculation from Solver controls.
 - [x] **SOLV-02**: User can see sketch solve states (`solved`, `loose`, `fixed`, `error`) and timestamped solver diagnostics with `INFO`, `WARNING`, and `ERROR` levels.
 - [x] **SOLV-03**: The system uses one solver backend type for v1.2 and exposes that active type in sketch solver controls.
-- [ ] **SOLV-04**: User can identify implicated constraints/geometries when a solve fails or is invalid.
+- [x] **SOLV-04**: User can identify implicated constraints/geometries when a solve fails or is invalid.
 
 ### Scripting
 
@@ -42,7 +42,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 - [ ] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
 - [ ] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
-- [ ] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
+- [x] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
 - [ ] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
 - [ ] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
 - [ ] **VAL-03**: macOS parity validation is executed after Windows gate pass and results are recorded.
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SOLV-01 | Phase 12 | Complete |
 | SOLV-02 | Phase 12 | Complete |
 | SOLV-03 | Phase 12 | Complete |
-| SOLV-04 | Phase 12 | Pending |
+| SOLV-04 | Phase 12 | Complete |
 | SCRP-01 | Phase 13 | Pending |
 | SCRP-02 | Phase 13 | Pending |
 | SCRP-03 | Phase 13 | Pending |
@@ -98,7 +98,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCRP-06 | Phase 13 | Pending |
 | API-01 | Phase 14 | Pending |
 | API-02 | Phase 14 | Pending |
-| API-03 | Phase 12 | Pending |
+| API-03 | Phase 12 | Complete |
 | VAL-01 | Phase 15 | Pending |
 | VAL-02 | Phase 15 | Pending |
 | VAL-03 | Phase 15 | Pending |
