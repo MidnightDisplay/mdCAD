@@ -1608,8 +1608,8 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     sk->solve_completed_serial = sk->solve_request_serial;
     sk->last_solve_timestamp_ms = (uint64_t)time(NULL) * 1000ULL;
     sk->solver_backend_id = scene_solver_backend_id(scene);
-    sk->status = scene_derive_sketch_status(scene, sketch);
-    return true;
+    sketch_status_t derived_status = scene_derive_sketch_status(scene, sketch);
+    return scene_solver_apply_status(scene, sketch, derived_status);
 }
 
 static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,
