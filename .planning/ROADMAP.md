@@ -127,4 +127,4 @@ Plans:
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
-| 16. Constraint UX Closure & Verification | 2/2 | Complete   | 2026-04-01 |
+| 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |

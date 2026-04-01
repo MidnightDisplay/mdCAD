@@ -41,11 +41,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Import long-tail migration now runs through cglm-backed importer paths with targeted parity evidence — Validated in Phase 7: import-pipeline-long-tail-migration
 - ✓ Undo/editor utility migration now uses cglm-backed helper boundaries with glue burn-down evidence — Validated in Phase 8: undo-editor-utility-migration-and-glue-burn-down
 - ✓ Phase 9 long-tail validation/performance and boundary finalization gates (`VAL-01`, `VAL-02`, `VAL-03`, `TRED-02`) are satisfied with final verification pass — Validated in Phase 9: long-tail-validation-performance-gates-and-boundary-finalization
+- ✓ Constraint UX closure unified glyph and manager participant highlighting semantics and closed Phase 11 verification/validation evidence debt (`SKCH-04`, `CONS-01`, `CONS-02`, `CONS-03`, `CONS-04`, `CONS-05`) — Validated in Phase 16: constraint-ux-closure-and-verification
 
 ### Active
 
 - [ ] Add sketch entity system with solver status, geometry/constraint management, and fix/loose workflow controls.
-- [ ] Add constraint authoring/view/edit workflows (glyphs, menu, legal-type filtering, dimensional editing).
 - [ ] Add bidirectional sketch scripting subsystem with script editor, parser, serializer, and IO parameter UI.
 - [ ] Expand scene API + undo integration for sketch/constraint/script operations.
 - [ ] Add constraint-focused example sketches/scripts for validation and debugging.
@@ -115,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-30 after v1.1 milestone completion*
+*Last updated: 2026-04-01 after Phase 16 closure execution*

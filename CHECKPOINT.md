@@ -207,7 +207,31 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
-## Most Recent Changes (2026-03-31)
+## Most Recent Changes (2026-04-01)
+
+### Phase 16 Constraint UX Closure + Verification Debt Burn-Down (IMPLEMENTED)
+
+- Executed Phase 16 plans `16-01` and `16-02` (gap-closure mode) and completed all tasks.
+- Added shared participant-selection helper:
+  - `src/constraints/constraint_selection.h` with `constraint_selection_apply_participants(...)`.
+- Unified constraint selection behavior:
+  - `src/app.c` glyph click now routes through shared participant selection.
+  - `src/ui/ui_entity_inspector.h` manager row selection now uses the same helper in both manager sections.
+  - Preserved `selected_constraint_entity`, dimensional double-click popup flow, and keybindings (`C` menu, `Tab` gizmo mode).
+- Closed Phase 11 evidence debt:
+  - Created `.planning/phases/11-constraint-authoring-ux/11-VERIFICATION.md` covering `SKCH-04`, `CONS-01..05`.
+  - Upgraded `.planning/phases/11-constraint-authoring-ux/11-VALIDATION.md` to compliant (`status: complete`, `nyquist_compliant: true`, `wave_0_complete: true`).
+- Added Phase 16 planning artifacts and validation contract:
+  - `16-RESEARCH.md`, approved `16-UI-SPEC.md`, `16-VALIDATION.md`, `16-VERIFICATION.md`, `16-HUMAN-UAT.md`, `16-01/02-SUMMARY.md`.
+- Human UAT for Phase 16 passed:
+  - Glyph click participant highlight parity — PASS.
+  - Dimensional glyph double-click popup + highlight persistence — PASS.
+- Phase 16 marked complete in roadmap/requirements traceability.
+- Build/test gate re-run:
+  - `cmake --build build-vulkan --config Release --target mdCAD` passed.
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure` exits 0 in this environment (no registered tests found).
+
+### Archived baseline notes
 
 ### Phase 11 UAT Stabilization + Sketch/Constraint Undo Hardening (IMPLEMENTED)
 
