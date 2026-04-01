@@ -12,3 +12,11 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Files changed:** docs/QUICKSTART.md
 ---
 
+## phase13-script-editor-uat-regressions — Script Editor silently ignored invalid edits and missed geometry refresh
+- **Date:** 2026-04-01
+- **Error patterns:** missing diagnostics, silent no-op apply, illegal constraint edit, stale/blocked apply state, moved line vertices not reflected in script, discard prompt repeats, random letters between blocks ignored
+- **Root cause:** Phase 13 implementation had four gaps: parser tolerated non-delimiter junk inside script blocks, preview only did syntax parse (not link/type legality), Script Editor diagnostics UI cleared apply failures while preview stayed parse-OK, and geometry vertex drag path did not bump script emit revision.
+- **Fix:** Enforced strict delimiter/token checks in parser blocks; added legality validation in preview path; preserved/displayed apply-failure diagnostics until edit/successful apply; and triggered script re-emit after geometry vertex drags. Added regression tests for unexpected-token rejection and illegal participant preview rejection.
+- **Files changed:** src/scripting/sketch_script_parse.h, src/scripting/sketch_script_apply.h, src/app.c, src/tests/script_roundtrip_tests.c
+---
+
