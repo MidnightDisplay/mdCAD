@@ -1,10 +1,11 @@
 ---
 phase: 16
 slug: constraint-ux-closure-and-verification
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-01
+reviewed_at: 2026-04-01T00:00:00Z
 ---
 
 # Phase 16 — UI Design Contract
@@ -42,9 +43,11 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks in workspace windows |
 | 3xl | 64px | Reserved for full-window spacing only |
 
-Exceptions:  
-- 12px is allowed for window/frame padding where existing theme already uses it (`WindowPadding 12`, `Scrollbar/Grab 12`).  
-- 18px is allowed for glyph stack spacing (`constraint_glyphs.h`) to avoid overlap in shared-participant stacks.
+Exceptions: none approved for Phase 16.  
+Legacy values detected in code (`12px`, `18px`) are migration debt and are **not** phase-valid spacing tokens.  
+Migration targets:
+- Legacy `12px` → `16px` (`md`) where visually acceptable, otherwise `8px` (`sm`) for compact controls.
+- Legacy `18px` → `16px` (`md`) for glyph stack spacing baseline, with overlap handled by draw-order/offset logic instead of non-scale spacing.
 
 **Source:** `src/ui/ui_theme.h`, `src/constraints/constraint_glyphs.h`  
 
@@ -90,14 +93,15 @@ Do **not** use accent for neutral text, static labels, or passive row background
 | Element | Copy |
 |---------|------|
 | Primary CTA | Apply Constraint |
+| Secondary dismiss action | Discard Changes |
 | Empty state heading | No constraints yet |
 | Empty state body | Select sketch geometry, press C to open applicable constraints, then apply one to define sketch behavior. |
 | Error state | No applicable constraints for current selection. Adjust selection to valid geometry participants and try again. |
-| Destructive confirmation | Delete Constraint: Delete selected constraint? Participating geometry will remain; this only removes the constraint. |
+| Destructive confirmation | Delete Constraint: Delete selected constraint? Participating geometry will remain; this only removes the constraint. Buttons: `Keep Constraint` (safe) and `Delete Constraint` (destructive). |
 
 Additional destructive actions in scope:  
 - `Delete Constraint##selected_constraint_delete` uses same confirmation semantics as ConstraintManager modal.  
-- Cancel labels remain explicit `Cancel` (never implicit close-only destructive dismissal).
+- Never use generic `Cancel` as the named CTA in this phase contract; use context-specific safe actions (`Discard Changes`, `Keep Constraint`).
 
 **Source:** `src/app.c`, `src/ui/ui_entity_inspector.h`
 
@@ -113,15 +117,22 @@ Additional destructive actions in scope:
 - Constraint entity-only selection (without participant highlight) is not allowed for this phase.
 - Hovering a glyph must continue to use constant-screen-size glyph affordance and hover color change.
 
+### Visual priority / focal anchor (primary-screen contract)
+1. **Primary focal anchor:** selected ConstraintManager row + corresponding viewport participant highlight state (must read as one linked state).
+2. **Secondary focal anchor:** active context menu or dimensional popup attached to the selected constraint.
+3. **Tertiary information layer:** metadata and supporting inspector text (counts, tooltips, non-active labels).
+
+At all times, visual emphasis must preserve this order: selection/highlight first, action surface second, metadata last.
+
 ### 2) Dimensional popup behavior
 - Double-click on a dimensional constraint glyph (`LENGTH`, `ANGLE`) opens the dimension popup.
 - Popup anchor order:
   1. glyph screen anchor + 16px offset if available,
   2. fallback to last constraint menu anchor.
 - Accept paths:
-  - `Accept` button and `Enter/KeypadEnter` both commit via `scene_constraint_set_dimensional_value(...)`.
+  - `Apply Value` button and `Enter/KeypadEnter` both commit via `scene_constraint_set_dimensional_value(...)`.
 - Dismissal paths:
-  - `Cancel`, `Escape`, or outside click close without committing new value.
+  - `Discard Changes`, `Escape`, or outside click close without committing new value.
 - Popup must close if the target constraint is deleted or no longer dimensional.
 
 ### 3) Constraint manager / viewport parity
@@ -159,4 +170,4 @@ Reason: project is native C/cimgui stack; no React/shadcn registry integration i
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-04-01
