@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -35,6 +36,8 @@
 #define ECS_SCENE_ARC_SEGMENTS_PER_RAD 8   // Arc tessellation density
 #define ECS_SCENE_BEZIER_DEFAULT_SEGMENTS 16
 #define ECS_SCENE_HELIX_DEFAULT_SEGMENTS 32
+#define ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS 32
+#define ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS 128
 
 //------------------------------------------------------------------------------
 // Tessellation Helpers
@@ -159,6 +162,39 @@ static inline vec3_t* ecs_scene_tessellate_helix(
 
 // Complete ECS scene state
 typedef struct {
+    bool active;
+    ecs_entity_t sketch;
+    ecs_entity_t first_constraint;
+    int implicated_constraint_count;
+    ecs_entity_t implicated_constraints[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS];
+    int participant_count;
+    ecs_entity_t participants[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS];
+    char reason[192];
+} scene_solver_failure_implication_t;
+
+typedef enum {
+    SCENE_SOLVER_DRAG_FEASIBLE = 0,
+    SCENE_SOLVER_DRAG_UNSATISFIABLE = 1,
+    SCENE_SOLVER_DRAG_INVALID = 2
+} scene_solver_drag_result_t;
+
+typedef struct {
+    scene_solver_drag_result_t result;
+    vec3_t projected_delta;
+    ecs_entity_t first_implicated_constraint;
+    int implicated_constraint_count;
+    ecs_entity_t implicated_constraints[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS];
+    char block_reason[192];
+} scene_solver_drag_decision_t;
+
+typedef struct {
+    sketch_solver_diagnostic_severity_t severity;
+    char timestamp[SKETCH_SOLVER_DIAGNOSTIC_TIMESTAMP_MAX];
+    char message[SKETCH_SOLVER_DIAGNOSTIC_MESSAGE_MAX];
+    ecs_entity_t implicated_constraint;
+} scene_solver_drag_diagnostic_event_t;
+
+typedef struct {
     ecs_world_state_t *world;           // Pointer to ECS world
     geometry_batch_manager_t batches;   // GPU batch manager
 
@@ -167,6 +203,7 @@ typedef struct {
     uint32_t next_sketch_name_index;
     uint32_t solver_backend_id;
     const char *solver_backend_name;
+    scene_solver_failure_implication_t solver_failure_implication;
 } ecs_scene_t;
 
 //------------------------------------------------------------------------------
@@ -193,6 +230,23 @@ static inline const sketch_solver_diagnostic_t* scene_solver_diagnostic_at(ecs_s
                                                                            int index);
 static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sketch, sketch_status_t status);
 static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagnostic_severity_t severity);
+static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
+                                                       ecs_entity_t sketch,
+                                                       const ecs_entity_t *implicated_constraints,
+                                                       int implicated_constraint_count,
+                                                       const char *reason);
+static inline void scene_solver_clear_failure_implication(ecs_scene_t *scene,
+                                                          ecs_entity_t sketch,
+                                                          bool clear_on_success);
+static inline const scene_solver_failure_implication_t* scene_solver_failure_implication(const ecs_scene_t *scene);
+static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
+                                              ecs_entity_t sketch,
+                                              const ecs_entity_t *drag_entities,
+                                              int drag_entity_count,
+                                              vec3_t requested_delta,
+                                              scene_solver_drag_decision_t *out_decision);
+static inline bool scene_solver_drag_make_rejected_diagnostic(const scene_solver_drag_decision_t *decision,
+                                                             scene_solver_drag_diagnostic_event_t *out_event);
 
 //------------------------------------------------------------------------------
 // Scene Initialization
@@ -204,6 +258,7 @@ static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) 
     scene->next_sketch_name_index = 1;
     scene->solver_backend_id = 1;
     scene->solver_backend_name = "ConstraintSketchSolverV1";
+    memset(&scene->solver_failure_implication, 0, sizeof(scene->solver_failure_implication));
     geometry_batch_manager_init(&scene->batches);
 }
 
@@ -1621,6 +1676,9 @@ static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sk
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return false;
     sk->status = status;
+    if (status == SKETCH_STATUS_SOLVED) {
+        scene_solver_clear_failure_implication(scene, sketch, true);
+    }
     return true;
 }
 
@@ -1631,6 +1689,176 @@ static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagn
         case SKETCH_SOLVER_DIAG_ERROR: return "ERROR";
         default: return "ERROR";
     }
+}
+
+static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
+                                                       ecs_entity_t sketch,
+                                                       const ecs_entity_t *implicated_constraints,
+                                                       int implicated_constraint_count,
+                                                       const char *reason) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    scene_solver_failure_implication_t *imp = &scene->solver_failure_implication;
+    memset(imp, 0, sizeof(*imp));
+    imp->active = true;
+    imp->sketch = sketch;
+
+    if (reason) {
+        snprintf(imp->reason, sizeof(imp->reason), "%s", reason);
+    }
+
+    if (!implicated_constraints || implicated_constraint_count <= 0) {
+        return true;
+    }
+
+    int capped_constraints = implicated_constraint_count;
+    if (capped_constraints > ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) {
+        capped_constraints = ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS;
+    }
+
+    for (int i = 0; i < capped_constraints; i++) {
+        ecs_entity_t constraint_e = implicated_constraints[i];
+        if (constraint_e == 0) continue;
+        if (!ecs_is_alive(scene->world->world, constraint_e)) continue;
+
+        imp->implicated_constraints[imp->implicated_constraint_count++] = constraint_e;
+        if (imp->first_constraint == 0) {
+            imp->first_constraint = constraint_e;
+        }
+
+        ConstraintComp *constraint = ecs_world_get_constraint(scene->world, constraint_e);
+        if (!constraint) continue;
+
+        uint32_t participant_count = constraint->participant_count;
+        if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {
+            participant_count = CONSTRAINT_MAX_PARTICIPANTS;
+        }
+
+        for (uint32_t p = 0; p < participant_count; p++) {
+            ecs_entity_t participant = (ecs_entity_t)constraint->participants[p];
+            if (participant == 0) continue;
+            if (!ecs_is_alive(scene->world->world, participant)) continue;
+
+            bool duplicate = false;
+            for (int k = 0; k < imp->participant_count; k++) {
+                if (imp->participants[k] == participant) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) continue;
+            if (imp->participant_count >= ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS) break;
+
+            imp->participants[imp->participant_count++] = participant;
+        }
+    }
+
+    return true;
+}
+
+static inline void scene_solver_clear_failure_implication(ecs_scene_t *scene,
+                                                          ecs_entity_t sketch,
+                                                          bool clear_on_success) {
+    if (!scene) return;
+    if (!clear_on_success) return;
+    scene_solver_failure_implication_t *imp = &scene->solver_failure_implication;
+    if (!imp->active) return;
+    if (sketch != 0 && imp->sketch != 0 && imp->sketch != sketch) return;
+    memset(imp, 0, sizeof(*imp));
+}
+
+static inline const scene_solver_failure_implication_t* scene_solver_failure_implication(const ecs_scene_t *scene) {
+    if (!scene) return NULL;
+    return &scene->solver_failure_implication;
+}
+
+static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
+                                              ecs_entity_t sketch,
+                                              const ecs_entity_t *drag_entities,
+                                              int drag_entity_count,
+                                              vec3_t requested_delta,
+                                              scene_solver_drag_decision_t *out_decision) {
+    if (!out_decision) return false;
+    memset(out_decision, 0, sizeof(*out_decision));
+    out_decision->projected_delta = requested_delta;
+    out_decision->result = SCENE_SOLVER_DRAG_INVALID;
+
+    if (!scene || !scene_is_sketch(scene, sketch)) {
+        snprintf(out_decision->block_reason, sizeof(out_decision->block_reason), "Invalid sketch for constrained drag.");
+        return false;
+    }
+    if (!drag_entities || drag_entity_count <= 0) {
+        snprintf(out_decision->block_reason, sizeof(out_decision->block_reason), "No drag entities selected.");
+        return false;
+    }
+
+    const float eps = 1e-7f;
+    float max_component = fmaxf(fabsf(requested_delta.x), fmaxf(fabsf(requested_delta.y), fabsf(requested_delta.z)));
+    if (max_component <= eps) {
+        out_decision->result = SCENE_SOLVER_DRAG_FEASIBLE;
+        out_decision->projected_delta = vec3_make(0.0f, 0.0f, 0.0f);
+        return true;
+    }
+
+    bool blocked_by_fixed = false;
+    for (int i = 0; i < drag_entity_count; i++) {
+        ecs_entity_t e = drag_entities[i];
+        if (!ecs_is_alive(scene->world->world, e)) continue;
+        if (ecs_world_get_geometry(scene->world, e) == NULL) continue;
+        ecs_entity_t parent = ecs_world_get_parent(scene->world, e);
+        if (parent != sketch) continue;
+
+        SketchGeometryStateComp *geom_state = ecs_world_get_sketch_geometry_state(scene->world, e);
+        if (geom_state && geom_state->fixed) {
+            blocked_by_fixed = true;
+            break;
+        }
+    }
+
+    if (blocked_by_fixed) {
+        out_decision->result = SCENE_SOLVER_DRAG_UNSATISFIABLE;
+        out_decision->projected_delta = vec3_make(0.0f, 0.0f, 0.0f);
+        snprintf(out_decision->block_reason, sizeof(out_decision->block_reason),
+                 "Unsatisfiable movement: fixed sketch geometry cannot be moved.");
+
+        int count = 0;
+        ecs_iter_t it = ecs_children(scene->world->world, sketch);
+        while (ecs_children_next(&it)) {
+            for (int i = 0; i < it.count; i++) {
+                ecs_entity_t child = it.entities[i];
+                if (!ecs_world_get_constraint(scene->world, child)) continue;
+                if (count >= ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) break;
+                out_decision->implicated_constraints[count++] = child;
+                if (out_decision->first_implicated_constraint == 0) {
+                    out_decision->first_implicated_constraint = child;
+                }
+            }
+            if (count >= ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) break;
+        }
+        out_decision->implicated_constraint_count = count;
+        return true;
+    }
+
+    out_decision->result = SCENE_SOLVER_DRAG_FEASIBLE;
+    out_decision->projected_delta = requested_delta;
+    out_decision->first_implicated_constraint = 0;
+    out_decision->implicated_constraint_count = 0;
+    out_decision->block_reason[0] = '\0';
+    return true;
+}
+
+static inline bool scene_solver_drag_make_rejected_diagnostic(const scene_solver_drag_decision_t *decision,
+                                                             scene_solver_drag_diagnostic_event_t *out_event) {
+    if (!decision || !out_event) return false;
+    if (decision->result != SCENE_SOLVER_DRAG_UNSATISFIABLE) return false;
+
+    memset(out_event, 0, sizeof(*out_event));
+    out_event->severity = SKETCH_SOLVER_DIAG_WARNING;
+    snprintf(out_event->timestamp, sizeof(out_event->timestamp), "%llu",
+             (unsigned long long)((uint64_t)time(NULL) * 1000ULL));
+    snprintf(out_event->message, sizeof(out_event->message),
+             "Drag rejected: active constraints make this move invalid.");
+    out_event->implicated_constraint = decision->first_implicated_constraint;
+    return true;
 }
 
 // Batch-parent all children to a single parent
