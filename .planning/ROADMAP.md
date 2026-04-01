@@ -66,7 +66,7 @@ Plans:
   5. User manipulation/gizmo transforms respect active constraints during interaction.
 **Plans**: 2 plans
 Plans:
-- [ ] 16-01-PLAN.md — Unify glyph and manager participant highlighting through a shared selection helper.
+- [x] 16-01-PLAN.md — Unify glyph and manager participant highlighting through a shared selection helper.
 - [ ] 16-02-PLAN.md — Create Phase 11 verification artifact and upgrade validation to compliant scope.
 **UI hint**: yes
 
@@ -127,4 +127,4 @@ Plans:
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
-| 16. Constraint UX Closure & Verification | 0/TBD | Not started | - |
+| 16. Constraint UX Closure & Verification | 1/2 | In Progress|  |

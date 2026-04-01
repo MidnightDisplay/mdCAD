@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-03-31T11:36:41.274Z"
-last_activity: 2026-03-31
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-01T14:42:12.109Z"
+last_activity: 2026-04-01
 progress:
-  total_phases: 6
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 4
+  total_phases: 7
+  completed_phases: 2
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 11 — constraint-authoring-ux
+**Current focus:** Phase 16 — constraint-ux-closure-and-verification
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 11 (constraint-authoring-ux) — EXECUTING
-Plan: 2 of 3
+Phase: 16 (constraint-ux-closure-and-verification) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-03-31
+Last activity: 2026-04-01
 
 ## Milestone Scope
 
@@ -49,6 +49,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 10 P02 | 6h 36m | 3 tasks | 2 files |
 | Phase 10 P03 | 15m | 3 tasks | 3 files |
 | Phase 11 P02 | 7min | 2 tasks | 2 files |
+| Phase 16 P01 | 2m | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -65,6 +66,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 10]: Consolidated GeometryManager interactions in Entity Inspector; removed duplicate Scene Hierarchy manager block.
 - [Phase 11]: Centralized v1.2 constraint legality and display helpers in src/constraints/constraint_types.h for shared inspector/menu usage.
 - [Phase 11]: ConstraintManager row selection now routes through selection buffer to highlight all participant geometry immediately.
+- [Phase 16]: Use shared constraint_selection_apply_participants helper so glyph and manager clicks produce identical participant highlighting.
+- [Phase 16]: Preserve selected_constraint_entity and dimensional popup double-click behavior while unifying selection path.
 
 ## Blockers
 
@@ -72,6 +75,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-03-31T11:36:41.271Z
-**Stopped At:** Completed 11-02-PLAN.md
+**Last Date:** 2026-04-01T14:42:12.105Z
+**Stopped At:** Completed 16-01-PLAN.md
 **Resume File:** None
