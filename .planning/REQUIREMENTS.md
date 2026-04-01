@@ -32,11 +32,11 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 ### Scripting
 
 - [ ] **SCRP-01**: User can open a standalone sketch script editor window from SketchManager.
-- [ ] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
+- [x] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
 - [ ] **SCRP-03**: UI-side sketch/geometry/constraint edits update script output deterministically.
 - [ ] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
 - [ ] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
-- [ ] **SCRP-06**: v1.2 scripting runtime is Lua 5.4.x.
+- [x] **SCRP-06**: v1.2 scripting runtime is Lua 5.4.x.
 
 ### Integration and Validation
 
@@ -91,11 +91,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SOLV-03 | Phase 12 | Complete |
 | SOLV-04 | Phase 12 | Complete |
 | SCRP-01 | Phase 13 | Pending |
-| SCRP-02 | Phase 13 | Pending |
+| SCRP-02 | Phase 13 | Complete |
 | SCRP-03 | Phase 13 | Pending |
 | SCRP-04 | Phase 14 | Pending |
 | SCRP-05 | Phase 14 | Pending |
-| SCRP-06 | Phase 13 | Pending |
+| SCRP-06 | Phase 13 | Complete |
 | API-01 | Phase 14 | Pending |
 | API-02 | Phase 14 | Pending |
 | API-03 | Phase 12 | Complete |

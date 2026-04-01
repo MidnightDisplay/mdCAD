@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-04-01T18:26:38.006Z"
+status: executing
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-04-01T19:09:24.801Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 14
+  completed_plans: 12
 ---
 
 # Project State
@@ -20,15 +20,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 12 — solver-control-and-constrained-interaction
+**Current focus:** Phase 13 — script-round-trip-baseline
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 13
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 13 (script-round-trip-baseline) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-01
 
 ## Milestone Scope
@@ -54,6 +54,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 12-solver-control-and-constrained-interaction P01 | 36min | 2 tasks | 3 files |
 | Phase 12-solver-control-and-constrained-interaction P02 | 398s | 2 tasks | 4 files |
 | Phase 12-solver-control-and-constrained-interaction P03 | 184s | 2 tasks | 1 files |
+| Phase 13-script-round-trip-baseline P01 | 2min | 2 tasks | 9 files |
 
 ## Decisions
 
@@ -80,6 +81,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 12-solver-control-and-constrained-interaction]: Route blocked drag focus/highlighting through constraint_selection_apply_participants to preserve Phase 16 parity.
 - [Phase 12-solver-control-and-constrained-interaction]: Use scene_solver_apply_status as sole recalculate status sink to enforce clear-on-success lifecycle.
 - [Phase 12-solver-control-and-constrained-interaction]: Add solved-path debug assertion against scene_solver_failure_implication active state as regression guard.
+- [Phase 13-script-round-trip-baseline]: Normalize script-local IDs at scene level per sketch before serializer emit/load to keep uniqueness deterministic.
+- [Phase 13-script-round-trip-baseline]: Implement Lua 5.4 baseline checks in header-only runtime helpers and verify through dedicated CTest target.
 
 ## Blockers
 
@@ -87,6 +90,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T18:26:38.003Z
-**Stopped At:** Phase 13 UI-SPEC approved
-**Resume File:** .planning/phases/13-script-round-trip-baseline/13-UI-SPEC.md
+**Last Date:** 2026-04-01T19:09:24.798Z
+**Stopped At:** Completed 13-01-PLAN.md
+**Resume File:** None
