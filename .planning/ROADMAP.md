@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Math Migration** — Phases 1-5 shipped 2026-03-26 ([archive](milestones/v1.0-ROADMAP.md))
 - ✅ **v1.1 Long-Tail Migration** — Phases 6-9 shipped 2026-03-30 ([archive](milestones/v1.1-ROADMAP.md))
-- 🚧 **v1.2 Sketches, Constraints, Scripting** — Phases 10-15 planned (current milestone)
+- 🚧 **v1.2 Sketches, Constraints, Scripting** — Phases 10-16 planned (current milestone)
 
 ## Active Roadmap (v1.2)
 
@@ -18,6 +18,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 - [ ] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime.
 - [ ] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional.
 - [ ] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance.
+- [ ] **Phase 16: Constraint UX Closure & Verification** - Teams close Phase 11 audit gaps, harden glyph-selection highlighting behavior, and produce complete verification evidence.
 
 ## Phase Details
 
@@ -100,6 +101,19 @@ Plans:
   3. macOS parity validation is executed after Windows gate pass and results are recorded.
 **Plans**: TBD
 
+### Phase 16: Constraint UX Closure & Verification
+**Goal**: Close outstanding Phase 11 audit gaps by hardening constraint glyph selection behavior and producing complete Phase 11 verification/validation evidence.
+**Depends on**: Phase 11
+**Requirements**: SKCH-04, CONS-01, CONS-02, CONS-03, CONS-04, CONS-05
+**Gap Closure:** Closes orphaned requirement evidence from `v1.2-MILESTONE-AUDIT.md` and the 10→11 integration/flow gap on glyph participant highlighting.
+**Success Criteria** (what must be TRUE):
+  1. Constraint glyph click/selection highlights all participant geometry immediately and consistently.
+  2. Constraint authoring/editing flows in manager and viewport are re-verified against SKCH-04 and CONS-01..05.
+  3. `11-VERIFICATION.md` exists with requirement-level evidence and no orphaned Phase 11 requirements.
+  4. `11-VALIDATION.md` is updated from draft to a compliant state for implemented scope.
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -110,3 +124,4 @@ Plans:
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
+| 16. Constraint UX Closure & Verification | 0/TBD | Not started | - |

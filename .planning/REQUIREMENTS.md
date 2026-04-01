@@ -12,15 +12,15 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **SKCH-01**: User can create a sketch entity and attach point, line, and arc/circle geometry to that sketch.
 - [x] **SKCH-02**: User can view per-sketch solve status, color policy, geometry count, and constraint count in the Entity Inspector.
 - [x] **SKCH-03**: User can fix, unfix, and delete sketch geometries from GeometryManager using single-select and multi-select workflows.
-- [x] **SKCH-04**: User can select a constraint and see all participating geometry entities/sub-entities highlighted.
+- [ ] **SKCH-04**: User can select a constraint and see all participating geometry entities/sub-entities highlighted.
 
 ### Constraint Authoring
 
-- [x] **CONS-01**: User can apply the initial constraint set (`FIXED`, `COINCIDENT`, `COLLINEAR`, `PARALLEL`, `PERPENDICULAR`, `ALONG X`, `ALONG Y`, `ALONG Z`, `CORADIAL`, `CONCENTRIC`, `LENGTH`, `ANGLE`, `TANGENTIAL`) to geometrically legal entity types.
+- [ ] **CONS-01**: User can apply the initial constraint set (`FIXED`, `COINCIDENT`, `COLLINEAR`, `PARALLEL`, `PERPENDICULAR`, `ALONG X`, `ALONG Y`, `ALONG Z`, `CORADIAL`, `CONCENTRIC`, `LENGTH`, `ANGLE`, `TANGENTIAL`) to geometrically legal entity types.
 - [ ] **CONS-02**: User can open a Tab-triggered in-context constraint menu that lists only currently applicable constraints and auto-hides after applying one.
 - [ ] **CONS-03**: User can hover and select constraints through constant-screen-size viewport glyphs anchored to constrained geometry/sub-geometry.
-- [x] **CONS-04**: User can create, view, and edit `LENGTH`/`ANGLE` constraints both from viewport dimensions and ConstraintManager with mirrored values.
-- [x] **CONS-05**: User can mark `LENGTH`/`ANGLE` constraints as driven so they remain visible/readable but do not drive solver equations.
+- [ ] **CONS-04**: User can create, view, and edit `LENGTH`/`ANGLE` constraints both from viewport dimensions and ConstraintManager with mirrored values.
+- [ ] **CONS-05**: User can mark `LENGTH`/`ANGLE` constraints as driven so they remain visible/readable but do not drive solver equations.
 
 ### Solver Control
 
@@ -80,12 +80,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKCH-01 | Phase 10 | Complete |
 | SKCH-02 | Phase 10 | Complete |
 | SKCH-03 | Phase 10 | Complete |
-| SKCH-04 | Phase 11 | Complete |
-| CONS-01 | Phase 11 | Complete |
-| CONS-02 | Phase 11 | Pending |
-| CONS-03 | Phase 11 | Pending |
-| CONS-04 | Phase 11 | Complete |
-| CONS-05 | Phase 11 | Complete |
+| SKCH-04 | Phase 16 | Pending |
+| CONS-01 | Phase 16 | Pending |
+| CONS-02 | Phase 16 | Pending |
+| CONS-03 | Phase 16 | Pending |
+| CONS-04 | Phase 16 | Pending |
+| CONS-05 | Phase 16 | Pending |
 | SOLV-01 | Phase 12 | Pending |
 | SOLV-02 | Phase 12 | Pending |
 | SOLV-03 | Phase 12 | Pending |
@@ -110,4 +110,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-03-30 after v1.2 roadmap phase mapping*
+*Last updated: 2026-04-01 after v1.2 milestone gap-plan remap*
