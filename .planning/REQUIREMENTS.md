@@ -31,7 +31,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 ### Scripting
 
-- [ ] **SCRP-01**: User can open a standalone sketch script editor window from SketchManager.
+- [x] **SCRP-01**: User can open a standalone sketch script editor window from SketchManager.
 - [x] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
 - [x] **SCRP-03**: UI-side sketch/geometry/constraint edits update script output deterministically.
 - [ ] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SOLV-02 | Phase 12 | Complete |
 | SOLV-03 | Phase 12 | Complete |
 | SOLV-04 | Phase 12 | Complete |
-| SCRP-01 | Phase 13 | Pending |
+| SCRP-01 | Phase 13 | Complete |
 | SCRP-02 | Phase 13 | Complete |
 | SCRP-03 | Phase 13 | Complete |
 | SCRP-04 | Phase 14 | Pending |
