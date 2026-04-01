@@ -39,6 +39,7 @@
 #include "ui/ui_fps_debug.h"
 #include "constraints/constraint_types.h"
 #include "constraints/constraint_glyphs.h"
+#include "constraints/constraint_selection.h"
 
 // Gizmo system
 #include "gizmo/gizmo.h"
@@ -1080,9 +1081,9 @@ static void frame(void) {
                             if (clicked_constraint != 0) {
                                 if (ecs_is_alive(state.ecs_world.world, clicked_constraint)) {
                                     state.selected_constraint_entity = clicked_constraint;
-                                    // Glyph click selects the constraint itself (not participants).
-                                    // Participant highlighting is handled in ConstraintManager row actions.
-                                    selection_set_single(&state.selection, clicked_constraint);
+                                    constraint_selection_apply_participants(&state.selection,
+                                                                            &state.ecs_world,
+                                                                            clicked_constraint);
 
                                     ConstraintComp *constraint = ecs_world_get_constraint(&state.ecs_world, clicked_constraint);
                                     if (constraint && constraint_type_is_dimensional(constraint->type) &&

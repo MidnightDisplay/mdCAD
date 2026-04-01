@@ -14,6 +14,7 @@
 #include "../selection.h"
 #include "../ecs/ecs_world.h"
 #include "../constraints/constraint_types.h"
+#include "../constraints/constraint_selection.h"
 #include "../components/geometry_comp.h"
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
@@ -724,13 +725,7 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
                 row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
             }
             if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
-                selection_clear(state->selection);
-                for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
-                    ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
-                    if (ecs_is_alive(w->world, p)) {
-                        selection_add(state->selection, p);
-                    }
-                }
+                constraint_selection_apply_participants(state->selection, w, c_e);
             }
 
             if (constraint_type_is_dimensional(constraint->type)) {
@@ -1355,13 +1350,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
                 }
                 if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
-                    selection_clear(state->selection);
-                    for (uint32_t pi = 0; pi < constraint->participant_count; pi++) {
-                        ecs_entity_t p = (ecs_entity_t)constraint->participants[pi];
-                        if (ecs_is_alive(w->world, p)) {
-                            selection_add(state->selection, p);
-                        }
-                    }
+                    constraint_selection_apply_participants(state->selection, w, c_e);
                 }
 
                 if (constraint_type_is_dimensional(constraint->type)) {
