@@ -90,6 +90,109 @@ static inline int ui_geometry_manager_index_of(const ecs_entity_t *entities, int
     return -1;
 }
 
+static inline int ui_geometry_manager_name_casecmp(const char *a, const char *b) {
+    if (!a) a = "";
+    if (!b) b = "";
+    while (*a && *b) {
+        int ca = tolower((unsigned char)*a);
+        int cb = tolower((unsigned char)*b);
+        if (ca != cb) return (ca < cb) ? -1 : 1;
+        a++;
+        b++;
+    }
+    if (*a == '\0' && *b == '\0') return 0;
+    return (*a == '\0') ? -1 : 1;
+}
+
+static inline const char* ui_geometry_manager_last_underscore(const char *s) {
+    if (!s) return NULL;
+    const char *last = NULL;
+    while (*s) {
+        if (*s == '_') last = s;
+        s++;
+    }
+    return last;
+}
+
+static inline bool ui_geometry_manager_parse_suffix_number(const char *name,
+                                                           int *out_number,
+                                                           const char **out_prefix_end) {
+    if (!name || !out_number || !out_prefix_end) return false;
+    const char *sep = ui_geometry_manager_last_underscore(name);
+    if (!sep || *(sep + 1) == '\0') return false;
+    const char *p = sep + 1;
+    int value = 0;
+    while (*p) {
+        if (!isdigit((unsigned char)*p)) return false;
+        value = value * 10 + (*p - '0');
+        p++;
+    }
+    *out_number = value;
+    *out_prefix_end = sep;
+    return true;
+}
+
+static inline int ui_geometry_manager_compare_entities(ecs_world_state_t *w, ecs_entity_t a, ecs_entity_t b) {
+    LabelComp *la = ecs_world_get_label(w, a);
+    LabelComp *lb = ecs_world_get_label(w, b);
+    const char *name_a = (la && la->name[0] != '\0') ? la->name : NULL;
+    const char *name_b = (lb && lb->name[0] != '\0') ? lb->name : NULL;
+
+    if (name_a && name_b) {
+        int suffix_num_a = 0;
+        int suffix_num_b = 0;
+        const char *prefix_end_a = NULL;
+        const char *prefix_end_b = NULL;
+        bool has_suffix_a = ui_geometry_manager_parse_suffix_number(name_a, &suffix_num_a, &prefix_end_a);
+        bool has_suffix_b = ui_geometry_manager_parse_suffix_number(name_b, &suffix_num_b, &prefix_end_b);
+
+        if (has_suffix_a && has_suffix_b) {
+            int prefix_len_a = (int)(prefix_end_a - name_a);
+            int prefix_len_b = (int)(prefix_end_b - name_b);
+            if (prefix_len_a == prefix_len_b) {
+                bool same_prefix = true;
+                for (int i = 0; i < prefix_len_a; i++) {
+                    int ca = tolower((unsigned char)name_a[i]);
+                    int cb = tolower((unsigned char)name_b[i]);
+                    if (ca != cb) {
+                        same_prefix = false;
+                        break;
+                    }
+                }
+                if (same_prefix && suffix_num_a != suffix_num_b) {
+                    return (suffix_num_a < suffix_num_b) ? -1 : 1;
+                }
+            }
+        }
+
+        int by_name = ui_geometry_manager_name_casecmp(name_a, name_b);
+        if (by_name != 0) return by_name;
+    } else if (name_a && !name_b) {
+        return -1;
+    } else if (!name_a && name_b) {
+        return 1;
+    }
+
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
+
+static inline void ui_geometry_manager_sort_rows(ecs_world_state_t *w,
+                                                 ecs_entity_t *rows,
+                                                 int row_count) {
+    if (!rows || row_count <= 1) return;
+    for (int i = 1; i < row_count; i++) {
+        ecs_entity_t key = rows[i];
+        int j = i - 1;
+        while (j >= 0 && ui_geometry_manager_compare_entities(w, key, rows[j]) < 0) {
+            rows[j + 1] = rows[j];
+            j--;
+        }
+        rows[j + 1] = key;
+    }
+}
+
 static inline void ui_geometry_manager_selection_clear(ecs_entity_t *selection, int *selection_count) {
     (void)selection;
     *selection_count = 0;
@@ -221,6 +324,7 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
             }
         }
     }
+    ui_geometry_manager_sort_rows(w, geometry_rows, geometry_row_count);
 
     for (int i = gm_selected_count - 1; i >= 0; i--) {
         if (!ui_geometry_manager_contains(geometry_rows, geometry_row_count, gm_selected_entities[i])) {
@@ -879,6 +983,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 }
             }
         }
+        ui_geometry_manager_sort_rows(w, geometry_rows, geometry_row_count);
 
         for (int i = gm_selected_count - 1; i >= 0; i--) {
             if (!ui_geometry_manager_contains(geometry_rows, geometry_row_count, gm_selected_entities[i])) {
