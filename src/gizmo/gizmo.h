@@ -430,7 +430,8 @@ static inline bool gizmo_begin_drag(gizmo_t *g, ray_t mouse_ray) {
     return true;
 }
 
-// Update drag, returns incremental world-space delta
+// Update drag, returns incremental world-space delta.
+// Caller owns constrained interaction policy (projection/blocking via scene solver).
 static inline vec3_t gizmo_update_drag(gizmo_t *g, ray_t mouse_ray) {
     if (g->mode != GIZMO_MODE_DRAGGING) return vec3_make(0, 0, 0);
 

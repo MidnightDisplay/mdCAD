@@ -48,6 +48,7 @@ typedef struct {
     vec3_t drag_start_point_pos;
     vec3_t drag_start_line_a;
     vec3_t drag_start_line_b;
+    ecs_entity_t *selected_constraint_entity;
 } ui_entity_inspector_state_t;
 
 //------------------------------------------------------------------------------
@@ -68,6 +69,11 @@ static inline void ui_entity_inspector_init(ui_entity_inspector_state_t *state,
 static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t *state,
                                                       undo_redo_t *undo_redo) {
     state->undo_redo = undo_redo;
+}
+
+static inline void ui_entity_inspector_set_selected_constraint_ptr(ui_entity_inspector_state_t *state,
+                                                                    ecs_entity_t *selected_constraint_entity) {
+    state->selected_constraint_entity = selected_constraint_entity;
 }
 
 #define UI_GEOMETRY_MANAGER_MAX_ROWS 2048
@@ -724,9 +730,12 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
             if (constraint->participant_count > 0) {
                 row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
             }
-            if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
-                constraint_selection_apply_participants(state->selection, w, c_e);
-            }
+                if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
+                    constraint_selection_apply_participants(state->selection, w, c_e);
+                    if (state->selected_constraint_entity) {
+                        *state->selected_constraint_entity = c_e;
+                    }
+                }
 
             if (constraint_type_is_dimensional(constraint->type)) {
                 char value_id[96];
@@ -1431,9 +1440,12 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 if (constraint->participant_count > 0) {
                     row_selected = selection_contains(state->selection, (ecs_entity_t)constraint->participants[0]);
                 }
-                if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
-                    constraint_selection_apply_participants(state->selection, w, c_e);
+            if (igSelectable_Bool(row_text, row_selected, 0, (ImVec2){0.0f, 0.0f})) {
+                constraint_selection_apply_participants(state->selection, w, c_e);
+                if (state->selected_constraint_entity) {
+                    *state->selected_constraint_entity = c_e;
                 }
+            }
 
                 if (constraint_type_is_dimensional(constraint->type)) {
                     char value_id[96];

@@ -118,6 +118,8 @@ static struct {
     ecs_entity_t constraint_dimension_popup_constraint;
     float constraint_dimension_popup_value;
     bool constraint_dimension_popup_open;
+    bool solver_drag_block_toast_active;
+    uint64_t solver_drag_block_toast_expires_ms;
 } state;
 
 static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
@@ -482,6 +484,76 @@ static void mdcad_draw_constraint_dimension_popup(void) {
     igEnd();
 }
 
+static uint64_t mdcad_now_ms(void) {
+    return (uint64_t)(stm_sec(stm_now()) * 1000.0);
+}
+
+static void mdcad_show_solver_drag_block_toast(void) {
+    state.solver_drag_block_toast_active = true;
+    state.solver_drag_block_toast_expires_ms = mdcad_now_ms() + 1800ULL;
+}
+
+static void mdcad_draw_solver_drag_block_toast(void) {
+    if (!state.solver_drag_block_toast_active) return;
+    uint64_t now_ms = mdcad_now_ms();
+    if (now_ms >= state.solver_drag_block_toast_expires_ms) {
+        state.solver_drag_block_toast_active = false;
+        return;
+    }
+
+    ImVec2 viewport_pos = igGetMainViewport()->Pos;
+    ImVec2 viewport_size = igGetMainViewport()->Size;
+    igSetNextWindowPos((ImVec2){
+        viewport_pos.x + viewport_size.x * 0.5f,
+        viewport_pos.y + 48.0f
+    }, ImGuiCond_Always, (ImVec2){0.5f, 0.0f});
+    igSetNextWindowBgAlpha(0.90f);
+    if (igBegin("SolverDragToast##solver_drag_blocked", NULL,
+                ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoMove)) {
+        igText("Movement blocked by active constraints.");
+    }
+    igEnd();
+}
+
+static void mdcad_apply_solver_failure_feedback(ecs_entity_t sketch,
+                                                const scene_solver_drag_decision_t *decision) {
+    if (!decision) return;
+    if (!scene_is_sketch(&state.ecs_scene, sketch)) return;
+    if (decision->result != SCENE_SOLVER_DRAG_UNSATISFIABLE) return;
+
+    scene_solver_set_failure_implication(&state.ecs_scene,
+                                         sketch,
+                                         decision->implicated_constraints,
+                                         decision->implicated_constraint_count,
+                                         decision->block_reason);
+
+    const char *drag_rejected_message = "Drag rejected: active constraints make this move invalid.";
+    scene_solver_drag_diagnostic_event_t event;
+    if (scene_solver_drag_make_rejected_diagnostic(decision, &event)) {
+        snprintf(event.message, sizeof(event.message), "%s", drag_rejected_message);
+        scene_solver_add_diagnostic(&state.ecs_scene, sketch, event.severity,
+                                    event.timestamp, event.message, event.implicated_constraint);
+    }
+
+    ecs_entity_t focus_constraint = decision->first_implicated_constraint;
+    if (focus_constraint == 0) {
+        const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&state.ecs_scene);
+        if (imp && imp->active) {
+            focus_constraint = imp->first_constraint;
+        }
+    }
+    if (focus_constraint != 0) {
+        state.selected_constraint_entity = focus_constraint;
+        constraint_selection_apply_participants(&state.selection, &state.ecs_world, focus_constraint);
+    }
+    mdcad_show_solver_drag_block_toast();
+}
+
 //------------------------------------------------------------------------------
 // Init
 //------------------------------------------------------------------------------
@@ -559,6 +631,7 @@ static void init(void) {
     // Initialize entity management UI
     ui_entity_inspector_init(&state.entity_inspector, &state.selection, &state.ecs_world);
     ui_scene_hierarchy_init(&state.scene_hierarchy, &state.selection, &state.ecs_scene);
+    ui_entity_inspector_set_selected_constraint_ptr(&state.entity_inspector, &state.selected_constraint_entity);
 
     // Initialize slot buffer debug viewer
     ui_slot_buffer_debug_init(&state.slot_buffer_debug, &state.ecs_scene);
@@ -593,6 +666,8 @@ static void init(void) {
     state.constraint_dimension_popup_open = false;
     state.constraint_dimension_popup_constraint = 0;
     state.constraint_dimension_popup_value = 0.0f;
+    state.solver_drag_block_toast_active = false;
+    state.solver_drag_block_toast_expires_ms = 0;
 
     // Create test ECS entities using the scene API
     {
@@ -772,6 +847,7 @@ static void frame(void) {
 
     mdcad_draw_constraint_context_menu();
     mdcad_draw_constraint_dimension_popup();
+    mdcad_draw_solver_drag_block_toast();
 
     // Handle keyboard shortcuts when no text input has focus
     if (!io->WantCaptureKeyboard) {
@@ -1116,7 +1192,48 @@ static void frame(void) {
                 ray_t mouse_ray = mdcad_interaction_screen_ray_from_viewport(
                     vp_x, vp_y, (float)vp_width, (float)vp_height, view_legacy, proj_legacy);
 
-                vec3_t delta = gizmo_update_drag(&state.gizmo, mouse_ray);
+                vec3_t requested_delta = gizmo_update_drag(&state.gizmo, mouse_ray);
+                scene_solver_drag_decision_t drag_decision;
+                bool has_drag_decision = false;
+                bool constrained_sketch_drag = false;
+                ecs_entity_t drag_sketch = 0;
+
+                if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE && state.gizmo_drag_entity_count > 0) {
+                    ecs_entity_t first = state.gizmo_drag_entities[0];
+                    ecs_entity_t parent = scene_get_parent(&state.ecs_scene, first);
+                    if (scene_is_sketch(&state.ecs_scene, parent)) {
+                        bool same_sketch = true;
+                        for (int i = 1; i < state.gizmo_drag_entity_count; i++) {
+                            ecs_entity_t current_parent = scene_get_parent(&state.ecs_scene, state.gizmo_drag_entities[i]);
+                            if (current_parent != parent) {
+                                same_sketch = false;
+                                break;
+                            }
+                        }
+                        if (same_sketch) {
+                            constrained_sketch_drag = true;
+                            drag_sketch = parent;
+                            has_drag_decision = scene_solver_can_apply_drag(
+                                &state.ecs_scene,
+                                drag_sketch,
+                                state.gizmo_drag_entities,
+                                state.gizmo_drag_entity_count,
+                                requested_delta,
+                                &drag_decision);
+                        }
+                    }
+                }
+
+                vec3_t delta = requested_delta;
+                if (has_drag_decision && drag_decision.result == SCENE_SOLVER_DRAG_FEASIBLE) {
+                    delta = drag_decision.projected_delta;
+                } else if (has_drag_decision && drag_decision.result == SCENE_SOLVER_DRAG_UNSATISFIABLE) {
+                    delta = vec3_make(0.0f, 0.0f, 0.0f);
+                    if (constrained_sketch_drag) {
+                        mdcad_apply_solver_failure_feedback(drag_sketch, &drag_decision);
+                    }
+                }
+
                 float delta_len = vec3_length(delta);
 
                 if (delta_len > 1e-7f) {
