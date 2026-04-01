@@ -18,6 +18,7 @@
 #include "../components/constraint_comp.h"
 #include "../components/constraint_participant_comp.h"
 #include "../constraints/constraint_types.h"
+#include "../scripting/sketch_script_contract.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -204,6 +205,7 @@ typedef struct {
     uint32_t next_sketch_name_index;
     uint32_t solver_backend_id;
     const char *solver_backend_name;
+    uint64_t script_emit_revision;
     scene_solver_failure_implication_t solver_failure_implication;
 } ecs_scene_t;
 
@@ -214,6 +216,13 @@ typedef struct {
 static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e);
 static inline void scene_refresh_sketch_metadata(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline void scene_normalize_sketch_script_local_ids(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_script_emit_for_sketch(ecs_scene_t *scene,
+                                                 ecs_entity_t sketch,
+                                                 char *out_script,
+                                                 size_t out_script_size,
+                                                 sketch_script_error_t *out_error);
+static inline bool scene_script_reemit_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline uint64_t scene_script_emit_revision(const ecs_scene_t *scene);
 static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
@@ -260,6 +269,7 @@ static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) 
     scene->next_sketch_name_index = 1;
     scene->solver_backend_id = 1;
     scene->solver_backend_name = "ConstraintSketchSolverV1";
+    scene->script_emit_revision = 0;
     memset(&scene->solver_failure_implication, 0, sizeof(scene->solver_failure_implication));
     geometry_batch_manager_init(&scene->batches);
 }
@@ -1411,6 +1421,7 @@ static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
     }
 
     scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
 
     return true;
 }
@@ -1641,6 +1652,7 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
 
     scene_refresh_sketch_metadata(scene, sketch);
     scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
     return constraint_e;
 }
 
@@ -1661,6 +1673,7 @@ static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
     ecs_entity_t sketch = ecs_world_get_parent(scene->world, constraint_entity);
     if (scene_is_sketch(scene, sketch)) {
         scene_solver_request_auto(scene, sketch);
+        scene_script_reemit_for_sketch(scene, sketch);
     }
     return true;
 }
@@ -1673,6 +1686,7 @@ static inline bool scene_remove_constraint(ecs_scene_t *scene, ecs_entity_t cons
     scene_remove_entity(scene, constraint_entity);
     if (scene_is_sketch(scene, sketch)) {
         scene_solver_request_auto(scene, sketch);
+        scene_script_reemit_for_sketch(scene, sketch);
     }
     return true;
 }

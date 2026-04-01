@@ -5,6 +5,7 @@
 #include "../scripting/sketch_script_contract.h"
 #include "../scripting/sketch_script_parse.h"
 #include "../scripting/sketch_script_apply.h"
+#include "../scripting/sketch_script_emit.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -260,6 +261,119 @@ static int test_script_apply_commit_is_atomic_on_unresolved_reference(void) {
     return (geometry_before == geometry_after && constraints_before == constraints_after) ? 0 : 1;
 }
 
+static int test_script_emit_orders_by_type_and_script_id(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec3_make(1, 0, 0), vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t point = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch, vec3_make(1, 1, 0), 1.0f, 0.0f, 1.0f, vec3_make(0, 0, 1), vec4_make(1, 1, 1, 1), 1.0f);
+    if (!line || !point || !arc) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_world_set_script_identity(scene.world, line, &(ScriptIdentityComp){.script_local_id = "geometry_2"});
+    ecs_world_set_script_identity(scene.world, point, &(ScriptIdentityComp){.script_local_id = "geometry_1"});
+    ecs_world_set_script_identity(scene.world, arc, &(ScriptIdentityComp){.script_local_id = "geometry_3"});
+
+    char script[4096] = {0};
+    sketch_script_error_t err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, script, sizeof(script), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char *point_pos = strstr(script, "id = \"geometry_1\"");
+    char *line_pos = strstr(script, "id = \"geometry_2\"");
+    char *arc_pos = strstr(script, "id = \"geometry_3\"");
+    ecs_world_shutdown(&world);
+    if (!point_pos || !line_pos || !arc_pos) return 1;
+    return (point_pos < line_pos && line_pos < arc_pos) ? 0 : 1;
+}
+
+static int test_script_emit_formats_numbers_without_scientific_notation(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    ecs_entity_t point = scene_add_point_to_sketch(&scene, sketch, vec3_make(1.500000f, 0.000123f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    if (point == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_set_script_identity(scene.world, point, &(ScriptIdentityComp){.script_local_id = "geometry_1"});
+
+    char script[4096] = {0};
+    sketch_script_error_t err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, script, sizeof(script), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_shutdown(&world);
+    if (strstr(script, "e+") || strstr(script, "e-") || strstr(script, "E+") || strstr(script, "E-")) return 1;
+    if (strstr(script, "1.5") == NULL) return 1;
+    return 0;
+}
+
+static int test_script_emit_noop_stability(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    ecs_entity_t point = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    if (point == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_set_script_identity(scene.world, point, &(ScriptIdentityComp){.script_local_id = "geometry_1"});
+
+    char first[4096] = {0};
+    char second[4096] = {0};
+    sketch_script_error_t err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, first, sizeof(first), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    scene_refresh_sketch_metadata(&scene, sketch);
+    if (!scene_script_emit_for_sketch(&scene, sketch, second, sizeof(second), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_shutdown(&world);
+    return strcmp(first, second) == 0 ? 0 : 1;
+}
+
+static int test_script_reemit_revision_changes_on_mutation(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    uint64_t rev0 = scene_script_emit_revision(&scene);
+    ecs_entity_t point = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    if (point == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    uint64_t rev1 = scene_script_emit_revision(&scene);
+    ecs_world_shutdown(&world);
+    return rev1 > rev0 ? 0 : 1;
+}
+
 
 int main(void) {
     if (test_runtime_rejects_non_54() != 0) return 1;
@@ -268,5 +382,9 @@ int main(void) {
     if (test_script_apply_reconstructs_supported_scope() != 0) return 1;
     if (test_script_apply_resolves_forward_references_two_pass() != 0) return 1;
     if (test_script_apply_commit_is_atomic_on_unresolved_reference() != 0) return 1;
+    if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
+    if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
+    if (test_script_emit_noop_stability() != 0) return 1;
+    if (test_script_reemit_revision_changes_on_mutation() != 0) return 1;
     return 0;
 }
