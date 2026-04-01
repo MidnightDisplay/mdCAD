@@ -24,9 +24,9 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 ### Solver Control
 
-- [ ] **SOLV-01**: User can toggle auto-solve per sketch and manually trigger solve recalculation from Solver controls.
-- [ ] **SOLV-02**: User can see sketch solve states (`solved`, `loose`, `fixed`, `error`) and timestamped solver diagnostics with `INFO`, `WARNING`, and `ERROR` levels.
-- [ ] **SOLV-03**: The system uses one solver backend type for v1.2 and exposes that active type in sketch solver controls.
+- [x] **SOLV-01**: User can toggle auto-solve per sketch and manually trigger solve recalculation from Solver controls.
+- [x] **SOLV-02**: User can see sketch solve states (`solved`, `loose`, `fixed`, `error`) and timestamped solver diagnostics with `INFO`, `WARNING`, and `ERROR` levels.
+- [x] **SOLV-03**: The system uses one solver backend type for v1.2 and exposes that active type in sketch solver controls.
 - [ ] **SOLV-04**: User can identify implicated constraints/geometries when a solve fails or is invalid.
 
 ### Scripting
@@ -86,9 +86,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONS-03 | Phase 16 | Complete |
 | CONS-04 | Phase 16 | Complete |
 | CONS-05 | Phase 16 | Complete |
-| SOLV-01 | Phase 12 | Pending |
-| SOLV-02 | Phase 12 | Pending |
-| SOLV-03 | Phase 12 | Pending |
+| SOLV-01 | Phase 12 | Complete |
+| SOLV-02 | Phase 12 | Complete |
+| SOLV-03 | Phase 12 | Complete |
 | SOLV-04 | Phase 12 | Pending |
 | SCRP-01 | Phase 13 | Pending |
 | SCRP-02 | Phase 13 | Pending |

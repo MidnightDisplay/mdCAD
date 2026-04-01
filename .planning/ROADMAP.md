@@ -66,7 +66,7 @@ Plans:
   5. User manipulation/gizmo transforms respect active constraints during interaction.
 **Plans**: 2 plans
 Plans:
-- [ ] 12-01-PLAN.md — Implement per-sketch solver controls, status/diagnostics pipeline, and fixed backend display.
+- [x] 12-01-PLAN.md — Implement per-sketch solver controls, status/diagnostics pipeline, and fixed backend display.
 - [ ] 12-02-PLAN.md — Implement failure implication highlighting/focus and constraint-respecting gizmo drag behavior.
 **UI hint**: yes
 
@@ -123,7 +123,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
-| 12. Solver Control & Constrained Interaction | 0/2 | Not started | - |
+| 12. Solver Control & Constrained Interaction | 1/2 | In Progress|  |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |

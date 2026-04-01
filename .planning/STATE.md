@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 12 context gathered
-last_updated: "2026-04-01T15:26:53.916Z"
+status: executing
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-04-01T16:29:52.821Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 10
+  completed_plans: 9
 ---
 
 # Project State
@@ -20,15 +20,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 16 — constraint-ux-closure-and-verification
+**Current focus:** Phase 12 — solver-control-and-constrained-interaction
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 12 (solver-control-and-constrained-interaction) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-01
 
 ## Milestone Scope
@@ -51,6 +51,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 11 P02 | 7min | 2 tasks | 2 files |
 | Phase 16 P01 | 2m | 2 tasks | 3 files |
 | Phase 16 P02 | 15min | 2 tasks | 2 files |
+| Phase 12-solver-control-and-constrained-interaction P01 | 36min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -71,6 +72,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 16]: Preserve selected_constraint_entity and dimensional popup double-click behavior while unifying selection path.
 - [Phase 16]: Recorded canonical keybinding mapping: C opens constraint menu; Tab toggles gizmo mode without runtime changes.
 - [Phase 16]: Validation evidence now requires explicit combined Windows MSVC+Vulkan build+ctest command output per requirement/manual row.
+- [Phase 12-solver-control-and-constrained-interaction]: Keep solver runtime authority in scene_solver APIs and keep inspector as thin caller.
+- [Phase 12-solver-control-and-constrained-interaction]: Use per-sketch diagnostics ring buffer capped at 100 entries with explicit clear action only.
 
 ## Blockers
 
@@ -78,6 +81,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T15:26:53.912Z
-**Stopped At:** Phase 12 context gathered
-**Resume File:** .planning/phases/12-solver-control-and-constrained-interaction/12-CONTEXT.md
+**Last Date:** 2026-04-01T16:29:52.818Z
+**Stopped At:** Completed 12-01-PLAN.md
+**Resume File:** None
