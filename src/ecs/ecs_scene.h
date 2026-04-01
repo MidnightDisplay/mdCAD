@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <assert.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -1678,6 +1679,8 @@ static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sk
     sk->status = status;
     if (status == SKETCH_STATUS_SOLVED) {
         scene_solver_clear_failure_implication(scene, sketch, true);
+        const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(scene);
+        assert(!imp || !imp->active || (imp->sketch != 0 && imp->sketch != sketch));
     }
     return true;
 }
