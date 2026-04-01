@@ -823,6 +823,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     static int cm_type_filter = 0;
     static char cm_search_filter[128] = "";
     static ecs_entity_t cm_delete_pending_constraint = 0;
+    static ecs_entity_t solver_clear_pending_sketch = 0;
 
     SketchComp *sketch = ecs_world_get_sketch(w, e);
     ecs_scene_t *scene = NULL;
@@ -953,6 +954,87 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 state->active_sketch = e;
                 state->active_sketch_workspace_open = true;
             }
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igSeparator();
+        igDummy((ImVec2){0.0f, 8.0f});
+
+        igTextDisabled("Solver");
+        igText("Backend: %s", scene ? scene_solver_backend_name(scene) : "ConstraintSketchSolverV1");
+        igTextDisabled("Backend ID: %u", scene ? scene_solver_backend_id(scene) : 1u);
+        igText("Status: %s", sketch_status_name(sketch->status));
+        if (sketch->last_solve_timestamp_ms > 0) {
+            igTextDisabled("Last solve (epoch ms): %llu",
+                           (unsigned long long)sketch->last_solve_timestamp_ms);
+        } else {
+            igTextDisabled("Last solve: never");
+        }
+
+        bool auto_solve_enabled = sketch->auto_solve_enabled;
+        if (igCheckbox("Auto-solve##sketch_solver_auto", &auto_solve_enabled)) {
+            if (scene) {
+                scene_solver_set_auto_solve(scene, e, auto_solve_enabled);
+                if (auto_solve_enabled) {
+                    scene_solver_request_auto(scene, e);
+                }
+                sketch = ecs_world_get_sketch(w, e);
+            } else {
+                sketch->auto_solve_enabled = auto_solve_enabled;
+            }
+        }
+
+        igBeginDisabled(scene == NULL);
+        if (igButton("Recalculate Sketch", (ImVec2){0, 0})) {
+            scene_solver_request_recalculate(scene, e);
+            scene_solver_add_diagnostic(scene, e, SKETCH_SOLVER_DIAG_INFO,
+                                        "manual", "Manual solve requested via Recalculate Sketch.", 0);
+            sketch = ecs_world_get_sketch(w, e);
+        }
+        igEndDisabled();
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Diagnostics");
+        int diag_count = scene ? scene_solver_diagnostic_count(scene, e) : 0;
+        if (diag_count <= 0) {
+            igTextDisabled("No solver diagnostics yet");
+            igTextWrapped("Run Recalculate Sketch or edit sketch geometry/constraints to generate diagnostics for this sketch.");
+        } else {
+            for (int i = 0; i < diag_count; i++) {
+                const sketch_solver_diagnostic_t *diag = scene_solver_diagnostic_at(scene, e, i);
+                if (!diag) continue;
+                const char *level = scene_solver_diagnostic_level_name(diag->severity);
+                const char *ts = diag->timestamp[0] ? diag->timestamp : "n/a";
+                igText("[%s] %s", level, ts);
+                igSameLine(0, 8.0f);
+                igTextWrapped("%s", diag->message[0] ? diag->message : "(no message)");
+            }
+        }
+
+        igBeginDisabled(scene == NULL);
+        if (igButton("Clear Diagnostics History##sketch_solver_clear", (ImVec2){0, 0})) {
+            solver_clear_pending_sketch = e;
+            igOpenPopup_Str("Clear Diagnostics History##sketch_solver_clear_popup", 0);
+        }
+        igEndDisabled();
+
+        if (igBeginPopupModal("Clear Diagnostics History##sketch_solver_clear_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            igTextWrapped("Clear Diagnostics History: Clear all saved solver diagnostics for this sketch? This action cannot be undone.");
+            igDummy((ImVec2){0.0f, 8.0f});
+            if (igButton("Clear Diagnostics History##sketch_solver_confirm_clear", (ImVec2){220.0f, 0.0f})) {
+                if (scene && solver_clear_pending_sketch != 0) {
+                    scene_solver_clear_diagnostics(scene, solver_clear_pending_sketch);
+                    sketch = ecs_world_get_sketch(w, solver_clear_pending_sketch);
+                }
+                solver_clear_pending_sketch = 0;
+                igCloseCurrentPopup();
+            }
+            igSameLine(0, 8);
+            if (igButton("Cancel##sketch_solver_cancel_clear", (ImVec2){120.0f, 0.0f})) {
+                solver_clear_pending_sketch = 0;
+                igCloseCurrentPopup();
+            }
+            igEndPopup();
         }
     }
 
