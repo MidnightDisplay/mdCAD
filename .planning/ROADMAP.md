@@ -64,7 +64,10 @@ Plans:
   3. User can see which single solver backend type is active for v1.2 in sketch solver controls.
   4. User can identify implicated constraints/geometries when solve is invalid or fails.
   5. User manipulation/gizmo transforms respect active constraints during interaction.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 16-01-PLAN.md — Unify glyph and manager participant highlighting through a shared selection helper.
+- [ ] 16-02-PLAN.md — Create Phase 11 verification artifact and upgrade validation to compliant scope.
 **UI hint**: yes
 
 ### Phase 13: Script Round-Trip Baseline
