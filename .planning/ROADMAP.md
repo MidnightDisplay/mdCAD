@@ -124,7 +124,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
-| 12. Solver Control & Constrained Interaction | 3/3 | Complete   | 2026-04-01 |
+| 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 0/TBD | Not started | - |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
