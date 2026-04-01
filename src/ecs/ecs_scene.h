@@ -3074,4 +3074,25 @@ static inline ecs_entity_t ecs_scene_get_hovered_entity(ecs_scene_t *scene) {
     return hovered;
 }
 
+//------------------------------------------------------------------------------
+// Script round-trip façade
+//------------------------------------------------------------------------------
+
+#include "../scripting/sketch_script_parse.h"
+#include "../scripting/sketch_script_apply.h"
+
+static inline bool scene_script_preview_parse(ecs_scene_t *scene,
+                                              ecs_entity_t sketch,
+                                              const char *script_text,
+                                              sketch_script_error_t *out_error) {
+    return sketch_script_apply_preview_model(scene, sketch, script_text, out_error);
+}
+
+static inline bool scene_script_apply_commit(ecs_scene_t *scene,
+                                             ecs_entity_t sketch,
+                                             const char *script_text,
+                                             sketch_script_error_t *out_error) {
+    return sketch_script_apply_commit_model(scene, sketch, script_text, out_error);
+}
+
 #endif // ECS_SCENE_H

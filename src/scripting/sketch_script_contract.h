@@ -11,6 +11,13 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef struct lua_State lua_State;
+typedef struct {
+    int line;
+    int column;
+    char message[192];
+} sketch_script_error_t;
+
 typedef struct {
     const char *type;
     bool has_id;
@@ -86,6 +93,16 @@ static inline bool sketch_script_contract_validate_constraint_decl(const sketch_
         return false;
     }
     return decl->participant_count <= CONSTRAINT_MAX_PARTICIPANTS;
+}
+
+static inline bool sketch_script_contract_validate(lua_State *L, sketch_script_error_t *out_error) {
+    (void)L;
+    if (out_error) {
+        out_error->line = 0;
+        out_error->column = 0;
+        out_error->message[0] = '\0';
+    }
+    return true;
 }
 
 #endif // SKETCH_SCRIPT_CONTRACT_H

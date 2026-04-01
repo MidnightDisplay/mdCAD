@@ -3,6 +3,8 @@
 #include "../scene_serializer.h"
 #include "../scripting/sketch_script_runtime.h"
 #include "../scripting/sketch_script_contract.h"
+#include "../scripting/sketch_script_parse.h"
+#include "../scripting/sketch_script_apply.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -139,9 +141,132 @@ static int test_script_identity_roundtrip(void) {
     return (found_match && saved_geom_id[0] != '\0') ? 0 : 1;
 }
 
+static int test_script_apply_reconstructs_supported_scope(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *script_text =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {2, 0, 0} },\n"
+        "    { id = \"geometry_3\", type = \"arc\", center = {1, 1, 0}, radius = 1.5, start_angle = 0, end_angle = 3.14159, normal = {0, 0, 1} },\n"
+        "    { id = \"geometry_4\", type = \"circle\", center = {3, 2, 0}, radius = 2.0, normal = {0, 0, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} },\n"
+        "    { id = \"constraint_2\", type = \"Length\", participants = {\"geometry_2\"}, value = 5.0, driven = false }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_count = scene_count_sketch_geometry(&scene, sketch);
+    int constraint_count = scene_count_sketch_constraints(&scene, sketch);
+    ecs_world_shutdown(&world);
+    return (geometry_count == 4 && constraint_count == 2) ? 0 : 1;
+}
+
+static int test_script_apply_resolves_forward_references_two_pass(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *script_text =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} },\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    bool found_constraint = false;
+    ecs_iter_t it = ecs_children(scene.world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ConstraintComp *constraint = ecs_world_get_constraint(scene.world, it.entities[i]);
+            if (!constraint) continue;
+            if (constraint->participant_count == 2 &&
+                constraint->participants[0] != 0 &&
+                constraint->participants[1] != 0) {
+                found_constraint = true;
+            }
+        }
+    }
+
+    ecs_world_shutdown(&world);
+    return found_constraint ? 0 : 1;
+}
+
+static int test_script_apply_commit_is_atomic_on_unresolved_reference(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    ecs_entity_t existing = scene_add_point_to_sketch(&scene, sketch, vec3_make(10, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    if (existing == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_before = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_before = scene_count_sketch_constraints(&scene, sketch);
+
+    const char *bad_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t error = {0};
+    if (scene_script_apply_commit(&scene, sketch, bad_script, &error)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_after = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_after = scene_count_sketch_constraints(&scene, sketch);
+    ecs_world_shutdown(&world);
+    return (geometry_before == geometry_after && constraints_before == constraints_after) ? 0 : 1;
+}
+
+
 int main(void) {
     if (test_runtime_rejects_non_54() != 0) return 1;
     if (test_contract_decl_validation() != 0) return 1;
     if (test_script_identity_roundtrip() != 0) return 1;
+    if (test_script_apply_reconstructs_supported_scope() != 0) return 1;
+    if (test_script_apply_resolves_forward_references_two_pass() != 0) return 1;
+    if (test_script_apply_commit_is_atomic_on_unresolved_reference() != 0) return 1;
     return 0;
 }
