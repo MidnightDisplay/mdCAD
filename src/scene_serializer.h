@@ -181,6 +181,7 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     SketchComp *sketch = ecs_world_get_sketch(w, e);
     SketchGeometryStateComp *sketch_state = ecs_world_get_sketch_geometry_state(w, e);
     ConstraintComp *constraint = ecs_world_get_constraint(w, e);
+    ScriptIdentityComp *script_identity = ecs_world_get_script_identity(w, e);
 
     // Only serialize entities that contribute to persisted scene state.
     // This keeps transient anchor entities out of save files.
@@ -523,6 +524,19 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         wrote_component = true;
     }
 
+    if (script_identity && script_identity->script_local_id[0] != '\0') {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"script_identity\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"script_local_id\": ");
+        json_write_string_escaped(b, script_identity->script_local_id);
+        json_builder_append(b, "\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
     json_builder_append(b, "\n");
 
     json_write_indent(b, depth + 1);
@@ -625,13 +639,28 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     ecs_entity_t *entities = NULL;
     int entity_count = 0;
     int entity_capacity = 0;
-    ecs_entity_t persisted_component_ids[3] = {
+    ecs_entity_t persisted_component_ids[4] = {
         w->GeometryComp_id,
         w->SketchComp_id,
-        w->ConstraintComp_id
+        w->ConstraintComp_id,
+        w->ScriptIdentityComp_id
     };
 
-    for (int c = 0; c < 3; c++) {
+    // Normalize script-local IDs for each sketch before emitting.
+    ecs_query_t *sq = ecs_query(w->world, {
+        .terms = {
+            { .id = w->SketchComp_id }
+        }
+    });
+    ecs_iter_t sit = ecs_query_iter(w->world, sq);
+    while (ecs_query_next(&sit)) {
+        for (int i = 0; i < sit.count; i++) {
+            scene_normalize_sketch_script_local_ids(scene, sit.entities[i]);
+        }
+    }
+    ecs_query_fini(sq);
+
+    for (int c = 0; c < 4; c++) {
         ecs_query_t *q = ecs_query(w->world, {
             .terms = {
                 { .id = persisted_component_ids[c] }
@@ -1216,6 +1245,8 @@ typedef struct {
 
     // Constraint
     ConstraintComp constraint;
+    ScriptIdentityComp script_identity;
+    bool has_script_identity;
 
     // Light (when is_light is true, geometry fields are unused)
     bool is_light;
@@ -1700,6 +1731,44 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
 }
 
 //------------------------------------------------------------------------------
+// Parse Script Identity Component
+//------------------------------------------------------------------------------
+
+static inline bool json_parse_script_identity(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->script_identity = script_identity_comp_default();
+    ent->has_script_identity = true;
+
+    if (!json_next_token(p)) return false;
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "script_local_id") == 0) {
+            if (p->token != JSON_TOK_STRING) return false;
+            strncpy(ent->script_identity.script_local_id, p->str_value, SCRIPT_LOCAL_ID_MAX - 1);
+            ent->script_identity.script_local_id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
+//------------------------------------------------------------------------------
 // Parse Light Component
 //------------------------------------------------------------------------------
 
@@ -1811,6 +1880,8 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
                     if (!json_parse_sketch_geometry_state(p, ent)) return false;
                 } else if (strcmp(comp_key, "constraint") == 0) {
                     if (!json_parse_constraint(p, ent)) return false;
+                } else if (strcmp(comp_key, "script_identity") == 0) {
+                    if (!json_parse_script_identity(p, ent)) return false;
                 } else if (strcmp(comp_key, "light") == 0) {
                     if (!json_parse_light(p, ent)) return false;
                 } else {
@@ -1869,6 +1940,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             t->scale = ent->scale;
             t->dirty = true;
         }
+        if (ent->has_script_identity) {
+            ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
+        }
         return e;
     }
 
@@ -1887,6 +1961,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
             t->rotation = ent->rotation;
             t->scale = ent->scale;
             t->dirty = true;
+        }
+        if (ent->has_script_identity) {
+            ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
         }
         return e;
     }
@@ -2003,6 +2080,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
         }
         if (ent->has_sketch_geometry_state) {
             ecs_world_set_sketch_geometry_state(scene->world, e, &ent->sketch_geometry_state);
+        }
+        if (ent->has_script_identity) {
+            ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
         }
     }
 
@@ -2205,6 +2285,12 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         }
         free(load_children);
         free(load_parents);
+    }
+
+    // Normalize script-local IDs for all loaded sketches after hierarchy exists.
+    for (int i = 0; i < entity_count; i++) {
+        if (!entities[i].has_sketch || entities[i].new_entity == 0) continue;
+        scene_normalize_sketch_script_local_ids(scene, entities[i].new_entity);
     }
 
     // Rebuild participant back-references on geometry after all entities exist.
