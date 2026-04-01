@@ -208,7 +208,11 @@ static inline bool sketch_script_apply_preview_model(ecs_scene_t *scene,
                                                      sketch_script_error_t *out_error) {
     sketch_script_model_t model = {0};
     if (!sketch_script_parse_model(script_text, &model, out_error)) return false;
-    return scene_is_sketch(scene, sketch);
+    if (!scene_is_sketch(scene, sketch)) {
+        sketch_script_apply_set_error(out_error, "Invalid scene/sketch/script.");
+        return false;
+    }
+    return sketch_script_apply_validate_model_links(&model, out_error);
 }
 
 static inline bool sketch_script_apply_commit_model(ecs_scene_t *scene,

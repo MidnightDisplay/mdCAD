@@ -129,6 +129,7 @@ static struct {
     bool script_editor_reset_pending;
     bool script_editor_apply_requested;
     bool script_editor_preview_ok;
+    bool script_editor_last_apply_failed;
     uint64_t script_editor_last_seen_emit_revision;
     char script_editor_text[16384];
     char script_editor_committed_text[16384];
@@ -139,6 +140,7 @@ static void mdcad_script_editor_clear_error(void) {
     state.script_editor_last_error.line = 0;
     state.script_editor_last_error.column = 0;
     state.script_editor_last_error.message[0] = '\0';
+    state.script_editor_last_apply_failed = false;
 }
 
 static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool overwrite_text) {
@@ -211,6 +213,7 @@ static void mdcad_draw_script_editor_window(void) {
                                            NULL);
         if (edited) {
             state.script_editor_has_unsaved_edits = strcmp(state.script_editor_text, state.script_editor_committed_text) != 0;
+            state.script_editor_last_apply_failed = false;
         }
 
         sketch_script_error_t preview_error = {0};
@@ -221,7 +224,9 @@ static void mdcad_draw_script_editor_window(void) {
         if (!state.script_editor_preview_ok) {
             state.script_editor_last_error = preview_error;
         } else if (!state.script_editor_apply_requested) {
-            mdcad_script_editor_clear_error();
+            if (!state.script_editor_last_apply_failed) {
+                mdcad_script_editor_clear_error();
+            }
         }
 
         igDummy((ImVec2){0.0f, 8.0f});
@@ -229,8 +234,8 @@ static void mdcad_draw_script_editor_window(void) {
         if (state.script_editor_text[0] == '\0') {
             igText("No script content yet");
             igTextWrapped("Start by editing sketch geometry or constraints, then generated script will appear here.");
-        } else if (!state.script_editor_preview_ok) {
-            igTextWrapped("Script parse failed. Review diagnostics, fix highlighted lines, then run Apply Script again.");
+        } else if (!state.script_editor_preview_ok || state.script_editor_last_apply_failed) {
+            igTextWrapped("Script validation/apply failed. Review diagnostics, fix highlighted lines, then run Apply Script again.");
             igTextWrapped("%s", state.script_editor_last_error.message[0] ? state.script_editor_last_error.message : "Unknown parse error.");
         } else {
             igTextDisabled("Preview parse: OK");
@@ -261,6 +266,7 @@ static void mdcad_draw_script_editor_window(void) {
                 mdcad_script_editor_clear_error();
             } else {
                 state.script_editor_last_error = apply_error;
+                state.script_editor_last_apply_failed = true;
             }
         }
         igEndDisabled();
@@ -870,6 +876,7 @@ static void init(void) {
     state.script_editor_reset_pending = false;
     state.script_editor_apply_requested = false;
     state.script_editor_preview_ok = false;
+    state.script_editor_last_apply_failed = false;
     state.script_editor_last_seen_emit_revision = 0;
     state.script_editor_text[0] = '\0';
     state.script_editor_committed_text[0] = '\0';
@@ -1505,6 +1512,10 @@ static void frame(void) {
                                     state.gizmo_drag_start_vertices,
                                     new_positions, count);
                                 free(new_positions);
+                            }
+                            ecs_entity_t parent = scene_get_parent(&state.ecs_scene, entity);
+                            if (parent != 0 && scene_is_sketch(&state.ecs_scene, parent)) {
+                                scene_script_reemit_for_sketch(&state.ecs_scene, parent);
                             }
                         }
                         ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);

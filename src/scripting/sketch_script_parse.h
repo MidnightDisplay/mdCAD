@@ -211,6 +211,15 @@ static inline bool sketch_script_parse_participants(const char *block,
     return out_constraint->participant_count > 0;
 }
 
+static inline bool sketch_script_parse_delimiter_segment_ok(const char *start, const char *end) {
+    if (!start || !end || end < start) return false;
+    for (const char *p = start; p < end; p++) {
+        if (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ',') continue;
+        return false;
+    }
+    return true;
+}
+
 static inline bool sketch_script_parse_entities_block(const char *script_text,
                                                       sketch_script_model_t *out_model,
                                                       sketch_script_error_t *out_error) {
@@ -228,9 +237,14 @@ static inline bool sketch_script_parse_entities_block(const char *script_text,
     }
 
     const char *p = list_start + 1;
+    const char *cursor = p;
     while (p < list_end) {
         while (p < list_end && *p != '{') p++;
         if (p >= list_end) break;
+        if (!sketch_script_parse_delimiter_segment_ok(cursor, p)) {
+            sketch_script_parse_error(out_error, "Unexpected token in entities block.");
+            return false;
+        }
         const char *entry_end = NULL;
         if (!sketch_script_find_matching_brace(p, &entry_end) || entry_end > list_end) {
             sketch_script_parse_error(out_error, "entity block missing matching '}'.");
@@ -307,6 +321,11 @@ static inline bool sketch_script_parse_entities_block(const char *script_text,
 
         out_model->entity_count++;
         p = entry_end + 1;
+        cursor = p;
+    }
+    if (!sketch_script_parse_delimiter_segment_ok(cursor, list_end)) {
+        sketch_script_parse_error(out_error, "Unexpected token in entities block.");
+        return false;
     }
     return true;
 }
@@ -328,9 +347,14 @@ static inline bool sketch_script_parse_constraints_block(const char *script_text
     }
 
     const char *p = list_start + 1;
+    const char *cursor = p;
     while (p < list_end) {
         while (p < list_end && *p != '{') p++;
         if (p >= list_end) break;
+        if (!sketch_script_parse_delimiter_segment_ok(cursor, p)) {
+            sketch_script_parse_error(out_error, "Unexpected token in constraints block.");
+            return false;
+        }
         const char *entry_end = NULL;
         if (!sketch_script_find_matching_brace(p, &entry_end) || entry_end > list_end) {
             sketch_script_parse_error(out_error, "constraint block missing matching '}'.");
@@ -383,6 +407,11 @@ static inline bool sketch_script_parse_constraints_block(const char *script_text
         sketch_script_parse_bool_named(entry, "driven", &dst->driven);
         out_model->constraint_count++;
         p = entry_end + 1;
+        cursor = p;
+    }
+    if (!sketch_script_parse_delimiter_segment_ok(cursor, list_end)) {
+        sketch_script_parse_error(out_error, "Unexpected token in constraints block.");
+        return false;
     }
     return true;
 }

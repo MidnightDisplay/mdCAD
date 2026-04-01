@@ -309,6 +309,58 @@ static int test_script_preview_parse_preserves_committed_scene_on_failure(void) 
     return (geometry_before == geometry_after && constraints_before == constraints_after) ? 0 : 1;
 }
 
+static int test_script_preview_parse_rejects_illegal_constraint_participants(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *invalid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 1, 0}, b = {1, 1, 0} },\n"
+        "    { id = \"geometry_3\", type = \"arc\", center = {0, 0, 0}, radius = 1, start_angle = 0, end_angle = 3.14, normal = {0, 0, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Perpendicular\", participants = {\"geometry_1\", \"geometry_3\"} }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t error = {0};
+    bool ok = scene_script_preview_parse(&scene, sketch, invalid_script, &error);
+    ecs_world_shutdown(&world);
+    if (ok) return 1;
+    return error.message[0] != '\0' ? 0 : 1;
+}
+
+static int test_script_parse_rejects_unexpected_tokens_between_blocks(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+
+    const char *invalid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Fixed\", participants = {\"geometry_1\"} } xyz\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t error = {0};
+    bool ok = scene_script_preview_parse(&scene, sketch, invalid_script, &error);
+    ecs_world_shutdown(&world);
+    if (ok) return 1;
+    return error.message[0] != '\0' ? 0 : 1;
+}
+
 static int test_script_apply_commit_keeps_last_valid_scene_on_failure(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -506,6 +558,8 @@ int main(void) {
     if (test_script_apply_resolves_forward_references_two_pass() != 0) return 1;
     if (test_script_apply_commit_is_atomic_on_unresolved_reference() != 0) return 1;
     if (test_script_preview_parse_preserves_committed_scene_on_failure() != 0) return 1;
+    if (test_script_preview_parse_rejects_illegal_constraint_participants() != 0) return 1;
+    if (test_script_parse_rejects_unexpected_tokens_between_blocks() != 0) return 1;
     if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
     if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
