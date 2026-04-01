@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-04-01T19:09:24.801Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-04-01T19:25:10.955Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 13 (script-round-trip-baseline) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-01
 
@@ -55,6 +55,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 12-solver-control-and-constrained-interaction P02 | 398s | 2 tasks | 4 files |
 | Phase 12-solver-control-and-constrained-interaction P03 | 184s | 2 tasks | 1 files |
 | Phase 13-script-round-trip-baseline P01 | 2min | 2 tasks | 9 files |
+| Phase 13-script-round-trip-baseline P02 | 35min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -83,6 +84,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 12-solver-control-and-constrained-interaction]: Add solved-path debug assertion against scene_solver_failure_implication active state as regression guard.
 - [Phase 13-script-round-trip-baseline]: Normalize script-local IDs at scene level per sketch before serializer emit/load to keep uniqueness deterministic.
 - [Phase 13-script-round-trip-baseline]: Implement Lua 5.4 baseline checks in header-only runtime helpers and verify through dedicated CTest target.
+- [Phase 13-script-round-trip-baseline]: Parser/apply remain header-only scene façade modules; emit ordering fixed by type-group then script-local ID.
+- [Phase 13-script-round-trip-baseline]: Scene mutation helpers now trigger script re-emit revision updates via scene_script_reemit_for_sketch.
 
 ## Blockers
 
@@ -90,6 +93,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T19:09:24.798Z
-**Stopped At:** Completed 13-01-PLAN.md
+**Last Date:** 2026-04-01T19:25:10.952Z
+**Stopped At:** Completed 13-02-PLAN.md
 **Resume File:** None

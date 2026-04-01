@@ -83,7 +83,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 13-01-PLAN.md — Add script identity/runtime contracts and Wave-0 script round-trip test target.
-- [ ] 13-02-PLAN.md — Implement declarative parser, atomic two-pass reconstruction, and deterministic emitter.
+- [x] 13-02-PLAN.md — Implement declarative parser, atomic two-pass reconstruction, and deterministic emitter.
 - [ ] 13-03-PLAN.md — Wire standalone Script Editor UX with preview/apply flow and checkpoint verification.
 **UI hint**: yes
 
@@ -129,7 +129,7 @@ Plans:
 | 10. Sketch Foundations & Managers | 3/3 | Complete    | 2026-03-30 |
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
 | 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
-| 13. Script Round-Trip Baseline | 1/3 | In Progress|  |
+| 13. Script Round-Trip Baseline | 2/3 | In Progress|  |
 | 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |
