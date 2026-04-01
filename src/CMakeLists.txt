@@ -91,6 +91,21 @@ if(MDCAD_NATIVE_DESKTOP)
     add_custom_target(math-validation
         DEPENDS math-regression math-bench ${PROJECT_NAME}
     )
+
+    include(CTest)
+    add_executable(script_roundtrip_tests tests/script_roundtrip_tests.c)
+    target_compile_features(script_roundtrip_tests PRIVATE c_std_11)
+    get_target_property(MDCAD_LIBSOKOL_INCLUDE_DIRS libsokol INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(MDCAD_LIBCIMGUI_INCLUDE_DIRS libcimgui INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(script_roundtrip_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(script_roundtrip_tests PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME script_roundtrip_tests COMMAND script_roundtrip_tests)
 endif()
 
 # Emscripten-specific linker options
