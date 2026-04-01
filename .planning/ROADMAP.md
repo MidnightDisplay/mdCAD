@@ -96,7 +96,11 @@ Plans:
   2. User can define script input/output variables and interact with generated numeric controls/readouts, including optional `min/max/step` slider behavior.
   3. Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
   4. User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial restores.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 14-01-PLAN.md — Add script-transaction undo command and atomic apply rollback guarantees.
+- [ ] 14-02-PLAN.md — Implement numeric script IO schema and scene-level IO façade APIs.
+- [ ] 14-03-PLAN.md — Wire dedicated Script IO window with live transactional auto-apply and UX verification.
 **UI hint**: yes
 
 ### Phase 15: Validation & Acceptance Closure
