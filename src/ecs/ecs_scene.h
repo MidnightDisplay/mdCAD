@@ -1998,6 +1998,18 @@ static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t 
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return false;
 
+    if (sk->diagnostics_count > 0) {
+        const sketch_solver_diagnostic_t *last =
+            scene_solver_diagnostic_at(scene, sketch, (int)sk->diagnostics_count - 1);
+        if (last &&
+            last->severity == severity &&
+            last->implicated_constraint == (uint64_t)implicated_constraint &&
+            ((last->message[0] == '\0' && (!message || message[0] == '\0')) ||
+             (message && strcmp(last->message, message) == 0))) {
+            return true;
+        }
+    }
+
     uint32_t write_index = sk->diagnostics_head;
     sketch_solver_diagnostic_t *diag = &sk->diagnostics[write_index];
     memset(diag, 0, sizeof(*diag));
@@ -2094,10 +2106,19 @@ static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
         capped_constraints = ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS;
     }
 
+    ecs_entity_t sorted_constraints[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS] = {0};
+    int sorted_constraint_count = 0;
     for (int i = 0; i < capped_constraints; i++) {
         ecs_entity_t constraint_e = implicated_constraints[i];
         if (constraint_e == 0) continue;
         if (!ecs_is_alive(scene->world->world, constraint_e)) continue;
+        sorted_constraints[sorted_constraint_count++] = constraint_e;
+    }
+    scene_solver_sort_entities_unique(sorted_constraints, &sorted_constraint_count);
+
+    for (int i = 0; i < sorted_constraint_count; i++) {
+        ecs_entity_t constraint_e = sorted_constraints[i];
+        if (constraint_e == 0) continue;
 
         imp->implicated_constraints[imp->implicated_constraint_count++] = constraint_e;
         if (imp->first_constraint == 0) {
@@ -2130,6 +2151,8 @@ static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
             imp->participants[imp->participant_count++] = participant;
         }
     }
+
+    scene_solver_sort_entities_unique(imp->participants, &imp->participant_count);
 
     return true;
 }

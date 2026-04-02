@@ -1056,6 +1056,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             igTextDisabled("No solver diagnostics yet");
             igTextWrapped("Run Recalculate Sketch or edit sketch geometry/constraints to generate diagnostics for this sketch.");
         } else {
+            igTextDisabled("Identical consecutive diagnostics are suppressed.");
             for (int i = 0; i < diag_count; i++) {
                 const sketch_solver_diagnostic_t *diag = scene_solver_diagnostic_at(scene, e, i);
                 if (!diag) continue;
