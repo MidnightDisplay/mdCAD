@@ -6,6 +6,7 @@
 #include "../scripting/sketch_script_parse.h"
 #include "../scripting/sketch_script_apply.h"
 #include "../scripting/sketch_script_emit.h"
+#include "../undo_redo_exec.h"
 #include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
 #include <string.h>
@@ -412,6 +413,191 @@ static int test_script_apply_commit_keeps_last_valid_scene_on_failure(void) {
     return strcmp(committed_script, after_failed_apply) == 0 ? 0 : 1;
 }
 
+static bool script_test_has_child_with_script_id(ecs_scene_t *scene, ecs_entity_t sketch, const char *script_id) {
+    if (!scene || sketch == 0 || !script_id) return false;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, it.entities[i]);
+            if (sid && strcmp(sid->script_local_id, script_id) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static int test_script_apply_undo_redo_single_step(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_a =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    const char *script_b =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_a, &error)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_before = undo_redo_get_undo_count(&undo_redo);
+    if (!scene_script_apply_commit(&scene, sketch, script_b, &error)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_after = undo_redo_get_undo_count(&undo_redo);
+    int redo_after_apply = undo_redo_get_redo_count(&undo_redo);
+    if ((undo_after - undo_before) != 1 || redo_after_apply != 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo_redo)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_count_sketch_geometry(&scene, sketch) != 1) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!script_test_has_child_with_script_id(&scene, sketch, "geometry_1") ||
+        script_test_has_child_with_script_id(&scene, sketch, "geometry_2") ||
+        script_test_has_child_with_script_id(&scene, sketch, "constraint_1")) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_redo(&undo_redo)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_count_sketch_geometry(&scene, sketch) != 2 ||
+        scene_count_sketch_constraints(&scene, sketch) != 1) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!script_test_has_child_with_script_id(&scene, sketch, "geometry_1") ||
+        !script_test_has_child_with_script_id(&scene, sketch, "geometry_2") ||
+        !script_test_has_child_with_script_id(&scene, sketch, "constraint_1")) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_script_apply_failure_preserves_last_valid_state(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *valid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+    const char *invalid_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t error = {0};
+    if (!scene_script_apply_commit(&scene, sketch, valid_script, &error)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_before = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_before = scene_count_sketch_constraints(&scene, sketch);
+    bool had_g1_before = script_test_has_child_with_script_id(&scene, sketch, "geometry_1");
+    bool had_g2_before = script_test_has_child_with_script_id(&scene, sketch, "geometry_2");
+    bool had_c1_before = script_test_has_child_with_script_id(&scene, sketch, "constraint_1");
+    int undo_before = undo_redo_get_undo_count(&undo_redo);
+
+    if (scene_script_apply_commit(&scene, sketch, invalid_script, &error)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int geometry_after = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_after = scene_count_sketch_constraints(&scene, sketch);
+    bool had_g1_after = script_test_has_child_with_script_id(&scene, sketch, "geometry_1");
+    bool had_g2_after = script_test_has_child_with_script_id(&scene, sketch, "geometry_2");
+    bool had_c1_after = script_test_has_child_with_script_id(&scene, sketch, "constraint_1");
+    int undo_after = undo_redo_get_undo_count(&undo_redo);
+    int redo_after = undo_redo_get_redo_count(&undo_redo);
+
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return (geometry_before == geometry_after &&
+            constraints_before == constraints_after &&
+            had_g1_before == had_g1_after &&
+            had_g2_before == had_g2_after &&
+            had_c1_before == had_c1_after &&
+            undo_before == undo_after &&
+            redo_after == 0) ? 0 : 1;
+}
+
 static int test_script_editor_launch_request_is_exposed_from_inspector_state(void) {
     selection_buffer_t selection = {0};
     ecs_world_state_t world = {0};
@@ -561,6 +747,8 @@ int main(void) {
     if (test_script_preview_parse_rejects_illegal_constraint_participants() != 0) return 1;
     if (test_script_parse_rejects_unexpected_tokens_between_blocks() != 0) return 1;
     if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
+    if (test_script_apply_undo_redo_single_step() != 0) return 1;
+    if (test_script_apply_failure_preserves_last_valid_state() != 0) return 1;
     if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
     if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
