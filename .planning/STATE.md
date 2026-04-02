@@ -101,6 +101,7 @@ Next command: `/gsd-plan-phase 15`
 - [Phase 14]: Implemented scene_script_io_* façade APIs and routed IO edits through scene_script_apply_commit transactional path.
 - [Phase 14]: Added dedicated Script IO window launch path from SketchManager and completed transactional live-apply UX closure.
 - [Phase 14]: Stabilized Script IO UAT loop with fixes for buffer sizing, label persistence, startup undo suppression, clipboard/hotkeys, and IO interaction undo coalescing.
+- [Roadmap]: Phase 17 added — Constraint-driven geometry solving (true constraint solve and geometry update behavior).
 
 ## Blockers
 

@@ -141,3 +141,13 @@ Plans:
 | 14. Script IO + API/Undo Integration | 3/3 | Complete    | 2026-04-02 |
 | 15. Validation & Acceptance Closure | 3/3 | Complete    | 2026-04-02 |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |
+
+### Phase 17: Constraint-driven geometry solving
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 16
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 17 to break down)
