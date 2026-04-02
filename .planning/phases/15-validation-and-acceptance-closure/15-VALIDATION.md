@@ -38,8 +38,8 @@ created: 2026-04-02
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 15-01-01 | 01 | 1 | VAL-01 | manual/doc + artifact audit | `cmake --build build-vulkan --config Release --target mdCAD` | ❌ W0 | ⬜ pending |
-| 15-01-02 | 01 | 1 | VAL-02 | build gate | `cmake --build build-vulkan --config Release --target mdCAD` | ❌ W0 | ⬜ pending |
+| 15-01-01 | 01 | 1 | VAL-01 | manual/doc + artifact audit | `cmake --build build-vulkan --config Release --target mdCAD` | ✅ | ✅ green |
+| 15-01-02 | 01 | 1 | VAL-01 | validation mapping | `git --no-pager grep -n "sketch-01-constraint-debug\\|sketch-02-driven-dimensions\\|script-io-scenario-01-parse-apply-reset-diagnostics" .planning/phases/15-validation-and-acceptance-closure/15-VALIDATION.md` | ✅ | ✅ green |
 | 15-02-01 | 02 | 2 | VAL-02 | full suite gate | `ctest --test-dir build-vulkan -C Release --output-on-failure` | ❌ W0 | ⬜ pending |
 | 15-03-01 | 03 | 3 | VAL-03 | deferred-traceability | `N/A (deferred by Phase 15 decision)` | ❌ W0 | ⬜ pending |
 
@@ -52,8 +52,32 @@ created: 2026-04-02
 - [ ] `.planning/phases/15-validation-and-acceptance-closure/15-03-SUMMARY.md` — phase closure narrative with requirement-level outcomes.
 - [ ] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt` — Release `mdCAD` build output evidence.
 - [ ] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt` — full CTest output evidence.
-- [ ] `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/` — two sketch case studies + one Script IO scenario with reproducible steps.
+- [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/` — two sketch case studies + one Script IO scenario with reproducible steps.
 - [ ] `CHECKPOINT.md` — update continuity entry with Phase 15 outcomes.
+
+---
+
+## Requirement Evidence Mapping
+
+### VAL-01 — Example sketch/script case studies shipped
+
+Required composition satisfied per D-06 and D-07:
+- Two representative sketch case studies:
+  - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-01-constraint-debug/README.md`
+  - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-02-driven-dimensions/README.md`
+- One Script IO parse/apply/reset/diagnostics scenario:
+  - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/script-io-scenario-01-parse-apply-reset-diagnostics/README.md`
+
+Script artifacts referenced by runbooks:
+- `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-01-constraint-debug/sketch.lua`
+- `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-02-driven-dimensions/sketch.lua`
+- `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/script-io-scenario-01-parse-apply-reset-diagnostics/script.lua`
+
+Verification commands:
+- `Get-ChildItem .planning/phases/15-validation-and-acceptance-closure/evidence/case-studies -Recurse`
+- `git --no-pager grep -n "parse/apply/reset" .planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/script-io-scenario-01-parse-apply-reset-diagnostics/README.md`
+
+Status: ✅ complete (artifact package created and mapped)
 
 ---
 
