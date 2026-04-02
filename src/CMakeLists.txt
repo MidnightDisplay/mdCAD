@@ -106,6 +106,54 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     target_link_libraries(script_roundtrip_tests PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME script_roundtrip_tests COMMAND script_roundtrip_tests)
+
+    add_executable(scene_solver_contract tests/scene_solver_contract_test.c)
+    target_compile_features(scene_solver_contract PRIVATE c_std_11)
+    target_include_directories(scene_solver_contract PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(scene_solver_contract PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME scene_solver_contract COMMAND scene_solver_contract)
+
+    add_executable(scene_solver_drag tests/scene_solver_drag_test.c)
+    target_compile_features(scene_solver_drag PRIVATE c_std_11)
+    target_include_directories(scene_solver_drag PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(scene_solver_drag PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME scene_solver_drag COMMAND scene_solver_drag)
+
+    add_executable(endpoint_pick tests/endpoint_pick_test.c)
+    target_compile_features(endpoint_pick PRIVATE c_std_11)
+    target_include_directories(endpoint_pick PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(endpoint_pick PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME endpoint_pick COMMAND endpoint_pick)
+
+    add_executable(scene_solver_diagnostics tests/scene_solver_diagnostics_test.c)
+    target_compile_features(scene_solver_diagnostics PRIVATE c_std_11)
+    target_include_directories(scene_solver_diagnostics PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(scene_solver_diagnostics PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME scene_solver_diagnostics COMMAND scene_solver_diagnostics)
 endif()
 
 # Emscripten-specific linker options
