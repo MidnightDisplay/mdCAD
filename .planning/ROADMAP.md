@@ -144,10 +144,12 @@ Plans:
 
 ### Phase 17: Constraint-driven geometry solving
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Users can author endpoint-aware constraints in normal viewport flow and get deterministic, constraint-driven geometry updates during solve and drag interactions.
+**Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
 **Depends on:** Phase 16
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 17 to break down)
+- [ ] 17-01-PLAN.md — Add transactional solve-apply contracts with deterministic failure/no-mutation tests.
+- [ ] 17-02-PLAN.md — Implement endpoint/sub-entity pick authoring path (no gizmo-vertex dependency) and Coincident endpoint wiring.
+- [ ] 17-03-PLAN.md — Harden live constrained drag, diagnostics dedupe, and bounded-frame solve behavior with deterministic gates.
