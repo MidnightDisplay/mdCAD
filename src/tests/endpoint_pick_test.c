@@ -65,6 +65,37 @@ static int test_endpoint_pick_overlay_precedence_contract(void) {
     return 0;
 }
 
+static int test_endpoint_pick_collision_prefers_overlay(void) {
+    pick_buffer_layer_event_t events[4] = {0};
+    int event_count = 0;
+    pick_buffer_layer_record_line(events, 4, &event_count, 12u);
+    pick_buffer_layer_record_line(events, 4, &event_count, 13u);
+    pick_buffer_layer_record_overlay_point(events, 4, &event_count, 200u);
+    if (pick_buffer_resolve_preferred_pick(events, event_count) != 200u) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_endpoint_pick_collision_deterministic_repeated_sampling(void) {
+    pick_buffer_layer_event_t events[6] = {0};
+    int event_count = 0;
+    pick_buffer_layer_record_line(events, 6, &event_count, 50u);
+    pick_buffer_layer_record_overlay_point(events, 6, &event_count, 250u);
+    pick_buffer_layer_record_overlay_point(events, 6, &event_count, 251u);
+
+    uint32_t first = pick_buffer_resolve_preferred_pick(events, event_count);
+    for (int i = 0; i < 16; i++) {
+        if (pick_buffer_resolve_preferred_pick(events, event_count) != first) {
+            return 1;
+        }
+    }
+    if (first != 251u) {
+        return 1;
+    }
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -72,6 +103,8 @@ int main(void) {
     static const test_case_t tests[] = {
         { "test_endpoint_pick_id_encode_decode_roundtrip", test_endpoint_pick_id_encode_decode_roundtrip },
         { "test_endpoint_pick_overlay_precedence_contract", test_endpoint_pick_overlay_precedence_contract },
+        { "test_endpoint_pick_collision_prefers_overlay", test_endpoint_pick_collision_prefers_overlay },
+        { "test_endpoint_pick_collision_deterministic_repeated_sampling", test_endpoint_pick_collision_deterministic_repeated_sampling },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
