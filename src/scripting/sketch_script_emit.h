@@ -193,7 +193,64 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
 
     out_script[0] = '\0';
     size_t off = 0;
-    sketch_script_emit_append(out_script, out_script_size, &off, "return {\n  entities = {\n");
+    sketch_script_emit_append(out_script, out_script_size, &off, "return {\n");
+    int io_count = scene_script_io_descriptor_count(scene, sketch);
+    if (io_count > 0) {
+        sketch_script_emit_append(out_script, out_script_size, &off, "  inputs = {\n");
+        for (int i = 0; i < io_count; i++) {
+            scene_script_io_descriptor_t desc = {0};
+            if (!scene_script_io_descriptor_at(scene, sketch, i, &desc) || !desc.is_input) continue;
+            char value_text[32] = {0};
+            sketch_script_emit_format_number(desc.value, value_text, sizeof(value_text));
+            sketch_script_emit_appendf(out_script, out_script_size, &off,
+                "    { id = \"%s\", value = %s", desc.id, value_text);
+            if (desc.has_min) {
+                char min_text[32] = {0};
+                sketch_script_emit_format_number(desc.min_value, min_text, sizeof(min_text));
+                sketch_script_emit_appendf(out_script, out_script_size, &off, ", min = %s", min_text);
+            }
+            if (desc.has_max) {
+                char max_text[32] = {0};
+                sketch_script_emit_format_number(desc.max_value, max_text, sizeof(max_text));
+                sketch_script_emit_appendf(out_script, out_script_size, &off, ", max = %s", max_text);
+            }
+            if (desc.has_step) {
+                char step_text[32] = {0};
+                sketch_script_emit_format_number(desc.step_value, step_text, sizeof(step_text));
+                sketch_script_emit_appendf(out_script, out_script_size, &off, ", step = %s", step_text);
+            }
+            bool has_more = false;
+            for (int j = i + 1; j < io_count; j++) {
+                scene_script_io_descriptor_t next = {0};
+                if (scene_script_io_descriptor_at(scene, sketch, j, &next) && next.is_input) {
+                    has_more = true;
+                    break;
+                }
+            }
+            sketch_script_emit_appendf(out_script, out_script_size, &off, " }%s\n", has_more ? "," : "");
+        }
+        sketch_script_emit_append(out_script, out_script_size, &off, "  },\n");
+        sketch_script_emit_append(out_script, out_script_size, &off, "  outputs = {\n");
+        for (int i = 0; i < io_count; i++) {
+            scene_script_io_descriptor_t desc = {0};
+            if (!scene_script_io_descriptor_at(scene, sketch, i, &desc) || desc.is_input) continue;
+            char value_text[32] = {0};
+            sketch_script_emit_format_number(desc.value, value_text, sizeof(value_text));
+            bool has_more = false;
+            for (int j = i + 1; j < io_count; j++) {
+                scene_script_io_descriptor_t next = {0};
+                if (scene_script_io_descriptor_at(scene, sketch, j, &next) && !next.is_input) {
+                    has_more = true;
+                    break;
+                }
+            }
+            sketch_script_emit_appendf(out_script, out_script_size, &off,
+                "    { id = \"%s\", value = %s }%s\n",
+                desc.id, value_text, has_more ? "," : "");
+        }
+        sketch_script_emit_append(out_script, out_script_size, &off, "  },\n");
+    }
+    sketch_script_emit_append(out_script, out_script_size, &off, "  entities = {\n");
     for (int i = 0; i < geom_count; i++) {
         GeometryComp *g = ecs_world_get_geometry(scene->world, geoms[i].entity);
         if (!g) continue;

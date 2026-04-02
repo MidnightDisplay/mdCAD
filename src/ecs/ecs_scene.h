@@ -19,6 +19,7 @@
 #include "../components/constraint_participant_comp.h"
 #include "../constraints/constraint_types.h"
 #include "../scripting/sketch_script_contract.h"
+#include "../components/script_identity_comp.h"
 #include "../undo_redo.h"
 #include <string.h>
 #include <stdio.h>
@@ -41,6 +42,9 @@
 #define ECS_SCENE_HELIX_DEFAULT_SEGMENTS 32
 #define ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS 32
 #define ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS 128
+#define ECS_SCENE_SCRIPT_IO_MAX_SKETCHES 64
+#define ECS_SCENE_SCRIPT_IO_MAX_INPUTS 32
+#define ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS 32
 
 //------------------------------------------------------------------------------
 // Tessellation Helpers
@@ -198,6 +202,38 @@ typedef struct {
 } scene_solver_drag_diagnostic_event_t;
 
 typedef struct {
+    char id[SCRIPT_LOCAL_ID_MAX];
+    double value;
+    bool has_min;
+    double min_value;
+    bool has_max;
+    double max_value;
+    bool has_step;
+    double step_value;
+} scene_script_io_entry_t;
+
+typedef struct {
+    bool occupied;
+    ecs_entity_t sketch;
+    uint32_t input_count;
+    uint32_t output_count;
+    scene_script_io_entry_t inputs[ECS_SCENE_SCRIPT_IO_MAX_INPUTS];
+    scene_script_io_entry_t outputs[ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS];
+} scene_script_io_state_t;
+
+typedef struct {
+    char id[SCRIPT_LOCAL_ID_MAX];
+    bool is_input;
+    double value;
+    bool has_min;
+    double min_value;
+    bool has_max;
+    double max_value;
+    bool has_step;
+    double step_value;
+} scene_script_io_descriptor_t;
+
+typedef struct {
     ecs_world_state_t *world;           // Pointer to ECS world
     geometry_batch_manager_t batches;   // GPU batch manager
 
@@ -209,6 +245,7 @@ typedef struct {
     uint64_t script_emit_revision;
     undo_redo_t *script_undo_redo;
     bool script_apply_undo_suppressed;
+    scene_script_io_state_t script_io_states[ECS_SCENE_SCRIPT_IO_MAX_SKETCHES];
     scene_solver_failure_implication_t solver_failure_implication;
 } ecs_scene_t;
 
@@ -224,10 +261,29 @@ static inline bool scene_script_emit_for_sketch(ecs_scene_t *scene,
                                                  char *out_script,
                                                  size_t out_script_size,
                                                  sketch_script_error_t *out_error);
+static inline bool scene_script_apply_commit(ecs_scene_t *scene,
+                                             ecs_entity_t sketch,
+                                             const char *script_text,
+                                             sketch_script_error_t *out_error);
 static inline bool scene_script_reemit_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline uint64_t scene_script_emit_revision(const ecs_scene_t *scene);
 static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e);
 static inline void scene_script_bind_undo_redo(ecs_scene_t *scene, undo_redo_t *undo_redo);
+static inline int scene_script_io_descriptor_count(const ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_script_io_descriptor_at(const ecs_scene_t *scene,
+                                                 ecs_entity_t sketch,
+                                                 int index,
+                                                 scene_script_io_descriptor_t *out_desc);
+static inline bool scene_script_io_read_value(const ecs_scene_t *scene,
+                                              ecs_entity_t sketch,
+                                              const char *id,
+                                              double *out_value,
+                                              bool *out_is_input);
+static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
+                                                     ecs_entity_t sketch,
+                                                     const char *id,
+                                                     double value,
+                                                     sketch_script_error_t *out_error);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
@@ -276,6 +332,7 @@ static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) 
     scene->script_emit_revision = 0;
     scene->script_undo_redo = NULL;
     scene->script_apply_undo_suppressed = false;
+    memset(scene->script_io_states, 0, sizeof(scene->script_io_states));
     memset(&scene->solver_failure_implication, 0, sizeof(scene->solver_failure_implication));
     geometry_batch_manager_init(&scene->batches);
 }
@@ -3101,6 +3158,181 @@ static inline ecs_entity_t ecs_scene_get_hovered_entity(ecs_scene_t *scene) {
 #include "../scripting/sketch_script_parse.h"
 #include "../scripting/sketch_script_apply.h"
 
+static inline scene_script_io_state_t* scene_script_io_state_for_sketch(ecs_scene_t *scene,
+                                                                         ecs_entity_t sketch,
+                                                                         bool create_if_missing) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return NULL;
+    for (int i = 0; i < ECS_SCENE_SCRIPT_IO_MAX_SKETCHES; i++) {
+        if (scene->script_io_states[i].occupied && scene->script_io_states[i].sketch == sketch) {
+            return &scene->script_io_states[i];
+        }
+    }
+    if (!create_if_missing) return NULL;
+    for (int i = 0; i < ECS_SCENE_SCRIPT_IO_MAX_SKETCHES; i++) {
+        if (!scene->script_io_states[i].occupied) {
+            memset(&scene->script_io_states[i], 0, sizeof(scene->script_io_states[i]));
+            scene->script_io_states[i].occupied = true;
+            scene->script_io_states[i].sketch = sketch;
+            return &scene->script_io_states[i];
+        }
+    }
+    return NULL;
+}
+
+static inline const scene_script_io_state_t* scene_script_io_state_for_sketch_const(const ecs_scene_t *scene,
+                                                                                      ecs_entity_t sketch) {
+    if (!scene || sketch == 0) return NULL;
+    for (int i = 0; i < ECS_SCENE_SCRIPT_IO_MAX_SKETCHES; i++) {
+        if (scene->script_io_states[i].occupied && scene->script_io_states[i].sketch == sketch) {
+            return &scene->script_io_states[i];
+        }
+    }
+    return NULL;
+}
+
+static inline void scene_script_io_state_copy_from_model(scene_script_io_state_t *state,
+                                                         const sketch_script_model_t *model) {
+    if (!state || !model) return;
+    state->input_count = (model->input_count > ECS_SCENE_SCRIPT_IO_MAX_INPUTS)
+        ? ECS_SCENE_SCRIPT_IO_MAX_INPUTS : model->input_count;
+    state->output_count = (model->output_count > ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS)
+        ? ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS : model->output_count;
+    memset(state->inputs, 0, sizeof(state->inputs));
+    memset(state->outputs, 0, sizeof(state->outputs));
+    for (uint32_t i = 0; i < state->input_count; i++) {
+        scene_script_io_entry_t *dst = &state->inputs[i];
+        const sketch_script_io_model_t *src = &model->inputs[i];
+        strncpy(dst->id, src->id, sizeof(dst->id) - 1);
+        dst->id[sizeof(dst->id) - 1] = '\0';
+        dst->value = src->value;
+        dst->has_min = src->has_min;
+        dst->min_value = src->min_value;
+        dst->has_max = src->has_max;
+        dst->max_value = src->max_value;
+        dst->has_step = src->has_step;
+        dst->step_value = src->step_value;
+    }
+    for (uint32_t i = 0; i < state->output_count; i++) {
+        scene_script_io_entry_t *dst = &state->outputs[i];
+        const sketch_script_io_model_t *src = &model->outputs[i];
+        strncpy(dst->id, src->id, sizeof(dst->id) - 1);
+        dst->id[sizeof(dst->id) - 1] = '\0';
+        dst->value = src->value;
+    }
+}
+
+static inline int scene_script_io_descriptor_count(const ecs_scene_t *scene, ecs_entity_t sketch) {
+    const scene_script_io_state_t *state = scene_script_io_state_for_sketch_const(scene, sketch);
+    if (!state) return 0;
+    return (int)state->input_count + (int)state->output_count;
+}
+
+static inline bool scene_script_io_descriptor_at(const ecs_scene_t *scene,
+                                                 ecs_entity_t sketch,
+                                                 int index,
+                                                 scene_script_io_descriptor_t *out_desc) {
+    if (!out_desc || index < 0) return false;
+    const scene_script_io_state_t *state = scene_script_io_state_for_sketch_const(scene, sketch);
+    if (!state) return false;
+    memset(out_desc, 0, sizeof(*out_desc));
+    if (index < (int)state->input_count) {
+        const scene_script_io_entry_t *src = &state->inputs[index];
+        strncpy(out_desc->id, src->id, sizeof(out_desc->id) - 1);
+        out_desc->id[sizeof(out_desc->id) - 1] = '\0';
+        out_desc->is_input = true;
+        out_desc->value = src->value;
+        out_desc->has_min = src->has_min;
+        out_desc->min_value = src->min_value;
+        out_desc->has_max = src->has_max;
+        out_desc->max_value = src->max_value;
+        out_desc->has_step = src->has_step;
+        out_desc->step_value = src->step_value;
+        return true;
+    }
+    int output_index = index - (int)state->input_count;
+    if (output_index < 0 || output_index >= (int)state->output_count) return false;
+    const scene_script_io_entry_t *src = &state->outputs[output_index];
+    strncpy(out_desc->id, src->id, sizeof(out_desc->id) - 1);
+    out_desc->id[sizeof(out_desc->id) - 1] = '\0';
+    out_desc->is_input = false;
+    out_desc->value = src->value;
+    return true;
+}
+
+static inline bool scene_script_io_read_value(const ecs_scene_t *scene,
+                                              ecs_entity_t sketch,
+                                              const char *id,
+                                              double *out_value,
+                                              bool *out_is_input) {
+    if (!scene || !id || id[0] == '\0' || !out_value) return false;
+    const scene_script_io_state_t *state = scene_script_io_state_for_sketch_const(scene, sketch);
+    if (!state) return false;
+    for (uint32_t i = 0; i < state->input_count; i++) {
+        if (strcmp(state->inputs[i].id, id) == 0) {
+            *out_value = state->inputs[i].value;
+            if (out_is_input) *out_is_input = true;
+            return true;
+        }
+    }
+    for (uint32_t i = 0; i < state->output_count; i++) {
+        if (strcmp(state->outputs[i].id, id) == 0) {
+            *out_value = state->outputs[i].value;
+            if (out_is_input) *out_is_input = false;
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
+                                                     ecs_entity_t sketch,
+                                                     const char *id,
+                                                     double value,
+                                                     sketch_script_error_t *out_error) {
+    if (!scene || !scene_is_sketch(scene, sketch) || !id || id[0] == '\0') {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "Invalid scene/sketch/input id.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+    scene_script_io_state_t *state = scene_script_io_state_for_sketch(scene, sketch, false);
+    if (!state) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "No script IO state for sketch.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+    bool found = false;
+    for (uint32_t i = 0; i < state->input_count; i++) {
+        if (strcmp(state->inputs[i].id, id) == 0) {
+            state->inputs[i].value = value;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "Input id '%s' not found.", id);
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+
+    char script[4096] = {0};
+    if (!scene_script_emit_for_sketch(scene, sketch, script, sizeof(script), out_error)) {
+        return false;
+    }
+    return scene_script_apply_commit(scene, sketch, script, out_error);
+}
+
 static inline bool scene_script_preview_parse(ecs_scene_t *scene,
                                               ecs_entity_t sketch,
                                               const char *script_text,
@@ -3112,11 +3344,27 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
                                              ecs_entity_t sketch,
                                              const char *script_text,
                                              sketch_script_error_t *out_error) {
+    scene_script_io_state_t *io_state = scene_script_io_state_for_sketch(scene, sketch, true);
+    scene_script_io_state_t io_state_before = {0};
+    if (io_state) {
+        io_state_before = *io_state;
+    }
     char before_script[4096] = {0};
     bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, sizeof(before_script), out_error);
     if (!capture_before) return false;
 
     if (!sketch_script_apply_commit_model(scene, sketch, script_text, out_error)) return false;
+
+    sketch_script_model_t model = {0};
+    if (!sketch_script_parse_model(script_text, &model, out_error)) {
+        sketch_script_error_t rollback_error = {0};
+        (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
+        if (io_state) *io_state = io_state_before;
+        return false;
+    }
+    if (io_state) {
+        scene_script_io_state_copy_from_model(io_state, &model);
+    }
 
     if (!scene->script_apply_undo_suppressed && scene->script_undo_redo) {
         char after_script[4096] = {0};
@@ -3125,6 +3373,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
             scene->script_apply_undo_suppressed = true;
             (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
             scene->script_apply_undo_suppressed = false;
+            if (io_state) *io_state = io_state_before;
             return false;
         }
 
@@ -3141,6 +3390,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
             scene->script_apply_undo_suppressed = true;
             (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
             scene->script_apply_undo_suppressed = false;
+            if (io_state) *io_state = io_state_before;
             if (out_error && out_error->message[0] == '\0') {
                 out_error->line = 0;
                 out_error->column = 0;

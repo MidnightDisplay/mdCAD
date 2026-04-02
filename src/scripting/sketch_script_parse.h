@@ -15,6 +15,8 @@
 
 #define SKETCH_SCRIPT_MODEL_MAX_ENTITIES 128
 #define SKETCH_SCRIPT_MODEL_MAX_CONSTRAINTS 128
+#define SKETCH_SCRIPT_MODEL_MAX_INPUTS 32
+#define SKETCH_SCRIPT_MODEL_MAX_OUTPUTS 32
 
 typedef enum {
     SKETCH_SCRIPT_ENTITY_POINT = 0,
@@ -46,11 +48,26 @@ typedef struct {
     char participants[CONSTRAINT_MAX_PARTICIPANTS][SCRIPT_LOCAL_ID_MAX];
 } sketch_script_constraint_model_t;
 
+typedef struct {
+    char id[SCRIPT_LOCAL_ID_MAX];
+    float value;
+    bool has_min;
+    float min_value;
+    bool has_max;
+    float max_value;
+    bool has_step;
+    float step_value;
+} sketch_script_io_model_t;
+
 typedef struct sketch_script_model_t {
     uint32_t entity_count;
     uint32_t constraint_count;
+    uint32_t input_count;
+    uint32_t output_count;
     sketch_script_entity_model_t entities[SKETCH_SCRIPT_MODEL_MAX_ENTITIES];
     sketch_script_constraint_model_t constraints[SKETCH_SCRIPT_MODEL_MAX_CONSTRAINTS];
+    sketch_script_io_model_t inputs[SKETCH_SCRIPT_MODEL_MAX_INPUTS];
+    sketch_script_io_model_t outputs[SKETCH_SCRIPT_MODEL_MAX_OUTPUTS];
 } sketch_script_model_t;
 
 static inline void sketch_script_parse_error(sketch_script_error_t *out_error,
@@ -215,6 +232,104 @@ static inline bool sketch_script_parse_delimiter_segment_ok(const char *start, c
     if (!start || !end || end < start) return false;
     for (const char *p = start; p < end; p++) {
         if (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ',') continue;
+        return false;
+    }
+    return true;
+}
+
+static inline bool sketch_script_parse_number_token(const char *p, float *out_value) {
+    if (!p || !out_value) return false;
+    while (*p == ' ' || *p == '\t') p++;
+    if (strncmp(p, "true", 4) == 0 || strncmp(p, "false", 5) == 0 || *p == '"') {
+        return false;
+    }
+    char *end = NULL;
+    float v = strtof(p, &end);
+    if (end == p) return false;
+    *out_value = v;
+    return true;
+}
+
+static inline bool sketch_script_parse_numeric_named(const char *block,
+                                                     const char *key,
+                                                     float *out_value) {
+    if (!block || !key || !out_value) return false;
+    const char *p = strstr(block, key);
+    if (!p) return false;
+    p = strchr(p, '=');
+    if (!p) return false;
+    p++;
+    return sketch_script_parse_number_token(p, out_value);
+}
+
+static inline bool sketch_script_parse_io_block(const char *script_text,
+                                                const char *block_name,
+                                                sketch_script_io_model_t *entries,
+                                                uint32_t max_entries,
+                                                uint32_t *out_count,
+                                                sketch_script_error_t *out_error) {
+    if (!script_text || !block_name || !entries || !out_count) return false;
+    *out_count = 0;
+    const char *io = strstr(script_text, block_name);
+    if (!io) return true;
+    const char *list_start = strchr(io, '{');
+    if (!list_start) {
+        sketch_script_parse_error(out_error, "io block missing '{'.");
+        return false;
+    }
+    const char *list_end = NULL;
+    if (!sketch_script_find_matching_brace(list_start, &list_end)) {
+        sketch_script_parse_error(out_error, "io block missing matching '}'.");
+        return false;
+    }
+
+    const char *p = list_start + 1;
+    const char *cursor = p;
+    while (p < list_end) {
+        while (p < list_end && *p != '{') p++;
+        if (p >= list_end) break;
+        if (!sketch_script_parse_delimiter_segment_ok(cursor, p)) {
+            sketch_script_parse_error(out_error, "Unexpected token in io block.");
+            return false;
+        }
+        const char *entry_end = NULL;
+        if (!sketch_script_find_matching_brace(p, &entry_end) || entry_end > list_end) {
+            sketch_script_parse_error(out_error, "io entry missing matching '}'.");
+            return false;
+        }
+        if (*out_count >= max_entries) {
+            sketch_script_parse_error(out_error, "too many io entries in script model.");
+            return false;
+        }
+
+        size_t entry_len = (size_t)(entry_end - p + 1);
+        char entry[1024];
+        if (entry_len >= sizeof(entry)) {
+            sketch_script_parse_error(out_error, "io declaration too large.");
+            return false;
+        }
+        memcpy(entry, p, entry_len);
+        entry[entry_len] = '\0';
+
+        sketch_script_io_model_t *dst = &entries[*out_count];
+        memset(dst, 0, sizeof(*dst));
+        if (!sketch_script_parse_id_field(entry, dst->id, sizeof(dst->id))) {
+            sketch_script_parse_error(out_error, "io declaration requires id.");
+            return false;
+        }
+        if (!sketch_script_parse_numeric_named(entry, "value", &dst->value)) {
+            sketch_script_parse_error(out_error, "io value must be numeric.");
+            return false;
+        }
+        dst->has_min = sketch_script_parse_numeric_named(entry, "min", &dst->min_value);
+        dst->has_max = sketch_script_parse_numeric_named(entry, "max", &dst->max_value);
+        dst->has_step = sketch_script_parse_numeric_named(entry, "step", &dst->step_value);
+        (*out_count)++;
+        p = entry_end + 1;
+        cursor = p;
+    }
+    if (!sketch_script_parse_delimiter_segment_ok(cursor, list_end)) {
+        sketch_script_parse_error(out_error, "Unexpected token in io block.");
         return false;
     }
     return true;
@@ -424,6 +539,18 @@ static inline bool sketch_script_parse_model(const char *script_text,
         return false;
     }
     memset(out_model, 0, sizeof(*out_model));
+    if (!sketch_script_parse_io_block(script_text,
+                                      "inputs",
+                                      out_model->inputs,
+                                      SKETCH_SCRIPT_MODEL_MAX_INPUTS,
+                                      &out_model->input_count,
+                                      out_error)) return false;
+    if (!sketch_script_parse_io_block(script_text,
+                                      "outputs",
+                                      out_model->outputs,
+                                      SKETCH_SCRIPT_MODEL_MAX_OUTPUTS,
+                                      &out_model->output_count,
+                                      out_error)) return false;
     if (!sketch_script_parse_entities_block(script_text, out_model, out_error)) return false;
     if (!sketch_script_parse_constraints_block(script_text, out_model, out_error)) return false;
     return true;
