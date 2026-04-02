@@ -111,7 +111,11 @@ Plans:
   1. Project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
   2. v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
   3. macOS parity validation is executed after Windows gate pass and results are recorded.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 15-01-PLAN.md — Package VAL-01 case-study evidence (2 sketch workflows + 1 Script IO parse/apply/reset/diagnostics scenario) and map it in validation docs.
+- [ ] 15-02-PLAN.md — Run mandatory Windows build+ctest gates and capture explicit evidence artifacts, then finalize closure summary for VAL-02.
+- [ ] 15-03-PLAN.md — Record explicit VAL-03 deferred traceability across validation/summary/checkpoint closure artifacts.
 
 ### Phase 16: Constraint UX Closure & Verification
 **Goal**: Close outstanding Phase 11 audit gaps by hardening constraint glyph selection behavior and producing complete Phase 11 verification/validation evidence.
