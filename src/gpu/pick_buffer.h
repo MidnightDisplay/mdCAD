@@ -173,6 +173,24 @@ static inline void pick_buffer_layer_record_overlay_point(pick_buffer_layer_even
     (*io_count)++;
 }
 
+static inline uint32_t pick_buffer_resolve_preferred_pick(const pick_buffer_layer_event_t *events,
+                                                          int event_count) {
+    if (!events || event_count <= 0) return 0;
+
+    // Last overlay event wins; if there is no overlay, last base event wins.
+    for (int i = event_count - 1; i >= 0; i--) {
+        if (events[i].layer == PICK_BUFFER_LAYER_OVERLAY && events[i].pick_id != 0) {
+            return events[i].pick_id;
+        }
+    }
+    for (int i = event_count - 1; i >= 0; i--) {
+        if (events[i].layer == PICK_BUFFER_LAYER_BASE && events[i].pick_id != 0) {
+            return events[i].pick_id;
+        }
+    }
+    return 0;
+}
+
 //------------------------------------------------------------------------------
 // Internal: Generate template geometry
 //------------------------------------------------------------------------------
