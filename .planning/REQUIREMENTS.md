@@ -47,6 +47,21 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
 - [x] **VAL-03**: macOS parity validation deferment is explicitly recorded after Windows gate pass with follow-up handoff for subsequent closure.
 
+### Constraint-driven Geometry Solving (Phase 17)
+
+- [x] **D-01**: Recalculate validates full active sketch constraints before committing geometry updates.
+- [x] **D-02**: Successful solve attempts apply resulting geometry updates atomically and immediately.
+- [ ] **D-03**: Drag interactions use live constrained solve projection when satisfiable.
+- [ ] **D-04**: Unsatisfiable drag keeps last valid solved state and surfaces immediate feedback.
+- [x] **D-05**: Contradictory solves fail deterministically with no scene mutation and stable implication payload.
+- [ ] **D-06**: Solver diagnostics dedupe identical consecutive entries while preserving append order.
+- [ ] **D-07**: Live solve path uses bounded per-frame budget with graceful degradation contract.
+- [x] **D-08**: Deterministic solver regression fixtures are wired as automated acceptance gates.
+- [x] **D-09**: Constraint participant representation supports endpoint/sub-entity metadata.
+- [x] **D-10**: Endpoint controls are first-class selectable/pickable participants for Coincident authoring.
+- [x] **D-11**: Coincident authoring supports endpoint-to-endpoint participant semantics through direct selection model.
+- [ ] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
+
 ## v1.3+ Requirements (Deferred)
 
 ### Platform Expansion
@@ -102,10 +117,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-01 | Phase 15 | Complete |
 | VAL-02 | Phase 15 | Complete |
 | VAL-03 | Phase 15 | Complete |
+| D-01 | Phase 17 | In Progress |
+| D-02 | Phase 17 | In Progress |
+| D-03 | Phase 17 | In Progress |
+| D-04 | Phase 17 | In Progress |
+| D-05 | Phase 17 | In Progress |
+| D-06 | Phase 17 | In Progress |
+| D-07 | Phase 17 | In Progress |
+| D-08 | Phase 17 | In Progress |
+| D-09 | Phase 17 | In Progress |
+| D-10 | Phase 17 | In Progress |
+| D-11 | Phase 17 | In Progress |
+| D-12 | Phase 17 | In Progress |
 
 **Coverage:**
-- v1.2 requirements: 25 total
-- Mapped to phases: 25 ✅
+- v1.2 requirements: 37 total
+- Mapped to phases: 37 ✅
 - Unmapped: 0 ✅
 
 ---

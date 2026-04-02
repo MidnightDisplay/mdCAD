@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 17 planned
-last_updated: "2026-04-02T16:39:00.996Z"
+status: executing
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-02T17:10:06.863Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 23
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -20,15 +20,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 15 — validation-and-acceptance-closure
+**Current focus:** Phase 17 — constraint-driven-geometry-solving
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 17 (constraint-driven-geometry-solving) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-02
 
 ## Milestone Scope
@@ -63,6 +63,7 @@ Next command: `/gsd-plan-phase 15`
 | Phase 15 P01 | 8 min | 2 tasks | 7 files |
 | Phase 15 P02 | 6 min | 2 tasks | 5 files |
 | Phase 15 P03 | 7 min | 2 tasks | 3 files |
+| Phase 17 P01 | 11 min | 2 tasks | 7 files |
 
 ## Decisions
 
@@ -102,6 +103,8 @@ Next command: `/gsd-plan-phase 15`
 - [Phase 14]: Added dedicated Script IO window launch path from SketchManager and completed transactional live-apply UX closure.
 - [Phase 14]: Stabilized Script IO UAT loop with fixes for buffer sizing, label persistence, startup undo suppression, clipboard/hotkeys, and IO interaction undo coalescing.
 - [Roadmap]: Phase 17 added — Constraint-driven geometry solving (true constraint solve and geometry update behavior).
+- [Phase 17]: Phase 17 Wave-0 tests are native C executables registered as first-class CTest targets.
+- [Phase 17]: Recalculate now performs transactional candidate staging and only commits geometry on full success.
 
 ## Blockers
 
@@ -109,6 +112,6 @@ Next command: `/gsd-plan-phase 15`
 
 ## Session
 
-**Last Date:** 2026-04-02T16:39:00.992Z
-**Stopped At:** Phase 17 planned
-**Resume File:** .planning/phases/17-constraint-driven-geometry-solving/17-01-PLAN.md
+**Last Date:** 2026-04-02T17:10:06.859Z
+**Stopped At:** Completed 17-01-PLAN.md
+**Resume File:** None
