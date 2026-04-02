@@ -659,7 +659,7 @@ static int test_script_io_rejects_non_numeric(void) {
     return strstr(err.message, "numeric") != NULL ? 0 : 1;
 }
 
-static int test_scene_script_io_apply_uses_transactional_apply(void) {
+static int test_script_io_live_edit_uses_transaction_pipeline(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
     undo_redo_t undo_redo = {0};
@@ -695,6 +695,19 @@ static int test_scene_script_io_apply_uses_transactional_apply(void) {
         return 1;
     }
 
+    double value_before = 0.0;
+    bool is_input_before = false;
+    if (!scene_script_io_read_value(&scene, sketch, "input_length", &value_before, &is_input_before)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!is_input_before || value_before != 10.0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
     int undo_before = undo_redo_get_undo_count(&undo_redo);
     if (!scene_script_io_apply_input_value(&scene, sketch, "input_length", 12.5, &err)) {
         undo_redo_shutdown(&undo_redo);
@@ -702,9 +715,63 @@ static int test_scene_script_io_apply_uses_transactional_apply(void) {
         return 1;
     }
     int undo_after = undo_redo_get_undo_count(&undo_redo);
+
+    double value_after = 0.0;
+    bool is_input_after = false;
+    if (!scene_script_io_read_value(&scene, sketch, "input_length", &value_after, &is_input_after)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!is_input_after || value_after != 12.5) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (scene_script_io_apply_input_value(&scene, sketch, "missing_input", 99.0, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    double value_after_failed_edit = 0.0;
+    bool is_input_after_failed_edit = false;
+    if (!scene_script_io_read_value(&scene, sketch, "input_length", &value_after_failed_edit, &is_input_after_failed_edit)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
     undo_redo_shutdown(&undo_redo);
     ecs_world_shutdown(&world);
-    return (undo_after - undo_before) == 1 ? 0 : 1;
+    return (undo_after - undo_before) == 1 &&
+           is_input_after_failed_edit &&
+           value_after_failed_edit == 12.5 ? 0 : 1;
+}
+
+static int test_script_io_window_request_is_exposed_from_inspector_state(void) {
+    selection_buffer_t selection = {0};
+    ecs_world_state_t world = {0};
+    ui_entity_inspector_state_t inspector = {0};
+    ui_entity_inspector_init(&inspector, &selection, &world);
+
+    ecs_entity_t requested = 0;
+    if (ui_entity_inspector_consume_script_io_open_request(&inspector, &requested)) {
+        return 1;
+    }
+
+    ui_entity_inspector_request_script_io(&inspector, (ecs_entity_t)77);
+    if (!ui_entity_inspector_consume_script_io_open_request(&inspector, &requested)) {
+        return 1;
+    }
+    if (requested != (ecs_entity_t)77) {
+        return 1;
+    }
+    if (ui_entity_inspector_consume_script_io_open_request(&inspector, &requested)) {
+        return 1;
+    }
+    return 0;
 }
 
 static int test_script_editor_launch_request_is_exposed_from_inspector_state(void) {
@@ -860,7 +927,8 @@ int main(void) {
     if (test_script_apply_failure_preserves_last_valid_state() != 0) return 1;
     if (test_script_io_numeric_schema_roundtrip() != 0) return 1;
     if (test_script_io_rejects_non_numeric() != 0) return 1;
-    if (test_scene_script_io_apply_uses_transactional_apply() != 0) return 1;
+    if (test_script_io_live_edit_uses_transaction_pipeline() != 0) return 1;
+    if (test_script_io_window_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
     if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
