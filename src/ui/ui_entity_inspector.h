@@ -38,6 +38,8 @@ typedef struct {
     bool active_sketch_workspace_open;
     ecs_entity_t script_editor_sketch;
     bool script_editor_open_requested;
+    ecs_entity_t script_io_sketch;
+    bool script_io_open_requested;
 
     // Cached values for drag operations (to capture old value at drag start)
     ecs_entity_t editing_entity;
@@ -68,6 +70,8 @@ static inline void ui_entity_inspector_init(ui_entity_inspector_state_t *state,
     state->active_sketch_workspace_open = false;
     state->script_editor_sketch = 0;
     state->script_editor_open_requested = false;
+    state->script_io_sketch = 0;
+    state->script_io_open_requested = false;
 }
 
 static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t *state,
@@ -92,6 +96,21 @@ static inline bool ui_entity_inspector_consume_script_editor_open_request(ui_ent
     if (!state || !state->script_editor_open_requested || state->script_editor_sketch == 0) return false;
     if (out_sketch) *out_sketch = state->script_editor_sketch;
     state->script_editor_open_requested = false;
+    return true;
+}
+
+static inline void ui_entity_inspector_request_script_io(ui_entity_inspector_state_t *state,
+                                                         ecs_entity_t sketch) {
+    if (!state || sketch == 0) return;
+    state->script_io_sketch = sketch;
+    state->script_io_open_requested = true;
+}
+
+static inline bool ui_entity_inspector_consume_script_io_open_request(ui_entity_inspector_state_t *state,
+                                                                       ecs_entity_t *out_sketch) {
+    if (!state || !state->script_io_open_requested || state->script_io_sketch == 0) return false;
+    if (out_sketch) *out_sketch = state->script_io_sketch;
+    state->script_io_open_requested = false;
     return true;
 }
 
@@ -987,6 +1006,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igSameLine(0, 8);
         if (igButton("Open Script Editor##sketch_script_editor_open", (ImVec2){0, 0})) {
             ui_entity_inspector_request_script_editor(state, e);
+        }
+        igSameLine(0, 8);
+        if (igButton("Open Script IO##sketch_script_io_open", (ImVec2){0, 0})) {
+            ui_entity_inspector_request_script_io(state, e);
         }
 
         igDummy((ImVec2){0.0f, 8.0f});

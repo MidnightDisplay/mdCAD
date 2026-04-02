@@ -134,6 +134,10 @@ static struct {
     char script_editor_text[16384];
     char script_editor_committed_text[16384];
     sketch_script_error_t script_editor_last_error;
+    ecs_entity_t script_io_sketch;
+    bool script_io_open;
+    uint64_t script_io_last_seen_emit_revision;
+    sketch_script_error_t script_io_last_error;
 } state;
 
 static void mdcad_script_editor_clear_error(void) {
@@ -141,6 +145,12 @@ static void mdcad_script_editor_clear_error(void) {
     state.script_editor_last_error.column = 0;
     state.script_editor_last_error.message[0] = '\0';
     state.script_editor_last_apply_failed = false;
+}
+
+static void mdcad_script_io_clear_error(void) {
+    state.script_io_last_error.line = 0;
+    state.script_io_last_error.column = 0;
+    state.script_io_last_error.message[0] = '\0';
 }
 
 static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool overwrite_text) {
@@ -175,6 +185,14 @@ static void mdcad_script_editor_open_for_sketch(ecs_entity_t sketch) {
     state.script_editor_text[0] = '\0';
     state.script_editor_committed_text[0] = '\0';
     mdcad_script_editor_load_emitted_script(sketch, true);
+}
+
+static void mdcad_script_io_open_for_sketch(ecs_entity_t sketch) {
+    if (sketch == 0) return;
+    state.script_io_sketch = sketch;
+    state.script_io_open = true;
+    state.script_io_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
+    mdcad_script_io_clear_error();
 }
 
 static void mdcad_draw_script_editor_window(void) {
@@ -319,6 +337,121 @@ static void mdcad_draw_script_editor_window(void) {
             igCloseCurrentPopup();
         }
         igEndPopup();
+    }
+}
+
+static void mdcad_draw_script_io_window(void) {
+    ecs_entity_t requested_sketch = 0;
+    if (ui_entity_inspector_consume_script_io_open_request(&state.entity_inspector, &requested_sketch)) {
+        mdcad_script_io_open_for_sketch(requested_sketch);
+    }
+
+    if (!state.script_io_open || state.script_io_sketch == 0) return;
+    if (!ecs_is_alive(state.ecs_world.world, state.script_io_sketch)) {
+        state.script_io_open = false;
+        state.script_io_sketch = 0;
+        return;
+    }
+
+    bool open = state.script_io_open;
+    igSetNextWindowSize((ImVec2){520.0f, 420.0f}, ImGuiCond_FirstUseEver);
+    if (igBegin("Script IO", &open, ImGuiWindowFlags_None)) {
+        LabelComp *label = ecs_world_get_label(&state.ecs_world, state.script_io_sketch);
+        const char *sketch_name = (label && label->name[0]) ? label->name : "Sketch";
+        igText("Sketch: %s (#%llu)", sketch_name, (unsigned long long)state.script_io_sketch);
+        igDummy((ImVec2){0.0f, 8.0f});
+
+        int descriptor_count = scene_script_io_descriptor_count(&state.ecs_scene, state.script_io_sketch);
+        if (descriptor_count <= 0) {
+            igTextDisabled("No script IO inputs/outputs available for this sketch.");
+        } else {
+            igTextDisabled("Inputs");
+            for (int i = 0; i < descriptor_count; i++) {
+                scene_script_io_descriptor_t desc = {0};
+                if (!scene_script_io_descriptor_at(&state.ecs_scene, state.script_io_sketch, i, &desc)) continue;
+                if (!desc.is_input) continue;
+
+                igPushID_Int(i);
+                igText("%s", desc.id);
+
+                double edited_value = desc.value;
+                bool changed = false;
+                if (desc.has_min && desc.has_max) {
+                    float slider_value = (float)edited_value;
+                    if (igSliderFloat("##script_io_input_slider",
+                                      &slider_value,
+                                      (float)desc.min_value,
+                                      (float)desc.max_value,
+                                      "%.6g",
+                                      ImGuiSliderFlags_None)) {
+                        edited_value = (double)slider_value;
+                        changed = true;
+                    }
+                }
+
+                double step = desc.has_step ? desc.step_value : 0.0;
+                if (igInputDouble("##script_io_input_value",
+                                  &edited_value,
+                                  step,
+                                  step > 0.0 ? step * 10.0 : 0.0,
+                                  "%.6f",
+                                  ImGuiInputTextFlags_None)) {
+                    changed = true;
+                }
+
+                if (changed) {
+                    sketch_script_error_t apply_error = {0};
+                    if (scene_script_io_apply_input_value(&state.ecs_scene,
+                                                          state.script_io_sketch,
+                                                          desc.id,
+                                                          edited_value,
+                                                          &apply_error)) {
+                        state.script_io_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
+                        mdcad_script_io_clear_error();
+                    } else {
+                        state.script_io_last_error = apply_error;
+                    }
+                }
+                igPopID();
+            }
+
+            igDummy((ImVec2){0.0f, 8.0f});
+            igSeparator();
+            igDummy((ImVec2){0.0f, 8.0f});
+            igTextDisabled("Outputs");
+            for (int i = 0; i < descriptor_count; i++) {
+                scene_script_io_descriptor_t desc = {0};
+                if (!scene_script_io_descriptor_at(&state.ecs_scene, state.script_io_sketch, i, &desc)) continue;
+                if (desc.is_input) continue;
+
+                igPushID_Int(10000 + i);
+                igText("%s", desc.id);
+                double output_value = desc.value;
+                igBeginDisabled(true);
+                igInputDouble("##script_io_output_value",
+                              &output_value,
+                              0.0,
+                              0.0,
+                              "%.6f",
+                              ImGuiInputTextFlags_ReadOnly);
+                igEndDisabled();
+                igPopID();
+            }
+        }
+
+        igDummy((ImVec2){0.0f, 8.0f});
+        igTextDisabled("Diagnostics");
+        if (state.script_io_last_error.message[0]) {
+            igTextWrapped("%s", state.script_io_last_error.message);
+        } else {
+            igTextDisabled("No errors");
+        }
+    }
+    igEnd();
+
+    if (!open) {
+        state.script_io_open = false;
+        state.script_io_sketch = 0;
     }
 }
 
@@ -882,6 +1015,10 @@ static void init(void) {
     state.script_editor_text[0] = '\0';
     state.script_editor_committed_text[0] = '\0';
     mdcad_script_editor_clear_error();
+    state.script_io_sketch = 0;
+    state.script_io_open = false;
+    state.script_io_last_seen_emit_revision = 0;
+    mdcad_script_io_clear_error();
 
     // Create test ECS entities using the scene API
     {
@@ -1054,6 +1191,7 @@ static void frame(void) {
         ui_scene_hierarchy_draw(&state.scene_hierarchy);
         ui_slot_buffer_debug_draw(&state.slot_buffer_debug);
         mdcad_draw_script_editor_window();
+        mdcad_draw_script_io_window();
 
         // Update and draw FPS debug (updates every frame, draws if visible)
         ui_fps_debug_update(&state.fps_debug);
