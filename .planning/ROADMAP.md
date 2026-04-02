@@ -16,7 +16,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 - [ ] **Phase 11: Constraint Authoring UX** - Users can author, inspect, and edit legal constraints through manager and viewport workflows.
 - [x] **Phase 12: Solver Control & Constrained Interaction** - Users can control solving, read diagnostics, and manipulate geometry with constraints respected. (completed 2026-04-01)
 - [x] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime. (completed 2026-04-01)
-- [ ] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional.
+- [x] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional. (completed 2026-04-02)
 - [ ] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance.
 - [x] **Phase 16: Constraint UX Closure & Verification** - Teams close Phase 11 audit gaps, harden glyph-selection highlighting behavior, and produce complete verification evidence. (completed 2026-04-01)
 
@@ -100,7 +100,7 @@ Plans:
 Plans:
 - [x] 14-01-PLAN.md — Add script-transaction undo command and atomic apply rollback guarantees.
 - [x] 14-02-PLAN.md — Implement numeric script IO schema and scene-level IO façade APIs.
-- [ ] 14-03-PLAN.md — Wire dedicated Script IO window with live transactional auto-apply and UX verification.
+- [x] 14-03-PLAN.md — Wire dedicated Script IO window with live transactional auto-apply and UX verification.
 **UI hint**: yes
 
 ### Phase 15: Validation & Acceptance Closure
@@ -134,6 +134,6 @@ Plans:
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
 | 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 3/3 | Complete   | 2026-04-01 |
-| 14. Script IO + API/Undo Integration | 2/3 | In Progress|  |
+| 14. Script IO + API/Undo Integration | 3/3 | Complete    | 2026-04-02 |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |

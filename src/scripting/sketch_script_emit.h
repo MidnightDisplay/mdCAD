@@ -336,7 +336,7 @@ static inline bool scene_script_emit_for_sketch(ecs_scene_t *scene,
 }
 
 static inline bool scene_script_reemit_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch) {
-    char sink[4096] = {0};
+    char sink[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
     sketch_script_error_t err = {0};
     bool ok = scene_script_emit_for_sketch(scene, sketch, sink, sizeof(sink), &err);
     if (ok && scene) {

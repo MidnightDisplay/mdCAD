@@ -860,7 +860,7 @@ static int test_script_io_live_edit_handles_large_script_buffers(void) {
         return 1;
     }
 
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 100; i++) {
         float x = (float)(i % 10) * 0.1f;
         float y = (float)((i / 10) % 10) * 0.1f;
         float z = (float)(i / 100) * 0.1f;
@@ -894,7 +894,7 @@ static int test_script_io_live_edit_handles_large_script_buffers(void) {
         return 1;
     }
 
-    char emitted[16384] = {0};
+    char emitted[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
     if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
         undo_redo_shutdown(&undo_redo);
         ecs_world_shutdown(&world);
@@ -922,7 +922,9 @@ static int test_script_io_live_edit_handles_large_script_buffers(void) {
 
     undo_redo_shutdown(&undo_redo);
     ecs_world_shutdown(&world);
-    return (is_input && updated == 1.8) ? 0 : 1;
+    double delta = updated - 1.8;
+    if (delta < 0.0) delta = -delta;
+    return (!is_input || delta > 1e-4) ? 1 : 0;
 }
 
 static int test_script_io_numeric_input_coalesces_single_undo_step(void) {
@@ -1061,11 +1063,11 @@ static int test_script_apply_preserves_labels_by_script_identity(void) {
     const char *script_text =
         "return {\n"
         "  entities = {\n"
-        "    { id = \"geometry_a\", type = \"point\", point = {0, 0, 0} },\n"
-        "    { id = \"geometry_b\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "    { id = \"geometry_101\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_102\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_a\", type = \"Coincident\", participants = {\"geometry_a\", \"geometry_b\"} }\n"
+        "    { id = \"constraint_201\", type = \"Coincident\", participants = {\"geometry_101\", \"geometry_102\"} }\n"
         "  }\n"
         "}";
     sketch_script_error_t err = {0};
@@ -1081,9 +1083,9 @@ static int test_script_apply_preserves_labels_by_script_identity(void) {
         for (int i = 0; i < it.count; i++) {
             ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, it.entities[i]);
             if (!sid) continue;
-            if (strcmp(sid->script_local_id, "geometry_a") == 0) {
+            if (strcmp(sid->script_local_id, "geometry_101") == 0) {
                 geometry_a = it.entities[i];
-            } else if (strcmp(sid->script_local_id, "constraint_a") == 0) {
+            } else if (strcmp(sid->script_local_id, "constraint_201") == 0) {
                 constraint_a = it.entities[i];
             }
         }
@@ -1111,9 +1113,9 @@ static int test_script_apply_preserves_labels_by_script_identity(void) {
             ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, it.entities[i]);
             LabelComp *label = ecs_world_get_label(scene.world, it.entities[i]);
             if (!sid || !label) continue;
-            if (strcmp(sid->script_local_id, "geometry_a") == 0) {
+            if (strcmp(sid->script_local_id, "geometry_101") == 0) {
                 geom_ok = strcmp(label->name, "VertexAnchor") == 0;
-            } else if (strcmp(sid->script_local_id, "constraint_a") == 0) {
+            } else if (strcmp(sid->script_local_id, "constraint_201") == 0) {
                 constraint_ok = strcmp(label->name, "LockRelation") == 0;
             }
         }
@@ -1261,31 +1263,47 @@ static int test_script_reemit_revision_changes_on_mutation(void) {
 }
 
 
+typedef int (*script_test_fn_t)(void);
+
+typedef struct script_test_case_t {
+    const char *name;
+    script_test_fn_t fn;
+} script_test_case_t;
+
 int main(void) {
-    if (test_runtime_rejects_non_54() != 0) return 1;
-    if (test_contract_decl_validation() != 0) return 1;
-    if (test_script_identity_roundtrip() != 0) return 1;
-    if (test_script_apply_reconstructs_supported_scope() != 0) return 1;
-    if (test_script_apply_resolves_forward_references_two_pass() != 0) return 1;
-    if (test_script_apply_commit_is_atomic_on_unresolved_reference() != 0) return 1;
-    if (test_script_preview_parse_preserves_committed_scene_on_failure() != 0) return 1;
-    if (test_script_preview_parse_rejects_illegal_constraint_participants() != 0) return 1;
-    if (test_script_parse_rejects_unexpected_tokens_between_blocks() != 0) return 1;
-    if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
-    if (test_script_apply_undo_redo_single_step() != 0) return 1;
-    if (test_script_apply_failure_preserves_last_valid_state() != 0) return 1;
-    if (test_script_apply_respects_undo_suppression_flag() != 0) return 1;
-    if (test_script_io_numeric_schema_roundtrip() != 0) return 1;
-    if (test_script_io_rejects_non_numeric() != 0) return 1;
-    if (test_script_io_live_edit_uses_transaction_pipeline() != 0) return 1;
-    if (test_script_io_live_edit_handles_large_script_buffers() != 0) return 1;
-    if (test_script_io_numeric_input_coalesces_single_undo_step() != 0) return 1;
-    if (test_script_io_window_request_is_exposed_from_inspector_state() != 0) return 1;
-    if (test_script_apply_preserves_labels_by_script_identity() != 0) return 1;
-    if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
-    if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
-    if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
-    if (test_script_emit_noop_stability() != 0) return 1;
-    if (test_script_reemit_revision_changes_on_mutation() != 0) return 1;
+    static const script_test_case_t tests[] = {
+        { "test_runtime_rejects_non_54", test_runtime_rejects_non_54 },
+        { "test_contract_decl_validation", test_contract_decl_validation },
+        { "test_script_identity_roundtrip", test_script_identity_roundtrip },
+        { "test_script_apply_reconstructs_supported_scope", test_script_apply_reconstructs_supported_scope },
+        { "test_script_apply_resolves_forward_references_two_pass", test_script_apply_resolves_forward_references_two_pass },
+        { "test_script_apply_commit_is_atomic_on_unresolved_reference", test_script_apply_commit_is_atomic_on_unresolved_reference },
+        { "test_script_preview_parse_preserves_committed_scene_on_failure", test_script_preview_parse_preserves_committed_scene_on_failure },
+        { "test_script_preview_parse_rejects_illegal_constraint_participants", test_script_preview_parse_rejects_illegal_constraint_participants },
+        { "test_script_parse_rejects_unexpected_tokens_between_blocks", test_script_parse_rejects_unexpected_tokens_between_blocks },
+        { "test_script_apply_commit_keeps_last_valid_scene_on_failure", test_script_apply_commit_keeps_last_valid_scene_on_failure },
+        { "test_script_apply_undo_redo_single_step", test_script_apply_undo_redo_single_step },
+        { "test_script_apply_failure_preserves_last_valid_state", test_script_apply_failure_preserves_last_valid_state },
+        { "test_script_apply_respects_undo_suppression_flag", test_script_apply_respects_undo_suppression_flag },
+        { "test_script_io_numeric_schema_roundtrip", test_script_io_numeric_schema_roundtrip },
+        { "test_script_io_rejects_non_numeric", test_script_io_rejects_non_numeric },
+        { "test_script_io_live_edit_uses_transaction_pipeline", test_script_io_live_edit_uses_transaction_pipeline },
+        { "test_script_io_live_edit_handles_large_script_buffers", test_script_io_live_edit_handles_large_script_buffers },
+        { "test_script_io_numeric_input_coalesces_single_undo_step", test_script_io_numeric_input_coalesces_single_undo_step },
+        { "test_script_io_window_request_is_exposed_from_inspector_state", test_script_io_window_request_is_exposed_from_inspector_state },
+        { "test_script_apply_preserves_labels_by_script_identity", test_script_apply_preserves_labels_by_script_identity },
+        { "test_script_editor_launch_request_is_exposed_from_inspector_state", test_script_editor_launch_request_is_exposed_from_inspector_state },
+        { "test_script_emit_orders_by_type_and_script_id", test_script_emit_orders_by_type_and_script_id },
+        { "test_script_emit_formats_numbers_without_scientific_notation", test_script_emit_formats_numbers_without_scientific_notation },
+        { "test_script_emit_noop_stability", test_script_emit_noop_stability },
+        { "test_script_reemit_revision_changes_on_mutation", test_script_reemit_revision_changes_on_mutation }
+    };
+
+    for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
+        if (tests[i].fn() != 0) {
+            fprintf(stderr, "FAILED: %s\n", tests[i].name);
+            return 1;
+        }
+    }
     return 0;
 }

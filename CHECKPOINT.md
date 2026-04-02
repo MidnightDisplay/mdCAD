@@ -207,7 +207,34 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
-## Most Recent Changes (2026-04-01)
+## Most Recent Changes (2026-04-02)
+
+### Phase 14 Script IO + API/Undo Integration Closure (IMPLEMENTED)
+
+- Completed Phase 14 plan `14-03` and closed Phase 14 (3/3 plans complete).
+- Delivered dedicated Script IO UX path:
+  - `Open Script IO` launch control beside `Open Script Editor` in SketchManager.
+  - Dedicated Script IO window lifecycle and rendering in app loop (`src/app.c`).
+- Stabilized transactional Script IO behavior from UAT loop:
+  - Startup Script IO seed now suppresses undo baseline noise.
+  - Live IO slider and numeric edits coalesce to one interaction-level undo transaction.
+  - Invalid IO edits preserve last-valid scene/script and surface diagnostics.
+  - Restored cross-platform clipboard/undo shortcut behavior (`Ctrl`/`Cmd` path handling).
+- Fixed script IO scaling and persistence edge cases:
+  - Replaced `scene_script_reemit_for_sketch` fixed 4096 sink with shared script buffer contract (`src/scripting/sketch_script_emit.h`).
+  - Preserved labels across script apply rebuild keyed by script identity (`src/scripting/sketch_script_apply.h`).
+  - Stabilized large-script live-edit regression fixture to remain within parser model limits while keeping >4096 coverage (`src/tests/script_roundtrip_tests.c`).
+- Validation/build evidence (Windows MSVC + Vulkan):
+  - `cmake --build build-vulkan --config Release --target script_roundtrip_tests` passed.
+  - `ctest --test-dir build-vulkan -C Release -R script_roundtrip_tests --output-on-failure` passed.
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure` passed.
+  - `cmake --build build-vulkan --config Release --target mdCAD` passed.
+- Added phase closure artifact:
+  - `.planning/phases/14-script-io-api-undo-integration/14-03-SUMMARY.md`
+- Updated planning state for next phase kickoff:
+  - `.planning/ROADMAP.md` marks Phase 14 complete.
+  - `.planning/STATE.md` advances focus to Phase 15 and updates progress counters.
+  - `.planning/phases/14-script-io-api-undo-integration/14-VALIDATION.md` marked complete.
 
 ### Phase 16 Constraint UX Closure + Verification Debt Burn-Down (IMPLEMENTED)
 
