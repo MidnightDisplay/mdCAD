@@ -43,8 +43,8 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
 - [x] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
 - [x] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
-- [ ] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
-- [ ] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
+- [x] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
+- [x] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
 - [ ] **VAL-03**: macOS parity validation is executed after Windows gate pass and results are recorded.
 
 ## v1.3+ Requirements (Deferred)
@@ -99,8 +99,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-01 | Phase 14 | Complete |
 | API-02 | Phase 14 | Complete |
 | API-03 | Phase 12 | Complete |
-| VAL-01 | Phase 15 | Pending |
-| VAL-02 | Phase 15 | Pending |
+| VAL-01 | Phase 15 | Complete |
+| VAL-02 | Phase 15 | Complete |
 | VAL-03 | Phase 15 | Pending |
 
 **Coverage:**

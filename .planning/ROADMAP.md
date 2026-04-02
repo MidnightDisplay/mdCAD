@@ -113,8 +113,8 @@ Plans:
   3. macOS parity validation is executed after Windows gate pass and results are recorded.
 **Plans**: 3 plans
 Plans:
-- [ ] 15-01-PLAN.md — Package VAL-01 case-study evidence (2 sketch workflows + 1 Script IO parse/apply/reset/diagnostics scenario) and map it in validation docs.
-- [ ] 15-02-PLAN.md — Run mandatory Windows build+ctest gates and capture explicit evidence artifacts, then finalize closure summary for VAL-02.
+- [x] 15-01-PLAN.md — Package VAL-01 case-study evidence (2 sketch workflows + 1 Script IO parse/apply/reset/diagnostics scenario) and map it in validation docs.
+- [x] 15-02-PLAN.md — Run mandatory Windows build+ctest gates and capture explicit evidence artifacts, then finalize closure summary for VAL-02.
 - [ ] 15-03-PLAN.md — Record explicit VAL-03 deferred traceability across validation/summary/checkpoint closure artifacts.
 
 ### Phase 16: Constraint UX Closure & Verification
@@ -139,5 +139,5 @@ Plans:
 | 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 3/3 | Complete   | 2026-04-01 |
 | 14. Script IO + API/Undo Integration | 3/3 | Complete    | 2026-04-02 |
-| 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
+| 15. Validation & Acceptance Closure | 2/3 | In Progress|  |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |
