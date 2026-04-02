@@ -40,7 +40,8 @@ created: 2026-04-02
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 15-01-01 | 01 | 1 | VAL-01 | manual/doc + artifact audit | `cmake --build build-vulkan --config Release --target mdCAD` | ✅ | ✅ green |
 | 15-01-02 | 01 | 1 | VAL-01 | validation mapping | `git --no-pager grep -n "sketch-01-constraint-debug\\|sketch-02-driven-dimensions\\|script-io-scenario-01-parse-apply-reset-diagnostics" .planning/phases/15-validation-and-acceptance-closure/15-VALIDATION.md` | ✅ | ✅ green |
-| 15-02-01 | 02 | 2 | VAL-02 | full suite gate | `ctest --test-dir build-vulkan -C Release --output-on-failure` | ❌ W0 | ⬜ pending |
+| 15-02-01 | 02 | 2 | VAL-02 | build gate evidence | `cmake --build build-vulkan --config Release --target mdCAD` | ✅ | ✅ green |
+| 15-02-02 | 02 | 2 | VAL-02 | full suite gate evidence | `ctest --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
 | 15-03-01 | 03 | 3 | VAL-03 | deferred-traceability | `N/A (deferred by Phase 15 decision)` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -50,8 +51,8 @@ created: 2026-04-02
 ## Wave 0 Requirements
 
 - [ ] `.planning/phases/15-validation-and-acceptance-closure/15-03-SUMMARY.md` — phase closure narrative with requirement-level outcomes.
-- [ ] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt` — Release `mdCAD` build output evidence.
-- [ ] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt` — full CTest output evidence.
+- [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt` — Release `mdCAD` build output evidence.
+- [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt` — full CTest output evidence.
 - [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/` — two sketch case studies + one Script IO scenario with reproducible steps.
 - [ ] `CHECKPOINT.md` — update continuity entry with Phase 15 outcomes.
 
@@ -78,6 +79,27 @@ Verification commands:
 - `git --no-pager grep -n "parse/apply/reset" .planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/script-io-scenario-01-parse-apply-reset-diagnostics/README.md`
 
 Status: ✅ complete (artifact package created and mapped)
+
+### VAL-02 — Windows MSVC + Vulkan acceptance gates
+
+Required commands per D-03/D-04 and recorded outcomes:
+
+1. Build gate command:
+   - `cmake --build build-vulkan --config Release --target mdCAD`
+   - Evidence: `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt`
+   - Anchor: `mdCAD.vcxproj -> C:\dev\mdCAD\build-vulkan\bin\Release\mdCAD.exe`
+   - Exit code: `0`
+
+2. Full suite command:
+   - `ctest --test-dir build-vulkan -C Release --output-on-failure`
+   - Evidence: `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt`
+   - Anchor: `100% tests passed, 0 tests failed out of 1`
+   - Exit code: `0`
+
+Provenance:
+- `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/provenance.md`
+
+Status: ✅ complete (both mandatory commands passed and were captured)
 
 ---
 
