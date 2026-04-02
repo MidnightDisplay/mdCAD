@@ -848,6 +848,7 @@ static void init(void) {
     // Initialize undo/redo system
     undo_redo_init(&state.undo_redo, &state.ecs_scene, 100);
     undo_redo_set_selection(&state.undo_redo, &state.selection);
+    scene_script_bind_undo_redo(&state.ecs_scene, &state.undo_redo);
 
     // Wire up undo/redo to scene hierarchy and entity inspector
     ui_scene_hierarchy_set_undo_redo(&state.scene_hierarchy, &state.undo_redo);

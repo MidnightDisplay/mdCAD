@@ -19,6 +19,7 @@
 #include "../components/constraint_participant_comp.h"
 #include "../constraints/constraint_types.h"
 #include "../scripting/sketch_script_contract.h"
+#include "../undo_redo.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -206,6 +207,8 @@ typedef struct {
     uint32_t solver_backend_id;
     const char *solver_backend_name;
     uint64_t script_emit_revision;
+    undo_redo_t *script_undo_redo;
+    bool script_apply_undo_suppressed;
     scene_solver_failure_implication_t solver_failure_implication;
 } ecs_scene_t;
 
@@ -224,6 +227,7 @@ static inline bool scene_script_emit_for_sketch(ecs_scene_t *scene,
 static inline bool scene_script_reemit_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline uint64_t scene_script_emit_revision(const ecs_scene_t *scene);
 static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e);
+static inline void scene_script_bind_undo_redo(ecs_scene_t *scene, undo_redo_t *undo_redo);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
@@ -270,6 +274,8 @@ static inline void ecs_scene_init(ecs_scene_t *scene, ecs_world_state_t *world) 
     scene->solver_backend_id = 1;
     scene->solver_backend_name = "ConstraintSketchSolverV1";
     scene->script_emit_revision = 0;
+    scene->script_undo_redo = NULL;
+    scene->script_apply_undo_suppressed = false;
     memset(&scene->solver_failure_implication, 0, sizeof(scene->solver_failure_implication));
     geometry_batch_manager_init(&scene->batches);
 }
@@ -3106,7 +3112,52 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
                                              ecs_entity_t sketch,
                                              const char *script_text,
                                              sketch_script_error_t *out_error) {
-    return sketch_script_apply_commit_model(scene, sketch, script_text, out_error);
+    char before_script[4096] = {0};
+    bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, sizeof(before_script), out_error);
+    if (!capture_before) return false;
+
+    if (!sketch_script_apply_commit_model(scene, sketch, script_text, out_error)) return false;
+
+    if (!scene->script_apply_undo_suppressed && scene->script_undo_redo) {
+        char after_script[4096] = {0};
+        if (!scene_script_emit_for_sketch(scene, sketch, after_script, sizeof(after_script), out_error)) {
+            sketch_script_error_t rollback_error = {0};
+            scene->script_apply_undo_suppressed = true;
+            (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
+            scene->script_apply_undo_suppressed = false;
+            return false;
+        }
+
+        undo_command_t cmd = {0};
+        cmd.type = CMD_SCRIPT_APPLY_TRANSACTION;
+        cmd.data.script_apply_transaction.sketch_id = (uint64_t)sketch;
+        cmd.data.script_apply_transaction.before_script = undo_strdup(before_script);
+        cmd.data.script_apply_transaction.after_script = undo_strdup(after_script);
+        if (!cmd.data.script_apply_transaction.before_script ||
+            !cmd.data.script_apply_transaction.after_script) {
+            if (cmd.data.script_apply_transaction.before_script) free(cmd.data.script_apply_transaction.before_script);
+            if (cmd.data.script_apply_transaction.after_script) free(cmd.data.script_apply_transaction.after_script);
+            sketch_script_error_t rollback_error = {0};
+            scene->script_apply_undo_suppressed = true;
+            (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
+            scene->script_apply_undo_suppressed = false;
+            if (out_error && out_error->message[0] == '\0') {
+                out_error->line = 0;
+                out_error->column = 0;
+                snprintf(out_error->message, sizeof(out_error->message), "Failed recording undo transaction for script apply.");
+                out_error->message[sizeof(out_error->message) - 1] = '\0';
+            }
+            return false;
+        }
+        undo_redo_push(scene->script_undo_redo, &cmd);
+    }
+
+    return true;
+}
+
+static inline void scene_script_bind_undo_redo(ecs_scene_t *scene, undo_redo_t *undo_redo) {
+    if (!scene) return;
+    scene->script_undo_redo = undo_redo;
 }
 
 #endif // ECS_SCENE_H

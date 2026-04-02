@@ -984,8 +984,8 @@ static inline void undo_cmd_bulk_delete_entities(undo_redo_t *ur, ecs_entity_t *
 
 // Record geometry vertex position changes
 static inline void undo_cmd_set_geometry_vertices(undo_redo_t *ur, ecs_entity_t e,
-                                                    int *vertex_indices, vec3_t *old_positions,
-                                                    vec3_t *new_positions, int count) {
+                                                     int *vertex_indices, vec3_t *old_positions,
+                                                     vec3_t *new_positions, int count) {
     if (!ur || count <= 0) return;
 
     undo_command_t cmd = {0};
@@ -999,6 +999,27 @@ static inline void undo_cmd_set_geometry_vertices(undo_redo_t *ur, ecs_entity_t 
     memcpy(cmd.data.set_vertices.vertex_indices, vertex_indices, sizeof(int) * count);
     memcpy(cmd.data.set_vertices.old_positions, old_positions, sizeof(vec3_t) * count);
     memcpy(cmd.data.set_vertices.new_positions, new_positions, sizeof(vec3_t) * count);
+
+    undo_redo_push(ur, &cmd);
+}
+
+static inline void undo_cmd_script_apply_transaction(undo_redo_t *ur,
+                                                     ecs_entity_t sketch,
+                                                     const char *before_script,
+                                                     const char *after_script) {
+    if (!ur || sketch == 0 || !before_script || !after_script) return;
+
+    undo_command_t cmd = {0};
+    cmd.type = CMD_SCRIPT_APPLY_TRANSACTION;
+    cmd.data.script_apply_transaction.sketch_id = (uint64_t)sketch;
+    cmd.data.script_apply_transaction.before_script = undo_strdup(before_script);
+    cmd.data.script_apply_transaction.after_script = undo_strdup(after_script);
+    if (!cmd.data.script_apply_transaction.before_script ||
+        !cmd.data.script_apply_transaction.after_script) {
+        if (cmd.data.script_apply_transaction.before_script) free(cmd.data.script_apply_transaction.before_script);
+        if (cmd.data.script_apply_transaction.after_script) free(cmd.data.script_apply_transaction.after_script);
+        return;
+    }
 
     undo_redo_push(ur, &cmd);
 }
@@ -1243,6 +1264,20 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             }
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
+            break;
+        }
+
+        case CMD_SCRIPT_APPLY_TRANSACTION: {
+            ecs_entity_t sketch = (ecs_entity_t)cmd->data.script_apply_transaction.sketch_id;
+            if (!scene_is_sketch(scene, sketch) || !cmd->data.script_apply_transaction.after_script) break;
+            if (ur->selection) {
+                selection_clear((selection_buffer_t*)ur->selection);
+            }
+            sketch_script_error_t error = {0};
+            bool prev_suppressed = scene->script_apply_undo_suppressed;
+            scene->script_apply_undo_suppressed = true;
+            scene_script_apply_commit(scene, sketch, cmd->data.script_apply_transaction.after_script, &error);
+            scene->script_apply_undo_suppressed = prev_suppressed;
             break;
         }
 
@@ -1505,6 +1540,20 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             }
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
+            break;
+        }
+
+        case CMD_SCRIPT_APPLY_TRANSACTION: {
+            ecs_entity_t sketch = (ecs_entity_t)cmd->data.script_apply_transaction.sketch_id;
+            if (!scene_is_sketch(scene, sketch) || !cmd->data.script_apply_transaction.before_script) break;
+            if (ur->selection) {
+                selection_clear((selection_buffer_t*)ur->selection);
+            }
+            sketch_script_error_t error = {0};
+            bool prev_suppressed = scene->script_apply_undo_suppressed;
+            scene->script_apply_undo_suppressed = true;
+            scene_script_apply_commit(scene, sketch, cmd->data.script_apply_transaction.before_script, &error);
+            scene->script_apply_undo_suppressed = prev_suppressed;
             break;
         }
 

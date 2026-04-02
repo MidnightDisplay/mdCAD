@@ -40,6 +40,15 @@
 // Forward declarations - we use void* to avoid coupling to ECS headers
 // Actual types: ecs_scene_t* and selection_buffer_t*
 
+static inline char* undo_strdup(const char *src) {
+    if (!src) return NULL;
+    size_t len = strlen(src) + 1;
+    char *out = (char*)malloc(len);
+    if (!out) return NULL;
+    memcpy(out, src, len);
+    return out;
+}
+
 // ============================================================================
 // Command Types
 // ============================================================================
@@ -77,6 +86,7 @@ typedef enum {
 
     // Geometry vertex editing (gizmo geometry mode)
     CMD_SET_GEOMETRY_VERTICES,
+    CMD_SCRIPT_APPLY_TRANSACTION,
 
     CMD_TYPE_COUNT
 } undo_cmd_type_t;
@@ -291,6 +301,12 @@ typedef struct {
     int count;
 } cmd_set_geometry_vertices_t;
 
+typedef struct {
+    uint64_t sketch_id;
+    char *before_script;
+    char *after_script;
+} cmd_script_apply_transaction_t;
+
 // ============================================================================
 // Command Union
 // ============================================================================
@@ -312,6 +328,7 @@ typedef struct {
         cmd_bulk_set_sketch_fixed_t bulk_sketch_fixed;
         cmd_bulk_delete_entities_t bulk_delete;
         cmd_set_geometry_vertices_t set_vertices;
+        cmd_script_apply_transaction_t script_apply_transaction;
     } data;
 } undo_command_t;
 
@@ -446,6 +463,15 @@ static inline void undo_command_free(undo_command_t *cmd) {
             if (cmd->data.set_vertices.new_positions) free(cmd->data.set_vertices.new_positions);
             break;
 
+        case CMD_SCRIPT_APPLY_TRANSACTION:
+            if (cmd->data.script_apply_transaction.before_script) {
+                free(cmd->data.script_apply_transaction.before_script);
+            }
+            if (cmd->data.script_apply_transaction.after_script) {
+                free(cmd->data.script_apply_transaction.after_script);
+            }
+            break;
+
         default:
             break;
     }
@@ -556,6 +582,7 @@ static inline const char* undo_cmd_name(undo_cmd_type_t type) {
         case CMD_BULK_SET_SKETCH_FIXED: return "Bulk Fix/Unfix";
         case CMD_BULK_DELETE_ENTITIES: return "Bulk Delete";
         case CMD_SET_GEOMETRY_VERTICES: return "Edit Vertices";
+        case CMD_SCRIPT_APPLY_TRANSACTION: return "Apply Script";
         default: return "Unknown";
     }
 }
