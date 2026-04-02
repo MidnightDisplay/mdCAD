@@ -51,11 +51,11 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 - [x] **D-01**: Recalculate validates full active sketch constraints before committing geometry updates.
 - [x] **D-02**: Successful solve attempts apply resulting geometry updates atomically and immediately.
-- [ ] **D-03**: Drag interactions use live constrained solve projection when satisfiable.
-- [ ] **D-04**: Unsatisfiable drag keeps last valid solved state and surfaces immediate feedback.
+- [x] **D-03**: Drag interactions use live constrained solve projection when satisfiable.
+- [x] **D-04**: Unsatisfiable drag keeps last valid solved state and surfaces immediate feedback.
 - [x] **D-05**: Contradictory solves fail deterministically with no scene mutation and stable implication payload.
-- [ ] **D-06**: Solver diagnostics dedupe identical consecutive entries while preserving append order.
-- [ ] **D-07**: Live solve path uses bounded per-frame budget with graceful degradation contract.
+- [x] **D-06**: Solver diagnostics dedupe identical consecutive entries while preserving append order.
+- [x] **D-07**: Live solve path uses bounded per-frame budget with graceful degradation contract.
 - [x] **D-08**: Deterministic solver regression fixtures are wired as automated acceptance gates.
 - [x] **D-09**: Constraint participant representation supports endpoint/sub-entity metadata.
 - [x] **D-10**: Endpoint controls are first-class selectable/pickable participants for Coincident authoring.

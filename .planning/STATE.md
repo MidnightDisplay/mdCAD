@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-02T17:10:06.863Z"
+stopped_at: Completed 17-03-PLAN.md
+last_updated: "2026-04-02T17:19:28.855Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 23
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 17 (constraint-driven-geometry-solving) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-02
 
@@ -64,6 +64,7 @@ Next command: `/gsd-plan-phase 15`
 | Phase 15 P02 | 6 min | 2 tasks | 5 files |
 | Phase 15 P03 | 7 min | 2 tasks | 3 files |
 | Phase 17 P01 | 11 min | 2 tasks | 7 files |
+| Phase 17 P03 | 4m | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -105,6 +106,8 @@ Next command: `/gsd-plan-phase 15`
 - [Roadmap]: Phase 17 added — Constraint-driven geometry solving (true constraint solve and geometry update behavior).
 - [Phase 17]: Phase 17 Wave-0 tests are native C executables registered as first-class CTest targets.
 - [Phase 17]: Recalculate now performs transactional candidate staging and only commits geometry on full success.
+- [Phase 17]: Bound constrained drag with deterministic per-frame projected-delta clamp in scene_solver_can_apply_drag.
+- [Phase 17]: Diagnostics now suppress identical consecutive entries and expose deterministic implication ordering.
 
 ## Blockers
 
@@ -112,6 +115,6 @@ Next command: `/gsd-plan-phase 15`
 
 ## Session
 
-**Last Date:** 2026-04-02T17:10:06.859Z
-**Stopped At:** Completed 17-01-PLAN.md
+**Last Date:** 2026-04-02T17:19:28.851Z
+**Stopped At:** Completed 17-03-PLAN.md
 **Resume File:** None
