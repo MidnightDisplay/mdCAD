@@ -43,6 +43,7 @@
 #define ECS_SCENE_HELIX_DEFAULT_SEGMENTS 32
 #define ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS 32
 #define ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS 128
+#define ECS_SCENE_SOLVER_DRAG_MAX_DELTA_PER_FRAME 0.25f
 #define ECS_SCENE_SCRIPT_IO_MAX_SKETCHES 64
 #define ECS_SCENE_SCRIPT_IO_MAX_INPUTS 32
 #define ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS 32
@@ -378,6 +379,16 @@ static inline void scene_solver_sort_entities_unique(ecs_entity_t *values, int *
         values[write_index++] = values[i];
     }
     *io_count = write_index;
+}
+
+static inline vec3_t scene_solver_project_drag_delta_with_budget(vec3_t requested_delta) {
+    const float max_delta = ECS_SCENE_SOLVER_DRAG_MAX_DELTA_PER_FRAME;
+    float len = vec3_length(requested_delta);
+    if (len <= max_delta || len <= 1e-7f) {
+        return requested_delta;
+    }
+    float scale = max_delta / len;
+    return vec3_scale(requested_delta, scale);
 }
 
 //------------------------------------------------------------------------------
@@ -2147,7 +2158,7 @@ static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
                                               scene_solver_drag_decision_t *out_decision) {
     if (!out_decision) return false;
     memset(out_decision, 0, sizeof(*out_decision));
-    out_decision->projected_delta = requested_delta;
+    out_decision->projected_delta = scene_solver_project_drag_delta_with_budget(requested_delta);
     out_decision->result = SCENE_SOLVER_DRAG_INVALID;
 
     if (!scene || !scene_is_sketch(scene, sketch)) {
@@ -2207,7 +2218,7 @@ static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
     }
 
     out_decision->result = SCENE_SOLVER_DRAG_FEASIBLE;
-    out_decision->projected_delta = requested_delta;
+    out_decision->projected_delta = scene_solver_project_drag_delta_with_budget(requested_delta);
     out_decision->first_implicated_constraint = 0;
     out_decision->implicated_constraint_count = 0;
     out_decision->block_reason[0] = '\0';
