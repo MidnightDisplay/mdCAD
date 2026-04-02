@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Deliver true constraint-driven solve behavior for sketch geometry so constraints are not cosmetic: the solver must compute and apply geometry updates, keep interaction stable under constraints, and provide deterministic diagnostics and regression gates.
+Deliver true constraint-driven solve behavior for sketch geometry so constraints are not cosmetic: the solver must compute and apply geometry updates, keep interaction stable under constraints, provide deterministic diagnostics and regression gates, and support endpoint/sub-entity selection needed for robust coincident chaining/loop authoring.
 
 This phase upgrades solver behavior within the existing sketch/constraint architecture. It does **not** introduce multi-sketch/global solving, multi-backend solver UX, or broader scripting/runtime expansion.
 
@@ -30,6 +30,12 @@ This phase upgrades solver behavior within the existing sketch/constraint archit
 ### Precision and performance guardrails
 - **D-07:** Optimize for interaction responsiveness using a **bounded per-frame solve budget** with graceful degrade path, while preserving correctness contract.
 - **D-08:** Add deterministic regression checks with fixtures and tolerance-based assertions as acceptance gates for solver outputs.
+
+### Sketch endpoint/sub-entity selection model
+- **D-09:** Endpoint/sub-entity selection for lines/arcs must be available in normal viewport selection flow (no dependency on Tab-toggle gizmo vertex mode).
+- **D-10:** Add explicit selectable/hoverable endpoint control points as first-class pickable sketch sub-elements so Coincident authoring can connect geometry chains/loops directly.
+- **D-11:** Coincident constraints must support endpoint-to-endpoint authoring across relevant sketch geometries (including line and arc endpoints) through this direct selection path.
+- **D-12:** Main viewport and pick buffer behavior must keep endpoint points rendered/pickable above continuous primitives (lines/arcs/circles) for reliable selection.
 
 ### the agent's Discretion
 - Exact per-frame solve budget thresholds and degrade trigger heuristics.
@@ -62,6 +68,10 @@ This phase upgrades solver behavior within the existing sketch/constraint archit
 - `src/ui/ui_entity_inspector.h` — solver panel controls and diagnostics rendering.
 - `src/components/sketch_comp.h` — sketch solver state/diagnostic storage model.
 - `src/constraints/constraint_selection.h` — participant highlighting utility used by failure implication UX.
+- `src/components/geometry_comp.h` — geometry endpoint/value storage surfaces impacted by sub-entity solve updates.
+- `src/gpu/pick_buffer.h` — pick overlay behavior and render/pick layering constraints.
+- `src/gizmo/gizmo_vertex_mode.h` — existing endpoint selection mode to decouple from as the primary authoring path.
+- `src/ui/ui_viewport.h` — viewport-level interaction and overlay entry points for endpoint visibility/picking.
 
 ### Codebase constraints and architecture guidance
 - `.planning/codebase/ARCHITECTURE.md` — subsystem boundaries and integration layers.
@@ -89,6 +99,8 @@ This phase upgrades solver behavior within the existing sketch/constraint archit
 - Keep `app.c` drag loop wired to solver decisions while ensuring no invalid intermediate pose is committed.
 - Expand diagnostics handling with deterministic dedupe behavior while preserving explicit clear controls in inspector UX.
 - Add deterministic fixtures/assertions under existing test infrastructure to gate solver output stability.
+- Add first-class sketch sub-entity endpoint selection/pick contracts so Coincident authoring no longer depends on gizmo vertex mode.
+- Ensure viewport + pick pass layering gives endpoint points reliable visibility/selection priority over continuous geometry.
 
 </code_context>
 

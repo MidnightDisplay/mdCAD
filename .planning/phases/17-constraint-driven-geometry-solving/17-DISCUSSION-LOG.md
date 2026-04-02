@@ -106,3 +106,24 @@
 ## Deferred Ideas
 
 - None raised beyond current phase boundary during this discussion.
+
+---
+
+## Sketch endpoint/sub-entity selection gap (addendum)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Keep gizmo vertex mode as selection path | Endpoint picking remains tied to Tab vertex mode | |
+| Add first-class endpoint sub-elements in normal viewport selection | Endpoint points hover/select without entering gizmo mode | ✓ |
+| Constraint authoring by whole-entity inference only | No explicit endpoint selection, infer from line/arc entity picks | |
+
+**User's choice:** Add first-class endpoint/sub-entity selection in normal viewport flow; do not rely on gizmo vertex mode.
+**Notes:** Coincident endpoint chaining/loop closure is a core sketch-authoring requirement.
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Render endpoint points above continuous geometry in viewport + pick buffer | Prioritize endpoint pickability for authoring reliability | ✓ |
+| Keep existing primitive layering and use mode-switch filtering | Lower structural change, but less direct authoring | |
+
+**User's choice:** Keep endpoint points rendered/pickable above lines/arcs/circles for reliable direct selection.
+**Notes:** Must support line/arc endpoint Coincident constraints and robust chain/loop construction.
