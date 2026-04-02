@@ -26,6 +26,7 @@
 #include <time.h>
 #include <math.h>
 #include <assert.h>
+#include <stdlib.h>
 
 // For theme-aware hover colors (cimgui already defined in app.c before this include)
 #ifndef CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -303,10 +304,10 @@ static inline const sketch_solver_diagnostic_t* scene_solver_diagnostic_at(ecs_s
 static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sketch, sketch_status_t status);
 static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagnostic_severity_t severity);
 static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
-                                                       ecs_entity_t sketch,
-                                                       const ecs_entity_t *implicated_constraints,
-                                                       int implicated_constraint_count,
-                                                       const char *reason);
+                                                        ecs_entity_t sketch,
+                                                        const ecs_entity_t *implicated_constraints,
+                                                        int implicated_constraint_count,
+                                                        const char *reason);
 static inline void scene_solver_clear_failure_implication(ecs_scene_t *scene,
                                                           ecs_entity_t sketch,
                                                           bool clear_on_success);
@@ -319,6 +320,65 @@ static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
                                               scene_solver_drag_decision_t *out_decision);
 static inline bool scene_solver_drag_make_rejected_diagnostic(const scene_solver_drag_decision_t *decision,
                                                              scene_solver_drag_diagnostic_event_t *out_event);
+
+typedef struct {
+    ecs_entity_t entity;
+    vec3_t point;
+    bool has_candidate;
+    bool fixed;
+} scene_solver_point_candidate_t;
+
+static inline int scene_solver_compare_entity_asc(const void *lhs, const void *rhs) {
+    const ecs_entity_t a = *(const ecs_entity_t *)lhs;
+    const ecs_entity_t b = *(const ecs_entity_t *)rhs;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
+
+static inline int scene_solver_find_point_candidate(scene_solver_point_candidate_t *entries,
+                                                    int entry_count,
+                                                    ecs_entity_t entity) {
+    if (!entries || entry_count <= 0 || entity == 0) return -1;
+    for (int i = 0; i < entry_count; i++) {
+        if (entries[i].entity == entity) return i;
+    }
+    return -1;
+}
+
+static inline int scene_solver_ensure_point_candidate(ecs_scene_t *scene,
+                                                      scene_solver_point_candidate_t *entries,
+                                                      int max_entries,
+                                                      int *io_entry_count,
+                                                      ecs_entity_t entity) {
+    if (!scene || !entries || !io_entry_count || entity == 0) return -1;
+    int existing = scene_solver_find_point_candidate(entries, *io_entry_count, entity);
+    if (existing >= 0) return existing;
+    if (*io_entry_count >= max_entries) return -1;
+
+    GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
+    if (!g || g->type != GEOM_POINT) return -1;
+    SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(scene->world, entity);
+
+    int index = (*io_entry_count)++;
+    entries[index].entity = entity;
+    entries[index].point = g->data.point.point;
+    entries[index].has_candidate = true;
+    entries[index].fixed = state ? state->fixed : false;
+    return index;
+}
+
+static inline void scene_solver_sort_entities_unique(ecs_entity_t *values, int *io_count) {
+    if (!values || !io_count || *io_count <= 1) return;
+    qsort(values, (size_t)*io_count, sizeof(ecs_entity_t), scene_solver_compare_entity_asc);
+    int write_index = 0;
+    for (int i = 0; i < *io_count; i++) {
+        if (values[i] == 0) continue;
+        if (write_index > 0 && values[write_index - 1] == values[i]) continue;
+        values[write_index++] = values[i];
+    }
+    *io_count = write_index;
+}
 
 //------------------------------------------------------------------------------
 // Scene Initialization
@@ -1798,11 +1858,122 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return false;
 
+    ecs_entity_t sketch_points[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
+    int point_count = 0;
+    ecs_entity_t implicated_constraints[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS] = {0};
+    int implicated_constraint_count = 0;
+    bool solve_failed = false;
+    const char *failure_reason = "Unsupported constraint participant combination.";
+
+    ecs_iter_t children = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&children)) {
+        for (int i = 0; i < children.count; i++) {
+            ecs_entity_t child = children.entities[i];
+            GeometryComp *g = ecs_world_get_geometry(scene->world, child);
+            if (!g || g->type != GEOM_POINT) continue;
+            if (point_count < ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS) {
+                sketch_points[point_count++] = child;
+            }
+        }
+    }
+
+    scene_solver_point_candidate_t candidates[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
+    int candidate_count = 0;
+    for (int i = 0; i < point_count; i++) {
+        scene_solver_ensure_point_candidate(scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                           &candidate_count, sketch_points[i]);
+    }
+
+    children = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&children) && !solve_failed) {
+        for (int i = 0; i < children.count; i++) {
+            ecs_entity_t child = children.entities[i];
+            ConstraintComp *constraint = ecs_world_get_constraint(scene->world, child);
+            if (!constraint) continue;
+
+            uint32_t participant_count = constraint->participant_count;
+            if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {
+                participant_count = CONSTRAINT_MAX_PARTICIPANTS;
+            }
+
+            if (constraint->type == CONSTRAINT_COINCIDENT && participant_count == 2) {
+                ecs_entity_t pa = (ecs_entity_t)constraint->participants[0];
+                ecs_entity_t pb = (ecs_entity_t)constraint->participants[1];
+                int ia = scene_solver_ensure_point_candidate(scene, candidates,
+                                                             ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                             &candidate_count, pa);
+                int ib = scene_solver_ensure_point_candidate(scene, candidates,
+                                                             ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                             &candidate_count, pb);
+                if (ia < 0 || ib < 0) {
+                    solve_failed = true;
+                    failure_reason = "Unsupported coincident participants: only point-point is solved in this phase.";
+                    implicated_constraints[implicated_constraint_count++] = child;
+                    break;
+                }
+
+                if (candidates[ia].fixed && candidates[ib].fixed) {
+                    if (fabsf(candidates[ia].point.x - candidates[ib].point.x) > 1e-6f ||
+                        fabsf(candidates[ia].point.y - candidates[ib].point.y) > 1e-6f ||
+                        fabsf(candidates[ia].point.z - candidates[ib].point.z) > 1e-6f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied coincident constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    continue;
+                }
+
+                if (candidates[ia].fixed && !candidates[ib].fixed) {
+                    candidates[ib].point = candidates[ia].point;
+                    continue;
+                }
+                if (!candidates[ia].fixed && candidates[ib].fixed) {
+                    candidates[ia].point = candidates[ib].point;
+                    continue;
+                }
+
+                vec3_t midpoint = vec3_scale(vec3_add(candidates[ia].point, candidates[ib].point), 0.5f);
+                candidates[ia].point = midpoint;
+                candidates[ib].point = midpoint;
+                continue;
+            }
+
+            if (constraint->type == CONSTRAINT_FIXED || constraint->type == CONSTRAINT_LENGTH) {
+                continue;
+            }
+
+            solve_failed = true;
+            failure_reason = "Constraint type not yet solved in transactional recalc.";
+            implicated_constraints[implicated_constraint_count++] = child;
+            break;
+        }
+    }
+
     sk->auto_solve_pending = false;
     sk->solve_request_serial++;
-    sk->solve_completed_serial = sk->solve_request_serial;
     sk->last_solve_timestamp_ms = (uint64_t)time(NULL) * 1000ULL;
     sk->solver_backend_id = scene_solver_backend_id(scene);
+
+    if (solve_failed) {
+        scene_solver_sort_entities_unique(implicated_constraints, &implicated_constraint_count);
+        scene_solver_set_failure_implication(scene, sketch,
+                                             implicated_constraints,
+                                             implicated_constraint_count,
+                                             failure_reason);
+        scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
+        return false;
+    }
+
+    for (int i = 0; i < candidate_count; i++) {
+        GeometryComp *g = ecs_world_get_geometry(scene->world, candidates[i].entity);
+        RenderableComp *r = ecs_world_get_renderable(scene->world, candidates[i].entity);
+        if (!g || g->type != GEOM_POINT) continue;
+        g->data.point.point = candidates[i].point;
+        if (r) r->instance_dirty = true;
+    }
+
+    sk->solve_completed_serial = sk->solve_request_serial;
     sketch_status_t derived_status = scene_derive_sketch_status(scene, sketch);
     return scene_solver_apply_status(scene, sketch, derived_status);
 }

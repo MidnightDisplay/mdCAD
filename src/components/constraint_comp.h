@@ -28,6 +28,23 @@ typedef enum {
 #define CONSTRAINT_MAX_PARTICIPANTS 8
 
 typedef struct {
+    uint64_t entity;
+    uint8_t role;
+    uint8_t sub_index;
+    uint16_t reserved;
+} constraint_participant_descriptor_t;
+
+static inline constraint_participant_descriptor_t constraint_participant_descriptor_make(uint64_t entity,
+                                                                                        uint8_t role,
+                                                                                        uint8_t sub_index) {
+    constraint_participant_descriptor_t descriptor = {0};
+    descriptor.entity = entity;
+    descriptor.role = role;
+    descriptor.sub_index = sub_index;
+    return descriptor;
+}
+
+typedef struct {
     constraint_type_t type;
     bool has_value;                             // true for dimensional constraints
     bool driven;                                // CONS-05 for LENGTH/ANGLE
@@ -35,6 +52,7 @@ typedef struct {
     uint8_t display_decimals;                   // UI display precision for dimensional values
     uint32_t participant_count;
     uint64_t participants[CONSTRAINT_MAX_PARTICIPANTS];
+    constraint_participant_descriptor_t participant_descriptors[CONSTRAINT_MAX_PARTICIPANTS];
 } ConstraintComp;
 
 static inline ConstraintComp constraint_comp_default(void) {
@@ -90,6 +108,9 @@ static inline ConstraintComp constraint_comp_make(constraint_type_t type,
         }
         memcpy(c.participants, participants, participant_count * sizeof(uint64_t));
         c.participant_count = participant_count;
+        for (uint32_t i = 0; i < participant_count; i++) {
+            c.participant_descriptors[i] = constraint_participant_descriptor_make(c.participants[i], 1, 0);
+        }
     }
     return c;
 }
