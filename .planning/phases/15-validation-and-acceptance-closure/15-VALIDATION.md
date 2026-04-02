@@ -1,9 +1,9 @@
 ---
 phase: 15
 slug: validation-and-acceptance-closure
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-02
 ---
 
@@ -42,7 +42,7 @@ created: 2026-04-02
 | 15-01-02 | 01 | 1 | VAL-01 | validation mapping | `git --no-pager grep -n "sketch-01-constraint-debug\\|sketch-02-driven-dimensions\\|script-io-scenario-01-parse-apply-reset-diagnostics" .planning/phases/15-validation-and-acceptance-closure/15-VALIDATION.md` | ✅ | ✅ green |
 | 15-02-01 | 02 | 2 | VAL-02 | build gate evidence | `cmake --build build-vulkan --config Release --target mdCAD` | ✅ | ✅ green |
 | 15-02-02 | 02 | 2 | VAL-02 | full suite gate evidence | `ctest --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
-| 15-03-01 | 03 | 3 | VAL-03 | deferred-traceability | `N/A (deferred by Phase 15 decision)` | ❌ W0 | ⬜ pending |
+| 15-03-01 | 03 | 3 | VAL-03 | deferred-traceability | `N/A (deferred by Phase 15 decision)` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -50,11 +50,11 @@ created: 2026-04-02
 
 ## Wave 0 Requirements
 
-- [ ] `.planning/phases/15-validation-and-acceptance-closure/15-03-SUMMARY.md` — phase closure narrative with requirement-level outcomes.
+- [x] `.planning/phases/15-validation-and-acceptance-closure/15-03-SUMMARY.md` — phase closure narrative with requirement-level outcomes.
 - [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt` — Release `mdCAD` build output evidence.
 - [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt` — full CTest output evidence.
 - [x] `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/` — two sketch case studies + one Script IO scenario with reproducible steps.
-- [ ] `CHECKPOINT.md` — update continuity entry with Phase 15 outcomes.
+- [x] `CHECKPOINT.md` — update continuity entry with Phase 15 outcomes.
 
 ---
 
@@ -103,6 +103,18 @@ Status: ✅ complete (both mandatory commands passed and were captured)
 
 ---
 
+### VAL-03 — macOS parity validation status (deferred in Phase 15)
+
+Deferred by locked discuss-phase decisions D-09 and D-10:
+- **Status in Phase 15:** ⏸ deferred / out of scope (no completion claim).
+- **Reason:** User-directed scope for this phase prioritizes Windows evidence closure first.
+- **Handoff:** Execute macOS parity validation in a follow-up closure activity after Phase 15.
+- **Traceability anchors:** `15-03-SUMMARY.md` and `CHECKPOINT.md` include matching deferred language and follow-up pointer.
+
+Status: ✅ complete for deferred-traceability documentation contract.
+
+---
+
 ## Manual-Only Verifications
 
 | Behavior | Requirement | Why Manual | Test Instructions |
@@ -115,11 +127,11 @@ Status: ✅ complete (both mandatory commands passed and were captured)
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 240s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 240s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete
