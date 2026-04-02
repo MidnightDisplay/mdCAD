@@ -98,7 +98,7 @@ Plans:
   4. User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial restores.
 **Plans**: 3 plans
 Plans:
-- [ ] 14-01-PLAN.md — Add script-transaction undo command and atomic apply rollback guarantees.
+- [x] 14-01-PLAN.md — Add script-transaction undo command and atomic apply rollback guarantees.
 - [ ] 14-02-PLAN.md — Implement numeric script IO schema and scene-level IO façade APIs.
 - [ ] 14-03-PLAN.md — Wire dedicated Script IO window with live transactional auto-apply and UX verification.
 **UI hint**: yes
@@ -134,6 +134,6 @@ Plans:
 | 11. Constraint Authoring UX | 1/3 | In Progress|  |
 | 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 3/3 | Complete   | 2026-04-01 |
-| 14. Script IO + API/Undo Integration | 0/TBD | Not started | - |
+| 14. Script IO + API/Undo Integration | 1/3 | In Progress|  |
 | 15. Validation & Acceptance Closure | 0/TBD | Not started | - |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |

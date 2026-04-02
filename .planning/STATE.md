@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 14 context gathered
-last_updated: "2026-04-01T23:01:44.385Z"
-last_activity: 2026-04-01
+status: executing
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-04-02T09:22:10.537Z"
+last_activity: 2026-04-02
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 17
+  completed_plans: 15
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 13 — script-round-trip-baseline
+**Current focus:** Phase 14 — script-io-api-undo-integration
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 13 (script-round-trip-baseline) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-04-01
+Phase: 14 (script-io-api-undo-integration) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-02
 
 ## Milestone Scope
 
@@ -57,6 +57,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 13-script-round-trip-baseline P01 | 2min | 2 tasks | 9 files |
 | Phase 13-script-round-trip-baseline P02 | 35min | 2 tasks | 6 files |
 | Phase 13-script-round-trip-baseline P03 | 18min | 2 tasks | 7 files |
+| Phase 14 P01 | 83s | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -89,6 +90,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 13-script-round-trip-baseline]: Scene mutation helpers now trigger script re-emit revision updates via scene_script_reemit_for_sketch.
 - [Phase 13-script-round-trip-baseline]: Phase 13 plan 13-03 human-verify checkpoint approved after regression hardening and validation rerun.
 - [Phase 13-script-round-trip-baseline]: Script Editor closure keeps preview-failure scene safety and atomic apply as enforced acceptance contract.
+- [Phase 14]: Script apply undo now uses a dedicated CMD_SCRIPT_APPLY_TRANSACTION with before/after emitted script snapshots.
+- [Phase 14]: scene_script_apply_commit records exactly one undo entry per successful apply and rolls back if transaction recording fails.
 
 ## Blockers
 
@@ -96,6 +99,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-01T23:01:44.382Z
-**Stopped At:** Phase 14 context gathered
-**Resume File:** .planning/phases/14-script-io-api-undo-integration/14-CONTEXT.md
+**Last Date:** 2026-04-02T09:22:10.533Z
+**Stopped At:** Completed 14-01-PLAN.md
+**Resume File:** None
