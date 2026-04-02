@@ -598,6 +598,115 @@ static int test_script_apply_failure_preserves_last_valid_state(void) {
             redo_after == 0) ? 0 : 1;
 }
 
+static int test_script_io_numeric_schema_roundtrip(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+
+    const char *script_text =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"input_length\", value = 10.0, min = 1.0, max = 20.0, step = 0.5 }\n"
+        "  },\n"
+        "  outputs = {\n"
+        "    { id = \"output_span\", value = 7.5 }\n"
+        "  },\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char emitted[4096] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_world_shutdown(&world);
+    return (strstr(emitted, "inputs") != NULL &&
+            strstr(emitted, "outputs") != NULL &&
+            strstr(emitted, "min = 1") != NULL &&
+            strstr(emitted, "max = 20") != NULL &&
+            strstr(emitted, "step = 0.5") != NULL) ? 0 : 1;
+}
+
+static int test_script_io_rejects_non_numeric(void) {
+    sketch_script_model_t model = {0};
+    sketch_script_error_t err = {0};
+    const char *bad_script =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"mode\", value = true }\n"
+        "  },\n"
+        "  outputs = {},\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    if (sketch_script_parse_model(bad_script, &model, &err)) {
+        return 1;
+    }
+    return strstr(err.message, "numeric") != NULL ? 0 : 1;
+}
+
+static int test_scene_script_io_apply_uses_transactional_apply(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_text =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"input_length\", value = 10.0, min = 1.0, max = 20.0, step = 0.5 }\n"
+        "  },\n"
+        "  outputs = {\n"
+        "    { id = \"output_span\", value = 7.5 }\n"
+        "  },\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int undo_before = undo_redo_get_undo_count(&undo_redo);
+    if (!scene_script_io_apply_input_value(&scene, sketch, "input_length", 12.5, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_after = undo_redo_get_undo_count(&undo_redo);
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return (undo_after - undo_before) == 1 ? 0 : 1;
+}
+
 static int test_script_editor_launch_request_is_exposed_from_inspector_state(void) {
     selection_buffer_t selection = {0};
     ecs_world_state_t world = {0};
@@ -749,6 +858,9 @@ int main(void) {
     if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
     if (test_script_apply_undo_redo_single_step() != 0) return 1;
     if (test_script_apply_failure_preserves_last_valid_state() != 0) return 1;
+    if (test_script_io_numeric_schema_roundtrip() != 0) return 1;
+    if (test_script_io_rejects_non_numeric() != 0) return 1;
+    if (test_scene_script_io_apply_uses_transactional_apply() != 0) return 1;
     if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
     if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
