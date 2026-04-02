@@ -209,6 +209,30 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-04-02)
 
+### Phase 15 Validation & Acceptance Closure (IMPLEMENTED)
+
+- Executed Phase 15 plans `15-01`, `15-02`, and `15-03` (3/3 plans complete).
+- Shipped required VAL-01 case-study evidence bundle:
+  - Two sketch runbooks + scripts:
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-01-constraint-debug/`
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/sketch-02-driven-dimensions/`
+  - One Script IO parse/apply/reset diagnostics scenario:
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/case-studies/script-io-scenario-01-parse-apply-reset-diagnostics/`
+- Captured mandatory Windows MSVC + Vulkan gate evidence (VAL-02):
+  - `cmake --build build-vulkan --config Release --target mdCAD`
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure`
+  - Evidence files:
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-build-mdcad.txt`
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/gate-ctest-full.txt`
+    - `.planning/phases/15-validation-and-acceptance-closure/evidence/windows-vulkan-msvc/provenance.md`
+- Updated closure artifacts bundle:
+  - `.planning/phases/15-validation-and-acceptance-closure/15-VALIDATION.md`
+  - `.planning/phases/15-validation-and-acceptance-closure/15-03-SUMMARY.md`
+  - `CHECKPOINT.md` (this continuity update)
+- VAL-03 handling:
+  - Explicitly marked **deferred/out of scope in Phase 15** by user decision.
+  - Follow-up required: execute and record macOS parity validation in a subsequent closure activity.
+
 ### Phase 14 Script IO + API/Undo Integration Closure (IMPLEMENTED)
 
 - Completed Phase 14 plan `14-03` and closed Phase 14 (3/3 plans complete).
