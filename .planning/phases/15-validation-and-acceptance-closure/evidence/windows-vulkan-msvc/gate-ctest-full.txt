@@ -1,0 +1,12 @@
+Command: ctest --test-dir build-vulkan -C Release --output-on-failure
+TimestampUTC: 2026-04-02T14:58:25.2276863Z
+---
+Test project C:/dev/mdCAD/build-vulkan
+    Start 1: script_roundtrip_tests
+1/1 Test #1: script_roundtrip_tests ...........   Passed    0.09 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.25 sec
+
+ExitCode: 0

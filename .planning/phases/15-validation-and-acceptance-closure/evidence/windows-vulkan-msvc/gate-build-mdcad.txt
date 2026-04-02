@@ -1,0 +1,12 @@
+Command: cmake --build build-vulkan --config Release --target mdCAD
+TimestampUTC: 2026-04-02T14:58:13.0776294Z
+---
+MSBuild version 18.0.5+e22287bf1 for .NET Framework
+
+  cjson.vcxproj -> C:\dev\mdCAD\build-vulkan\vendors\cjson\Release\cjson.lib
+  flecs_static.vcxproj -> C:\dev\mdCAD\build-vulkan\vendors\flecs\Release\flecs_static.lib
+  libcimgui.vcxproj -> C:\dev\mdCAD\build-vulkan\vendors\libcimgui\Release\libcimgui.lib
+  libsokol.vcxproj -> C:\dev\mdCAD\build-vulkan\vendors\libsokol\Release\libsokol.lib
+  mdCAD.vcxproj -> C:\dev\mdCAD\build-vulkan\bin\Release\mdCAD.exe
+
+ExitCode: 0
