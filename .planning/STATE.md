@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-04-02T09:22:10.537Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-04-02T09:32:20.799Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 14 (script-io-api-undo-integration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-02
 
@@ -58,6 +58,7 @@ Next command: `/gsd-plan-phase 10`
 | Phase 13-script-round-trip-baseline P02 | 35min | 2 tasks | 6 files |
 | Phase 13-script-round-trip-baseline P03 | 18min | 2 tasks | 7 files |
 | Phase 14 P01 | 83s | 2 tasks | 5 files |
+| Phase 14 P02 | 442s | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -92,6 +93,8 @@ Next command: `/gsd-plan-phase 10`
 - [Phase 13-script-round-trip-baseline]: Script Editor closure keeps preview-failure scene safety and atomic apply as enforced acceptance contract.
 - [Phase 14]: Script apply undo now uses a dedicated CMD_SCRIPT_APPLY_TRANSACTION with before/after emitted script snapshots.
 - [Phase 14]: scene_script_apply_commit records exactly one undo entry per successful apply and rolls back if transaction recording fails.
+- [Phase 14]: Kept script IO scope numeric-only with explicit parser rejection for non-numeric declarations.
+- [Phase 14]: Implemented scene_script_io_* façade APIs and routed IO edits through scene_script_apply_commit transactional path.
 
 ## Blockers
 
@@ -99,6 +102,6 @@ Next command: `/gsd-plan-phase 10`
 
 ## Session
 
-**Last Date:** 2026-04-02T09:22:10.533Z
-**Stopped At:** Completed 14-01-PLAN.md
+**Last Date:** 2026-04-02T09:32:20.796Z
+**Stopped At:** Completed 14-02-PLAN.md
 **Resume File:** None

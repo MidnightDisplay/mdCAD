@@ -35,12 +35,12 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
 - [x] **SCRP-03**: UI-side sketch/geometry/constraint edits update script output deterministically.
 - [x] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
-- [ ] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
+- [x] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
 - [x] **SCRP-06**: v1.2 scripting runtime is Lua 5.4.x.
 
 ### Integration and Validation
 
-- [ ] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
+- [x] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
 - [x] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
 - [x] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
 - [ ] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
@@ -94,9 +94,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCRP-02 | Phase 13 | Complete |
 | SCRP-03 | Phase 13 | Complete |
 | SCRP-04 | Phase 14 | Complete |
-| SCRP-05 | Phase 14 | Pending |
+| SCRP-05 | Phase 14 | Complete |
 | SCRP-06 | Phase 13 | Complete |
-| API-01 | Phase 14 | Pending |
+| API-01 | Phase 14 | Complete |
 | API-02 | Phase 14 | Complete |
 | API-03 | Phase 12 | Complete |
 | VAL-01 | Phase 15 | Pending |
