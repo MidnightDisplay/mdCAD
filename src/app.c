@@ -138,6 +138,10 @@ static struct {
     bool script_io_open;
     uint64_t script_io_last_seen_emit_revision;
     sketch_script_error_t script_io_last_error;
+    bool script_io_slider_drag_active;
+    ecs_entity_t script_io_slider_drag_sketch;
+    char script_io_slider_drag_input_id[SCRIPT_LOCAL_ID_MAX];
+    char script_io_slider_drag_before_script[16384];
 } state;
 
 static void mdcad_script_editor_clear_error(void) {
@@ -192,6 +196,10 @@ static void mdcad_script_io_open_for_sketch(ecs_entity_t sketch) {
     state.script_io_sketch = sketch;
     state.script_io_open = true;
     state.script_io_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
+    state.script_io_slider_drag_active = false;
+    state.script_io_slider_drag_sketch = 0;
+    state.script_io_slider_drag_input_id[0] = '\0';
+    state.script_io_slider_drag_before_script[0] = '\0';
     mdcad_script_io_clear_error();
 }
 
@@ -354,6 +362,7 @@ static void mdcad_draw_script_io_window(void) {
     }
 
     bool open = state.script_io_open;
+    bool slider_drag_active_this_frame = false;
     igSetNextWindowSize((ImVec2){520.0f, 420.0f}, ImGuiCond_FirstUseEver);
     if (igBegin("Script IO", &open, ImGuiWindowFlags_None)) {
         LabelComp *label = ecs_world_get_label(&state.ecs_world, state.script_io_sketch);
@@ -376,6 +385,8 @@ static void mdcad_draw_script_io_window(void) {
 
                 double edited_value = desc.value;
                 bool changed = false;
+                bool slider_active = false;
+                bool input_active = false;
                 if (desc.has_min && desc.has_max) {
                     float slider_value = (float)edited_value;
                     if (igSliderFloat("##script_io_input_slider",
@@ -387,6 +398,7 @@ static void mdcad_draw_script_io_window(void) {
                         edited_value = (double)slider_value;
                         changed = true;
                     }
+                    slider_active = igIsItemActive();
                 }
 
                 double step = desc.has_step ? desc.step_value : 0.0;
@@ -398,9 +410,45 @@ static void mdcad_draw_script_io_window(void) {
                                   ImGuiInputTextFlags_None)) {
                     changed = true;
                 }
+                input_active = igIsItemActive();
+
+                bool interaction_active = slider_active || input_active;
+                bool session_active_for_item = state.script_io_slider_drag_active &&
+                                               state.script_io_slider_drag_sketch == state.script_io_sketch &&
+                                               strcmp(state.script_io_slider_drag_input_id, desc.id) == 0;
+                if (interaction_active && !session_active_for_item) {
+                    sketch_script_error_t emit_error = {0};
+                    char before_script[16384] = {0};
+                    if (scene_script_emit_for_sketch(&state.ecs_scene,
+                                                     state.script_io_sketch,
+                                                     before_script,
+                                                     sizeof(before_script),
+                                                     &emit_error)) {
+                        state.script_io_slider_drag_active = true;
+                        state.script_io_slider_drag_sketch = state.script_io_sketch;
+                        snprintf(state.script_io_slider_drag_input_id,
+                                 sizeof(state.script_io_slider_drag_input_id),
+                                 "%s",
+                                 desc.id);
+                        state.script_io_slider_drag_input_id[sizeof(state.script_io_slider_drag_input_id) - 1] = '\0';
+                        snprintf(state.script_io_slider_drag_before_script,
+                                 sizeof(state.script_io_slider_drag_before_script),
+                                 "%s",
+                                 before_script);
+                        state.script_io_slider_drag_before_script[sizeof(state.script_io_slider_drag_before_script) - 1] = '\0';
+                        session_active_for_item = true;
+                    }
+                }
+                if (session_active_for_item && interaction_active) {
+                    slider_drag_active_this_frame = true;
+                }
 
                 if (changed) {
                     sketch_script_error_t apply_error = {0};
+                    bool prev_undo_suppressed = state.ecs_scene.script_apply_undo_suppressed;
+                    if (session_active_for_item) {
+                        state.ecs_scene.script_apply_undo_suppressed = true;
+                    }
                     if (scene_script_io_apply_input_value(&state.ecs_scene,
                                                           state.script_io_sketch,
                                                           desc.id,
@@ -410,6 +458,13 @@ static void mdcad_draw_script_io_window(void) {
                         mdcad_script_io_clear_error();
                     } else {
                         state.script_io_last_error = apply_error;
+                        state.script_io_slider_drag_active = false;
+                        state.script_io_slider_drag_sketch = 0;
+                        state.script_io_slider_drag_input_id[0] = '\0';
+                        state.script_io_slider_drag_before_script[0] = '\0';
+                    }
+                    if (session_active_for_item) {
+                        state.ecs_scene.script_apply_undo_suppressed = prev_undo_suppressed;
                     }
                 }
                 igPopID();
@@ -449,9 +504,37 @@ static void mdcad_draw_script_io_window(void) {
     }
     igEnd();
 
+    if (state.script_io_slider_drag_active) {
+        if (!slider_drag_active_this_frame ||
+            state.script_io_slider_drag_sketch != state.script_io_sketch) {
+            char after_script[16384] = {0};
+            sketch_script_error_t emit_error = {0};
+            if (scene_script_emit_for_sketch(&state.ecs_scene,
+                                             state.script_io_slider_drag_sketch,
+                                             after_script,
+                                             sizeof(after_script),
+                                             &emit_error)) {
+                if (strcmp(state.script_io_slider_drag_before_script, after_script) != 0) {
+                    undo_cmd_script_apply_transaction(&state.undo_redo,
+                                                      state.script_io_slider_drag_sketch,
+                                                      state.script_io_slider_drag_before_script,
+                                                      after_script);
+                }
+            }
+            state.script_io_slider_drag_active = false;
+            state.script_io_slider_drag_sketch = 0;
+            state.script_io_slider_drag_input_id[0] = '\0';
+            state.script_io_slider_drag_before_script[0] = '\0';
+        }
+    }
+
     if (!open) {
         state.script_io_open = false;
         state.script_io_sketch = 0;
+        state.script_io_slider_drag_active = false;
+        state.script_io_slider_drag_sketch = 0;
+        state.script_io_slider_drag_input_id[0] = '\0';
+        state.script_io_slider_drag_before_script[0] = '\0';
     }
 }
 
@@ -524,6 +607,50 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
     return *out_sketch != 0;
 }
 
+static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
+    char emitted[16384] = {0};
+    sketch_script_error_t error = {0};
+    if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &error)) {
+        return false;
+    }
+
+    const char *entities_marker = "  entities = {\n";
+    char *entities_pos = strstr(emitted, entities_marker);
+    if (!entities_pos) {
+        return false;
+    }
+
+    const char *io_block =
+        "  inputs = {\n"
+        "    { id = \"front_span\", value = 1.5, min = 0.5, max = 3.0, step = 0.05 },\n"
+        "    { id = \"hole_depth\", value = 1.0, min = 0.25, max = 2.0, step = 0.05 },\n"
+        "    { id = \"include_cube_connectors\", value = 1.0, min = 0.0, max = 1.0, step = 1.0 },\n"
+        "    { id = \"include_hole_connectors\", value = 1.0, min = 0.0, max = 1.0, step = 1.0 }\n"
+        "  },\n"
+        "  outputs = {\n"
+        "    { id = \"body_depth\", value = 1.0 },\n"
+        "    { id = \"hole_diameter\", value = 0.7 }\n"
+        "  },\n";
+
+    char seeded_script[16384] = {0};
+    size_t prefix_len = (size_t)(entities_pos - emitted);
+    int written = snprintf(seeded_script,
+                           sizeof(seeded_script),
+                           "%.*s%s%s",
+                           (int)prefix_len,
+                           emitted,
+                           io_block,
+                           entities_pos);
+    if (written <= 0 || (size_t)written >= sizeof(seeded_script)) {
+        return false;
+    }
+
+    bool prev_undo_suppressed = state.ecs_scene.script_apply_undo_suppressed;
+    state.ecs_scene.script_apply_undo_suppressed = true;
+    bool applied = scene_script_apply_commit(&state.ecs_scene, sketch, seeded_script, &error);
+    state.ecs_scene.script_apply_undo_suppressed = prev_undo_suppressed;
+    return applied;
+}
 static void mdcad_seed_default_sketch_scene(void) {
     const vec4_t sketch_color = vec4_make(0.90f, 0.90f, 0.95f, 1.0f);
     ecs_entity_t sketch = scene_add_sketch(&state.ecs_scene,
@@ -642,6 +769,7 @@ static void mdcad_seed_default_sketch_scene(void) {
     }
 
     scene_refresh_sketch_metadata(&state.ecs_scene, sketch);
+    (void)mdcad_seed_default_sketch_script_io(sketch);
 }
 
 static void mdcad_draw_constraint_context_menu(void) {
@@ -1018,6 +1146,10 @@ static void init(void) {
     state.script_io_sketch = 0;
     state.script_io_open = false;
     state.script_io_last_seen_emit_revision = 0;
+    state.script_io_slider_drag_active = false;
+    state.script_io_slider_drag_sketch = 0;
+    state.script_io_slider_drag_input_id[0] = '\0';
+    state.script_io_slider_drag_before_script[0] = '\0';
     mdcad_script_io_clear_error();
 
     // Create test ECS entities using the scene API
@@ -1204,16 +1336,18 @@ static void frame(void) {
 
     // Handle keyboard shortcuts when no text input has focus
     if (!io->WantCaptureKeyboard) {
-        // Undo: Ctrl+Z
-        if (io->KeyCtrl && !io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) {
+        bool shortcut_mod = io->KeyCtrl || io->KeySuper;
+
+        // Undo: Ctrl/Cmd+Z
+        if (shortcut_mod && !io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) {
             if (undo_redo_undo(&state.undo_redo)) {
                 ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
             }
         }
 
-        // Redo: Ctrl+Shift+Z or Ctrl+Y
-        if ((io->KeyCtrl && io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) ||
-            (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_Y, false))) {
+        // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+        if ((shortcut_mod && io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) ||
+            (shortcut_mod && igIsKeyPressed_Bool(ImGuiKey_Y, false))) {
             if (undo_redo_redo(&state.undo_redo)) {
                 ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
             }
@@ -1749,6 +1883,8 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .width = 1280,
         .height = 720,
         .high_dpi = true,
+        .enable_clipboard = true,
+        .clipboard_size = 65536,
         .icon.sokol_default = false,
         .logger.func = slog_func,
     };

@@ -45,6 +45,7 @@
 #define ECS_SCENE_SCRIPT_IO_MAX_SKETCHES 64
 #define ECS_SCENE_SCRIPT_IO_MAX_INPUTS 32
 #define ECS_SCENE_SCRIPT_IO_MAX_OUTPUTS 32
+#define ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE 16384
 
 //------------------------------------------------------------------------------
 // Tessellation Helpers
@@ -3326,7 +3327,7 @@ static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
         return false;
     }
 
-    char script[4096] = {0};
+    char script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
     if (!scene_script_emit_for_sketch(scene, sketch, script, sizeof(script), out_error)) {
         return false;
     }
@@ -3349,7 +3350,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
     if (io_state) {
         io_state_before = *io_state;
     }
-    char before_script[4096] = {0};
+    char before_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
     bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, sizeof(before_script), out_error);
     if (!capture_before) return false;
 
@@ -3367,7 +3368,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
     }
 
     if (!scene->script_apply_undo_suppressed && scene->script_undo_redo) {
-        char after_script[4096] = {0};
+        char after_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
         if (!scene_script_emit_for_sketch(scene, sketch, after_script, sizeof(after_script), out_error)) {
             sketch_script_error_t rollback_error = {0};
             scene->script_apply_undo_suppressed = true;

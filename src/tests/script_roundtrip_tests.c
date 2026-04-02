@@ -598,6 +598,75 @@ static int test_script_apply_failure_preserves_last_valid_state(void) {
             redo_after == 0) ? 0 : 1;
 }
 
+static int test_script_apply_respects_undo_suppression_flag(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_a =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    const char *script_b =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"input_length\", value = 10.0, min = 1.0, max = 20.0, step = 0.5 }\n"
+        "  },\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_a, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_before_suppressed = undo_redo_get_undo_count(&undo_redo);
+
+    scene.script_apply_undo_suppressed = true;
+    bool suppressed_ok = scene_script_apply_commit(&scene, sketch, script_b, &err);
+    scene.script_apply_undo_suppressed = false;
+    if (!suppressed_ok) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_after_suppressed = undo_redo_get_undo_count(&undo_redo);
+    if (undo_after_suppressed != undo_before_suppressed) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_script_apply_commit(&scene, sketch, script_a, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int undo_after_normal = undo_redo_get_undo_count(&undo_redo);
+
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return (undo_after_normal == (undo_after_suppressed + 1)) ? 0 : 1;
+}
+
 static int test_script_io_numeric_schema_roundtrip(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -750,6 +819,209 @@ static int test_script_io_live_edit_uses_transaction_pipeline(void) {
            value_after_failed_edit == 12.5 ? 0 : 1;
 }
 
+static int test_script_io_live_edit_handles_large_script_buffers(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *base_script =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"front_span\", value = 1.5, min = 0.5, max = 3.0, step = 0.05 },\n"
+        "    { id = \"hole_depth\", value = 1.0, min = 0.25, max = 2.0, step = 0.05 },\n"
+        "    { id = \"include_cube_connectors\", value = 1.0, min = 0.0, max = 1.0, step = 1.0 },\n"
+        "    { id = \"include_hole_connectors\", value = 1.0, min = 0.0, max = 1.0, step = 1.0 }\n"
+        "  },\n"
+        "  outputs = {\n"
+        "    { id = \"body_depth\", value = 1.0 },\n"
+        "    { id = \"hole_diameter\", value = 0.7 }\n"
+        "  },\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, base_script, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    for (int i = 0; i < 200; i++) {
+        float x = (float)(i % 10) * 0.1f;
+        float y = (float)((i / 10) % 10) * 0.1f;
+        float z = (float)(i / 100) * 0.1f;
+        char id_buf[32] = {0};
+        snprintf(id_buf, sizeof(id_buf), "bulk_line_%d", i + 1);
+        ecs_entity_t line = scene_add_line_to_sketch(&scene,
+                                                     sketch,
+                                                     vec3_make(x, y, z),
+                                                     vec3_make(x + 1.0f, y, z),
+                                                     vec4_make(1, 1, 1, 1),
+                                                     0.01f);
+        if (line == 0) {
+            undo_redo_shutdown(&undo_redo);
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        ecs_world_set_script_identity(scene.world, line, &(ScriptIdentityComp){0});
+        ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, line);
+        if (!sid) {
+            undo_redo_shutdown(&undo_redo);
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        snprintf(sid->script_local_id, SCRIPT_LOCAL_ID_MAX, "%s", id_buf);
+        sid->script_local_id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+    }
+
+    if (!scene_script_reemit_for_sketch(&scene, sketch)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char emitted[16384] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (strlen(emitted) <= 4096) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_script_io_apply_input_value(&scene, sketch, "front_span", 1.8, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    double updated = 0.0;
+    bool is_input = false;
+    if (!scene_script_io_read_value(&scene, sketch, "front_span", &updated, &is_input)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return (is_input && updated == 1.8) ? 0 : 1;
+}
+
+static int test_script_io_numeric_input_coalesces_single_undo_step(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    undo_redo_t undo_redo = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    scene_script_bind_undo_redo(&scene, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_text =
+        "return {\n"
+        "  inputs = {\n"
+        "    { id = \"input_length\", value = 10.0, min = 1.0, max = 20.0, step = 0.5 }\n"
+        "  },\n"
+        "  outputs = {\n"
+        "    { id = \"output_span\", value = 7.5 }\n"
+        "  },\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char before_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, before_script, sizeof(before_script), &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    scene.script_apply_undo_suppressed = true;
+    if (!scene_script_io_apply_input_value(&scene, sketch, "input_length", 12.75, &err)) {
+        scene.script_apply_undo_suppressed = false;
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    scene.script_apply_undo_suppressed = false;
+
+    char after_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, after_script, sizeof(after_script), &err)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (strcmp(before_script, after_script) == 0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int undo_before_push = undo_redo_get_undo_count(&undo_redo);
+    undo_cmd_script_apply_transaction(&undo_redo, sketch, before_script, after_script);
+    int undo_after_push = undo_redo_get_undo_count(&undo_redo);
+    if ((undo_after_push - undo_before_push) != 1) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo_redo)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    double reverted_value = 0.0;
+    bool reverted_is_input = false;
+    if (!scene_script_io_read_value(&scene, sketch, "input_length", &reverted_value, &reverted_is_input)) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!reverted_is_input || reverted_value != 10.0) {
+        undo_redo_shutdown(&undo_redo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo_redo);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 static int test_script_io_window_request_is_exposed_from_inspector_state(void) {
     selection_buffer_t selection = {0};
     ecs_world_state_t world = {0};
@@ -772,6 +1044,83 @@ static int test_script_io_window_request_is_exposed_from_inspector_state(void) {
         return 1;
     }
     return 0;
+}
+
+static int test_script_apply_preserves_labels_by_script_identity(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_text =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_a\", type = \"point\", point = {0, 0, 0} },\n"
+        "    { id = \"geometry_b\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_a\", type = \"Coincident\", participants = {\"geometry_a\", \"geometry_b\"} }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t geometry_a = 0;
+    ecs_entity_t constraint_a = 0;
+    ecs_iter_t it = ecs_children(scene.world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, it.entities[i]);
+            if (!sid) continue;
+            if (strcmp(sid->script_local_id, "geometry_a") == 0) {
+                geometry_a = it.entities[i];
+            } else if (strcmp(sid->script_local_id, "constraint_a") == 0) {
+                constraint_a = it.entities[i];
+            }
+        }
+    }
+    if (geometry_a == 0 || constraint_a == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    LabelComp custom_geom = label_comp_make("VertexAnchor", "manual-geom");
+    LabelComp custom_constraint = label_comp_make("LockRelation", "manual-constraint");
+    ecs_world_set_label(scene.world, geometry_a, &custom_geom);
+    ecs_world_set_label(scene.world, constraint_a, &custom_constraint);
+
+    if (!scene_script_apply_commit(&scene, sketch, script_text, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    bool geom_ok = false;
+    bool constraint_ok = false;
+    it = ecs_children(scene.world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, it.entities[i]);
+            LabelComp *label = ecs_world_get_label(scene.world, it.entities[i]);
+            if (!sid || !label) continue;
+            if (strcmp(sid->script_local_id, "geometry_a") == 0) {
+                geom_ok = strcmp(label->name, "VertexAnchor") == 0;
+            } else if (strcmp(sid->script_local_id, "constraint_a") == 0) {
+                constraint_ok = strcmp(label->name, "LockRelation") == 0;
+            }
+        }
+    }
+
+    ecs_world_shutdown(&world);
+    return (geom_ok && constraint_ok) ? 0 : 1;
 }
 
 static int test_script_editor_launch_request_is_exposed_from_inspector_state(void) {
@@ -925,10 +1274,14 @@ int main(void) {
     if (test_script_apply_commit_keeps_last_valid_scene_on_failure() != 0) return 1;
     if (test_script_apply_undo_redo_single_step() != 0) return 1;
     if (test_script_apply_failure_preserves_last_valid_state() != 0) return 1;
+    if (test_script_apply_respects_undo_suppression_flag() != 0) return 1;
     if (test_script_io_numeric_schema_roundtrip() != 0) return 1;
     if (test_script_io_rejects_non_numeric() != 0) return 1;
     if (test_script_io_live_edit_uses_transaction_pipeline() != 0) return 1;
+    if (test_script_io_live_edit_handles_large_script_buffers() != 0) return 1;
+    if (test_script_io_numeric_input_coalesces_single_undo_step() != 0) return 1;
     if (test_script_io_window_request_is_exposed_from_inspector_state() != 0) return 1;
+    if (test_script_apply_preserves_labels_by_script_identity() != 0) return 1;
     if (test_script_editor_launch_request_is_exposed_from_inspector_state() != 0) return 1;
     if (test_script_emit_orders_by_type_and_script_id() != 0) return 1;
     if (test_script_emit_formats_numbers_without_scientific_notation() != 0) return 1;
