@@ -14,6 +14,11 @@
 #define CONSTRAINT_GLYPH_PICK_MAX    3200u
 #define CONSTRAINT_GLYPH_PICK_END    (CONSTRAINT_GLYPH_PICK_BASE + CONSTRAINT_GLYPH_PICK_MAX - 1u)
 
+#define ENDPOINT_PICK_BASE         16760832u   // 3168 IDs: endpoint/sub-entity picks (2 roles * 1584 entities)
+#define ENDPOINT_PICK_MAX_ENTITIES 1584u
+#define ENDPOINT_PICK_ROLE_COUNT   2u
+#define ENDPOINT_PICK_END          (ENDPOINT_PICK_BASE + (ENDPOINT_PICK_MAX_ENTITIES * ENDPOINT_PICK_ROLE_COUNT) - 1u)
+
 #define GIZMO_PICK_RESERVED_START  16767200u   // Everything >= this is gizmo territory
 #define GIZMO_HANDLE_BASE          16767200u   // 16 IDs: transform gizmo handles (16767200-16767215)
 #define GIZMO_HANDLE_COUNT         16

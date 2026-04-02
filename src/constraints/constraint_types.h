@@ -127,7 +127,17 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
         return sig->count == 1;
     }
     if (type == CONSTRAINT_COINCIDENT) {
-        return sig->count == 2;
+        if (sig->count != 2) return false;
+        for (uint32_t i = 0; i < sig->count; i++) {
+            bool endpoint_role =
+                sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+            if (endpoint_role &&
+                !(sig->geometry_types[i] == GEOM_LINE || sig->geometry_types[i] == GEOM_ARC)) {
+                return false;
+            }
+        }
+        return true;
     }
     if (type == CONSTRAINT_COLLINEAR || type == CONSTRAINT_PARALLEL) {
         if (sig->count < 2) return false;

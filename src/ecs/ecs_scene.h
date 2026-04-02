@@ -287,6 +287,15 @@ static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
                                                      const char *id,
                                                      double value,
                                                      sketch_script_error_t *out_error);
+static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, uint32_t pick_id);
+static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
+    ecs_scene_t *scene,
+    ecs_entity_t sketch,
+    constraint_type_t type,
+    const constraint_participant_descriptor_t *participants,
+    uint32_t participant_count,
+    float value,
+    bool driven);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
@@ -321,9 +330,16 @@ static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
                                               scene_solver_drag_decision_t *out_decision);
 static inline bool scene_solver_drag_make_rejected_diagnostic(const scene_solver_drag_decision_t *decision,
                                                              scene_solver_drag_diagnostic_event_t *out_event);
+static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
+                                                     constraint_participant_role_t role,
+                                                     vec3_t *out_local_point,
+                                                     uint8_t *out_sub_index);
 
 typedef struct {
     ecs_entity_t entity;
+    geometry_type_t geometry_type;
+    constraint_participant_role_t role;
+    uint8_t sub_index;
     vec3_t point;
     bool has_candidate;
     bool fixed;
@@ -339,10 +355,11 @@ static inline int scene_solver_compare_entity_asc(const void *lhs, const void *r
 
 static inline int scene_solver_find_point_candidate(scene_solver_point_candidate_t *entries,
                                                     int entry_count,
-                                                    ecs_entity_t entity) {
+                                                    ecs_entity_t entity,
+                                                    constraint_participant_role_t role) {
     if (!entries || entry_count <= 0 || entity == 0) return -1;
     for (int i = 0; i < entry_count; i++) {
-        if (entries[i].entity == entity) return i;
+        if (entries[i].entity == entity && entries[i].role == role) return i;
     }
     return -1;
 }
@@ -351,22 +368,143 @@ static inline int scene_solver_ensure_point_candidate(ecs_scene_t *scene,
                                                       scene_solver_point_candidate_t *entries,
                                                       int max_entries,
                                                       int *io_entry_count,
-                                                      ecs_entity_t entity) {
+                                                      ecs_entity_t entity,
+                                                      constraint_participant_role_t role) {
     if (!scene || !entries || !io_entry_count || entity == 0) return -1;
-    int existing = scene_solver_find_point_candidate(entries, *io_entry_count, entity);
+    int existing = scene_solver_find_point_candidate(entries, *io_entry_count, entity, role);
     if (existing >= 0) return existing;
     if (*io_entry_count >= max_entries) return -1;
 
     GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
-    if (!g || g->type != GEOM_POINT) return -1;
+    if (!g) return -1;
+
+    if (g->type == GEOM_POINT) {
+        role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    } else if (g->type == GEOM_LINE || g->type == GEOM_ARC) {
+        if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A && role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+
     SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(scene->world, entity);
 
     int index = (*io_entry_count)++;
     entries[index].entity = entity;
-    entries[index].point = g->data.point.point;
+    entries[index].geometry_type = g->type;
+    entries[index].role = role;
+    entries[index].sub_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) ? 1 : 0;
+    if (g->type == GEOM_POINT) {
+        entries[index].point = g->data.point.point;
+    } else {
+        if (!scene_entity_participant_subpoint(g, role, &entries[index].point, &entries[index].sub_index)) {
+            (*io_entry_count)--;
+            return -1;
+        }
+    }
     entries[index].has_candidate = true;
     entries[index].fixed = state ? state->fixed : false;
     return index;
+}
+
+static inline bool endpoint_pick_is_encoded(uint32_t pick_id) {
+    return pick_id >= ENDPOINT_PICK_BASE && pick_id <= ENDPOINT_PICK_END;
+}
+
+static inline bool endpoint_pick_encode(uint32_t entity_pick_id,
+                                        constraint_participant_role_t role,
+                                        uint32_t *out_pick_id) {
+    if (!out_pick_id) return false;
+    if (entity_pick_id == 0 || entity_pick_id >= CONSTRAINT_GLYPH_PICK_BASE) return false;
+    if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A && role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) return false;
+
+    uint32_t slot = entity_pick_id - 1u;
+    if (slot >= ENDPOINT_PICK_MAX_ENTITIES) return false;
+
+    uint32_t role_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0u : 1u;
+    *out_pick_id = ENDPOINT_PICK_BASE + (slot * ENDPOINT_PICK_ROLE_COUNT) + role_index;
+    return true;
+}
+
+static inline bool endpoint_pick_decode(uint32_t pick_id,
+                                        uint32_t *out_entity_pick_id,
+                                        constraint_participant_role_t *out_role) {
+    if (!endpoint_pick_is_encoded(pick_id)) return false;
+    uint32_t encoded = pick_id - ENDPOINT_PICK_BASE;
+    uint32_t slot = encoded / ENDPOINT_PICK_ROLE_COUNT;
+    uint32_t role_index = encoded % ENDPOINT_PICK_ROLE_COUNT;
+    if (slot >= ENDPOINT_PICK_MAX_ENTITIES) return false;
+
+    if (out_entity_pick_id) {
+        *out_entity_pick_id = slot + 1u;
+    }
+    if (out_role) {
+        *out_role = (role_index == 0u)
+            ? CONSTRAINT_PARTICIPANT_ROLE_POINT_A
+            : CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    }
+    return true;
+}
+
+static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
+                                                     constraint_participant_role_t role,
+                                                     vec3_t *out_local_point,
+                                                     uint8_t *out_sub_index) {
+    if (!g || !out_local_point) return false;
+    if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A && role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) return false;
+
+    switch (g->type) {
+        case GEOM_LINE:
+            if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+                *out_local_point = g->data.line.a;
+                if (out_sub_index) *out_sub_index = 0;
+            } else {
+                *out_local_point = g->data.line.b;
+                if (out_sub_index) *out_sub_index = 1;
+            }
+            return true;
+        case GEOM_ARC: {
+            float angle = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A)
+                ? g->data.arc.start_angle
+                : g->data.arc.end_angle;
+            vec3_t center = g->data.arc.center;
+            float radius = g->data.arc.radius;
+            vec3_t normal = g->data.arc.normal;
+            vec3_t arbitrary = (fabsf(normal.y) < 0.9f) ? vec3_make(0, 1, 0) : vec3_make(1, 0, 0);
+            vec3_t x_axis = vec3_normalize(vec3_cross(arbitrary, normal));
+            vec3_t y_axis = vec3_cross(normal, x_axis);
+            float cx = cosf(angle) * radius;
+            float cy = sinf(angle) * radius;
+            *out_local_point = vec3_add(center, vec3_add(vec3_scale(x_axis, cx), vec3_scale(y_axis, cy)));
+            if (out_sub_index) *out_sub_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0 : 1;
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+static inline ecs_entity_t scene_constraint_participant_entity_for_pick(ecs_scene_t *scene,
+                                                                         uint32_t pick_id,
+                                                                         constraint_participant_role_t *out_role,
+                                                                         uint8_t *out_sub_index) {
+    if (!scene || pick_id == 0) return 0;
+    if (!endpoint_pick_is_encoded(pick_id)) return 0;
+
+    uint32_t entity_pick_id = 0;
+    constraint_participant_role_t role = CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+    if (!endpoint_pick_decode(pick_id, &entity_pick_id, &role)) return 0;
+
+    ecs_entity_t entity = ecs_scene_find_entity_by_pick_id(scene, entity_pick_id);
+    if (!entity || !ecs_is_alive(scene->world->world, entity)) return 0;
+    GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
+    if (!g) return 0;
+    if (g->type != GEOM_LINE && g->type != GEOM_ARC) return 0;
+
+    if (out_role) *out_role = role;
+    if (out_sub_index) *out_sub_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0 : 1;
+    return entity;
 }
 
 static inline void scene_solver_sort_entities_unique(ecs_entity_t *values, int *io_count) {
@@ -1740,6 +1878,26 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
                                                           uint32_t participant_count,
                                                           float value,
                                                           bool driven) {
+    constraint_participant_descriptor_t descriptors[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+    if (!participants || participant_count == 0 || participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
+    for (uint32_t i = 0; i < participant_count; i++) {
+        descriptors[i] = constraint_participant_descriptor_make((uint64_t)participants[i],
+                                                                CONSTRAINT_PARTICIPANT_ROLE_ENTITY,
+                                                                0);
+    }
+    return scene_add_constraint_to_sketch_with_descriptors(scene, sketch, type,
+                                                           descriptors, participant_count,
+                                                           value, driven);
+}
+
+static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
+                                                          ecs_scene_t *scene,
+                                                          ecs_entity_t sketch,
+                                                          constraint_type_t type,
+                                                          const constraint_participant_descriptor_t *participants,
+                                                          uint32_t participant_count,
+                                                          float value,
+                                                          bool driven) {
     if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
     if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
     if (participant_count < constraint_type_min_participants(type)) return 0;
@@ -1747,15 +1905,29 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
     constraint_selection_signature_t signature = {0};
     signature.count = participant_count;
     uint64_t participant_ids[CONSTRAINT_MAX_PARTICIPANTS];
+    constraint_participant_descriptor_t participant_descriptors[CONSTRAINT_MAX_PARTICIPANTS] = {0};
     for (uint32_t i = 0; i < participant_count; i++) {
-        ecs_entity_t p = participants[i];
+        ecs_entity_t p = (ecs_entity_t)participants[i].entity;
+        constraint_participant_role_t role = (constraint_participant_role_t)participants[i].role;
         if (!ecs_is_alive(scene->world->world, p)) return 0;
         GeometryComp *g = ecs_world_get_geometry(scene->world, p);
         if (!g) return 0;
         if (ecs_world_get_parent(scene->world, p) != sketch) return 0;
+        if (role == CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED) role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        if (g->type == GEOM_LINE || g->type == GEOM_ARC) {
+            if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                return 0;
+            }
+        } else {
+            role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        }
         participant_ids[i] = (uint64_t)p;
         signature.geometry_types[i] = g->type;
-        signature.roles[i] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        signature.roles[i] = role;
+        participant_descriptors[i] =
+            constraint_participant_descriptor_make((uint64_t)p, (uint8_t)role, participants[i].sub_index);
     }
     if (!constraint_type_is_selection_legal(&signature, type)) return 0;
 
@@ -1767,12 +1939,15 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
         constraint.display_decimals = constraint_value_infer_decimals(value, 0);
         constraint.value = constraint_round_to_decimals(value, constraint.display_decimals);
     }
+    memcpy(constraint.participant_descriptors,
+           participant_descriptors,
+           sizeof(constraint_participant_descriptor_t) * participant_count);
     ecs_world_set_constraint(scene->world, constraint_e, &constraint);
     scene_set_parent(scene, constraint_e, sketch);
     scene_set_constraint_default_label(scene, sketch, constraint_e, type);
 
     for (uint32_t i = 0; i < participant_count; i++) {
-        ecs_entity_t p = participants[i];
+        ecs_entity_t p = (ecs_entity_t)participant_descriptors[i].entity;
         ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, p);
         if (!refs) {
             ConstraintParticipantComp init_refs = constraint_participant_comp_default();
@@ -1892,7 +2067,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     int candidate_count = 0;
     for (int i = 0; i < point_count; i++) {
         scene_solver_ensure_point_candidate(scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
-                                           &candidate_count, sketch_points[i]);
+                                           &candidate_count, sketch_points[i], CONSTRAINT_PARTICIPANT_ROLE_ENTITY);
     }
 
     children = ecs_children(scene->world->world, sketch);
@@ -1908,14 +2083,18 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
             }
 
             if (constraint->type == CONSTRAINT_COINCIDENT && participant_count == 2) {
-                ecs_entity_t pa = (ecs_entity_t)constraint->participants[0];
-                ecs_entity_t pb = (ecs_entity_t)constraint->participants[1];
+                ecs_entity_t pa = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                ecs_entity_t pb = (ecs_entity_t)constraint->participant_descriptors[1].entity;
+                constraint_participant_role_t role_a =
+                    (constraint_participant_role_t)constraint->participant_descriptors[0].role;
+                constraint_participant_role_t role_b =
+                    (constraint_participant_role_t)constraint->participant_descriptors[1].role;
                 int ia = scene_solver_ensure_point_candidate(scene, candidates,
                                                              ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
-                                                             &candidate_count, pa);
+                                                             &candidate_count, pa, role_a);
                 int ib = scene_solver_ensure_point_candidate(scene, candidates,
                                                              ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
-                                                             &candidate_count, pb);
+                                                             &candidate_count, pb, role_b);
                 if (ia < 0 || ib < 0) {
                     solve_failed = true;
                     failure_reason = "Unsupported coincident participants: only point-point is solved in this phase.";
@@ -1979,9 +2158,30 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     for (int i = 0; i < candidate_count; i++) {
         GeometryComp *g = ecs_world_get_geometry(scene->world, candidates[i].entity);
         RenderableComp *r = ecs_world_get_renderable(scene->world, candidates[i].entity);
-        if (!g || g->type != GEOM_POINT) continue;
-        g->data.point.point = candidates[i].point;
-        if (r) r->instance_dirty = true;
+        if (!g) continue;
+        if (g->type == GEOM_POINT) {
+            g->data.point.point = candidates[i].point;
+            if (r) r->instance_dirty = true;
+            continue;
+        }
+        if (g->type == GEOM_LINE) {
+            if (candidates[i].role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+                g->data.line.a = candidates[i].point;
+            } else if (candidates[i].role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                g->data.line.b = candidates[i].point;
+            }
+            if (r) r->instance_dirty = true;
+            continue;
+        }
+        if (g->type == GEOM_ARC) {
+            vec3_t endpoint;
+            uint8_t sub_index = 0;
+            if (scene_entity_participant_subpoint(g, candidates[i].role, &endpoint, &sub_index)) {
+                vec3_t delta = vec3_sub(candidates[i].point, endpoint);
+                g->data.arc.center = vec3_add(g->data.arc.center, delta);
+                if (r) r->instance_dirty = true;
+            }
+        }
     }
 
     sk->solve_completed_serial = sk->solve_request_serial;
@@ -2978,6 +3178,15 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     if (!va || !vb) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; } // Straddles camera — don't cull
                     if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) break;
                     pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+
+                    uint32_t endpoint_pick_a = 0u;
+                    uint32_t endpoint_pick_b = 0u;
+                    if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &endpoint_pick_a)) {
+                        pick_buffer_add_overlay_point(pb, world_a, endpoint_pick_a);
+                    }
+                    if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &endpoint_pick_b)) {
+                        pick_buffer_add_overlay_point(pb, world_b, endpoint_pick_b);
+                    }
                     break;
                 }
                 case GEOM_POINT: {
@@ -3047,6 +3256,18 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                                 vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg]);
                                 vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg + 1]);
                                 pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
+                            }
+                            if (arc_point_count >= 2) {
+                                vec3_t world_start = ecs_scene_transform_point_world(&t->world_matrix, arc_points[0]);
+                                vec3_t world_end = ecs_scene_transform_point_world(&t->world_matrix, arc_points[arc_point_count - 1]);
+                                uint32_t endpoint_pick_a = 0u;
+                                uint32_t endpoint_pick_b = 0u;
+                                if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &endpoint_pick_a)) {
+                                    pick_buffer_add_overlay_point(pb, world_start, endpoint_pick_a);
+                                }
+                                if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &endpoint_pick_b)) {
+                                    pick_buffer_add_overlay_point(pb, world_end, endpoint_pick_b);
+                                }
                             }
                             for (int j = 1; j < arc_point_count - 1; j++) {
                                 vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, arc_points[j]);

@@ -111,7 +111,7 @@ static struct {
     bool constraint_menu_open_request;
     ImVec2 constraint_menu_anchor;
     ecs_entity_t constraint_menu_sketch;
-    ecs_entity_t constraint_menu_participants[CONSTRAINT_MAX_PARTICIPANTS];
+    constraint_participant_descriptor_t constraint_menu_participants[CONSTRAINT_MAX_PARTICIPANTS];
     uint32_t constraint_menu_participant_count;
     constraint_selection_signature_t constraint_menu_signature;
     ecs_entity_t selected_constraint_entity;
@@ -548,7 +548,7 @@ static mat4_t mdcad_mat4_bridge_from_cglm(mat4s matrix) {
 static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
                                              selection_buffer_t *selection,
                                              ecs_entity_t *out_sketch,
-                                             ecs_entity_t *out_participants,
+                                             constraint_participant_descriptor_t *out_participants,
                                              uint32_t *out_participant_count,
                                              constraint_selection_signature_t *out_sig) {
     if (!scene || !selection || !out_sketch || !out_participants || !out_participant_count || !out_sig) {
@@ -589,7 +589,8 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
 
         bool already_added = false;
         for (uint32_t p = 0; p < *out_participant_count; p++) {
-            if (out_participants[p] == selected) {
+            if ((ecs_entity_t)out_participants[p].entity == selected &&
+                out_participants[p].role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY) {
                 already_added = true;
                 break;
             }
@@ -597,7 +598,10 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
         if (already_added) continue;
         if (*out_participant_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
 
-        out_participants[*out_participant_count] = selected;
+        out_participants[*out_participant_count] =
+            constraint_participant_descriptor_make((uint64_t)selected,
+                                                   CONSTRAINT_PARTICIPANT_ROLE_ENTITY,
+                                                   0);
         out_sig->geometry_types[*out_participant_count] = g->type;
         out_sig->roles[*out_participant_count] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
         (*out_participant_count)++;
@@ -605,6 +609,48 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
     }
 
     return *out_sketch != 0;
+}
+
+static bool mdcad_append_endpoint_participant_from_pick(ecs_scene_t *scene,
+                                                        uint32_t pick_id,
+                                                        ecs_entity_t *io_sketch,
+                                                        constraint_participant_descriptor_t *io_participants,
+                                                        uint32_t *io_participant_count,
+                                                        constraint_selection_signature_t *io_sig) {
+    if (!scene || !io_sketch || !io_participants || !io_participant_count || !io_sig) return false;
+
+    constraint_participant_role_t role = CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+    uint8_t sub_index = 0;
+    ecs_entity_t entity = scene_constraint_participant_entity_for_pick(scene, pick_id, &role, &sub_index);
+    if (entity == 0) return false;
+
+    ecs_entity_t sketch = scene_get_parent(scene, entity);
+    if (!scene_is_sketch(scene, sketch)) return false;
+    if (*io_sketch == 0) {
+        *io_sketch = sketch;
+    } else if (*io_sketch != sketch) {
+        return false;
+    }
+
+    GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
+    if (!g) return false;
+
+    for (uint32_t i = 0; i < *io_participant_count; i++) {
+        if ((ecs_entity_t)io_participants[i].entity == entity &&
+            io_participants[i].role == role &&
+            io_participants[i].sub_index == sub_index) {
+            return true;
+        }
+    }
+
+    if (*io_participant_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
+    io_participants[*io_participant_count] =
+        constraint_participant_descriptor_make((uint64_t)entity, (uint8_t)role, sub_index);
+    io_sig->geometry_types[*io_participant_count] = g->type;
+    io_sig->roles[*io_participant_count] = role;
+    (*io_participant_count)++;
+    io_sig->count = *io_participant_count;
+    return true;
 }
 
 static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
@@ -802,7 +848,7 @@ static void mdcad_draw_constraint_context_menu(void) {
 
         if (igMenuItem_Bool(constraint_type_display_name(type), NULL, false, true)) {
             float initial_value = (type == CONSTRAINT_ANGLE) ? 90.0f : 1.0f;
-            ecs_entity_t created = scene_add_constraint_to_sketch(
+            ecs_entity_t created = scene_add_constraint_to_sketch_with_descriptors(
                 &state.ecs_scene,
                 state.constraint_menu_sketch,
                 type,
@@ -1363,7 +1409,7 @@ static void frame(void) {
         // C: open context-aware constraint authoring menu at cursor
         if (igIsKeyPressed_Bool(ImGuiKey_C, false)) {
             ecs_entity_t sketch = 0;
-            ecs_entity_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+            constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
             uint32_t participant_count = 0;
             constraint_selection_signature_t signature;
 
@@ -1591,6 +1637,7 @@ static void frame(void) {
             if (!state.gizmo_drag_active) {
                 // Check if we should start a gizmo drag
                 if (state.viewport.hovered && io->MouseDown[0] && igIsMouseClicked_Bool(0, false)) {
+                    bool endpoint_pick = endpoint_pick_is_encoded(pick_id);
                     if (state.gizmo.hovered_handle != GIZMO_HANDLE_NONE) {
                         // Start gizmo drag — compute mouse ray
                         ray_t mouse_ray = mdcad_interaction_screen_ray_from_viewport(
@@ -1637,6 +1684,27 @@ static void frame(void) {
                                                   state.gizmo.hovered_vertex,
                                                   state.viewport.shift_held,
                                                   state.viewport.ctrl_held);
+                    } else if (endpoint_pick && state.viewport.clicked) {
+                        ecs_entity_t sketch = 0;
+                        constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+                        uint32_t participant_count = 0;
+                        constraint_selection_signature_t signature = {0};
+                        if (state.viewport.shift_held || state.viewport.ctrl_held) {
+                            mdcad_collect_constraint_context(&state.ecs_scene, &state.selection,
+                                                            &sketch, participants, &participant_count, &signature);
+                        }
+                        if (mdcad_append_endpoint_participant_from_pick(&state.ecs_scene, pick_id,
+                                                                        &sketch, participants,
+                                                                        &participant_count, &signature)) {
+                            state.constraint_menu_sketch = sketch;
+                            state.constraint_menu_participant_count = participant_count;
+                            memcpy(state.constraint_menu_participants, participants, sizeof(participants));
+                            state.constraint_menu_signature = signature;
+                            state.constraint_menu_anchor = io->MousePos;
+                            state.constraint_menu_open_request = true;
+                            state.constraint_menu_open = false;
+                            gizmo_handle_hover(&state.gizmo, 0);
+                        }
                     } else if (state.viewport.clicked) {
                         if (constraint_glyphs_is_pick_id(pick_id)) {
                             ecs_entity_t clicked_constraint =

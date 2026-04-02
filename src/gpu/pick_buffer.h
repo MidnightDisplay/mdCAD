@@ -141,6 +141,38 @@ typedef struct {
     uint32_t prev_camera_hash;
 } pick_buffer_t;
 
+typedef enum {
+    PICK_BUFFER_LAYER_BASE = 0,
+    PICK_BUFFER_LAYER_OVERLAY = 1
+} pick_buffer_layer_t;
+
+typedef struct {
+    uint32_t pick_id;
+    pick_buffer_layer_t layer;
+} pick_buffer_layer_event_t;
+
+static inline void pick_buffer_layer_record_line(pick_buffer_layer_event_t *events,
+                                                 int max_events,
+                                                 int *io_count,
+                                                 uint32_t pick_id) {
+    if (!events || !io_count || max_events <= 0) return;
+    if (*io_count < 0 || *io_count >= max_events) return;
+    events[*io_count].pick_id = pick_id;
+    events[*io_count].layer = PICK_BUFFER_LAYER_BASE;
+    (*io_count)++;
+}
+
+static inline void pick_buffer_layer_record_overlay_point(pick_buffer_layer_event_t *events,
+                                                          int max_events,
+                                                          int *io_count,
+                                                          uint32_t pick_id) {
+    if (!events || !io_count || max_events <= 0) return;
+    if (*io_count < 0 || *io_count >= max_events) return;
+    events[*io_count].pick_id = pick_id;
+    events[*io_count].layer = PICK_BUFFER_LAYER_OVERLAY;
+    (*io_count)++;
+}
+
 //------------------------------------------------------------------------------
 // Internal: Generate template geometry
 //------------------------------------------------------------------------------
