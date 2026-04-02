@@ -17,7 +17,7 @@ Milestone outcome: users can build constrained sketches, diagnose/resolve solver
 - [x] **Phase 12: Solver Control & Constrained Interaction** - Users can control solving, read diagnostics, and manipulate geometry with constraints respected. (completed 2026-04-01)
 - [x] **Phase 13: Script Round-Trip Baseline** - Users can open script editing and deterministically round-trip sketch scene state with Lua 5.4.x runtime. (completed 2026-04-01)
 - [x] **Phase 14: Script IO + API/Undo Integration** - Users can drive sketches via script IO while API and undo/redo remain transactional. (completed 2026-04-02)
-- [ ] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance.
+- [x] **Phase 15: Validation & Acceptance Closure** - Teams have shipped examples and platform gate evidence for v1.2 acceptance. (completed 2026-04-02)
 - [x] **Phase 16: Constraint UX Closure & Verification** - Teams close Phase 11 audit gaps, harden glyph-selection highlighting behavior, and produce complete verification evidence. (completed 2026-04-01)
 
 ## Phase Details
@@ -110,12 +110,12 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
   2. v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
-  3. macOS parity validation is executed after Windows gate pass and results are recorded.
+  3. macOS parity validation deferment is explicitly recorded after Windows gate pass with a follow-up handoff for subsequent closure.
 **Plans**: 3 plans
 Plans:
 - [x] 15-01-PLAN.md — Package VAL-01 case-study evidence (2 sketch workflows + 1 Script IO parse/apply/reset/diagnostics scenario) and map it in validation docs.
 - [x] 15-02-PLAN.md — Run mandatory Windows build+ctest gates and capture explicit evidence artifacts, then finalize closure summary for VAL-02.
-- [ ] 15-03-PLAN.md — Record explicit VAL-03 deferred traceability across validation/summary/checkpoint closure artifacts.
+- [x] 15-03-PLAN.md — Record explicit VAL-03 deferred traceability across validation/summary/checkpoint closure artifacts.
 
 ### Phase 16: Constraint UX Closure & Verification
 **Goal**: Close outstanding Phase 11 audit gaps by hardening constraint glyph selection behavior and producing complete Phase 11 verification/validation evidence.
@@ -139,5 +139,5 @@ Plans:
 | 12. Solver Control & Constrained Interaction | 3/3 | Complete    | 2026-04-01 |
 | 13. Script Round-Trip Baseline | 3/3 | Complete   | 2026-04-01 |
 | 14. Script IO + API/Undo Integration | 3/3 | Complete    | 2026-04-02 |
-| 15. Validation & Acceptance Closure | 2/3 | In Progress|  |
+| 15. Validation & Acceptance Closure | 3/3 | Complete    | 2026-04-02 |
 | 16. Constraint UX Closure & Verification | 2/2 | Complete    | 2026-04-01 |

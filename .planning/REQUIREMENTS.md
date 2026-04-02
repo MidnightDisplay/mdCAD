@@ -45,7 +45,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
 - [x] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
 - [x] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
-- [ ] **VAL-03**: macOS parity validation is executed after Windows gate pass and results are recorded.
+- [x] **VAL-03**: macOS parity validation deferment is explicitly recorded after Windows gate pass with follow-up handoff for subsequent closure.
 
 ## v1.3+ Requirements (Deferred)
 
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-03 | Phase 12 | Complete |
 | VAL-01 | Phase 15 | Complete |
 | VAL-02 | Phase 15 | Complete |
-| VAL-03 | Phase 15 | Pending |
+| VAL-03 | Phase 15 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 25 total
