@@ -16,6 +16,7 @@
 #include "../components/constraint_comp.h"
 #include "../components/constraint_participant_comp.h"
 #include "../components/script_identity_comp.h"
+#include "../components/endpoints_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -37,6 +38,7 @@ typedef struct {
     ecs_entity_t ConstraintComp_id;
     ecs_entity_t ConstraintParticipantComp_id;
     ecs_entity_t ScriptIdentityComp_id;
+    ecs_entity_t EndPointsComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -150,6 +152,12 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "ScriptIdentityComp" }),
         .type.size = sizeof(ScriptIdentityComp),
         .type.alignment = ECS_ALIGNOF(ScriptIdentityComp)
+    });
+
+    s->EndPointsComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "EndPointsComp" }),
+        .type.size = sizeof(EndPointsComp),
+        .type.alignment = ECS_ALIGNOF(EndPointsComp)
     });
 
     // Register tag components (zero-size)
@@ -343,6 +351,15 @@ static inline ScriptIdentityComp* ecs_world_get_script_identity(ecs_world_state_
 static inline void ecs_world_set_script_identity(ecs_world_state_t *s, ecs_entity_t e,
                                                  const ScriptIdentityComp *identity) {
     ecs_set_id(s->world, e, s->ScriptIdentityComp_id, sizeof(ScriptIdentityComp), identity);
+}
+
+static inline EndPointsComp* ecs_world_get_endpoints(ecs_world_state_t *s, ecs_entity_t e) {
+    return (EndPointsComp*)ecs_get_id(s->world, e, s->EndPointsComp_id);
+}
+
+static inline void ecs_world_set_endpoints(ecs_world_state_t *s, ecs_entity_t e,
+                                           const EndPointsComp *endpoints) {
+    ecs_set_id(s->world, e, s->EndPointsComp_id, sizeof(EndPointsComp), endpoints);
 }
 
 //------------------------------------------------------------------------------
