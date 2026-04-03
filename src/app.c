@@ -1743,18 +1743,11 @@ static void frame(void) {
                     pick_buffer_invalidate(&state.pick_buffer);
 
                     if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
-                        // Apply delta to all selected entities
-                        for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
-                            ecs_entity_t e = state.gizmo_drag_entities[i];
-                            TransformComp *t = (TransformComp*)ecs_world_get_transform(state.ecs_scene.world, e);
-                            if (t) {
-                                t->position = vec3_add(t->position, delta);
-                                t->dirty = true;
-                                ecs_world_mark_descendants_dirty(state.ecs_scene.world, e);
-                            }
-                            RenderableComp *r = (RenderableComp*)ecs_world_get_renderable(state.ecs_scene.world, e);
-                            if (r) r->instance_dirty = true;
-                        }
+                        // Apply delta to all selected entities (endpoint points route through owner geometry sync)
+                        scene_apply_transform_delta_for_selection(&state.ecs_scene,
+                                                                  state.gizmo_drag_entities,
+                                                                  state.gizmo_drag_entity_count,
+                                                                  delta);
                     } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
                                state.gizmo.vertex_mode.active) {
                         // Apply delta to selected vertices

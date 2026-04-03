@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include "../constraints/constraint_types.h"
 
-#define ENDPOINTS_COMP_MAX_ENDPOINTS 2u
+#define ENDPOINTS_COMP_MAX_ENDPOINTS 3u
 
 typedef struct {
     uint64_t endpoint_entity;                    // Native endpoint point entity
@@ -50,7 +50,9 @@ static inline EndPointsComp endpoints_comp_point(uint64_t owner_entity,
 }
 
 static inline bool endpoints_comp_is_supported_role(constraint_participant_role_t role) {
-    return role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A || role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    return role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+           role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B ||
+           role == CONSTRAINT_PARTICIPANT_ROLE_CENTER;
 }
 
 static inline bool endpoints_comp_set_binding(EndPointsComp *comp,

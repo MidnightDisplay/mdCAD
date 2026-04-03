@@ -335,6 +335,17 @@ static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
                                                      constraint_participant_role_t role,
                                                      vec3_t *out_local_point,
                                                      uint8_t *out_sub_index);
+static inline bool scene_apply_local_point_to_participant(GeometryComp *g,
+                                                          constraint_participant_role_t role,
+                                                          vec3_t local_point);
+static inline vec3_t scene_world_delta_to_local(const mat4_t *world_matrix, vec3_t world_delta);
+static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
+                                                          ecs_entity_t endpoint_entity,
+                                                          vec3_t world_delta);
+static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
+                                                             const ecs_entity_t *entities,
+                                                             int entity_count,
+                                                             vec3_t world_delta);
 static inline ecs_entity_t scene_find_parent_sketch(ecs_scene_t *scene, ecs_entity_t entity);
 static inline bool scene_endpoint_owner_entity_for_pick(ecs_scene_t *scene,
                                                          uint32_t pick_id,
@@ -532,6 +543,169 @@ static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
         default:
             return false;
     }
+}
+
+static inline bool scene_apply_local_point_to_participant(GeometryComp *g,
+                                                          constraint_participant_role_t role,
+                                                          vec3_t local_point) {
+    if (!g) return false;
+    if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+        role != CONSTRAINT_PARTICIPANT_ROLE_CENTER &&
+        role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+        role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+        return false;
+    }
+
+    switch (g->type) {
+        case GEOM_POINT:
+            g->data.point.point = local_point;
+            return role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        case GEOM_LINE:
+            if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+                g->data.line.a = local_point;
+                return true;
+            }
+            if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                g->data.line.b = local_point;
+                return true;
+            }
+            return false;
+        case GEOM_ARC: {
+            if (role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+                g->data.arc.center = local_point;
+                return true;
+            }
+            if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                return false;
+            }
+
+            vec3_t normal = g->data.arc.normal;
+            vec3_t arbitrary = (fabsf(normal.y) < 0.9f) ? vec3_make(0, 1, 0) : vec3_make(1, 0, 0);
+            vec3_t x_axis = vec3_normalize(vec3_cross(arbitrary, normal));
+            vec3_t y_axis = vec3_cross(normal, x_axis);
+            vec3_t radial = vec3_sub(local_point, g->data.arc.center);
+            float radius = vec3_length(radial);
+            if (!isfinite(radius) || radius <= 1e-6f) {
+                return false;
+            }
+
+            float projected_x = vec3_dot(radial, x_axis);
+            float projected_y = vec3_dot(radial, y_axis);
+            float angle = atan2f(projected_y, projected_x);
+            if (!isfinite(angle)) return false;
+
+            g->data.arc.radius = radius;
+            if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+                g->data.arc.start_angle = angle;
+            } else {
+                g->data.arc.end_angle = angle;
+            }
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+static inline vec3_t scene_world_delta_to_local(const mat4_t *world_matrix, vec3_t world_delta) {
+    if (!world_matrix) return vec3_make(0.0f, 0.0f, 0.0f);
+    if (!isfinite(world_delta.x) || !isfinite(world_delta.y) || !isfinite(world_delta.z)) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    mat4 world_cglm;
+    memcpy(world_cglm, world_matrix->m, sizeof(*world_matrix));
+    float det = glm_mat4_det(world_cglm);
+    if (!isfinite(det) || fabsf(det) <= 1e-8f) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    mat4 inv_world;
+    glm_mat4_inv(world_cglm, inv_world);
+    vec4 delta4 = { world_delta.x, world_delta.y, world_delta.z, 0.0f };
+    vec4 local4;
+    glm_mat4_mulv(inv_world, delta4, local4);
+
+    if (!isfinite(local4[0]) || !isfinite(local4[1]) || !isfinite(local4[2])) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+    return vec3_make(local4[0], local4[1], local4[2]);
+}
+
+static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
+                                                          ecs_entity_t endpoint_entity,
+                                                          vec3_t world_delta) {
+    if (!scene || endpoint_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, endpoint_entity)) return false;
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, endpoint_entity);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, endpoint_entity);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point || !endpoint_geom || endpoint_geom->type != GEOM_POINT) {
+        return false;
+    }
+
+    if (!endpoints_comp_is_supported_role(endpoint_meta->role) &&
+        endpoint_meta->role != CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+        return false;
+    }
+
+    ecs_entity_t owner = (ecs_entity_t)endpoint_meta->owner_entity;
+    if (owner == 0 || !ecs_is_alive(scene->world->world, owner)) return false;
+    GeometryComp *owner_geom = ecs_world_get_geometry(scene->world, owner);
+    TransformComp *owner_xform = ecs_world_get_transform(scene->world, owner);
+    if (!owner_geom || !owner_xform) return false;
+
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, owner);
+    if (!scene_is_sketch(scene, sketch)) return false;
+
+    vec3_t local_delta = scene_world_delta_to_local(&owner_xform->world_matrix, world_delta);
+    vec3_t source = vec3_make(0.0f, 0.0f, 0.0f);
+    bool has_source = false;
+    if (owner_geom->type == GEOM_ARC && endpoint_meta->role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+        source = owner_geom->data.arc.center;
+        has_source = true;
+    } else {
+        has_source = scene_entity_participant_subpoint(owner_geom, endpoint_meta->role, &source, NULL);
+    }
+    if (!has_source) return false;
+
+    vec3_t target = vec3_add(source, local_delta);
+    if (!scene_apply_local_point_to_participant(owner_geom, endpoint_meta->role, target)) return false;
+
+    RenderableComp *owner_renderable = ecs_world_get_renderable(scene->world, owner);
+    if (owner_renderable) owner_renderable->instance_dirty = true;
+
+    scene_sync_endpoint_entities_for_owner(scene, owner);
+    return true;
+}
+
+static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
+                                                             const ecs_entity_t *entities,
+                                                             int entity_count,
+                                                             vec3_t world_delta) {
+    if (!scene || !entities || entity_count <= 0) return false;
+    bool applied_any = false;
+    for (int i = 0; i < entity_count; i++) {
+        ecs_entity_t e = entities[i];
+        if (e == 0 || !ecs_is_alive(scene->world->world, e)) continue;
+
+        if (scene_apply_endpoint_point_world_delta(scene, e, world_delta)) {
+            applied_any = true;
+            continue;
+        }
+
+        TransformComp *t = ecs_world_get_transform(scene->world, e);
+        if (t) {
+            t->position = vec3_add(t->position, world_delta);
+            t->dirty = true;
+            ecs_world_mark_descendants_dirty(scene->world, e);
+            applied_any = true;
+        }
+        RenderableComp *r = (RenderableComp*)ecs_world_get_renderable(scene->world, e);
+        if (r) r->instance_dirty = true;
+    }
+    return applied_any;
 }
 
 static inline ecs_entity_t scene_constraint_participant_entity_for_pick(ecs_scene_t *scene,
@@ -1796,17 +1970,24 @@ static inline void scene_sync_endpoint_entities_for_owner(ecs_scene_t *scene, ec
         if (!owner_endpoints) return;
     }
 
-    const constraint_participant_role_t roles[2] = {
+    constraint_participant_role_t roles[3] = {
         CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
-        CONSTRAINT_PARTICIPANT_ROLE_POINT_B
+        CONSTRAINT_PARTICIPANT_ROLE_POINT_B,
+        CONSTRAINT_PARTICIPANT_ROLE_CENTER
     };
+    uint8_t role_count = (owner_geom->type == GEOM_ARC) ? 3u : 2u;
 
-    for (uint8_t i = 0; i < 2; i++) {
+    for (uint8_t i = 0; i < role_count; i++) {
         constraint_participant_role_t role = roles[i];
         vec3_t owner_point = vec3_make(0.0f, 0.0f, 0.0f);
         uint8_t sub_index = 0;
-        if (!scene_entity_participant_subpoint(owner_geom, role, &owner_point, &sub_index)) {
-            continue;
+        if (role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+            owner_point = owner_geom->data.arc.center;
+            sub_index = 2u;
+        } else {
+            if (!scene_entity_participant_subpoint(owner_geom, role, &owner_point, &sub_index)) {
+                continue;
+            }
         }
 
         endpoint_binding_t binding = {0};
@@ -2270,29 +2451,8 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
         GeometryComp *g = ecs_world_get_geometry(scene->world, candidates[i].entity);
         RenderableComp *r = ecs_world_get_renderable(scene->world, candidates[i].entity);
         if (!g) continue;
-        if (g->type == GEOM_POINT) {
-            g->data.point.point = candidates[i].point;
-            if (r) r->instance_dirty = true;
-            continue;
-        }
-        if (g->type == GEOM_LINE) {
-            if (candidates[i].role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
-                g->data.line.a = candidates[i].point;
-            } else if (candidates[i].role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
-                g->data.line.b = candidates[i].point;
-            }
-            if (r) r->instance_dirty = true;
-            continue;
-        }
-        if (g->type == GEOM_ARC) {
-            vec3_t endpoint;
-            uint8_t sub_index = 0;
-            if (scene_entity_participant_subpoint(g, candidates[i].role, &endpoint, &sub_index)) {
-                vec3_t delta = vec3_sub(candidates[i].point, endpoint);
-                g->data.arc.center = vec3_add(g->data.arc.center, delta);
-                if (r) r->instance_dirty = true;
-            }
-        }
+        scene_apply_local_point_to_participant(g, candidates[i].role, candidates[i].point);
+        if (r) r->instance_dirty = true;
         scene_sync_endpoint_entities_for_owner(scene, candidates[i].entity);
     }
 

@@ -9,6 +9,7 @@
 #include "../undo_redo_exec.h"
 #include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -112,6 +113,46 @@ static int test_endpoint_pick_non_sketch_line_has_no_native_endpoints(void) {
     return 0;
 }
 
+static int test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t line = scene_add_line(
+        &scene, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    GeometryComp *before = ecs_world_get_geometry(&world, line);
+    if (!before || before->type != GEOM_LINE) return 1;
+    vec3_t before_a = before->data.line.a;
+    vec3_t before_b = before->data.line.b;
+
+    ecs_entity_t selected[1] = { line };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.25f, 0.5f, 0.0f))) return 1;
+
+    TransformComp *xform = ecs_world_get_transform(&world, line);
+    if (!xform) return 1;
+    if (fabsf(xform->position.x - 0.25f) > 1e-6f || fabsf(xform->position.y - 0.5f) > 1e-6f) return 1;
+
+    GeometryComp *after = ecs_world_get_geometry(&world, line);
+    if (!after || after->type != GEOM_LINE) return 1;
+    if (fabsf(after->data.line.a.x - before_a.x) > 1e-6f ||
+        fabsf(after->data.line.a.y - before_a.y) > 1e-6f ||
+        fabsf(after->data.line.a.z - before_a.z) > 1e-6f) return 1;
+    if (fabsf(after->data.line.b.x - before_b.x) > 1e-6f ||
+        fabsf(after->data.line.b.y - before_b.y) > 1e-6f ||
+        fabsf(after->data.line.b.z - before_b.z) > 1e-6f) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    if (line_endpoints != NULL) return 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 static int test_endpoint_pick_overlay_precedence_contract(void) {
     pick_buffer_layer_event_t events[8] = {0};
     int event_count = 0;
@@ -186,6 +227,86 @@ static int test_endpoint_point_context_keeps_coincident_for_endpoint_pairs(void)
     return 0;
 }
 
+static int test_endpoint_line_endpoint_to_owner_bidirectional_sync(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    if (!line_endpoints) return 1;
+    endpoint_binding_t binding_a = {0};
+    if (!endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) return 1;
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    if (endpoint_a == 0) return 1;
+
+    ecs_entity_t selected[1] = { endpoint_a };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.5f, 0.0f, 0.0f))) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(&world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    if (fabsf(line_geom->data.line.a.x - 0.5f) > 1e-5f) return 1;
+
+    line_geom->data.line.b = vec3_make(2.0f, 0.0f, 0.0f);
+    scene_sync_endpoint_entities_for_owner(&scene, line);
+    line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_b = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &binding_b)) return 1;
+    GeometryComp *endpoint_b_geom = ecs_world_get_geometry(&world, (ecs_entity_t)binding_b.endpoint_entity);
+    if (!endpoint_b_geom || endpoint_b_geom->type != GEOM_POINT) return 1;
+    if (fabsf(endpoint_b_geom->data.point.point.x - 2.0f) > 1e-5f) return 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t arc = scene_add_arc_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f, vec3_make(0.0f, 0.0f, 1.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (arc == 0) return 1;
+
+    EndPointsComp *arc_endpoints = ecs_world_get_endpoints(&world, arc);
+    if (!arc_endpoints) return 1;
+    endpoint_binding_t center_binding = {0};
+    if (!endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_CENTER, &center_binding)) return 1;
+
+    ecs_entity_t selected_center[1] = { (ecs_entity_t)center_binding.endpoint_entity };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected_center, 1, vec3_make(1.0f, 0.0f, 0.0f))) return 1;
+
+    GeometryComp *arc_geom = ecs_world_get_geometry(&world, arc);
+    if (!arc_geom || arc_geom->type != GEOM_ARC) return 1;
+    if (fabsf(arc_geom->data.arc.center.x - 1.0f) > 1e-5f) return 1;
+
+    arc_geom->data.arc.start_angle = 3.1415926f;
+    scene_sync_endpoint_entities_for_owner(&scene, arc);
+    arc_endpoints = ecs_world_get_endpoints(&world, arc);
+    endpoint_binding_t start_binding = {0};
+    if (!arc_endpoints || !endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &start_binding)) return 1;
+    GeometryComp *start_geom = ecs_world_get_geometry(&world, (ecs_entity_t)start_binding.endpoint_entity);
+    if (!start_geom || start_geom->type != GEOM_POINT) return 1;
+    if (fabsf(start_geom->data.point.point.x - 0.0f) > 1e-4f) return 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -194,11 +315,14 @@ int main(void) {
         { "test_endpoint_pick_id_encode_decode_roundtrip", test_endpoint_pick_id_encode_decode_roundtrip },
         { "test_endpoint_pick_native_endpoint_entity_resolution", test_endpoint_pick_native_endpoint_entity_resolution },
         { "test_endpoint_pick_non_sketch_line_has_no_native_endpoints", test_endpoint_pick_non_sketch_line_has_no_native_endpoints },
+        { "test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash", test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash },
         { "test_endpoint_pick_overlay_precedence_contract", test_endpoint_pick_overlay_precedence_contract },
         { "test_endpoint_pick_collision_prefers_overlay", test_endpoint_pick_collision_prefers_overlay },
         { "test_endpoint_pick_collision_deterministic_repeated_sampling", test_endpoint_pick_collision_deterministic_repeated_sampling },
         { "test_endpoint_point_context_filters_line_only_constraints", test_endpoint_point_context_filters_line_only_constraints },
         { "test_endpoint_point_context_keeps_coincident_for_endpoint_pairs", test_endpoint_point_context_keeps_coincident_for_endpoint_pairs },
+        { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
+        { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
