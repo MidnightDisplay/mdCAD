@@ -158,6 +158,34 @@ static int test_endpoint_pick_collision_deterministic_repeated_sampling(void) {
     return 0;
 }
 
+static int test_endpoint_point_context_filters_line_only_constraints(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 1;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_FIXED)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_ALONG_X)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_ALONG_Y)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_ALONG_Z)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_LENGTH)) return 1;
+    return 0;
+}
+
+static int test_endpoint_point_context_keeps_coincident_for_endpoint_pairs(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 2;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    sig.geometry_types[1] = GEOM_ARC;
+    sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+
+    if (!constraint_type_is_selection_legal(&sig, CONSTRAINT_COINCIDENT)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_PARALLEL)) return 1;
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_ANGLE)) return 1;
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -169,6 +197,8 @@ int main(void) {
         { "test_endpoint_pick_overlay_precedence_contract", test_endpoint_pick_overlay_precedence_contract },
         { "test_endpoint_pick_collision_prefers_overlay", test_endpoint_pick_collision_prefers_overlay },
         { "test_endpoint_pick_collision_deterministic_repeated_sampling", test_endpoint_pick_collision_deterministic_repeated_sampling },
+        { "test_endpoint_point_context_filters_line_only_constraints", test_endpoint_point_context_filters_line_only_constraints },
+        { "test_endpoint_point_context_keeps_coincident_for_endpoint_pairs", test_endpoint_point_context_keeps_coincident_for_endpoint_pairs },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
