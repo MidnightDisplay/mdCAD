@@ -75,11 +75,25 @@ created: 2026-04-02
 | Coincident endpoint authoring for open chains/closed loops feels usable in viewport | D-09..D-12 | UX and interaction feel | In app, create multiple lines/arcs, select endpoints directly (no Tab vertex mode), apply Coincident, verify chain/loop authoring is reliable. |
 | Unsat drag feedback clarity in viewport | D-04,D-05 | Visual feedback quality | Force unsat movement and verify no partial mutation + immediate understandable feedback. |
 
+## Checkpoint Failure Addendum (2026-04-03, Plan 17-02 Task 3)
+
+**Result:** ❌ Human verification failed (automated `endpoint_pick` remained green).
+
+**Observed failures (repro from user verification):**
+- Endpoint points are not visibly rendered in normal viewport flow; discoverable only via pick IDs or Tab gizmo vertex mode.
+- Left-click near endpoint unexpectedly opens constraint context menu as if point-selected + C-triggered.
+- Single endpoint selection exposes invalid line-oriented options for point participants (e.g., Fixed/Along X/Y/Z/Length context mismatch).
+
+**Disposition:** Keep D-12 and full D-09..D-12 UX row open pending redesign/reimplementation.
+
+**Planning handoff recommendation:** `/gsd-plan-phase 17 --gaps` with scope to transition from synthetic endpoint tail-range picks to sketch-scoped native point entities synchronized from line/arc notable vertices.
+
 ## Validation Sign-Off
 
 - [x] All planned tasks have verify steps or Wave 0 dependencies.
 - [x] Deterministic fixture coverage exists for D-01..D-12.
 - [x] No unresolved missing test references.
+- [ ] Human verification closure for D-09..D-12 endpoint UX (Plan 17-02 Task 3 failed; redesign pending).
 - [x] `nyquist_compliant: true` set when checks are fully wired.
 
-Approval: ready for `/gsd-verify-work`
+Approval: conditional — do **not** close Phase 17 until endpoint UX redesign gap is planned and shipped.

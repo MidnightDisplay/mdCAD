@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 17-03-PLAN.md
-last_updated: "2026-04-02T17:19:28.855Z"
+stopped_at: Blocked at 17-02-PLAN.md Task 3 human verification failed
+last_updated: "2026-04-03T12:23:56.688Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 17 (constraint-driven-geometry-solving) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
+Phase: 17 (constraint-driven-geometry-solving) — EXECUTING (blocked)
+Plan: 2 of 3 complete
+Status: Blocked at 17-02 human verification redesign gate
 Last activity: 2026-04-02
 
 ## Milestone Scope
@@ -38,7 +38,7 @@ Last activity: 2026-04-02
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 15`
+Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Performance Metrics
 
@@ -108,13 +108,14 @@ Next command: `/gsd-plan-phase 15`
 - [Phase 17]: Recalculate now performs transactional candidate staging and only commits geometry on full success.
 - [Phase 17]: Bound constrained drag with deterministic per-frame projected-delta clamp in scene_solver_can_apply_drag.
 - [Phase 17]: Diagnostics now suppress identical consecutive entries and expose deterministic implication ordering.
+- [Phase 17]: Plan 17-02 checkpoint failed; pursue redesign using sketch-scoped native endpoint point entities instead of synthetic endpoint tail-range picks.
 
 ## Blockers
 
-- None.
+- Phase 17 Plan 17-02 Task 3 human verification failed: endpoint points not visibly rendered in normal viewport and endpoint context semantics expose invalid options; redesign required before completion.
 
 ## Session
 
-**Last Date:** 2026-04-02T17:19:28.851Z
-**Stopped At:** Completed 17-03-PLAN.md
+**Last Date:** 2026-04-03T12:23:56.659Z
+**Stopped At:** Blocked at 17-02-PLAN.md Task 3 human verification failed
 **Resume File:** None

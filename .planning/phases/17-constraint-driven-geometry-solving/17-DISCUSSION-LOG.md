@@ -109,6 +109,24 @@
 
 ---
 
+## Plan 17-02 checkpoint failure follow-up (2026-04-03)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Patch current synthetic endpoint pick range | Keep endpoint tail-range IDs and attempt visibility/menu fixes | |
+| Redesign around sketch-scoped native endpoint point entities | Attach EndPoints metadata to sketch lines/arcs and spawn/sync real point entities for notable vertices | ✓ |
+| Revert to Tab-only vertex workflow | Require gizmo mode for endpoint authoring to avoid broader changes | |
+
+**User's choice:** Redesign around sketch-scoped native point entities for endpoint authoring.
+**Notes:** Human verification failed because endpoints were not visibly first-class in normal viewport selection and point context semantics mismatched expected behavior.
+
+**Scope boundary explicitly requested by user:**
+- Apply only to sketch-created line/arc entities.
+- Do not change behavior for bare non-sketch lines/arcs.
+- Keep standard pick buffer allocation (no endpoint special tail range).
+
+---
+
 ## Sketch endpoint/sub-entity selection gap (addendum)
 
 | Option | Description | Selected |
