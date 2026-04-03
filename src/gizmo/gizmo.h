@@ -109,6 +109,21 @@ static inline void gizmo_plane_axes(int plane_idx, int *a1, int *a2) {
     }
 }
 
+static inline vec3_t gizmo_entity_world_center(ecs_world_state_t *world, ecs_entity_t entity) {
+    const TransformComp *xform = ecs_world_get_transform(world, entity);
+    if (!xform) return vec3_make(0.0f, 0.0f, 0.0f);
+
+    const GeometryComp *geom = ecs_world_get_geometry(world, entity);
+    if (geom && geom->type == GEOM_POINT) {
+        return mat4_mul_point(xform->world_matrix, geom->data.point.point);
+    }
+
+    if (xform->world_matrix.m[12] != 0 || xform->world_matrix.m[13] != 0 || xform->world_matrix.m[14] != 0) {
+        return vec3_make(xform->world_matrix.m[12], xform->world_matrix.m[13], xform->world_matrix.m[14]);
+    }
+    return xform->position;
+}
+
 //------------------------------------------------------------------------------
 // Init
 //------------------------------------------------------------------------------
@@ -237,9 +252,7 @@ static inline void gizmo_update(gizmo_t *g,
                 g->center = gizmo_vertex_mode_get_center(&g->vertex_mode, geom, xform->world_matrix);
             } else {
                 // No vertices selected — center at entity position
-                g->center = xform->world_matrix.m[12] != 0 || xform->world_matrix.m[13] != 0 || xform->world_matrix.m[14] != 0
-                    ? vec3_make(xform->world_matrix.m[12], xform->world_matrix.m[13], xform->world_matrix.m[14])
-                    : xform->position;
+                g->center = gizmo_entity_world_center(world, entity);
             }
         }
     } else {
@@ -247,12 +260,7 @@ static inline void gizmo_update(gizmo_t *g,
         vec3_t sum = vec3_make(0, 0, 0);
         for (int i = 0; i < selection->count; i++) {
             ecs_entity_t e = selection->entities[i];
-            const TransformComp *xform = ecs_world_get_transform(world, e);
-            if (xform) {
-                sum = vec3_add(sum, vec3_make(xform->world_matrix.m[12],
-                                               xform->world_matrix.m[13],
-                                               xform->world_matrix.m[14]));
-            }
+            sum = vec3_add(sum, gizmo_entity_world_center(world, e));
         }
         g->center = vec3_scale(sum, 1.0f / (float)selection->count);
     }

@@ -350,6 +350,34 @@ static int test_endpoint_direct_geometry_edit_syncs_owner_and_entities(void) {
     return 0;
 }
 
+static int test_arc_slot_reallocation_for_expanded_span(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t arc = scene_add_arc(
+        &scene, vec3_make(0.0f, 0.0f, 0.0f), 1.0f,
+        0.0f, 0.2f, vec3_make(0.0f, 0.0f, 1.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (arc == 0) return 1;
+
+    RenderableComp *r = ecs_world_get_renderable(&world, arc);
+    GeometryComp *g = ecs_world_get_geometry(&world, arc);
+    if (!r || !g || g->type != GEOM_ARC) return 1;
+    uint32_t before_segments = r->segment_count;
+    uint32_t before_joins = r->join_count;
+
+    g->data.arc.end_angle = 3.2f;
+    if (!scene_update_arc_renderable_slots(&scene, arc, r, g)) return 1;
+    if (r->segment_count <= before_segments) return 1;
+    if (r->join_count <= before_joins) return 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -367,6 +395,7 @@ int main(void) {
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },
+        { "test_arc_slot_reallocation_for_expanded_span", test_arc_slot_reallocation_for_expanded_span },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

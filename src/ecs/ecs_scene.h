@@ -344,6 +344,7 @@ static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
                                                           vec3_t world_delta);
 static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *scene,
                                                                   ecs_entity_t endpoint_entity);
+static inline bool scene_update_arc_renderable_slots(ecs_scene_t *scene, ecs_entity_t entity, RenderableComp *r, const GeometryComp *g);
 static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
                                                              const ecs_entity_t *entities,
                                                              int entity_count,
@@ -715,6 +716,77 @@ static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *s
     scene_sync_endpoint_entities_for_owner(scene, owner);
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
+    return true;
+}
+
+static inline bool scene_update_arc_renderable_slots(ecs_scene_t *scene,
+                                                     ecs_entity_t entity,
+                                                     RenderableComp *r,
+                                                     const GeometryComp *g) {
+    if (!scene || !r || !g) return false;
+    if (g->type != GEOM_ARC) return false;
+    if (r->instance_slot == 0xFFFFFFFF) return false;
+
+    int point_count = 0;
+    vec3_t *points = ecs_scene_tessellate_arc(g->data.arc.center, g->data.arc.radius,
+                                              g->data.arc.start_angle, g->data.arc.end_angle,
+                                              g->data.arc.normal, &point_count);
+    if (!points || point_count < 2) {
+        if (points) free(points);
+        return false;
+    }
+
+    int required_segments = point_count - 1;
+    int required_joins = (point_count > 2) ? (point_count - 2) : 0;
+    bool needs_realloc = ((int)r->segment_count != required_segments) || ((int)r->join_count != required_joins);
+
+    if (needs_realloc) {
+        for (uint32_t i = 0; i < r->segment_count; i++) {
+            geom_line_batch_free(&scene->batches.lines, (int)(r->instance_slot + i));
+        }
+        if (r->join_slot_start != 0xFFFFFFFF) {
+            for (uint32_t i = 0; i < r->join_count; i++) {
+                geom_point_batch_free(&scene->batches.points, (int)(r->join_slot_start + i));
+            }
+        }
+
+        int new_segment_slot = geom_line_batch_alloc_contiguous(&scene->batches.lines, required_segments);
+        if (new_segment_slot < 0) {
+            free(points);
+            return false;
+        }
+
+        int new_join_slot = -1;
+        if (required_joins > 0) {
+            new_join_slot = geom_point_batch_alloc_contiguous(&scene->batches.points, required_joins);
+            if (new_join_slot < 0) {
+                for (int i = 0; i < required_segments; i++) {
+                    geom_line_batch_free(&scene->batches.lines, new_segment_slot + i);
+                }
+                free(points);
+                return false;
+            }
+        }
+
+        r->instance_slot = (uint32_t)new_segment_slot;
+        r->segment_count = (uint32_t)required_segments;
+        r->join_slot_start = (new_join_slot >= 0) ? (uint32_t)new_join_slot : 0xFFFFFFFF;
+        r->join_count = (uint32_t)required_joins;
+    }
+
+    for (int i = 0; i < required_segments; i++) {
+        geom_line_batch_set_entity(&scene->batches.lines, (int)(r->instance_slot + (uint32_t)i),
+                                   (uint64_t)entity, (uint8_t)GEOM_ARC);
+    }
+    if (r->join_slot_start != 0xFFFFFFFF) {
+        for (int i = 0; i < required_joins; i++) {
+            geom_point_batch_set_entity(&scene->batches.points, (int)(r->join_slot_start + (uint32_t)i),
+                                        (uint64_t)entity, (uint8_t)GEOM_ARC);
+        }
+    }
+
+    free(points);
+    r->instance_dirty = true;
     return true;
 }
 
@@ -3202,6 +3274,7 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                     break;
                 }
                 case GEOM_ARC: {
+                    scene_update_arc_renderable_slots(scene, e, r, g);
                     // Tessellate arc to points and update slots
                     int arc_point_count = 0;
                     vec3_t *arc_points = ecs_scene_tessellate_arc(
