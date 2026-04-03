@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Blocked at 17-02-PLAN.md Task 3 human verification failed
-last_updated: "2026-04-03T12:23:56.688Z"
-last_activity: 2026-04-02
+stopped_at: Completed 17-04-PLAN.md
+last_updated: "2026-04-03T12:46:39.693Z"
+last_activity: 2026-04-03
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 23
-  completed_plans: 22
+  total_plans: 25
+  completed_plans: 24
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 17 (constraint-driven-geometry-solving) — EXECUTING (blocked)
-Plan: 2 of 3 complete
-Status: Blocked at 17-02 human verification redesign gate
-Last activity: 2026-04-02
+Plan: 3 of 3 complete
+Status: Ready to execute
+Last activity: 2026-04-03
 
 ## Milestone Scope
 
@@ -65,6 +65,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 15 P03 | 7 min | 2 tasks | 3 files |
 | Phase 17 P01 | 11 min | 2 tasks | 7 files |
 | Phase 17 P03 | 4m | 2 tasks | 5 files |
+| Phase 17 P04 | 1297 | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -109,6 +110,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 17]: Bound constrained drag with deterministic per-frame projected-delta clamp in scene_solver_can_apply_drag.
 - [Phase 17]: Diagnostics now suppress identical consecutive entries and expose deterministic implication ordering.
 - [Phase 17]: Plan 17-02 checkpoint failed; pursue redesign using sketch-scoped native endpoint point entities instead of synthetic endpoint tail-range picks.
+- [Phase 17]: Endpoint picks now resolve through native EndPoints point entities with sketch-only endpoint lifecycle guardrails.
+- [Phase 17]: Removed synthetic endpoint tail-range dependency from normal endpoint path by routing through native point entity picks.
 
 ## Blockers
 
@@ -116,6 +119,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-03T12:23:56.659Z
-**Stopped At:** Blocked at 17-02-PLAN.md Task 3 human verification failed
+**Last Date:** 2026-04-03T12:46:39.689Z
+**Stopped At:** Completed 17-04-PLAN.md
 **Resume File:** None

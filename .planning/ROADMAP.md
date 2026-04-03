@@ -147,11 +147,11 @@ Plans:
 **Goal:** Users can author endpoint-aware constraints in normal viewport flow and get deterministic, constraint-driven geometry updates during solve and drag interactions.
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
 **Depends on:** Phase 16
-**Plans:** 3/5 plans executed (17-02 checkpoint failed; 17-04 and 17-05 added for gap closure redesign)
+**Plans:** 4/5 plans executed
 
 Plans:
 - [x] 17-01-PLAN.md — Add transactional solve-apply contracts with deterministic failure/no-mutation tests.
-- [ ] 17-02-PLAN.md — Implement endpoint/sub-entity pick authoring path (no gizmo-vertex dependency) and Coincident endpoint wiring. *(Checkpoint failed: endpoint visibility/context UX redesign required.)*
+- [x] 17-02-PLAN.md — Implement endpoint/sub-entity pick authoring path (no gizmo-vertex dependency) and Coincident endpoint wiring. *(Checkpoint failed: endpoint visibility/context UX redesign required.)*
 - [x] 17-03-PLAN.md — Harden live constrained drag, diagnostics dedupe, and bounded-frame solve behavior with deterministic gates.
-- [ ] 17-04-PLAN.md — Implement sketch-scoped EndPoints native point entity contract and sketch-only endpoint spawn/sync replacing synthetic tail-range picks.
+- [x] 17-04-PLAN.md — Implement sketch-scoped EndPoints native point entity contract and sketch-only endpoint spawn/sync replacing synthetic tail-range picks.
 - [ ] 17-05-PLAN.md — Correct point-context menu semantics, verify endpoint Coincident chain/loop UX closure, and update validation evidence.

@@ -60,7 +60,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **D-09**: Constraint participant representation supports endpoint/sub-entity metadata.
 - [x] **D-10**: Endpoint controls are first-class selectable/pickable participants for Coincident authoring.
 - [x] **D-11**: Coincident authoring supports endpoint-to-endpoint participant semantics through direct selection model.
-- [ ] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
+- [x] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
 
 ## v1.3+ Requirements (Deferred)
 
