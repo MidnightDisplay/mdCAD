@@ -123,7 +123,18 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
         if (!constraint_type_allows_geometry(sig->geometry_types[i])) return false;
     }
 
+    bool has_subentity_point_role = false;
+    for (uint32_t i = 0; i < sig->count; i++) {
+        if (sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+            sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B ||
+            sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+            has_subentity_point_role = true;
+            break;
+        }
+    }
+
     if (type == CONSTRAINT_FIXED) {
+        if (has_subentity_point_role) return false;
         return sig->count == 1;
     }
     if (type == CONSTRAINT_COINCIDENT) {
@@ -147,19 +158,23 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
         return true;
     }
     if (type == CONSTRAINT_PERPENDICULAR || type == CONSTRAINT_ANGLE) {
+        if (has_subentity_point_role) return false;
         return sig->count == 2 &&
                sig->geometry_types[0] == GEOM_LINE &&
                sig->geometry_types[1] == GEOM_LINE;
     }
     if (type == CONSTRAINT_ALONG_X || type == CONSTRAINT_ALONG_Y || type == CONSTRAINT_ALONG_Z) {
+        if (has_subentity_point_role) return false;
         return sig->count == 1 && sig->geometry_types[0] == GEOM_LINE;
     }
     if (type == CONSTRAINT_CORADIAL || type == CONSTRAINT_CONCENTRIC || type == CONSTRAINT_TANGENTIAL) {
+        if (has_subentity_point_role) return false;
         return sig->count == 2 &&
                sig->geometry_types[0] == GEOM_ARC &&
                sig->geometry_types[1] == GEOM_ARC;
     }
     if (type == CONSTRAINT_LENGTH) {
+        if (has_subentity_point_role) return false;
         return sig->count == 1 &&
                (sig->geometry_types[0] == GEOM_LINE || sig->geometry_types[0] == GEOM_ARC);
     }
