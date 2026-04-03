@@ -101,7 +101,7 @@ static inline void ui_visibility_draw(ui_visibility_state_t* vis) {
         igSliderFloat("ECS Line Width", vis->ecs_line_width, 0.005f, 0.1f, "%.3f", 0);
     }
     if (vis->ecs_point_size) {
-        igSliderFloat("ECS Point Size", vis->ecs_point_size, 0.01f, 0.2f, "%.3f", 0);
+        igSliderFloat("ECS Point Size", vis->ecs_point_size, 0.006f, 0.2f, "%.3f", 0);
     }
     if (vis->pick_thickness_multiplier) {
         igSliderFloat("Pick Thickness x", vis->pick_thickness_multiplier, 1.0f, 5.0f, "%.1f", 0);

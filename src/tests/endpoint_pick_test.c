@@ -307,6 +307,49 @@ static int test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync(void) {
     return 0;
 }
 
+static int test_endpoint_direct_geometry_edit_syncs_owner_and_entities(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) return 1;
+
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+
+    endpoint_geom->data.point.point = vec3_make(3.0f, 4.0f, 0.0f);
+    if (!scene_sync_owner_geometry_from_endpoint_entity(&scene, endpoint_a)) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(&world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    if (fabsf(line_geom->data.line.a.x - 3.0f) > 1e-5f ||
+        fabsf(line_geom->data.line.a.y - 4.0f) > 1e-5f) return 1;
+
+    line_geom->data.line.b = vec3_make(7.0f, 0.0f, 0.0f);
+    scene_sync_endpoint_entities_for_owner(&scene, line);
+    line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_b = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &binding_b)) return 1;
+    GeometryComp *endpoint_b_geom = ecs_world_get_geometry(&world, (ecs_entity_t)binding_b.endpoint_entity);
+    if (!endpoint_b_geom || endpoint_b_geom->type != GEOM_POINT) return 1;
+    if (fabsf(endpoint_b_geom->data.point.point.x - 7.0f) > 1e-5f) return 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -323,6 +366,7 @@ int main(void) {
         { "test_endpoint_point_context_keeps_coincident_for_endpoint_pairs", test_endpoint_point_context_keeps_coincident_for_endpoint_pairs },
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
+        { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

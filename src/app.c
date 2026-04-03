@@ -1756,6 +1756,12 @@ static void frame(void) {
                         const TransformComp *xform = ecs_world_get_transform(state.ecs_scene.world, entity);
                         if (geom && xform) {
                             gizmo_vertex_mode_apply_delta(&state.gizmo.vertex_mode, geom, xform->world_matrix, delta);
+                            scene_sync_endpoint_entities_for_owner(&state.ecs_scene, entity);
+                            ecs_entity_t parent = scene_get_parent(&state.ecs_scene, entity);
+                            if (parent != 0 && scene_is_sketch(&state.ecs_scene, parent)) {
+                                scene_solver_request_auto(&state.ecs_scene, parent);
+                                scene_script_reemit_for_sketch(&state.ecs_scene, parent);
+                            }
                         }
                         RenderableComp *r = (RenderableComp*)ecs_world_get_renderable(state.ecs_scene.world, entity);
                         if (r) r->instance_dirty = true;

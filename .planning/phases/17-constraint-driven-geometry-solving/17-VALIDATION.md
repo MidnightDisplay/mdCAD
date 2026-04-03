@@ -88,12 +88,29 @@ created: 2026-04-02
 
 **Planning handoff recommendation:** `/gsd-plan-phase 17 --gaps` with scope to transition from synthetic endpoint tail-range picks to sketch-scoped native point entities synchronized from line/arc notable vertices.
 
+## Gap-Closure Remediation Evidence (2026-04-03, Plan 17-05 follow-up)
+
+Automated verification after crash/sync remediation and endpoint geometry-edit sync wiring:
+
+- `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure` ✅ pass
+- `ctest -R "scene_solver_contract|scene_solver_drag|scene_solver_diagnostics" --test-dir build-vulkan -C Release --output-on-failure` ✅ pass
+
+Additional regression coverage added:
+
+- `test_endpoint_direct_geometry_edit_syncs_owner_and_entities` in `src/tests/endpoint_pick_test.c`
+
+Manual checkpoint status:
+
+- ❌ still pending user approval after latest remediation pass.
+- Latest reported failures before this remediation: bare-geometry gizmo crash persisted; sketch endpoint point/owner sync still broken in interactive flow.
+- New build/test baseline is green; awaiting fresh manual recheck against updated build.
+
 ## Validation Sign-Off
 
 - [x] All planned tasks have verify steps or Wave 0 dependencies.
 - [x] Deterministic fixture coverage exists for D-01..D-12.
 - [x] No unresolved missing test references.
-- [ ] Human verification closure for D-09..D-12 endpoint UX (Plan 17-02 Task 3 failed; redesign pending).
+- [ ] Human verification closure for D-09..D-12 endpoint UX (remediation applied; awaiting user re-check approval).
 - [x] `nyquist_compliant: true` set when checks are fully wired.
 
 Approval: conditional — do **not** close Phase 17 until endpoint UX redesign gap is planned and shipped.

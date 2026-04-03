@@ -21,6 +21,9 @@ key-files:
     - src/components/endpoints_comp.h
     - src/ecs/ecs_scene.h
     - src/tests/endpoint_pick_test.c
+    - src/ui/ui_entity_inspector.h
+    - src/gpu/geometry_batch.h
+    - src/ui/ui_visibility.h
 key-decisions:
   - "Transform-mode gizmo deltas now route through scene-level selection delta application so endpoint point entities update owner geometry instead of mutating transform-only paths."
   - "Arc endpoint metadata now includes center-role endpoint binding to keep center/start/end endpoint entities synchronized in both directions."
@@ -55,4 +58,16 @@ Implemented remediation requested after failed human verification:
 - Addressed failure #1: bare non-sketch line/arc transform path now avoids endpoint-only mutation assumptions and preserves baseline transform behavior.
 - Addressed failure #2: endpoint point entities and owner line/arc notable vertices now synchronize in both directions, including arc center support.
 - Informational checkpoint note retained: coincident-visible morph behavior remains governed by current phase solver contract and is not expanded in this remediation pass.
+
+## Follow-up remediation pass (after user re-check)
+
+- Hardened sketch guards in `scene_is_sketch` to prevent invalid sketch checks on `0`/dead entities during transform drag paths.
+- Added explicit endpoint-point fast-path handling in `scene_apply_transform_delta_for_selection` so endpoint and non-endpoint entities no longer share unsafe assumptions.
+- Added direct endpoint-geometry synchronization API (`scene_sync_owner_geometry_from_endpoint_entity`) and wired it into inspector editing flow so endpoint point edits propagate to parent line/arc geometry immediately.
+- Wired geometry edit paths to re-sync endpoint entities and re-request sketch solve/script re-emit when parent is a sketch.
+- Added transform-gizmo geometry-mode hook to keep endpoint entities synchronized while editing geometry in-viewport.
+- Included user-requested visual tuning tweaks:
+  - point render size increased in `src/gpu/geometry_batch.h`,
+  - minimum point-size slider lowered in `src/ui/ui_visibility.h`.
+- Added new regression test `test_endpoint_direct_geometry_edit_syncs_owner_and_entities`.
 

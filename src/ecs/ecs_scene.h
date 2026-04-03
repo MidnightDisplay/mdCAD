@@ -342,6 +342,8 @@ static inline vec3_t scene_world_delta_to_local(const mat4_t *world_matrix, vec3
 static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
                                                           ecs_entity_t endpoint_entity,
                                                           vec3_t world_delta);
+static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *scene,
+                                                                  ecs_entity_t endpoint_entity);
 static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
                                                              const ecs_entity_t *entities,
                                                              int entity_count,
@@ -677,6 +679,42 @@ static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
     if (owner_renderable) owner_renderable->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, owner);
+    scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
+    return true;
+}
+
+static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *scene,
+                                                                  ecs_entity_t endpoint_entity) {
+    if (!scene || endpoint_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, endpoint_entity)) return false;
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, endpoint_entity);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, endpoint_entity);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point || !endpoint_geom || endpoint_geom->type != GEOM_POINT) {
+        return false;
+    }
+
+    if (!endpoints_comp_is_supported_role(endpoint_meta->role)) return false;
+
+    ecs_entity_t owner = (ecs_entity_t)endpoint_meta->owner_entity;
+    if (owner == 0 || !ecs_is_alive(scene->world->world, owner)) return false;
+
+    GeometryComp *owner_geom = ecs_world_get_geometry(scene->world, owner);
+    if (!owner_geom) return false;
+
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, owner);
+    if (!scene_is_sketch(scene, sketch)) return false;
+
+    vec3_t local_point = endpoint_geom->data.point.point;
+    if (!scene_apply_local_point_to_participant(owner_geom, endpoint_meta->role, local_point)) return false;
+
+    RenderableComp *owner_renderable = ecs_world_get_renderable(scene->world, owner);
+    if (owner_renderable) owner_renderable->instance_dirty = true;
+
+    scene_sync_endpoint_entities_for_owner(scene, owner);
+    scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
     return true;
 }
 
@@ -690,8 +728,12 @@ static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
         ecs_entity_t e = entities[i];
         if (e == 0 || !ecs_is_alive(scene->world->world, e)) continue;
 
-        if (scene_apply_endpoint_point_world_delta(scene, e, world_delta)) {
-            applied_any = true;
+        EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, e);
+        bool is_endpoint_point = endpoint_meta && endpoint_meta->is_endpoint_point;
+        if (is_endpoint_point) {
+            if (scene_apply_endpoint_point_world_delta(scene, e, world_delta)) {
+                applied_any = true;
+            }
             continue;
         }
 
@@ -1884,6 +1926,8 @@ static inline ecs_entity_t scene_add_sketch(ecs_scene_t *scene,
 }
 
 static inline bool scene_is_sketch(ecs_scene_t *scene, ecs_entity_t e) {
+    if (!scene || e == 0) return false;
+    if (!ecs_is_alive(scene->world->world, e)) return false;
     return ecs_world_get_sketch(scene->world, e) != NULL;
 }
 
@@ -2014,6 +2058,13 @@ static inline void scene_sync_endpoint_entities_for_owner(ecs_scene_t *scene, ec
             endpoint_geom->data.point.point = owner_point;
             endpoint_geom->color = owner_geom->color;
             endpoint_geom->point_size = 8.0f;
+        }
+        TransformComp *endpoint_xform = ecs_world_get_transform(scene->world, endpoint_entity);
+        if (endpoint_xform) {
+            endpoint_xform->position = vec3_make(0.0f, 0.0f, 0.0f);
+            endpoint_xform->rotation = vec3_make(0.0f, 0.0f, 0.0f);
+            endpoint_xform->scale = vec3_make(1.0f, 1.0f, 1.0f);
+            endpoint_xform->dirty = true;
         }
         RenderableComp *endpoint_renderable = ecs_world_get_renderable(scene->world, endpoint_entity);
         if (endpoint_renderable) {
@@ -3845,6 +3896,7 @@ static inline ecs_entity_t ecs_scene_get_hovered_entity(ecs_scene_t *scene) {
 //------------------------------------------------------------------------------
 
 #include "../scripting/sketch_script_parse.h"
+#include "../scripting/sketch_script_emit.h"
 #include "../scripting/sketch_script_apply.h"
 
 static inline scene_script_io_state_t* scene_script_io_state_for_sketch(ecs_scene_t *scene,

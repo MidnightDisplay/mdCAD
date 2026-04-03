@@ -1954,6 +1954,19 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
 
         if (changed) {
+            if (scene) {
+                EndPointsComp *endpoint_meta = ecs_world_get_endpoints(w, e);
+                if (endpoint_meta && endpoint_meta->is_endpoint_point) {
+                    scene_sync_owner_geometry_from_endpoint_entity(scene, e);
+                } else {
+                    scene_sync_endpoint_entities_for_owner(scene, e);
+                    ecs_entity_t parent = scene_get_parent(scene, e);
+                    if (parent != 0 && scene_is_sketch(scene, parent)) {
+                        scene_solver_request_auto(scene, parent);
+                        scene_script_reemit_for_sketch(scene, parent);
+                    }
+                }
+            }
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
         }
