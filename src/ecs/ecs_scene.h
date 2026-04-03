@@ -17,6 +17,7 @@
 #include "../components/selectable_comp.h"
 #include "../components/constraint_comp.h"
 #include "../components/constraint_participant_comp.h"
+#include "../components/endpoints_comp.h"
 #include "../constraints/constraint_types.h"
 #include "../scripting/sketch_script_contract.h"
 #include "../components/script_identity_comp.h"
@@ -334,6 +335,13 @@ static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
                                                      constraint_participant_role_t role,
                                                      vec3_t *out_local_point,
                                                      uint8_t *out_sub_index);
+static inline ecs_entity_t scene_find_parent_sketch(ecs_scene_t *scene, ecs_entity_t entity);
+static inline bool scene_endpoint_owner_entity_for_pick(ecs_scene_t *scene,
+                                                         uint32_t pick_id,
+                                                         ecs_entity_t *out_owner_entity,
+                                                         constraint_participant_role_t *out_role,
+                                                         uint8_t *out_sub_index);
+static inline void scene_sync_endpoint_entities_for_owner(ecs_scene_t *scene, ecs_entity_t owner_entity);
 
 typedef struct {
     ecs_entity_t entity;
@@ -447,6 +455,47 @@ static inline bool endpoint_pick_decode(uint32_t pick_id,
     return true;
 }
 
+static inline ecs_entity_t scene_find_parent_sketch(ecs_scene_t *scene, ecs_entity_t entity) {
+    if (!scene || entity == 0 || !ecs_is_alive(scene->world->world, entity)) return 0;
+    ecs_entity_t cursor = entity;
+    while (cursor != 0 && ecs_is_alive(scene->world->world, cursor)) {
+        if (scene_is_sketch(scene, cursor)) return cursor;
+        cursor = ecs_world_get_parent(scene->world, cursor);
+    }
+    return 0;
+}
+
+static inline bool scene_endpoint_owner_entity_for_pick(ecs_scene_t *scene,
+                                                         uint32_t pick_id,
+                                                         ecs_entity_t *out_owner_entity,
+                                                         constraint_participant_role_t *out_role,
+                                                         uint8_t *out_sub_index) {
+    if (!scene || pick_id == 0) return false;
+    ecs_entity_t endpoint_entity = ecs_scene_find_entity_by_pick_id(scene, pick_id);
+    if (endpoint_entity == 0 || !ecs_is_alive(scene->world->world, endpoint_entity)) return false;
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, endpoint_entity);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, endpoint_entity);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point || !endpoint_geom || endpoint_geom->type != GEOM_POINT) {
+        return false;
+    }
+    if (!endpoints_comp_is_supported_role(endpoint_meta->role)) return false;
+
+    ecs_entity_t owner = (ecs_entity_t)endpoint_meta->owner_entity;
+    if (owner == 0 || !ecs_is_alive(scene->world->world, owner)) return false;
+
+    GeometryComp *owner_geom = ecs_world_get_geometry(scene->world, owner);
+    if (!owner_geom || (owner_geom->type != GEOM_LINE && owner_geom->type != GEOM_ARC)) return false;
+
+    ecs_entity_t owner_sketch = scene_find_parent_sketch(scene, owner);
+    if (!scene_is_sketch(scene, owner_sketch)) return false;
+
+    if (out_owner_entity) *out_owner_entity = owner;
+    if (out_role) *out_role = endpoint_meta->role;
+    if (out_sub_index) *out_sub_index = endpoint_meta->sub_index;
+    return true;
+}
+
 static inline bool scene_entity_participant_subpoint(const GeometryComp *g,
                                                      constraint_participant_role_t role,
                                                      vec3_t *out_local_point,
@@ -490,21 +539,13 @@ static inline ecs_entity_t scene_constraint_participant_entity_for_pick(ecs_scen
                                                                          constraint_participant_role_t *out_role,
                                                                          uint8_t *out_sub_index) {
     if (!scene || pick_id == 0) return 0;
-    if (!endpoint_pick_is_encoded(pick_id)) return 0;
-
-    uint32_t entity_pick_id = 0;
+    ecs_entity_t owner_entity = 0;
     constraint_participant_role_t role = CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
-    if (!endpoint_pick_decode(pick_id, &entity_pick_id, &role)) return 0;
-
-    ecs_entity_t entity = ecs_scene_find_entity_by_pick_id(scene, entity_pick_id);
-    if (!entity || !ecs_is_alive(scene->world->world, entity)) return 0;
-    GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
-    if (!g) return 0;
-    if (g->type != GEOM_LINE && g->type != GEOM_ARC) return 0;
-
+    uint8_t sub_index = 0;
+    if (!scene_endpoint_owner_entity_for_pick(scene, pick_id, &owner_entity, &role, &sub_index)) return 0;
     if (out_role) *out_role = role;
-    if (out_sub_index) *out_sub_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0 : 1;
-    return entity;
+    if (out_sub_index) *out_sub_index = sub_index;
+    return owner_entity;
 }
 
 static inline void scene_solver_sort_entities_unique(ecs_entity_t *values, int *io_count) {
@@ -1693,6 +1734,8 @@ static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
         scene_set_geometry_default_label(scene, sketch, geometry_entity, g->type);
     }
 
+    scene_sync_endpoint_entities_for_owner(scene, geometry_entity);
+
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
 
@@ -1733,6 +1776,74 @@ static inline ecs_entity_t scene_add_arc_to_sketch(ecs_scene_t *scene, ecs_entit
         return 0;
     }
     return e;
+}
+
+static inline void scene_sync_endpoint_entities_for_owner(ecs_scene_t *scene, ecs_entity_t owner_entity) {
+    if (!scene || owner_entity == 0 || !ecs_is_alive(scene->world->world, owner_entity)) return;
+
+    GeometryComp *owner_geom = ecs_world_get_geometry(scene->world, owner_entity);
+    if (!owner_geom) return;
+    if (owner_geom->type != GEOM_LINE && owner_geom->type != GEOM_ARC) return;
+
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, owner_entity);
+    if (!scene_is_sketch(scene, sketch)) return; // sketch scope guard
+
+    EndPointsComp *owner_endpoints = ecs_world_get_endpoints(scene->world, owner_entity);
+    if (!owner_endpoints || owner_endpoints->is_endpoint_point) {
+        EndPointsComp init_owner = endpoints_comp_owner_default();
+        ecs_world_set_endpoints(scene->world, owner_entity, &init_owner);
+        owner_endpoints = ecs_world_get_endpoints(scene->world, owner_entity);
+        if (!owner_endpoints) return;
+    }
+
+    const constraint_participant_role_t roles[2] = {
+        CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
+        CONSTRAINT_PARTICIPANT_ROLE_POINT_B
+    };
+
+    for (uint8_t i = 0; i < 2; i++) {
+        constraint_participant_role_t role = roles[i];
+        vec3_t owner_point = vec3_make(0.0f, 0.0f, 0.0f);
+        uint8_t sub_index = 0;
+        if (!scene_entity_participant_subpoint(owner_geom, role, &owner_point, &sub_index)) {
+            continue;
+        }
+
+        endpoint_binding_t binding = {0};
+        ecs_entity_t endpoint_entity = 0;
+        if (endpoints_comp_find_binding(owner_endpoints, role, &binding)) {
+            endpoint_entity = (ecs_entity_t)binding.endpoint_entity;
+            if (endpoint_entity != 0 && !ecs_is_alive(scene->world->world, endpoint_entity)) {
+                endpoint_entity = 0;
+            }
+        }
+
+        if (endpoint_entity == 0) {
+            endpoint_entity = scene_add_point(scene, owner_point, owner_geom->color, 8.0f);
+            if (endpoint_entity == 0) continue;
+            scene_set_parent(scene, endpoint_entity, owner_entity);
+        }
+
+        EndPointsComp endpoint_meta = endpoints_comp_point((uint64_t)owner_entity, role, sub_index);
+        ecs_world_set_endpoints(scene->world, endpoint_entity, &endpoint_meta);
+        endpoints_comp_set_binding(owner_endpoints, role, sub_index, (uint64_t)endpoint_entity);
+
+        GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, endpoint_entity);
+        if (endpoint_geom && endpoint_geom->type == GEOM_POINT) {
+            endpoint_geom->data.point.point = owner_point;
+            endpoint_geom->color = owner_geom->color;
+            endpoint_geom->point_size = 8.0f;
+        }
+        RenderableComp *endpoint_renderable = ecs_world_get_renderable(scene->world, endpoint_entity);
+        if (endpoint_renderable) {
+            endpoint_renderable->visible = true;
+            endpoint_renderable->instance_dirty = true;
+        }
+        SelectableComp *endpoint_selectable = ecs_world_get_selectable(scene->world, endpoint_entity);
+        if (endpoint_selectable) endpoint_selectable->pickable = true;
+    }
+
+    owner_endpoints->is_endpoint_point = false;
 }
 
 static inline bool scene_is_constraint_entity(ecs_scene_t *scene, ecs_entity_t e) {
@@ -2182,6 +2293,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                 if (r) r->instance_dirty = true;
             }
         }
+        scene_sync_endpoint_entities_for_owner(scene, candidates[i].entity);
     }
 
     sk->solve_completed_serial = sk->solve_request_serial;
@@ -2836,6 +2948,8 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
             } else if (ecs_has_id(w->world, e, w->Hovered_tag)) {
                 render_color = hover_color;
             }
+            EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, e);
+            bool endpoint_point = endpoint_meta && endpoint_meta->is_endpoint_point;
 
             // Update instance data based on geometry type
             switch (g->type) {
@@ -2848,6 +2962,9 @@ static inline void ecs_scene_update(ecs_scene_t *scene) {
                 }
                 case GEOM_POINT: {
                     vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, g->data.point.point);
+                    if (endpoint_point) {
+                        g->point_size = 8.0f;
+                    }
                     geom_point_batch_set(&scene->batches.points, (int)r->instance_slot,
                                          world_pos, render_color);
                     break;
@@ -3161,6 +3278,8 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
 
             GeometryComp *g = &geoms[i];
             TransformComp *t = &transforms[i];
+            EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, it.entities[i]);
+            bool endpoint_point = endpoint_meta && endpoint_meta->is_endpoint_point;
 
             // Add to pick buffer based on geometry type, with screen-space frustum culling
             switch (g->type) {
@@ -3178,15 +3297,6 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     if (!va || !vb) { min_x = -1e30f; max_x = 1e30f; min_y = -1e30f; max_y = 1e30f; } // Straddles camera — don't cull
                     if (!pick_ndc_aabb_overlaps(min_x, max_x, min_y, max_y, LINE_MARGIN)) break;
                     pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
-
-                    uint32_t endpoint_pick_a = 0u;
-                    uint32_t endpoint_pick_b = 0u;
-                    if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &endpoint_pick_a)) {
-                        pick_buffer_add_overlay_point(pb, world_a, endpoint_pick_a);
-                    }
-                    if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &endpoint_pick_b)) {
-                        pick_buffer_add_overlay_point(pb, world_b, endpoint_pick_b);
-                    }
                     break;
                 }
                 case GEOM_POINT: {
@@ -3195,7 +3305,11 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                     if (!clip_space_project(pick_mvp, world_pos, &ndc_x, &ndc_y)) break;
                     if (ndc_x > POINT_MARGIN || ndc_x < -POINT_MARGIN ||
                         ndc_y > POINT_MARGIN || ndc_y < -POINT_MARGIN) break;
-                    pick_buffer_add_point(pb, world_pos, s->pick_id);
+                    if (endpoint_point) {
+                        pick_buffer_add_overlay_point(pb, world_pos, s->pick_id);
+                    } else {
+                        pick_buffer_add_point(pb, world_pos, s->pick_id);
+                    }
                     break;
                 }
                 case GEOM_POLYLINE: {
@@ -3256,18 +3370,6 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
                                 vec3_t world_a = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg]);
                                 vec3_t world_b = ecs_scene_transform_point_world(&t->world_matrix, arc_points[seg + 1]);
                                 pick_buffer_add_line(pb, world_a, world_b, s->pick_id);
-                            }
-                            if (arc_point_count >= 2) {
-                                vec3_t world_start = ecs_scene_transform_point_world(&t->world_matrix, arc_points[0]);
-                                vec3_t world_end = ecs_scene_transform_point_world(&t->world_matrix, arc_points[arc_point_count - 1]);
-                                uint32_t endpoint_pick_a = 0u;
-                                uint32_t endpoint_pick_b = 0u;
-                                if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &endpoint_pick_a)) {
-                                    pick_buffer_add_overlay_point(pb, world_start, endpoint_pick_a);
-                                }
-                                if (endpoint_pick_encode(s->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &endpoint_pick_b)) {
-                                    pick_buffer_add_overlay_point(pb, world_end, endpoint_pick_b);
-                                }
                             }
                             for (int j = 1; j < arc_point_count - 1; j++) {
                                 vec3_t world_pos = ecs_scene_transform_point_world(&t->world_matrix, arc_points[j]);
