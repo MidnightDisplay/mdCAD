@@ -378,6 +378,81 @@ static int test_arc_slot_reallocation_for_expanded_span(void) {
     return 0;
 }
 
+static int test_endpoint_undo_command_contract_roundtrip(void) {
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, NULL, 8);
+
+    vec3_t old_local = vec3_make(0.0f, 0.0f, 0.0f);
+    vec3_t new_local = vec3_make(1.25f, -0.5f, 0.0f);
+    undo_cmd_move_endpoint_participant(&undo,
+                                       (ecs_entity_t)77,
+                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
+                                       0u,
+                                       old_local,
+                                       new_local);
+
+    if (undo.count != 1 || undo.current != 1) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    const undo_command_t *cmd = &undo.commands[0];
+    if (cmd->type != CMD_MOVE_ENDPOINT_PARTICIPANT) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    if ((ecs_entity_t)cmd->data.move_endpoint_participant.owner_entity_id != (ecs_entity_t)77) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (cmd->data.move_endpoint_participant.role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (cmd->data.move_endpoint_participant.sub_index != 0u) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (fabsf(cmd->data.move_endpoint_participant.old_local_point.x - old_local.x) > 1e-6f ||
+        fabsf(cmd->data.move_endpoint_participant.new_local_point.x - new_local.x) > 1e-6f) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    return 0;
+}
+
+static int test_undo_legacy_position_and_point_commands_unchanged(void) {
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, NULL, 8);
+
+    undo_cmd_set_position(&undo, (ecs_entity_t)10,
+                          vec3_make(1.0f, 2.0f, 3.0f),
+                          vec3_make(4.0f, 5.0f, 6.0f));
+    undo_cmd_set_point_position(&undo, (ecs_entity_t)11,
+                                vec3_make(-1.0f, -2.0f, -3.0f),
+                                vec3_make(2.0f, 3.0f, 4.0f));
+
+    if (undo.count != 2 || undo.current != 2) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (undo.commands[0].type != CMD_SET_POSITION || undo.commands[1].type != CMD_SET_POINT_POSITION) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if ((ecs_entity_t)undo.commands[0].data.set_vec3.entity_id != (ecs_entity_t)10 ||
+        (ecs_entity_t)undo.commands[1].data.set_vec3.entity_id != (ecs_entity_t)11) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -396,6 +471,8 @@ int main(void) {
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },
         { "test_arc_slot_reallocation_for_expanded_span", test_arc_slot_reallocation_for_expanded_span },
+        { "test_endpoint_undo_command_contract_roundtrip", test_endpoint_undo_command_contract_roundtrip },
+        { "test_undo_legacy_position_and_point_commands_unchanged", test_undo_legacy_position_and_point_commands_unchanged },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
