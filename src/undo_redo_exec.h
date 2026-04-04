@@ -1074,6 +1074,22 @@ static inline bool undo_cmd_record_endpoint_participant_move_if_changed(undo_red
     return true;
 }
 
+static inline vec3_t record_drag_start_position_for_entity(ecs_scene_t *scene,
+                                                            ecs_entity_t entity) {
+    if (!scene || entity == 0) return vec3_make(0, 0, 0);
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, entity);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, entity);
+    if (endpoint_meta && endpoint_meta->is_endpoint_point &&
+        endpoint_geom && endpoint_geom->type == GEOM_POINT) {
+        return endpoint_geom->data.point.point;
+    }
+
+    const TransformComp *transform = ecs_world_get_transform(scene->world, entity);
+    if (transform) return transform->position;
+    return vec3_make(0, 0, 0);
+}
+
 static inline bool record_drag_end_move_for_entity(undo_redo_t *ur,
                                                     ecs_scene_t *scene,
                                                     ecs_entity_t entity,

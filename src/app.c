@@ -1623,8 +1623,8 @@ static void frame(void) {
                                 for (int i = 0; i < count; i++) {
                                     ecs_entity_t e = state.selection.entities[i];
                                     state.gizmo_drag_entities[i] = e;
-                                    const TransformComp *t = ecs_world_get_transform(state.ecs_scene.world, e);
-                                    state.gizmo_drag_start_positions[i] = t ? t->position : vec3_make(0, 0, 0);
+                                    state.gizmo_drag_start_positions[i] =
+                                        record_drag_start_position_for_entity(&state.ecs_scene, e);
                                 }
                             } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
                                        state.gizmo.vertex_mode.active) {
