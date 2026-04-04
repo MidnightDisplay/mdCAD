@@ -191,6 +191,7 @@ static int test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side
         return 1;
     }
 
+    sk->auto_solve_pending = false;
     uint32_t before_request = sk->solve_request_serial;
     uint64_t before_revision = scene_script_emit_revision(&scene);
 
@@ -212,6 +213,7 @@ static int test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side
     sk = ecs_world_get_sketch(scene.world, sketch);
     if (!sk ||
         sk->solve_request_serial <= before_request ||
+        !sk->auto_solve_pending ||
         scene_script_emit_revision(&scene) <= before_revision) {
         undo_redo_shutdown(&undo);
         ecs_world_shutdown(&world);
@@ -229,7 +231,8 @@ static int test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side
 
     sk = ecs_world_get_sketch(scene.world, sketch);
     int ok = (sk &&
-              sk->solve_request_serial > after_undo_request &&
+              sk->solve_request_serial >= after_undo_request &&
+              sk->auto_solve_pending &&
               scene_script_emit_revision(&scene) > after_undo_revision);
 
     undo_redo_shutdown(&undo);

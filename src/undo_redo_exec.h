@@ -1112,6 +1112,11 @@ static inline bool undo_replay_endpoint_participant_move(ecs_scene_t *scene,
     if (r) r->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, owner);
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, owner);
+    if (scene_is_sketch(scene, sketch)) {
+        scene_solver_request_auto(scene, sketch);
+        scene_script_reemit_for_sketch(scene, sketch);
+    }
     return true;
 }
 
