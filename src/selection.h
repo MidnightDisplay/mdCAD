@@ -152,6 +152,20 @@ static inline void selection_remove(selection_buffer_t *sel, ecs_entity_t e) {
     }
 }
 
+// Remove dead entities from selection buffer (safety after scene-side deletions)
+static inline void selection_prune_dead(selection_buffer_t *sel) {
+    if (!sel || !sel->world) return;
+    for (int i = 0; i < sel->count; ) {
+        ecs_entity_t e = sel->entities[i];
+        if (!ecs_is_alive(sel->world->world, e)) {
+            sel->entities[i] = sel->entities[sel->count - 1];
+            sel->count--;
+            continue;
+        }
+        i++;
+    }
+}
+
 // Toggle entity selection state
 static inline void selection_toggle(selection_buffer_t *sel, ecs_entity_t e) {
     if (e == 0) return;

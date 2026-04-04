@@ -153,6 +153,93 @@ static int test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash(voi
     return 0;
 }
 
+static int test_geometry_manager_selection_sync_maps_viewport_selection_to_rows(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    ecs_entity_t non_sketch_line = scene_add_line(
+        &scene, vec3_make(2.0f, 0.0f, 0.0f), vec3_make(3.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!sketch || !line || !non_sketch_line) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    if (endpoint_a == 0) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    selection_buffer_t selection = {0};
+    selection_init(&selection, &world);
+    selection_add(&selection, line);
+    selection_add(&selection, endpoint_a);   // selecting endpoint in viewport should map to owner line row
+    selection_add(&selection, non_sketch_line);
+
+    ecs_entity_t row_selection[UI_GEOMETRY_MANAGER_MAX_ROWS] = {0};
+    int row_selection_count = 0;
+    ui_geometry_manager_sync_selection_from_scene(&world, &selection, sketch,
+                                                  row_selection, &row_selection_count);
+
+    int line_hits = 0;
+    int non_sketch_hits = 0;
+    for (int i = 0; i < row_selection_count; i++) {
+        if (row_selection[i] == line) line_hits++;
+        if (row_selection[i] == non_sketch_line) non_sketch_hits++;
+    }
+
+    selection_shutdown(&selection);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+
+    if (line_hits != 1) return 1;
+    if (non_sketch_hits != 0) return 1;
+    return 0;
+}
+
+static int test_selection_prune_dead_removes_deleted_selection_entries(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t line = scene_add_line(
+        &scene, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!line) return 1;
+
+    selection_buffer_t selection = {0};
+    selection_init(&selection, &world);
+    selection_add(&selection, line);
+    if (selection_count(&selection) != 1) {
+        selection_shutdown(&selection);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    scene_remove_entity(&scene, line);
+    selection_prune_dead(&selection);
+    int ok = (selection_count(&selection) == 0);
+
+    selection_shutdown(&selection);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_endpoint_pick_overlay_precedence_contract(void) {
     pick_buffer_layer_event_t events[8] = {0};
     int event_count = 0;
@@ -1029,6 +1116,10 @@ int main(void) {
         { "test_endpoint_pick_native_endpoint_entity_resolution", test_endpoint_pick_native_endpoint_entity_resolution },
         { "test_endpoint_pick_non_sketch_line_has_no_native_endpoints", test_endpoint_pick_non_sketch_line_has_no_native_endpoints },
         { "test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash", test_endpoint_pick_transform_delta_non_sketch_line_does_not_crash },
+        { "test_geometry_manager_selection_sync_maps_viewport_selection_to_rows",
+          test_geometry_manager_selection_sync_maps_viewport_selection_to_rows },
+        { "test_selection_prune_dead_removes_deleted_selection_entries",
+          test_selection_prune_dead_removes_deleted_selection_entries },
         { "test_endpoint_pick_overlay_precedence_contract", test_endpoint_pick_overlay_precedence_contract },
         { "test_endpoint_pick_collision_prefers_overlay", test_endpoint_pick_collision_prefers_overlay },
         { "test_endpoint_pick_collision_deterministic_repeated_sampling", test_endpoint_pick_collision_deterministic_repeated_sampling },

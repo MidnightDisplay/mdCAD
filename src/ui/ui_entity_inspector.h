@@ -287,6 +287,31 @@ static inline void ui_geometry_manager_handle_click(ecs_entity_t *selection,
     }
 }
 
+static inline void ui_geometry_manager_sync_selection_from_scene(ecs_world_state_t *w,
+                                                                 selection_buffer_t *source_selection,
+                                                                 ecs_entity_t sketch_entity,
+                                                                 ecs_entity_t *row_selection,
+                                                                 int *row_selection_count) {
+    if (!w || !source_selection || !row_selection || !row_selection_count) return;
+    *row_selection_count = 0;
+
+    int selected_total = selection_count(source_selection);
+    for (int i = 0; i < selected_total; i++) {
+        ecs_entity_t selected = selection_get(source_selection, i);
+        if (selected == 0 || !ecs_is_alive(w->world, selected)) continue;
+
+        ecs_entity_t row_entity = selected;
+        EndPointsComp *endpoint_meta = ecs_world_get_endpoints(w, selected);
+        if (endpoint_meta && endpoint_meta->is_endpoint_point) {
+            row_entity = (ecs_entity_t)endpoint_meta->owner_entity;
+        }
+        if (row_entity == 0 || !ecs_is_alive(w->world, row_entity)) continue;
+        if (ecs_world_get_parent(w, row_entity) != sketch_entity) continue;
+        if (!ecs_world_get_geometry(w, row_entity)) continue;
+        ui_geometry_manager_selection_add(row_selection, row_selection_count, row_entity);
+    }
+}
+
 static inline bool ui_constraint_text_matches(const char *haystack, const char *needle) {
     if (!needle || needle[0] == '\0') return true;
     if (!haystack) return false;
@@ -352,6 +377,13 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
 
     if (gm_bound_sketch != e) {
         gm_bound_sketch = e;
+        gm_selected_count = 0;
+    }
+
+    if (state->selection) {
+        ui_geometry_manager_sync_selection_from_scene(
+            w, state->selection, e, gm_selected_entities, &gm_selected_count);
+    } else {
         gm_selected_count = 0;
     }
 
@@ -484,6 +516,7 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
                     io->KeyShift,
                     io->KeyCtrl
                 );
+                selection_handle_click(state->selection, child, io->KeyShift, io->KeyCtrl);
             }
         }
     }
@@ -603,12 +636,20 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
                 undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
             }
 
+            if (state->selection) {
+                for (int i = 0; i < delete_count; i++) {
+                    selection_remove(state->selection, delete_entities[i]);
+                }
+            }
             for (int i = 0; i < delete_count; i++) {
                 if (scene) {
                     scene_remove_entity(scene, delete_entities[i]);
                 } else {
                     ecs_delete(w->world, delete_entities[i]);
                 }
+            }
+            if (state->selection) {
+                selection_prune_dead(state->selection);
             }
 
             gm_selected_count = 0;
@@ -1103,6 +1144,13 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             gm_selected_count = 0;
         }
 
+        if (state->selection) {
+            ui_geometry_manager_sync_selection_from_scene(
+                w, state->selection, e, gm_selected_entities, &gm_selected_count);
+        } else {
+            gm_selected_count = 0;
+        }
+
         ecs_entity_t geometry_rows[UI_GEOMETRY_MANAGER_MAX_ROWS];
         int geometry_row_count = 0;
         ecs_iter_t child_it = ecs_children(w->world, e);
@@ -1228,6 +1276,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                         io->KeyShift,
                         io->KeyCtrl
                     );
+                    selection_handle_click(state->selection, child, io->KeyShift, io->KeyCtrl);
                 }
             }
         }
@@ -1345,12 +1394,20 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
                 }
 
+                if (state->selection) {
+                    for (int i = 0; i < delete_count; i++) {
+                        selection_remove(state->selection, delete_entities[i]);
+                    }
+                }
                 for (int i = 0; i < delete_count; i++) {
                     if (scene) {
                         scene_remove_entity(scene, delete_entities[i]);
                     } else {
                         ecs_delete(w->world, delete_entities[i]);
                     }
+                }
+                if (state->selection) {
+                    selection_prune_dead(state->selection);
                 }
 
                 gm_selected_count = 0;
