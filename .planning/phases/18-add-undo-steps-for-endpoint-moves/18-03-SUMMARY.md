@@ -45,13 +45,14 @@ completed: 2026-04-04
 - **Duration:** 6m
 - **Started:** 2026-04-04T08:40:05Z
 - **Completed:** 2026-04-04T08:46:08Z
-- **Tasks:** 2 completed, 1 checkpoint pending (UAT fix applied, awaiting re-check)
+- **Tasks:** 2 completed, 1 checkpoint pending (UAT follow-up fixes applied, awaiting re-check)
 - **Files modified:** 6
 
 ## Accomplishments
 - Added endpoint regression tests for non-sketch drag-end legacy undo behavior and endpoint drag release-only coalescing boundaries.
 - Added script transaction regression checks for command type integrity and noop transaction undo suppression.
 - Updated `18-VALIDATION.md` to mark PH18-01..PH18-03 automated evidence green and set `nyquist_compliant: true`.
+- Added arc endpoint undo branch-continuity fix plus regression coverage to prevent undo/redo inversion flips across ±π wrapping.
 
 ## Task Commits
 
@@ -60,6 +61,7 @@ Each completed task was committed atomically:
 1. **Task 1: Add regression gates for non-sketch invariants and undo coalescing boundary** - `f512a20` (test), `6d64f89` (feat)
 2. **Task 2: Lock script transaction invariants and update phase validation evidence** - `6ae049d` (test), `8389199` (feat)
 3. **Task 3 follow-up (from checkpoint repro): Fix endpoint drag undo pre-drag snapshot regression** - `6e2b611` (fix)
+4. **Task 3 follow-up (new checkpoint repro): Fix arc endpoint undo inversion reliability** - `4a1bce4` (fix)
 
 _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 
@@ -67,14 +69,17 @@ _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 - `src/tests/endpoint_pick_test.c` - Added non-sketch drag-end legacy undo routing and endpoint release-boundary coalescing regressions.
 - `src/app.c` - Switched transform drag-end undo commit loop to shared recorder helper.
 - `src/undo_redo_exec.h` - Added `record_drag_end_move_for_entity` helper and noop guard for script transaction pushes.
+- `src/ecs/ecs_scene.h` - Preserved arc endpoint angle branch continuity when applying participant local points to avoid ±π wrap flips.
 - `src/tests/script_roundtrip_tests.c` - Added script apply transaction command-type and noop-push regression tests.
 - `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-VALIDATION.md` - Marked automated evidence green for PH18-01..PH18-03 and set compliance fields.
 - `src/tests/endpoint_pick_test.c` - Added regression that validates endpoint drag undo restores the true pre-drag endpoint local point instead of origin.
+- `src/tests/endpoint_pick_test.c` - Added regression that reproduces arc endpoint undo branch inversion and locks deterministic undo/redo branch continuity.
 
 ## Decisions Made
 - Reused shared helper logic for drag-end command path selection to avoid drift between runtime behavior and test expectations.
 - Treated noop script transaction pushes as correctness issue for undo granularity and fixed inline.
 - Capture endpoint drag-start snapshots from endpoint local geometry for endpoint entities; preserve transform snapshot path for non-endpoints.
+- Keep arc endpoint replay angles on the nearest equivalent branch relative to current angle to eliminate wrap-induced inversion.
 
 ## Deviations from Plan
 
@@ -96,10 +101,18 @@ _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 - **Verification:** `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure`; `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_drag|scene_solver_diagnostics|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure`
 - **Committed in:** `6e2b611`
 
+**3. [Rule 1 - Bug] Arc endpoint undo could flip to inverse branch after undo/redo**
+- **Found during:** Task 3 human verify follow-up (new repro)
+- **Issue:** Replaying arc endpoint local points computed angle with `atan2f`, which can switch between equivalent branches at ±π and invert arc orientation/span after undo.
+- **Fix:** In `scene_apply_local_point_to_participant` (arc path), added angular continuity normalization to keep new angle on the nearest branch to existing start/end angle before commit. Added endpoint regression exercising near-π branch wrap and asserting stable undo/redo behavior.
+- **Files modified:** `src/ecs/ecs_scene.h`, `src/tests/endpoint_pick_test.c`
+- **Verification:** `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure`; `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_drag|scene_solver_diagnostics|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure`
+- **Committed in:** `4a1bce4`
+
 ---
 
-**Total deviations:** 2 auto-fixed (2 bugs)
-**Impact on plan:** Fixes were required to make regression gates executable and preserve endpoint drag undo correctness with no scope creep.
+**Total deviations:** 3 auto-fixed (3 bugs)
+**Impact on plan:** Fixes were required to make regression gates executable and preserve endpoint undo correctness (line and arc paths) with no scope creep.
 
 ## Known Stubs
 None.
@@ -115,3 +128,4 @@ None.
 - FOUND: 6ae049d
 - FOUND: 8389199
 - FOUND: 6e2b611
+- FOUND: 4a1bce4
