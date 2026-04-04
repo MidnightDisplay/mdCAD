@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-04-04T08:30:39.379Z"
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-04-04T08:39:19.228Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 28
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 18 (add-undo-steps-for-endpoint-moves) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-04
 
@@ -67,6 +67,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 17 P03 | 4m | 2 tasks | 5 files |
 | Phase 17 P04 | 1297 | 2 tasks | 5 files |
 | Phase 18 P01 | 64m | 2 tasks | 5 files |
+| Phase 18-add-undo-steps-for-endpoint-moves P02 | 280 | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -115,6 +116,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 17]: Removed synthetic endpoint tail-range dependency from normal endpoint path by routing through native point entity picks.
 - [Phase 18]: Use dedicated CMD_MOVE_ENDPOINT_PARTICIPANT payload with owner entity + role/sub-index + old/new local point for endpoint undo semantics.
 - [Phase 18]: Route endpoint-point gizmo drag-end and inspector deactivation commits through endpoint-aware undo helper while preserving non-endpoint legacy command paths.
+- [Phase 18-add-undo-steps-for-endpoint-moves]: Centralized endpoint replay into undo_replay_endpoint_participant_move for apply/unapply parity.
+- [Phase 18-add-undo-steps-for-endpoint-moves]: Endpoint replay now triggers solver auto-request and script re-emit only for sketch-owned owners.
 
 ## Accumulated Context
 
@@ -128,6 +131,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-04T08:30:39.375Z
-**Stopped At:** Completed 18-01-PLAN.md
+**Last Date:** 2026-04-04T08:39:19.224Z
+**Stopped At:** Completed 18-02-PLAN.md
 **Resume File:** None

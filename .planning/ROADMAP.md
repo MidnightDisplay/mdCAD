@@ -161,9 +161,9 @@ Plans:
 **Goal:** Endpoint moves in sketch workflows produce deterministic, coalesced undo/redo steps that replay through scene-authoritative sync without regressing non-sketch or script transactional behavior.
 **Requirements**: PH18-01, PH18-02, PH18-03
 **Depends on:** Phase 17
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 18-01-PLAN.md — Define endpoint-aware undo command contract and wire drag/inspector recorders at interaction boundaries.
-- [ ] 18-02-PLAN.md — Implement endpoint undo replay via scene sync helpers with sketch-only side effects.
+- [x] 18-02-PLAN.md — Implement endpoint undo replay via scene sync helpers with sketch-only side effects.
 - [ ] 18-03-PLAN.md — Add regression hardening for non-sketch/script invariants and finalize Phase 18 validation evidence.
