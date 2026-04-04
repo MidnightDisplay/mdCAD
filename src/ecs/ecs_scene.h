@@ -598,6 +598,17 @@ static inline bool scene_apply_local_point_to_participant(GeometryComp *g,
             float angle = atan2f(projected_y, projected_x);
             if (!isfinite(angle)) return false;
 
+            // Preserve angular branch continuity to avoid endpoint replay flipping/inverting
+            // arc span when an equivalent point crosses [-pi, +pi] wrap boundaries.
+            const float two_pi = 6.28318530718f;
+            float reference = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A)
+                ? g->data.arc.start_angle
+                : g->data.arc.end_angle;
+            if (isfinite(reference)) {
+                while ((angle - reference) > 3.14159265359f) angle -= two_pi;
+                while ((angle - reference) < -3.14159265359f) angle += two_pi;
+            }
+
             g->data.arc.radius = radius;
             if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
                 g->data.arc.start_angle = angle;

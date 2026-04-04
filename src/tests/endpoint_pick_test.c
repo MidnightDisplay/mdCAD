@@ -916,6 +916,110 @@ static int test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position(voi
     return 0;
 }
 
+static int test_endpoint_arc_undo_preserves_angle_branch_without_inversion(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t arc = scene_add_arc_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), 1.0f,
+        3.10f, 3.12f, vec3_make(0.0f, 0.0f, 1.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (arc == 0) return 1;
+
+    EndPointsComp *arc_endpoints = ecs_world_get_endpoints(&world, arc);
+    endpoint_binding_t start_binding = {0};
+    if (!arc_endpoints || !endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &start_binding)) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t endpoint_a = (ecs_entity_t)start_binding.endpoint_entity;
+    GeometryComp *arc_geom = ecs_world_get_geometry(&world, arc);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!arc_geom || arc_geom->type != GEOM_ARC) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    float old_start = arc_geom->data.arc.start_angle;
+    vec3_t old_local = endpoint_geom->data.point.point;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+
+    vec3_t new_local = vec3_make(-0.999f, -0.045f, 0.0f); // equivalent angle near -pi branch
+    if (!undo_cmd_record_endpoint_participant_move_if_changed(&undo, &scene, endpoint_a,
+                                                               old_local,
+                                                               new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1 || undo.commands[0].type != CMD_MOVE_ENDPOINT_PARTICIPANT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    arc_geom = ecs_world_get_geometry(&world, arc);
+    if (!arc_geom || arc_geom->type != GEOM_ARC) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(arc_geom->data.arc.start_angle - old_start) > 0.02f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_redo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    arc_geom = ecs_world_get_geometry(&world, arc);
+    if (!arc_geom || arc_geom->type != GEOM_ARC) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    // Redo should stay in same branch neighborhood near +pi instead of flipping to negative branch.
+    if (arc_geom->data.arc.start_angle < 2.8f || arc_geom->data.arc.start_angle > 3.4f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -943,6 +1047,7 @@ int main(void) {
         { "test_non_sketch_drag_release_records_legacy_position_undo", test_non_sketch_drag_release_records_legacy_position_undo },
         { "test_endpoint_drag_records_only_on_release_boundary", test_endpoint_drag_records_only_on_release_boundary },
         { "test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position", test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position },
+        { "test_endpoint_arc_undo_preserves_angle_branch_without_inversion", test_endpoint_arc_undo_preserves_angle_branch_without_inversion },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
