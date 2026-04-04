@@ -689,6 +689,135 @@ static int test_endpoint_redo_replay_resyncs_owner_and_endpoint_entity(void) {
     return 0;
 }
 
+static int test_non_sketch_drag_release_records_legacy_position_undo(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t line = scene_add_line(
+        &scene, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    TransformComp *before_xform = ecs_world_get_transform(&world, line);
+    GeometryComp *before_geom = ecs_world_get_geometry(&world, line);
+    if (!before_xform || !before_geom || before_geom->type != GEOM_LINE) return 1;
+    vec3_t old_pos = before_xform->position;
+    vec3_t geom_a_before = before_geom->data.line.a;
+    vec3_t geom_b_before = before_geom->data.line.b;
+
+    ecs_entity_t selected[1] = { line };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.35f, -0.2f, 0.0f))) return 1;
+
+    TransformComp *after_xform = ecs_world_get_transform(&world, line);
+    GeometryComp *after_geom = ecs_world_get_geometry(&world, line);
+    if (!after_xform || !after_geom || after_geom->type != GEOM_LINE) return 1;
+    vec3_t new_pos = after_xform->position;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    if (!record_drag_end_move_for_entity(&undo, &scene, line, old_pos, new_pos)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (undo.count != 1 || undo.commands[0].type != CMD_SET_POSITION) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (fabsf(after_geom->data.line.a.x - geom_a_before.x) > 1e-6f ||
+        fabsf(after_geom->data.line.a.y - geom_a_before.y) > 1e-6f ||
+        fabsf(after_geom->data.line.b.x - geom_b_before.x) > 1e-6f ||
+        fabsf(after_geom->data.line.b.y - geom_b_before.y) > 1e-6f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_endpoint_drag_records_only_on_release_boundary(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) return 1;
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+    vec3_t old_local = endpoint_geom->data.point.point;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    if (undo.count != 0) return 1;
+
+    ecs_entity_t selected[1] = { endpoint_a };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.2f, 0.0f, 0.0f))) return 1;
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.1f, 0.15f, 0.0f))) return 1;
+    if (undo.count != 0) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+    vec3_t new_local = endpoint_geom->data.point.point;
+    if (!record_drag_end_move_for_entity(&undo, &scene, endpoint_a, old_local, new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (undo.count != 1 || undo.commands[0].type != CMD_MOVE_ENDPOINT_PARTICIPANT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (record_drag_end_move_for_entity(&undo, &scene, endpoint_a, new_local, new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -713,6 +842,8 @@ int main(void) {
         { "test_inspector_endpoint_edit_records_only_at_commit_boundary", test_inspector_endpoint_edit_records_only_at_commit_boundary },
         { "test_endpoint_undo_replay_resyncs_owner_and_endpoint_entity", test_endpoint_undo_replay_resyncs_owner_and_endpoint_entity },
         { "test_endpoint_redo_replay_resyncs_owner_and_endpoint_entity", test_endpoint_redo_replay_resyncs_owner_and_endpoint_entity },
+        { "test_non_sketch_drag_release_records_legacy_position_undo", test_non_sketch_drag_release_records_legacy_position_undo },
+        { "test_endpoint_drag_records_only_on_release_boundary", test_endpoint_drag_records_only_on_release_boundary },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
