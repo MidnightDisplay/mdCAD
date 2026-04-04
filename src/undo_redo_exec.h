@@ -1004,10 +1004,11 @@ static inline void undo_cmd_set_geometry_vertices(undo_redo_t *ur, ecs_entity_t 
 }
 
 static inline void undo_cmd_script_apply_transaction(undo_redo_t *ur,
-                                                     ecs_entity_t sketch,
-                                                     const char *before_script,
-                                                     const char *after_script) {
+                                                      ecs_entity_t sketch,
+                                                      const char *before_script,
+                                                      const char *after_script) {
     if (!ur || sketch == 0 || !before_script || !after_script) return;
+    if (strcmp(before_script, after_script) == 0) return;
 
     undo_command_t cmd = {0};
     cmd.type = CMD_SCRIPT_APPLY_TRANSACTION;
