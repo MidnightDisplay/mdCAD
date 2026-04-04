@@ -165,6 +165,113 @@ static int test_failure_implication_dedupes_participants(void) {
     return ok ? 0 : 1;
 }
 
+static int test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(1.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(scene.world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    uint32_t before_request = sk->solve_request_serial;
+    uint64_t before_revision = scene_script_emit_revision(&scene);
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    undo_cmd_move_endpoint_participant(&undo,
+                                       line,
+                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
+                                       binding_a.sub_index,
+                                       vec3_make(0.0f, 0.0f, 0.0f),
+                                       vec3_make(0.3f, 0.1f, 0.0f));
+
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk ||
+        sk->solve_request_serial <= before_request ||
+        scene_script_emit_revision(&scene) <= before_revision) {
+        undo_redo_shutdown(&undo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    uint32_t after_undo_request = sk->solve_request_serial;
+    uint64_t after_undo_revision = scene_script_emit_revision(&scene);
+
+    if (!undo_redo_redo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sk = ecs_world_get_sketch(scene.world, sketch);
+    int ok = (sk &&
+              sk->solve_request_serial > after_undo_request &&
+              scene_script_emit_revision(&scene) > after_undo_revision);
+
+    undo_redo_shutdown(&undo);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t line = scene_add_line(&scene,
+                                       vec3_make(0.0f, 0.0f, 0.0f),
+                                       vec3_make(1.0f, 0.0f, 0.0f),
+                                       vec4_make(1, 1, 1, 1), 1.0f);
+    if (!line) return 1;
+
+    uint64_t before_revision = scene_script_emit_revision(&scene);
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    undo_cmd_move_endpoint_participant(&undo,
+                                       line,
+                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
+                                       0u,
+                                       vec3_make(0.0f, 0.0f, 0.0f),
+                                       vec3_make(0.2f, 0.0f, 0.0f));
+
+    if (!undo_redo_undo(&undo) || !undo_redo_redo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int ok = (scene_script_emit_revision(&scene) == before_revision);
+    undo_redo_shutdown(&undo);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -175,6 +282,10 @@ int main(void) {
         { "test_recalculate_unsat_is_transactional_and_deterministic", test_recalculate_unsat_is_transactional_and_deterministic },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
         { "test_failure_implication_dedupes_participants", test_failure_implication_dedupes_participants },
+        { "test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects",
+          test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects },
+        { "test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision",
+          test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
