@@ -4,7 +4,7 @@ milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: verifying
 stopped_at: Completed 18-03-PLAN.md
-last_updated: "2026-04-04T22:25:09.341Z"
+last_updated: "2026-04-04T22:33:43.622Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 9
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 18 (add-undo-steps-for-endpoint-moves) — EXECUTING
-Plan: 3 of 3
+Phase: 18
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-04
 

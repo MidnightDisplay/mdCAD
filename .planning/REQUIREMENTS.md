@@ -62,6 +62,12 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **D-11**: Coincident authoring supports endpoint-to-endpoint participant semantics through direct selection model.
 - [x] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
 
+### Endpoint Undo Hardening (Phase 18)
+
+- [x] **PH18-01**: Endpoint drags and endpoint numeric edits record endpoint-aware undo payloads at interaction boundaries (coalesced to one step per completed drag/edit session).
+- [x] **PH18-02**: Endpoint undo/redo replays through scene-authoritative sync flow, preserving endpoint-owner geometry consistency and sketch-only solver/script side effects.
+- [x] **PH18-03**: Endpoint undo integration preserves non-sketch manipulation and script transaction invariants, including stable arc endpoint undo behavior across angular branch boundaries.
+
 ## v1.3+ Requirements (Deferred)
 
 ### Platform Expansion
@@ -129,12 +135,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | D-10 | Phase 17 | In Progress |
 | D-11 | Phase 17 | In Progress |
 | D-12 | Phase 17 | In Progress |
+| PH18-01 | Phase 18 | Complete |
+| PH18-02 | Phase 18 | Complete |
+| PH18-03 | Phase 18 | Complete |
 
 **Coverage:**
-- v1.2 requirements: 37 total
-- Mapped to phases: 37 ✅
+- v1.2 requirements: 40 total
+- Mapped to phases: 40 ✅
 - Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-04-01 after v1.2 milestone gap-plan remap*
+*Last updated: 2026-04-04 after Phase 18 execution and traceability closure*
