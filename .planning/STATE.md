@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 17-04-PLAN.md
-last_updated: "2026-04-03T12:46:39.693Z"
-last_activity: 2026-04-03
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-04-04T08:30:39.379Z"
+last_activity: 2026-04-04
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 25
-  completed_plans: 24
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 28
+  completed_plans: 26
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 17 — constraint-driven-geometry-solving
+**Current focus:** Phase 18 — add-undo-steps-for-endpoint-moves
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 17 (constraint-driven-geometry-solving) — EXECUTING (blocked)
-Plan: 3 of 3 complete
+Phase: 18 (add-undo-steps-for-endpoint-moves) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-04-03
+Last activity: 2026-04-04
 
 ## Milestone Scope
 
@@ -66,6 +66,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 17 P01 | 11 min | 2 tasks | 7 files |
 | Phase 17 P03 | 4m | 2 tasks | 5 files |
 | Phase 17 P04 | 1297 | 2 tasks | 5 files |
+| Phase 18 P01 | 64m | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -112,6 +113,14 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 17]: Plan 17-02 checkpoint failed; pursue redesign using sketch-scoped native endpoint point entities instead of synthetic endpoint tail-range picks.
 - [Phase 17]: Endpoint picks now resolve through native EndPoints point entities with sketch-only endpoint lifecycle guardrails.
 - [Phase 17]: Removed synthetic endpoint tail-range dependency from normal endpoint path by routing through native point entity picks.
+- [Phase 18]: Use dedicated CMD_MOVE_ENDPOINT_PARTICIPANT payload with owner entity + role/sub-index + old/new local point for endpoint undo semantics.
+- [Phase 18]: Route endpoint-point gizmo drag-end and inspector deactivation commits through endpoint-aware undo helper while preserving non-endpoint legacy command paths.
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 18 added: Add undo steps for endpoint moves.
 
 ## Blockers
 
@@ -119,6 +128,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-03T12:46:39.689Z
-**Stopped At:** Completed 17-04-PLAN.md
+**Last Date:** 2026-04-04T08:30:39.375Z
+**Stopped At:** Completed 18-01-PLAN.md
 **Resume File:** None
