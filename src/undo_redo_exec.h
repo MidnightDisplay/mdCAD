@@ -164,6 +164,12 @@ static inline undo_entity_snapshot_t undo_snapshot_entity(ecs_scene_t *scene, ec
         snap.sketch_geometry_state = *geom_state;
     }
 
+    EndPointsComp *endpoints = ecs_world_get_endpoints(w, e);
+    if (endpoints) {
+        snap.has_endpoints = true;
+        snap.endpoints = *endpoints;
+    }
+
     // Get parent
     snap.parent_id = (uint64_t)scene_get_parent(scene, e);
 
@@ -437,6 +443,26 @@ static inline void undo_restore_bulk_entity_relationships(ecs_scene_t *scene,
     }
 
     // Third pass: refresh sketch metadata for touched sketches and restored sketch roots
+    // and remap endpoint ownership/bindings against recreated entity IDs.
+    for (int i = 0; i < count; i++) {
+        ecs_entity_t e = (ecs_entity_t)new_ids[i];
+        if (e == 0 || !ecs_is_alive(scene->world->world, e)) continue;
+        if (!snapshots[i].has_endpoints) continue;
+
+        EndPointsComp *endpoints = ecs_world_get_endpoints(scene->world, e);
+        if (!endpoints) continue;
+
+        if (endpoints->is_endpoint_point) {
+            endpoints->owner_entity = undo_map_entity_id(endpoints->owner_entity, old_ids, new_ids, count);
+            continue;
+        }
+
+        for (uint8_t bi = 0; bi < endpoints->endpoint_count; bi++) {
+            endpoint_binding_t *binding = &endpoints->endpoints[bi];
+            binding->endpoint_entity = undo_map_entity_id(binding->endpoint_entity, old_ids, new_ids, count);
+        }
+    }
+
     for (int i = 0; i < count; i++) {
         ecs_entity_t e = (ecs_entity_t)new_ids[i];
         if (e != 0 && ecs_is_alive(scene->world->world, e) && scene_is_sketch(scene, e)) {
@@ -659,6 +685,9 @@ static inline ecs_entity_t undo_create_from_snapshot(ecs_scene_t *scene, undo_en
         }
         if (snap->has_sketch_geometry_state) {
             ecs_world_set_sketch_geometry_state(scene->world, e, &snap->sketch_geometry_state);
+        }
+        if (snap->has_endpoints) {
+            ecs_world_set_endpoints(scene->world, e, &snap->endpoints);
         }
     }
 

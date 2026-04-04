@@ -122,6 +122,7 @@ typedef struct {
     bool has_constraint;
     bool has_sketch_geometry_state;
     bool has_renderable;
+    bool has_endpoints;
 
     // Geometry type
     undo_geom_type_t geom_type;
@@ -152,6 +153,7 @@ typedef struct {
     SketchComp sketch;
     ConstraintComp constraint;
     SketchGeometryStateComp sketch_geometry_state;
+    EndPointsComp endpoints;
 
     // Geometry-specific data
     union {

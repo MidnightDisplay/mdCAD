@@ -1107,6 +1107,390 @@ static int test_endpoint_arc_undo_preserves_angle_branch_without_inversion(void)
     return 0;
 }
 
+static int test_bulk_delete_undo_restores_endpoint_owner_sync_metadata(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+
+    ecs_entity_t to_delete[1] = { line };
+    undo_cmd_bulk_delete_entities(&undo, to_delete, 1);
+    scene_remove_entity(&scene, line);
+
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1 || undo.commands[0].type != CMD_BULK_DELETE_ENTITIES) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t restored_line = 0;
+    undo_command_t *cmd = &undo.commands[0];
+    for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+        undo_entity_snapshot_t *snap = &cmd->data.bulk_delete.snapshots[i];
+        if (!snap->has_geometry) continue;
+        if (snap->geom_type != UNDO_GEOM_LINE) continue;
+        if (snap->parent_id != (uint64_t)sketch) continue;
+        restored_line = (ecs_entity_t)cmd->data.bulk_delete.entity_ids[i];
+        break;
+    }
+    if (restored_line == 0 || !ecs_is_alive(world.world, restored_line)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    EndPointsComp *restored_owner_endpoints = ecs_world_get_endpoints(&world, restored_line);
+    endpoint_binding_t binding_a = {0};
+    if (!restored_owner_endpoints ||
+        restored_owner_endpoints->is_endpoint_point ||
+        !endpoints_comp_find_binding(restored_owner_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(&world, endpoint_a);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point ||
+        (ecs_entity_t)endpoint_meta->owner_entity != restored_line) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t restored_line_children[8] = {0};
+    int restored_line_child_count = scene_get_children(&scene, restored_line, restored_line_children, 8);
+    if (restored_line_child_count != 2) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    for (int i = 0; i < restored_line_child_count; i++) {
+        EndPointsComp *child_endpoint_meta = ecs_world_get_endpoints(&world, restored_line_children[i]);
+        if (!child_endpoint_meta || !child_endpoint_meta->is_endpoint_point ||
+            (ecs_entity_t)child_endpoint_meta->owner_entity != restored_line) {
+            undo_redo_shutdown(&undo);
+            ecs_scene_shutdown(&scene);
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+
+    GeometryComp *line_geom_before = ecs_world_get_geometry(&world, restored_line);
+    TransformComp *endpoint_xform_before = ecs_world_get_transform(&world, endpoint_a);
+    if (!line_geom_before || line_geom_before->type != GEOM_LINE || !endpoint_xform_before) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t old_a = line_geom_before->data.line.a;
+
+    ecs_entity_t selected[1] = { endpoint_a };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.3f, 0.2f, 0.0f))) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *line_geom_after = ecs_world_get_geometry(&world, restored_line);
+    TransformComp *endpoint_xform_after = ecs_world_get_transform(&world, endpoint_a);
+    if (!line_geom_after || !endpoint_xform_after) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(line_geom_after->data.line.a.x - old_a.x) <= 1e-6f &&
+        fabsf(line_geom_after->data.line.a.y - old_a.y) <= 1e-6f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(endpoint_xform_after->position.x) > 1e-6f ||
+        fabsf(endpoint_xform_after->position.y) > 1e-6f ||
+        fabsf(endpoint_xform_after->position.z) > 1e-6f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_endpoint_pick_lookup_decodes_encoded_pick_ids(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    SelectableComp *owner_sel = ecs_world_get_selectable(&world, line);
+    if (!owner_sel || owner_sel->pick_id == 0) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    uint32_t encoded_endpoint_pick = 0;
+    if (!endpoint_pick_encode(owner_sel->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &encoded_endpoint_pick)) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t looked_up = ecs_scene_find_entity_by_pick_id(&scene, encoded_endpoint_pick);
+    if (looked_up == 0) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(&world, looked_up);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point ||
+        (ecs_entity_t)endpoint_meta->owner_entity != line ||
+        endpoint_meta->role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_bulk_delete_undo_restores_arc_endpoint_sync_for_center_drag(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t arc = scene_add_arc_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (arc == 0) return 1;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    ecs_entity_t to_delete[1] = { arc };
+    undo_cmd_bulk_delete_entities(&undo, to_delete, 1);
+    scene_remove_entity(&scene, arc);
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t restored_arc = 0;
+    undo_command_t *cmd = &undo.commands[0];
+    for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+        undo_entity_snapshot_t *snap = &cmd->data.bulk_delete.snapshots[i];
+        if (!snap->has_geometry) continue;
+        if (snap->geom_type != UNDO_GEOM_ARC) continue;
+        if (snap->parent_id != (uint64_t)sketch) continue;
+        restored_arc = (ecs_entity_t)cmd->data.bulk_delete.entity_ids[i];
+        break;
+    }
+    if (restored_arc == 0 || !ecs_is_alive(world.world, restored_arc)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    EndPointsComp *owner_endpoints = ecs_world_get_endpoints(&world, restored_arc);
+    endpoint_binding_t center_binding = {0};
+    if (!owner_endpoints ||
+        !endpoints_comp_find_binding(owner_endpoints, CONSTRAINT_PARTICIPANT_ROLE_CENTER, &center_binding)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t center_endpoint = (ecs_entity_t)center_binding.endpoint_entity;
+    EndPointsComp *center_meta = ecs_world_get_endpoints(&world, center_endpoint);
+    if (!center_meta || !center_meta->is_endpoint_point ||
+        center_meta->role != CONSTRAINT_PARTICIPANT_ROLE_CENTER ||
+        (ecs_entity_t)center_meta->owner_entity != restored_arc) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t restored_arc_children[12] = {0};
+    int restored_arc_child_count = scene_get_children(&scene, restored_arc, restored_arc_children, 12);
+    if (restored_arc_child_count != 3) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    for (int i = 0; i < restored_arc_child_count; i++) {
+        EndPointsComp *child_endpoint_meta = ecs_world_get_endpoints(&world, restored_arc_children[i]);
+        if (!child_endpoint_meta || !child_endpoint_meta->is_endpoint_point ||
+            (ecs_entity_t)child_endpoint_meta->owner_entity != restored_arc) {
+            undo_redo_shutdown(&undo);
+            ecs_scene_shutdown(&scene);
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+
+    GeometryComp *arc_before = ecs_world_get_geometry(&world, restored_arc);
+    if (!arc_before || arc_before->type != GEOM_ARC) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t center_before = arc_before->data.arc.center;
+
+    ecs_entity_t selected[1] = { center_endpoint };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.25f, -0.15f, 0.0f))) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *arc_after = ecs_world_get_geometry(&world, restored_arc);
+    TransformComp *center_xform = ecs_world_get_transform(&world, center_endpoint);
+    if (!arc_after || !center_xform) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(arc_after->data.arc.center.x - center_before.x) <= 1e-6f &&
+        fabsf(arc_after->data.arc.center.y - center_before.y) <= 1e-6f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(center_xform->position.x) > 1e-6f ||
+        fabsf(center_xform->position.y) > 1e-6f ||
+        fabsf(center_xform->position.z) > 1e-6f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_bulk_delete_undo_restores_endpoint_pick_id_mapping(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    ecs_entity_t to_delete[1] = { line };
+    undo_cmd_bulk_delete_entities(&undo, to_delete, 1);
+    scene_remove_entity(&scene, line);
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t restored_line = 0;
+    undo_command_t *cmd = &undo.commands[0];
+    for (int i = 0; i < cmd->data.bulk_delete.count; i++) {
+        undo_entity_snapshot_t *snap = &cmd->data.bulk_delete.snapshots[i];
+        if (!snap->has_geometry) continue;
+        if (snap->geom_type != UNDO_GEOM_LINE) continue;
+        if (snap->parent_id != (uint64_t)sketch) continue;
+        restored_line = (ecs_entity_t)cmd->data.bulk_delete.entity_ids[i];
+        break;
+    }
+    if (restored_line == 0 || !ecs_is_alive(world.world, restored_line)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    SelectableComp *restored_owner_sel = ecs_world_get_selectable(&world, restored_line);
+    if (!restored_owner_sel || restored_owner_sel->pick_id == 0) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    uint32_t encoded_endpoint_pick = 0;
+    if (!endpoint_pick_encode(restored_owner_sel->pick_id, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &encoded_endpoint_pick)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t resolved_owner = scene_constraint_participant_entity_for_pick(&scene, encoded_endpoint_pick, NULL, NULL);
+    if (resolved_owner != restored_line) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -1139,6 +1523,12 @@ int main(void) {
         { "test_endpoint_drag_records_only_on_release_boundary", test_endpoint_drag_records_only_on_release_boundary },
         { "test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position", test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position },
         { "test_endpoint_arc_undo_preserves_angle_branch_without_inversion", test_endpoint_arc_undo_preserves_angle_branch_without_inversion },
+        { "test_bulk_delete_undo_restores_endpoint_owner_sync_metadata", test_bulk_delete_undo_restores_endpoint_owner_sync_metadata },
+        { "test_endpoint_pick_lookup_decodes_encoded_pick_ids", test_endpoint_pick_lookup_decodes_encoded_pick_ids },
+        { "test_bulk_delete_undo_restores_arc_endpoint_sync_for_center_drag",
+          test_bulk_delete_undo_restores_arc_endpoint_sync_for_center_drag },
+        { "test_bulk_delete_undo_restores_endpoint_pick_id_mapping",
+          test_bulk_delete_undo_restores_endpoint_pick_id_mapping },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
