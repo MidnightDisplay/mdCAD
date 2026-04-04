@@ -53,6 +53,8 @@ completed: 2026-04-04
 - Added script transaction regression checks for command type integrity and noop transaction undo suppression.
 - Updated `18-VALIDATION.md` to mark PH18-01..PH18-03 automated evidence green and set `nyquist_compliant: true`.
 - Added arc endpoint undo branch-continuity fix plus regression coverage to prevent undo/redo inversion flips across ±π wrapping.
+- Fixed GeometryManager delete crash when viewport-selected sketch entities are also selected in manager rows.
+- Added viewport → GeometryManager selection highlight synchronization (including endpoint-point to owner-row mapping) for single/multi-select parity with ConstraintManager.
 
 ## Task Commits
 
@@ -62,6 +64,7 @@ Each completed task was committed atomically:
 2. **Task 2: Lock script transaction invariants and update phase validation evidence** - `6ae049d` (test), `8389199` (feat)
 3. **Task 3 follow-up (from checkpoint repro): Fix endpoint drag undo pre-drag snapshot regression** - `6e2b611` (fix)
 4. **Task 3 follow-up (new checkpoint repro): Fix arc endpoint undo inversion reliability** - `4a1bce4` (fix)
+5. **Task 3 follow-up (new checkpoint repro): Fix GeometryManager delete crash + selection highlight sync** - `559f43d` (fix)
 
 _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 
@@ -74,12 +77,16 @@ _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 - `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-VALIDATION.md` - Marked automated evidence green for PH18-01..PH18-03 and set compliance fields.
 - `src/tests/endpoint_pick_test.c` - Added regression that validates endpoint drag undo restores the true pre-drag endpoint local point instead of origin.
 - `src/tests/endpoint_pick_test.c` - Added regression that reproduces arc endpoint undo branch inversion and locks deterministic undo/redo branch continuity.
+- `src/selection.h` - Added `selection_prune_dead` helper to invalidate stale selection entries after scene deletions.
+- `src/ui/ui_entity_inspector.h` - Synced GeometryManager row selection with viewport selection, mapped endpoint-point picks to owner rows, and pruned selection around manager-driven deletes.
+- `src/tests/endpoint_pick_test.c` - Added regression coverage for viewport→GeometryManager selection mapping and dead-selection pruning after entity delete.
 
 ## Decisions Made
 - Reused shared helper logic for drag-end command path selection to avoid drift between runtime behavior and test expectations.
 - Treated noop script transaction pushes as correctness issue for undo granularity and fixed inline.
 - Capture endpoint drag-start snapshots from endpoint local geometry for endpoint entities; preserve transform snapshot path for non-endpoints.
 - Keep arc endpoint replay angles on the nearest equivalent branch relative to current angle to eliminate wrap-induced inversion.
+- Treat GeometryManager row highlight state as a pure projection of canonical scene selection to prevent stale local row selections and crash-prone delete paths.
 
 ## Deviations from Plan
 
@@ -109,9 +116,17 @@ _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 - **Verification:** `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure`; `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_drag|scene_solver_diagnostics|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure`
 - **Committed in:** `4a1bce4`
 
+**4. [Rule 1 - Bug] GeometryManager delete could crash when rows inherited stale viewport-selected entities**
+- **Found during:** Task 3 human verify follow-up (new repro)
+- **Issue:** GeometryManager maintained static row selection independent of canonical scene selection; when a row was selected after viewport pick state changes, delete-confirm path could iterate stale/dead selection entries and hit invalid entity lifetime assumptions.
+- **Fix:** Added `selection_prune_dead` guard in selection subsystem, removed to-be-deleted entities from canonical selection before delete loop, pruned dead entries post-delete, and made GeometryManager row highlight a live projection of viewport/scene selection (including endpoint-point → owner-geometry mapping) for single/multi-select sync parity.
+- **Files modified:** `src/selection.h`, `src/ui/ui_entity_inspector.h`, `src/tests/endpoint_pick_test.c`
+- **Verification:** `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_drag|scene_solver_diagnostics|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure`; `cmake --build build-vulkan --config Release --target mdCAD`
+- **Committed in:** `559f43d`
+
 ---
 
-**Total deviations:** 3 auto-fixed (3 bugs)
+**Total deviations:** 4 auto-fixed (4 bugs)
 **Impact on plan:** Fixes were required to make regression gates executable and preserve endpoint undo correctness (line and arc paths) with no scope creep.
 
 ## Known Stubs
@@ -119,7 +134,7 @@ None.
 
 ## Next Phase Readiness
 - Automated verifies for plan 18-03 are green, including endpoint drag-start snapshot regression coverage.
-- Human checkpoint (Task 3) remains pending re-check to confirm UX feel and single-step interaction behavior in viewport.
+- Human checkpoint (Task 3) remains pending re-check to confirm: endpoint drag undo UX feel, GeometryManager delete stability after mixed viewport/manager selection, and viewport↔GeometryManager row highlight synchronization.
 
 ## Self-Check: PASSED
 - FOUND: .planning/phases/18-add-undo-steps-for-endpoint-moves/18-03-SUMMARY.md
@@ -129,3 +144,4 @@ None.
 - FOUND: 8389199
 - FOUND: 6e2b611
 - FOUND: 4a1bce4
+- FOUND: 559f43d
