@@ -1093,6 +1093,28 @@ static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
     }
 }
 
+static inline bool undo_replay_endpoint_participant_move(ecs_scene_t *scene,
+                                                         cmd_move_endpoint_participant_t *move,
+                                                         bool use_new_value) {
+    if (!scene || !scene->world || !move) return false;
+    if (!endpoints_comp_is_supported_role(move->role)) return false;
+
+    ecs_entity_t owner = (ecs_entity_t)move->owner_entity_id;
+    if (owner == 0 || !ecs_is_alive(scene->world->world, owner)) return false;
+
+    GeometryComp *g = ecs_world_get_geometry(scene->world, owner);
+    if (!g) return false;
+
+    vec3_t target = use_new_value ? move->new_local_point : move->old_local_point;
+    if (!scene_apply_local_point_to_participant(g, move->role, target)) return false;
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, owner);
+    if (r) r->instance_dirty = true;
+
+    scene_sync_endpoint_entities_for_owner(scene, owner);
+    return true;
+}
+
 // ============================================================================
 // Apply Command (for redo)
 // ============================================================================
@@ -1331,16 +1353,7 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
         }
 
         case CMD_MOVE_ENDPOINT_PARTICIPANT: {
-            ecs_entity_t owner = (ecs_entity_t)cmd->data.move_endpoint_participant.owner_entity_id;
-            GeometryComp *g = ecs_world_get_geometry(w, owner);
-            if (!g) break;
-            if (!scene_apply_local_point_to_participant(g,
-                                                        cmd->data.move_endpoint_participant.role,
-                                                        cmd->data.move_endpoint_participant.new_local_point)) {
-                break;
-            }
-            RenderableComp *r = ecs_world_get_renderable(w, owner);
-            if (r) r->instance_dirty = true;
+            undo_replay_endpoint_participant_move(scene, &cmd->data.move_endpoint_participant, true);
             break;
         }
 
@@ -1621,16 +1634,7 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
         }
 
         case CMD_MOVE_ENDPOINT_PARTICIPANT: {
-            ecs_entity_t owner = (ecs_entity_t)cmd->data.move_endpoint_participant.owner_entity_id;
-            GeometryComp *g = ecs_world_get_geometry(w, owner);
-            if (!g) break;
-            if (!scene_apply_local_point_to_participant(g,
-                                                        cmd->data.move_endpoint_participant.role,
-                                                        cmd->data.move_endpoint_participant.old_local_point)) {
-                break;
-            }
-            RenderableComp *r = ecs_world_get_renderable(w, owner);
-            if (r) r->instance_dirty = true;
+            undo_replay_endpoint_participant_move(scene, &cmd->data.move_endpoint_participant, false);
             break;
         }
 
