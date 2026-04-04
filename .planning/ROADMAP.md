@@ -155,3 +155,15 @@ Plans:
 - [x] 17-03-PLAN.md — Harden live constrained drag, diagnostics dedupe, and bounded-frame solve behavior with deterministic gates.
 - [x] 17-04-PLAN.md — Implement sketch-scoped EndPoints native point entity contract and sketch-only endpoint spawn/sync replacing synthetic tail-range picks.
 - [ ] 17-05-PLAN.md — Correct point-context menu semantics, verify endpoint Coincident chain/loop UX closure, and update validation evidence.
+
+### Phase 18: Add undo steps for endpoint moves
+
+**Goal:** Endpoint moves in sketch workflows produce deterministic, coalesced undo/redo steps that replay through scene-authoritative sync without regressing non-sketch or script transactional behavior.
+**Requirements**: PH18-01, PH18-02, PH18-03
+**Depends on:** Phase 17
+**Plans:** 3 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — Define endpoint-aware undo command contract and wire drag/inspector recorders at interaction boundaries.
+- [ ] 18-02-PLAN.md — Implement endpoint undo replay via scene sync helpers with sketch-only side effects.
+- [ ] 18-03-PLAN.md — Add regression hardening for non-sketch/script invariants and finalize Phase 18 validation evidence.
