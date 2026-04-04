@@ -1044,6 +1044,35 @@ static inline void undo_cmd_move_endpoint_participant(undo_redo_t *ur,
     undo_redo_push(ur, &cmd);
 }
 
+static inline bool undo_cmd_record_endpoint_participant_move_if_changed(undo_redo_t *ur,
+                                                                         ecs_scene_t *scene,
+                                                                         ecs_entity_t endpoint_entity,
+                                                                         vec3_t old_local_point,
+                                                                         vec3_t new_local_point) {
+    if (!ur || !scene || endpoint_entity == 0) return false;
+
+    const float eps = 1e-6f;
+    if (fabsf(old_local_point.x - new_local_point.x) <= eps &&
+        fabsf(old_local_point.y - new_local_point.y) <= eps &&
+        fabsf(old_local_point.z - new_local_point.z) <= eps) {
+        return false;
+    }
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, endpoint_entity);
+    if (!endpoint_meta || !endpoint_meta->is_endpoint_point) return false;
+    if (!endpoints_comp_is_supported_role(endpoint_meta->role)) return false;
+
+    ecs_entity_t owner = (ecs_entity_t)endpoint_meta->owner_entity;
+    if (owner == 0 || !ecs_is_alive(scene->world->world, owner)) return false;
+
+    undo_cmd_move_endpoint_participant(ur, owner,
+                                       endpoint_meta->role,
+                                       endpoint_meta->sub_index,
+                                       old_local_point,
+                                       new_local_point);
+    return true;
+}
+
 // Helper: set vertex position in GeometryComp by index
 static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
     switch (g->type) {

@@ -1778,10 +1778,22 @@ static void frame(void) {
                         if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
                             for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
                                 ecs_entity_t e = state.gizmo_drag_entities[i];
-                                const TransformComp *t = ecs_world_get_transform(state.ecs_scene.world, e);
-                                vec3_t new_pos = t ? t->position : vec3_make(0, 0, 0);
-                                undo_cmd_set_position(&state.undo_redo, e,
-                                    state.gizmo_drag_start_positions[i], new_pos);
+                                EndPointsComp *endpoint_meta = ecs_world_get_endpoints(state.ecs_scene.world, e);
+                                GeometryComp *endpoint_geom = ecs_world_get_geometry(state.ecs_scene.world, e);
+                                if (endpoint_meta && endpoint_meta->is_endpoint_point &&
+                                    endpoint_geom && endpoint_geom->type == GEOM_POINT) {
+                                    undo_cmd_record_endpoint_participant_move_if_changed(
+                                        &state.undo_redo,
+                                        &state.ecs_scene,
+                                        e,
+                                        state.gizmo_drag_start_positions[i],
+                                        endpoint_geom->data.point.point);
+                                } else {
+                                    const TransformComp *t = ecs_world_get_transform(state.ecs_scene.world, e);
+                                    vec3_t new_pos = t ? t->position : vec3_make(0, 0, 0);
+                                    undo_cmd_set_position(&state.undo_redo, e,
+                                        state.gizmo_drag_start_positions[i], new_pos);
+                                }
                             }
                         } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
                                    state.gizmo.vertex_mode.active) {

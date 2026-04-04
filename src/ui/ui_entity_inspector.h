@@ -1769,7 +1769,13 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     if (state->drag_start_point_pos.x != new_pt.x ||
                         state->drag_start_point_pos.y != new_pt.y ||
                         state->drag_start_point_pos.z != new_pt.z) {
-                        undo_cmd_set_point_position(state->undo_redo, e, state->drag_start_point_pos, new_pt);
+                        EndPointsComp *endpoint_meta = ecs_world_get_endpoints(w, e);
+                        if (endpoint_meta && endpoint_meta->is_endpoint_point && scene) {
+                            undo_cmd_record_endpoint_participant_move_if_changed(
+                                state->undo_redo, scene, e, state->drag_start_point_pos, new_pt);
+                        } else {
+                            undo_cmd_set_point_position(state->undo_redo, e, state->drag_start_point_pos, new_pt);
+                        }
                     }
                 }
                 break;
