@@ -20,3 +20,11 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Files changed:** src/scripting/sketch_script_parse.h, src/scripting/sketch_script_apply.h, src/app.c, src/tests/script_roundtrip_tests.c
 ---
 
+## post-delete-undo-endpoint-desync — Bulk delete undo lost endpoint linkage and pick decode after recreate
+- **Date:** 2026-04-05
+- **Error patterns:** delete undo desync, endpoint gizmo transform move, endpoint owner linkage lost, encoded endpoint pick lookup, no visible errors
+- **Root cause:** Bulk delete undo restore did not explicitly preserve/remap endpoint linkage metadata in undo snapshots, and endpoint pick lookup path did not decode encoded endpoint pick IDs. In delete+undo flows this could leave endpoint interactions desynced from owner geometry semantics.
+- **Fix:** Extended undo_entity_snapshot_t to include EndPointsComp and restored it in undo_create_from_snapshot; added endpoint owner/binding ID remap in undo_restore_bulk_entity_relationships. Added regression coverage for bulk delete undo line/arc endpoint sync and restored endpoint pick mapping.
+- **Files changed:** src/undo_redo.h, src/undo_redo_exec.h, src/tests/endpoint_pick_test.c
+---
+
