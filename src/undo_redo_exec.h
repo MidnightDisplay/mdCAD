@@ -1045,10 +1045,10 @@ static inline void undo_cmd_move_endpoint_participant(undo_redo_t *ur,
 }
 
 static inline bool undo_cmd_record_endpoint_participant_move_if_changed(undo_redo_t *ur,
-                                                                         ecs_scene_t *scene,
-                                                                         ecs_entity_t endpoint_entity,
-                                                                         vec3_t old_local_point,
-                                                                         vec3_t new_local_point) {
+                                                                          ecs_scene_t *scene,
+                                                                          ecs_entity_t endpoint_entity,
+                                                                          vec3_t old_local_point,
+                                                                          vec3_t new_local_point) {
     if (!ur || !scene || endpoint_entity == 0) return false;
 
     const float eps = 1e-6f;
@@ -1070,6 +1070,37 @@ static inline bool undo_cmd_record_endpoint_participant_move_if_changed(undo_red
                                        endpoint_meta->sub_index,
                                        old_local_point,
                                        new_local_point);
+    return true;
+}
+
+static inline bool record_drag_end_move_for_entity(undo_redo_t *ur,
+                                                    ecs_scene_t *scene,
+                                                    ecs_entity_t entity,
+                                                    vec3_t old_position,
+                                                    vec3_t fallback_new_position) {
+    if (!ur || !scene || entity == 0) return false;
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, entity);
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(scene->world, entity);
+    if (endpoint_meta && endpoint_meta->is_endpoint_point &&
+        endpoint_geom && endpoint_geom->type == GEOM_POINT) {
+        return undo_cmd_record_endpoint_participant_move_if_changed(ur,
+                                                                     scene,
+                                                                     entity,
+                                                                     old_position,
+                                                                     endpoint_geom->data.point.point);
+    }
+
+    const TransformComp *transform = ecs_world_get_transform(scene->world, entity);
+    vec3_t new_position = transform ? transform->position : fallback_new_position;
+    const float eps = 1e-6f;
+    if (fabsf(old_position.x - new_position.x) <= eps &&
+        fabsf(old_position.y - new_position.y) <= eps &&
+        fabsf(old_position.z - new_position.z) <= eps) {
+        return false;
+    }
+
+    undo_cmd_set_position(ur, entity, old_position, new_position);
     return true;
 }
 
