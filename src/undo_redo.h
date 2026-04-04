@@ -87,6 +87,7 @@ typedef enum {
     // Geometry vertex editing (gizmo geometry mode)
     CMD_SET_GEOMETRY_VERTICES,
     CMD_SCRIPT_APPLY_TRANSACTION,
+    CMD_MOVE_ENDPOINT_PARTICIPANT,
 
     CMD_TYPE_COUNT
 } undo_cmd_type_t;
@@ -307,6 +308,14 @@ typedef struct {
     char *after_script;
 } cmd_script_apply_transaction_t;
 
+typedef struct {
+    uint64_t owner_entity_id;
+    constraint_participant_role_t role;
+    uint8_t sub_index;
+    vec3_t old_local_point;
+    vec3_t new_local_point;
+} cmd_move_endpoint_participant_t;
+
 // ============================================================================
 // Command Union
 // ============================================================================
@@ -329,6 +338,7 @@ typedef struct {
         cmd_bulk_delete_entities_t bulk_delete;
         cmd_set_geometry_vertices_t set_vertices;
         cmd_script_apply_transaction_t script_apply_transaction;
+        cmd_move_endpoint_participant_t move_endpoint_participant;
     } data;
 } undo_command_t;
 
@@ -583,6 +593,7 @@ static inline const char* undo_cmd_name(undo_cmd_type_t type) {
         case CMD_BULK_DELETE_ENTITIES: return "Bulk Delete";
         case CMD_SET_GEOMETRY_VERTICES: return "Edit Vertices";
         case CMD_SCRIPT_APPLY_TRANSACTION: return "Apply Script";
+        case CMD_MOVE_ENDPOINT_PARTICIPANT: return "Move Endpoint";
         default: return "Unknown";
     }
 }

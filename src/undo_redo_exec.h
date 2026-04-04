@@ -1024,6 +1024,26 @@ static inline void undo_cmd_script_apply_transaction(undo_redo_t *ur,
     undo_redo_push(ur, &cmd);
 }
 
+static inline void undo_cmd_move_endpoint_participant(undo_redo_t *ur,
+                                                      ecs_entity_t owner_entity,
+                                                      constraint_participant_role_t role,
+                                                      uint8_t sub_index,
+                                                      vec3_t old_local_point,
+                                                      vec3_t new_local_point) {
+    if (!ur) return;
+    if (!endpoints_comp_is_supported_role(role)) return;
+
+    undo_command_t cmd = {0};
+    cmd.type = CMD_MOVE_ENDPOINT_PARTICIPANT;
+    cmd.data.move_endpoint_participant.owner_entity_id = (uint64_t)owner_entity;
+    cmd.data.move_endpoint_participant.role = role;
+    cmd.data.move_endpoint_participant.sub_index = sub_index;
+    cmd.data.move_endpoint_participant.old_local_point = old_local_point;
+    cmd.data.move_endpoint_participant.new_local_point = new_local_point;
+
+    undo_redo_push(ur, &cmd);
+}
+
 // Helper: set vertex position in GeometryComp by index
 static inline void undo_set_vertex_pos(GeometryComp *g, int idx, vec3_t pos) {
     switch (g->type) {
@@ -1278,6 +1298,20 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             scene->script_apply_undo_suppressed = true;
             scene_script_apply_commit(scene, sketch, cmd->data.script_apply_transaction.after_script, &error);
             scene->script_apply_undo_suppressed = prev_suppressed;
+            break;
+        }
+
+        case CMD_MOVE_ENDPOINT_PARTICIPANT: {
+            ecs_entity_t owner = (ecs_entity_t)cmd->data.move_endpoint_participant.owner_entity_id;
+            GeometryComp *g = ecs_world_get_geometry(w, owner);
+            if (!g) break;
+            if (!scene_apply_local_point_to_participant(g,
+                                                        cmd->data.move_endpoint_participant.role,
+                                                        cmd->data.move_endpoint_participant.new_local_point)) {
+                break;
+            }
+            RenderableComp *r = ecs_world_get_renderable(w, owner);
+            if (r) r->instance_dirty = true;
             break;
         }
 
@@ -1554,6 +1588,20 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             scene->script_apply_undo_suppressed = true;
             scene_script_apply_commit(scene, sketch, cmd->data.script_apply_transaction.before_script, &error);
             scene->script_apply_undo_suppressed = prev_suppressed;
+            break;
+        }
+
+        case CMD_MOVE_ENDPOINT_PARTICIPANT: {
+            ecs_entity_t owner = (ecs_entity_t)cmd->data.move_endpoint_participant.owner_entity_id;
+            GeometryComp *g = ecs_world_get_geometry(w, owner);
+            if (!g) break;
+            if (!scene_apply_local_point_to_participant(g,
+                                                        cmd->data.move_endpoint_participant.role,
+                                                        cmd->data.move_endpoint_participant.old_local_point)) {
+                break;
+            }
+            RenderableComp *r = ecs_world_get_renderable(w, owner);
+            if (r) r->instance_dirty = true;
             break;
         }
 
