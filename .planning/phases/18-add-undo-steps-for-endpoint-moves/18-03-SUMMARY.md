@@ -45,7 +45,7 @@ completed: 2026-04-04
 - **Duration:** 6m
 - **Started:** 2026-04-04T08:40:05Z
 - **Completed:** 2026-04-04T08:46:08Z
-- **Tasks:** 2 completed, 1 checkpoint pending (UAT follow-up fixes applied, awaiting re-check)
+- **Tasks:** 3 completed (including human checkpoint approval)
 - **Files modified:** 6
 
 ## Accomplishments
@@ -55,6 +55,7 @@ completed: 2026-04-04
 - Added arc endpoint undo branch-continuity fix plus regression coverage to prevent undo/redo inversion flips across ±π wrapping.
 - Fixed GeometryManager delete crash when viewport-selected sketch entities are also selected in manager rows.
 - Added viewport → GeometryManager selection highlight synchronization (including endpoint-point to owner-row mapping) for single/multi-select parity with ConstraintManager.
+- Completed Task 3 human verification checkpoint with explicit approval after follow-up fixes; endpoint drag undo/redo granularity and mixed selection/delete behavior were re-checked and accepted.
 
 ## Task Commits
 
@@ -65,8 +66,7 @@ Each completed task was committed atomically:
 3. **Task 3 follow-up (from checkpoint repro): Fix endpoint drag undo pre-drag snapshot regression** - `6e2b611` (fix)
 4. **Task 3 follow-up (new checkpoint repro): Fix arc endpoint undo inversion reliability** - `4a1bce4` (fix)
 5. **Task 3 follow-up (new checkpoint repro): Fix GeometryManager delete crash + selection highlight sync** - `559f43d` (fix)
-
-_Task 3 is a blocking human-verify checkpoint and is not yet complete._
+6. **Task 3: Human verify endpoint drag undo feel and single-step granularity** - Approved (user response: `approved`)
 
 ## Files Created/Modified
 - `src/tests/endpoint_pick_test.c` - Added non-sketch drag-end legacy undo routing and endpoint release-boundary coalescing regressions.
@@ -133,8 +133,9 @@ _Task 3 is a blocking human-verify checkpoint and is not yet complete._
 None.
 
 ## Next Phase Readiness
+- Plan 18-03 execution is fully complete, including checkpoint closure.
 - Automated verifies for plan 18-03 are green, including endpoint drag-start snapshot regression coverage.
-- Human checkpoint (Task 3) remains pending re-check to confirm: endpoint drag undo UX feel, GeometryManager delete stability after mixed viewport/manager selection, and viewport↔GeometryManager row highlight synchronization.
+- Human checkpoint validated endpoint drag undo UX feel, GeometryManager delete stability after mixed viewport/manager selection, and viewport↔GeometryManager row highlight synchronization.
 
 ## Self-Check: PASSED
 - FOUND: .planning/phases/18-add-undo-steps-for-endpoint-moves/18-03-SUMMARY.md
