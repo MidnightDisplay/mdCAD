@@ -453,6 +453,116 @@ static int test_undo_legacy_position_and_point_commands_unchanged(void) {
     return 0;
 }
 
+static int test_gizmo_endpoint_drag_records_single_endpoint_undo_at_release(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) {
+        return 1;
+    }
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+    vec3_t old_local = endpoint_geom->data.point.point;
+
+    ecs_entity_t selected[1] = { endpoint_a };
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.3f, 0.0f, 0.0f))) return 1;
+    if (!scene_apply_transform_delta_for_selection(&scene, selected, 1, vec3_make(0.2f, 0.0f, 0.0f))) return 1;
+
+    endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+    vec3_t new_local = endpoint_geom->data.point.point;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    if (!undo_cmd_record_endpoint_participant_move_if_changed(&undo, &scene, endpoint_a, old_local, new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1 || undo.commands[0].type != CMD_MOVE_ENDPOINT_PARTICIPANT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_inspector_endpoint_edit_records_only_at_commit_boundary(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (line == 0) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(&world, line);
+    endpoint_binding_t binding_a = {0};
+    if (!line_endpoints || !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &binding_a)) {
+        return 1;
+    }
+    ecs_entity_t endpoint_a = (ecs_entity_t)binding_a.endpoint_entity;
+    GeometryComp *endpoint_geom = ecs_world_get_geometry(&world, endpoint_a);
+    if (!endpoint_geom || endpoint_geom->type != GEOM_POINT) return 1;
+    vec3_t old_local = endpoint_geom->data.point.point;
+    vec3_t new_local = vec3_add(old_local, vec3_make(0.4f, -0.1f, 0.0f));
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    if (!undo_cmd_record_endpoint_participant_move_if_changed(&undo, &scene, endpoint_a, old_local, new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1 || undo.commands[0].type != CMD_MOVE_ENDPOINT_PARTICIPANT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (undo_cmd_record_endpoint_participant_move_if_changed(&undo, &scene, endpoint_a, new_local, new_local)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (undo.count != 1) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -473,6 +583,8 @@ int main(void) {
         { "test_arc_slot_reallocation_for_expanded_span", test_arc_slot_reallocation_for_expanded_span },
         { "test_endpoint_undo_command_contract_roundtrip", test_endpoint_undo_command_contract_roundtrip },
         { "test_undo_legacy_position_and_point_commands_unchanged", test_undo_legacy_position_and_point_commands_unchanged },
+        { "test_gizmo_endpoint_drag_records_single_endpoint_undo_at_release", test_gizmo_endpoint_drag_records_single_endpoint_undo_at_release },
+        { "test_inspector_endpoint_edit_records_only_at_commit_boundary", test_inspector_endpoint_edit_records_only_at_commit_boundary },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
