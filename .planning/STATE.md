@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 19 context gathered
-last_updated: "2026-04-05T14:30:39.154Z"
-last_activity: 2026-04-04
+status: executing
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-04-05T15:19:44.452Z"
+last_activity: 2026-04-05
 progress:
   total_phases: 12
   completed_phases: 9
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 30
+  completed_plans: 29
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 18 — add-undo-steps-for-endpoint-moves
+**Current focus:** Phase 19 — backfill-script-api-verification-artifacts
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 18
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-04
+Phase: 19 (backfill-script-api-verification-artifacts) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-05
 
 ## Milestone Scope
 
@@ -69,6 +69,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 18 P01 | 64m | 2 tasks | 5 files |
 | Phase 18-add-undo-steps-for-endpoint-moves P02 | 280 | 2 tasks | 3 files |
 | Phase 18 P03 | 6m | 3 tasks | 6 files |
+| Phase 19 P01 | 3 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -120,6 +121,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 18-add-undo-steps-for-endpoint-moves]: Centralized endpoint replay into undo_replay_endpoint_participant_move for apply/unapply parity.
 - [Phase 18-add-undo-steps-for-endpoint-moves]: Endpoint replay now triggers solver auto-request and script re-emit only for sketch-owned owners.
 - [Phase 18]: Phase 18 plan 18-03 human checkpoint approved after endpoint undo follow-up fixes and mixed selection/delete stability re-check.
+- [Phase 19]: Used targeted script_roundtrip_tests rerun evidence (build + ctest) instead of broad suite reruns for Phase 13 closure.
+- [Phase 19]: Upgraded SCRP-01/02/03/06 from missing to passed only with explicit prior-state rationale and source-linked evidence.
 
 ## Accumulated Context
 
@@ -133,6 +136,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-05T14:30:39.142Z
-**Stopped At:** Phase 19 context gathered
-**Resume File:** .planning/phases/19-backfill-script-api-verification-artifacts/19-CONTEXT.md
+**Last Date:** 2026-04-05T15:19:44.447Z
+**Stopped At:** Completed 19-01-PLAN.md
+**Resume File:** None
