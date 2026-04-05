@@ -38,9 +38,8 @@ created: 2026-04-05
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 19-01-01 | 01 | 1 | SCRP-01, SCRP-02, SCRP-03, SCRP-06 | integration + traceability | `cmake --build build-vulkan --config Release --target script_roundtrip_tests && ctest --test-dir build-vulkan -C Release --output-on-failure -R script_roundtrip_tests` | ✅ | ⬜ pending |
-| 19-02-01 | 02 | 2 | SCRP-04, SCRP-05, API-01, API-02 | integration + transactional regression | `cmake --build build-vulkan --config Release --target script_roundtrip_tests && ctest --test-dir build-vulkan -C Release --output-on-failure -R script_roundtrip_tests` | ✅ | ⬜ pending |
-| 19-03-01 | 03 | 3 | SCRP-01..06, API-01..02 | docs/audit parity gate | `ctest --test-dir build-vulkan -C Release --output-on-failure -R script_roundtrip_tests` | ✅ | ⬜ pending |
+| 19-01-01 | 01 | 1 | SCRP-01, SCRP-02, SCRP-03, SCRP-06 | integration + traceability | `ctest --test-dir build-vulkan -C Release --output-on-failure -R script_roundtrip_tests` | ✅ | ⬜ pending |
+| 19-02-01 | 02 | 1 | SCRP-04, SCRP-05, API-01, API-02 | integration + transactional regression | `ctest --test-dir build-vulkan -C Release --output-on-failure -R script_roundtrip_tests` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
