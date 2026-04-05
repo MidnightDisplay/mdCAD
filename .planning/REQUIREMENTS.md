@@ -34,14 +34,14 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **SCRP-01**: User can open a standalone sketch script editor window from SketchManager.
 - [x] **SCRP-02**: User can reconstruct the full sketch sub-scene (entities, constraints, values, and links) from script parse output.
 - [x] **SCRP-03**: UI-side sketch/geometry/constraint edits update script output deterministically.
-- [ ] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
-- [ ] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
+- [x] **SCRP-04**: Script-side edits update the scene safely while preserving last-valid sketch state on parse/apply errors.
+- [x] **SCRP-05**: User can define script input/output variables and interact with dynamically generated numeric controls/readouts, including optional `min/max/step` slider behavior.
 - [x] **SCRP-06**: v1.2 scripting runtime is Lua 5.4.x.
 
 ### Integration and Validation
 
-- [ ] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
-- [ ] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
+- [x] **API-01**: Developers can use scene API entrypoints for sketch, geometry-manager, constraint-manager, and script workflows.
+- [x] **API-02**: User can undo/redo sketch, solver-impacting, and script-driven mutations transactionally without partial state restores.
 - [x] **API-03**: User manipulation/gizmo transforms respect active constraints during interaction.
 - [x] **VAL-01**: The project ships example sketch/script case studies, including constraint-focused samples for development and debugging.
 - [x] **VAL-02**: v1.2 feature acceptance gates pass on Windows MSVC + Vulkan.
@@ -114,11 +114,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCRP-01 | Phase 19 | Complete |
 | SCRP-02 | Phase 19 | Complete |
 | SCRP-03 | Phase 19 | Complete |
-| SCRP-04 | Phase 19 | Pending |
-| SCRP-05 | Phase 19 | Pending |
+| SCRP-04 | Phase 19 | Complete |
+| SCRP-05 | Phase 19 | Complete |
 | SCRP-06 | Phase 19 | Complete |
-| API-01 | Phase 19 | Pending |
-| API-02 | Phase 19 | Pending |
+| API-01 | Phase 19 | Complete |
+| API-02 | Phase 19 | Complete |
 | API-03 | Phase 12 | Complete |
 | VAL-01 | Phase 15 | Complete |
 | VAL-02 | Phase 15 | Complete |

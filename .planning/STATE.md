@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: executing
-stopped_at: Completed 19-01-PLAN.md
-last_updated: "2026-04-05T15:19:44.452Z"
+status: verifying
+stopped_at: Completed 19-02-PLAN.md
+last_updated: "2026-04-05T15:23:51.498Z"
 last_activity: 2026-04-05
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 30
-  completed_plans: 29
+  completed_plans: 30
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 Phase: 19 (backfill-script-api-verification-artifacts) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-05
 
 ## Milestone Scope
@@ -70,6 +70,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 18-add-undo-steps-for-endpoint-moves P02 | 280 | 2 tasks | 3 files |
 | Phase 18 P03 | 6m | 3 tasks | 6 files |
 | Phase 19 P01 | 3 min | 2 tasks | 2 files |
+| Phase 19 P02 | 1 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -123,6 +124,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 18]: Phase 18 plan 18-03 human checkpoint approved after endpoint undo follow-up fixes and mixed selection/delete stability re-check.
 - [Phase 19]: Used targeted script_roundtrip_tests rerun evidence (build + ctest) instead of broad suite reruns for Phase 13 closure.
 - [Phase 19]: Upgraded SCRP-01/02/03/06 from missing to passed only with explicit prior-state rationale and source-linked evidence.
+- [Phase 19]: Use targeted script_roundtrip_tests reruns as fresh Phase 14 verification evidence for SCRP-04/05 and API-01/02.
+- [Phase 19]: Keep 19-PREP-NOTES informational-only with explicit out-of-scope boundary for Phase 19 implementation claims.
 
 ## Accumulated Context
 
@@ -136,6 +139,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-05T15:19:44.447Z
-**Stopped At:** Completed 19-01-PLAN.md
+**Last Date:** 2026-04-05T15:23:51.494Z
+**Stopped At:** Completed 19-02-PLAN.md
 **Resume File:** None
