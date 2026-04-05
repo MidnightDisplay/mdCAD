@@ -69,7 +69,8 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Long-tail migration closure requirements (`TAIL-01..03`, `TRED-01..02`, `VAL-01..03`) are complete.
 - Milestone `v1.2` scope is now centered on sketch constraints and scripting workflows.
 - Phase 12 is complete and verified (`7/7` truths) after executing gap-closure plan `12-03`.
-- Next active phase is Phase 13 (`script-round-trip-baseline`).
+- Phase 13 and Phase 14 verification artifacts are now backfilled and requirement-aligned (`SCRP-01..06`, `API-01..02`) through Phase 19 closure.
+- Next active phase is Phase 20 (`finalize-phase-17-endpoint-ux-and-verification-closure`).
 
 ## Next Milestone Goals
 
@@ -118,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 12 closure execution*
+*Last updated: 2026-04-05 after Phase 19 closure execution*
