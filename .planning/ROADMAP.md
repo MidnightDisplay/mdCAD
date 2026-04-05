@@ -167,3 +167,36 @@ Plans:
 - [x] 18-01-PLAN.md — Define endpoint-aware undo command contract and wire drag/inspector recorders at interaction boundaries.
 - [x] 18-02-PLAN.md — Implement endpoint undo replay via scene sync helpers with sketch-only side effects.
 - [x] 18-03-PLAN.md — Add regression hardening for non-sketch/script invariants and finalize Phase 18 validation evidence. (completed 2026-04-04)
+
+### Phase 19: Backfill Script/API Verification Artifacts
+
+**Goal:** Close missing verification coverage for script round-trip and script IO/API requirements by producing phase-level verification artifacts and requirement evidence parity.
+**Requirements**: SCRP-01, SCRP-02, SCRP-03, SCRP-04, SCRP-05, SCRP-06, API-01, API-02
+**Depends on:** Phase 18
+**Gap Closure:** Closes orphaned requirement verification gaps from v1.2 milestone audit for phases 13 and 14.
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 19 to break down)
+
+### Phase 20: Finalize Phase 17 Endpoint UX and Verification Closure
+
+**Goal:** Close Phase 17 endpoint UX/manual-verification debt and publish final Phase 17 verification evidence for D-01..D-12 and endpoint legality/menu flow closure.
+**Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
+**Depends on:** Phase 19
+**Gap Closure:** Closes unresolved Phase 17 verification + integration/flow gaps from v1.2 milestone audit.
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 20 to break down)
+
+### Phase 21: Traceability Closure and Re-audit Readiness
+
+**Goal:** Resolve residual traceability gaps (Phase 10 human-needed closure and Phase 18 requirement completeness), then re-run milestone audit with clean requirement/verification alignment.
+**Requirements**: SKCH-01, SKCH-02, SKCH-03, PH18-03
+**Depends on:** Phase 20
+**Gap Closure:** Closes remaining partial requirements and prepares v1.2 for successful milestone re-audit.
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 21 to break down)
