@@ -186,10 +186,10 @@ Plans:
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
 **Depends on:** Phase 19
 **Gap Closure:** Closes unresolved Phase 17 verification + integration/flow gaps from v1.2 milestone audit.
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 20-01-PLAN.md — Create authoritative Phase 17 verification matrix and close D-01..D-08 with citation-first ambiguity handling.
+- [x] 20-01-PLAN.md — Create authoritative Phase 17 verification matrix and close D-01..D-08 with citation-first ambiguity handling.
 - [ ] 20-02-PLAN.md — Close endpoint verification rows D-09..D-12 using canonical UAT baseline and targeted endpoint evidence.
 - [ ] 20-03-PLAN.md — Align 17-VALIDATION with final 17-VERIFICATION closure state and record final targeted closure gate.
 

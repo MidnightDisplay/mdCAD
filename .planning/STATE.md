@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Phase 20 context gathered
-last_updated: "2026-04-07T08:15:48.840Z"
-last_activity: 2026-04-05
+status: executing
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-04-07T08:52:09.842Z"
+last_activity: 2026-04-07
 progress:
   total_phases: 12
   completed_phases: 10
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 33
+  completed_plans: 31
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 19 — backfill-script-api-verification-artifacts
+**Current focus:** Phase 20 — finalize-phase-17-endpoint-ux-and-verification-closure
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 20
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-05
+Phase: 20 (finalize-phase-17-endpoint-ux-and-verification-closure) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-07
 
 ## Milestone Scope
 
@@ -71,6 +71,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 18 P03 | 6m | 3 tasks | 6 files |
 | Phase 19 P01 | 3 min | 2 tasks | 2 files |
 | Phase 19 P02 | 1 min | 2 tasks | 2 files |
+| Phase 20 P01 | 3 min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -126,6 +127,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 19]: Upgraded SCRP-01/02/03/06 from missing to passed only with explicit prior-state rationale and source-linked evidence.
 - [Phase 19]: Use targeted script_roundtrip_tests reruns as fresh Phase 14 verification evidence for SCRP-04/05 and API-01/02.
 - [Phase 19]: Keep 19-PREP-NOTES informational-only with explicit out-of-scope boundary for Phase 19 implementation claims.
+- [Phase 20]: Use citation-first evidence reuse for D-01..D-08 and run only requirement-scoped targeted reruns when ambiguity must be resolved.
+- [Phase 20]: Keep D-09..D-12 rows explicitly present but pending in this plan so endpoint closure remains scoped to Plan 20-02.
 
 ## Accumulated Context
 
@@ -139,6 +142,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-07T08:15:48.833Z
-**Stopped At:** Phase 20 context gathered
-**Resume File:** .planning/phases/20-finalize-phase-17-endpoint-ux-and-verification-closure/20-CONTEXT.md
+**Last Date:** 2026-04-07T08:52:09.838Z
+**Stopped At:** Completed 20-01-PLAN.md
+**Resume File:** None
