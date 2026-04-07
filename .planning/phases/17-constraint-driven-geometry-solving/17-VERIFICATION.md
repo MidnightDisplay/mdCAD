@@ -60,3 +60,10 @@ For each requirement row, a status can only move to `Passed` when citations are 
    `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure`  
    Result: **1/1 passed** (`endpoint_pick`), 0 failed.
 
+## Endpoint Row Ambiguity Disposition (Plan 20-02)
+
+- D-09: **Targeted rerun required and completed** (`endpoint_pick`) to remove pending-row ambiguity before pass.
+- D-10: **Targeted rerun required and completed** (`endpoint_pick`) because this row anchors endpoint legality/menu behavior.
+- D-11: **Reused evidence + targeted rerun sufficient**; no fresh manual recheck required because canonical `17-UAT.md` Test 3 remains unambiguous and aligned with deterministic automation.
+- D-12: **Reused evidence + targeted rerun sufficient**; no fresh manual recheck required because canonical `17-UAT.md` Test 1 visibility/selection baseline remains unambiguous.
+
