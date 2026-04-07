@@ -275,6 +275,145 @@ static int test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision(v
     return ok ? 0 : 1;
 }
 
+static bool vec3_exact_eq(vec3_t a, vec3_t b) {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+static int test_recalculate_idempotent_on_unchanged_sketch(void) {
+    // idempotent: repeated recalc on unchanged solved sketch keeps status/geometry stable.
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t p1 = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t p2 = scene_add_point_to_sketch(&scene, sketch, vec3_make(4, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    if (!sketch || !p1 || !p2) return 1;
+
+    ecs_entity_t participants[2] = { p1, p2 };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    bool first_ok = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *g1 = ecs_world_get_geometry(scene.world, p1);
+    GeometryComp *g2 = ecs_world_get_geometry(scene.world, p2);
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!first_ok || !g1 || !g2 || !sk) return 1;
+    vec3_t p1_after_first = g1->data.point.point;
+    vec3_t p2_after_first = g2->data.point.point;
+    sketch_status_t status_after_first = sk->status;
+    uint32_t request_after_first = sk->solve_request_serial;
+    uint32_t complete_after_first = sk->solve_completed_serial;
+
+    bool second_ok = scene_solver_request_recalculate(&scene, sketch);
+    g1 = ecs_world_get_geometry(scene.world, p1);
+    g2 = ecs_world_get_geometry(scene.world, p2);
+    sk = ecs_world_get_sketch(scene.world, sketch);
+    int ok = (second_ok &&
+              g1 && g2 && sk &&
+              vec3_exact_eq(g1->data.point.point, p1_after_first) &&
+              vec3_exact_eq(g2->data.point.point, p2_after_first) &&
+              sk->status == status_after_first &&
+              sk->solve_request_serial == request_after_first &&
+              sk->solve_completed_serial == complete_after_first);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_driving_length_angle_unsat_no_mutation_contract_D09(void) {
+    // D-09: unsatisfiable driving LENGTH/ANGLE yields explicit failure implication and no mutation.
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(1.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t length_participants[1] = { line_a };
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                            length_participants, 1, 10.0f, true);
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 0.5f, true);
+    if (!c_length || !c_angle) return 1;
+
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t a0_before = ga->data.line.a;
+    vec3_t a1_before = ga->data.line.b;
+    vec3_t b0_before = gb->data.line.a;
+    vec3_t b1_before = gb->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+
+    int ok = (!solved &&
+              ga && gb &&
+              vec3_exact_eq(ga->data.line.a, a0_before) &&
+              vec3_exact_eq(ga->data.line.b, a1_before) &&
+              vec3_exact_eq(gb->data.line.a, b0_before) &&
+              vec3_exact_eq(gb->data.line.b, b1_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c_angle &&
+              imp->reason[0] != '\0');
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_driving_length_angle_atomic_success_contract_D10(void) {
+    // D-10: satisfiable driving LENGTH/ANGLE commits geometry atomically in one completion.
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t length_participants[1] = { line_a };
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                            length_participants, 1, 5.0f, true);
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 1.5707963f, true);
+    if (!c_length || !c_angle) return 1;
+
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    if (!ga || ga->type != GEOM_LINE) return 1;
+    vec3_t before_b = ga->data.line.b;
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+
+    int ok = (solved &&
+              ga && sk &&
+              !vec3_exact_eq(ga->data.line.b, before_b) &&
+              sk->solve_completed_serial == sk->solve_request_serial);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -289,6 +428,9 @@ int main(void) {
           test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects },
         { "test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision",
           test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision },
+        { "test_recalculate_idempotent_on_unchanged_sketch", test_recalculate_idempotent_on_unchanged_sketch },
+        { "test_driving_length_angle_unsat_no_mutation_contract_D09", test_driving_length_angle_unsat_no_mutation_contract_D09 },
+        { "test_driving_length_angle_atomic_success_contract_D10", test_driving_length_angle_atomic_success_contract_D10 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
