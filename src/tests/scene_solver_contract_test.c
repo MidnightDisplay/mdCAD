@@ -381,9 +381,9 @@ static int test_driving_length_angle_unsat_no_mutation_contract_D09(void) {
     ecs_entity_t length_participants[1] = { line_a };
     ecs_entity_t angle_participants[2] = { line_a, line_b };
     ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
-                                                            length_participants, 1, 10.0f, true);
+                                                            length_participants, 1, 10.0f, false);
     ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
-                                                           angle_participants, 2, 0.5f, true);
+                                                           angle_participants, 2, 0.5f, false);
     if (!c_length || !c_angle) return 1;
 
     GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
@@ -430,7 +430,7 @@ static int test_driving_length_atomic_success_contract_D10(void) {
 
     ecs_entity_t length_participants[1] = { line_a };
     ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
-                                                            length_participants, 1, 5.0f, true);
+                                                            length_participants, 1, 5.0f, false);
     ecs_entity_t coincident_participants[2] = { p1, p2 };
     ecs_entity_t c_coincident = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT,
                                                                 coincident_participants, 2, 0.0f, false);
@@ -455,6 +455,7 @@ static int test_driving_length_atomic_success_contract_D10(void) {
     ecs_world_shutdown(&world);
     return ok ? 0 : 1;
 }
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;

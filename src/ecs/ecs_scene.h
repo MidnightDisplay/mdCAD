@@ -2671,7 +2671,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                 }
 
                 if (constraint->type == CONSTRAINT_LENGTH) {
-                    if (!constraint->driven) continue;
+                    if (constraint->driven) continue;
                     if (participant_count < 1) {
                         solve_failed = true;
                         failure_reason = "Unsatisfied driving LENGTH constraint.";
@@ -2731,7 +2731,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                 }
 
                 if (constraint->type == CONSTRAINT_ANGLE) {
-                    if (!constraint->driven) continue;
+                    if (constraint->driven) continue;
                     solve_failed = true;
                     failure_reason = "Unsatisfied driving ANGLE constraint.";
                     implicated_constraints[implicated_constraint_count++] = child;
