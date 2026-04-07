@@ -1,64 +1,76 @@
-#include <stdbool.h>
-#include <stdint.h>
+#include "../ecs/ecs_world.h"
+#include "../ecs/ecs_scene.h"
 #include <stdio.h>
 
-typedef struct {
-    bool auto_solve_pending;
-    uint32_t solve_request_serial;
-    uint32_t solve_completed_serial;
-    uint32_t debounce_ms;
-} trigger_policy_state_t;
-
-static trigger_policy_state_t trigger_policy_default(void) {
-    trigger_policy_state_t state = {0};
-    state.debounce_ms = 50;
-    return state;
+#ifdef __cplusplus
+extern "C" {
+#endif
+void sokol_main(void) {}
+#ifdef __cplusplus
 }
+#endif
 
-static void trigger_policy_request_auto(trigger_policy_state_t *state) {
-    if (!state) return;
-    if (!state->auto_solve_pending) {
-        state->auto_solve_pending = true;
-        state->solve_request_serial++;
+static int test_auto_request_coalesces_and_only_flushes_after_debounce(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (!sketch) return 1;
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk) return 1;
+
+    if (!scene_solver_request_auto(&scene, sketch)) return 1;
+    uint32_t serial_after_first = sk->solve_request_serial;
+    if (!scene_solver_request_auto(&scene, sketch)) return 1;
+    if (!scene_solver_request_auto(&scene, sketch)) return 1;
+
+    if (!sk->auto_solve_pending || sk->solve_request_serial != serial_after_first) {
+        ecs_world_shutdown(&world);
+        return 1;
     }
+
+    uint32_t completed_before = sk->solve_completed_serial;
+    sk->auto_solve_queued_at_ms = 0;
+    scene_solver_process_auto_queue(&scene);
+    sk = ecs_world_get_sketch(scene.world, sketch);
+
+    int ok = (sk &&
+              !sk->auto_solve_pending &&
+              sk->solve_completed_serial > completed_before);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
 }
 
-static void trigger_policy_manual_recalculate(trigger_policy_state_t *state) {
-    if (!state) return;
-    state->auto_solve_pending = false;
-    state->solve_request_serial++;
-    state->solve_completed_serial = state->solve_request_serial;
-}
+static int test_manual_recalculate_cancels_pending_auto_queue(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
 
-static bool trigger_policy_flush_if_due(trigger_policy_state_t *state, uint32_t elapsed_ms) {
-    if (!state) return false;
-    if (!state->auto_solve_pending) return false;
-    if (elapsed_ms < state->debounce_ms) return false;
-    state->auto_solve_pending = false;
-    state->solve_completed_serial = state->solve_request_serial;
-    return true;
-}
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (!sketch) return 1;
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk) return 1;
 
-static int test_auto_request_debounce_default_and_coalescing(void) {
-    trigger_policy_state_t state = trigger_policy_default();
-    if (state.debounce_ms != 50) return 1; // D-02
+    if (!scene_solver_request_auto(&scene, sketch)) return 1;
+    if (!sk->auto_solve_pending) return 1;
+    sk->auto_solve_queued_at_ms = 0;
 
-    trigger_policy_request_auto(&state);
-    trigger_policy_request_auto(&state);
-    trigger_policy_request_auto(&state);
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    uint32_t completed_after_manual = sk->solve_completed_serial;
 
-    return (state.auto_solve_pending && state.solve_request_serial == 1) ? 0 : 1; // D-01, D-03
-}
-
-static int test_manual_recalculate_clears_pending_and_stale_flush(void) {
-    trigger_policy_state_t state = trigger_policy_default();
-    trigger_policy_request_auto(&state);
-    if (!state.auto_solve_pending) return 1;
-
-    trigger_policy_manual_recalculate(&state); // D-04
-    if (state.auto_solve_pending) return 1;
-
-    return trigger_policy_flush_if_due(&state, 100) ? 1 : 0;
+    scene_solver_process_auto_queue(&scene);
+    sk = ecs_world_get_sketch(scene.world, sketch);
+    int ok = (sk &&
+              !sk->auto_solve_pending &&
+              sk->solve_completed_serial == completed_after_manual);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
 }
 
 typedef int (*test_fn_t)(void);
@@ -66,8 +78,10 @@ typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
 int main(void) {
     static const test_case_t tests[] = {
-        { "test_auto_request_debounce_default_and_coalescing", test_auto_request_debounce_default_and_coalescing },
-        { "test_manual_recalculate_clears_pending_and_stale_flush", test_manual_recalculate_clears_pending_and_stale_flush },
+        { "test_auto_request_coalesces_and_only_flushes_after_debounce",
+          test_auto_request_coalesces_and_only_flushes_after_debounce },
+        { "test_manual_recalculate_cancels_pending_auto_queue",
+          test_manual_recalculate_cancels_pending_auto_queue },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
