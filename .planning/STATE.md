@@ -72,7 +72,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 19 P01 | 3 min | 2 tasks | 2 files |
 | Phase 19 P02 | 1 min | 2 tasks | 2 files |
 | Phase 20 P01 | 3 min | 2 tasks | 2 files |
-| Phase 20-finalize-phase-17-endpoint-ux-and-verification-closure P02 | -3396 | 2 tasks | 2 files |
+| Phase 20-finalize-phase-17-endpoint-ux-and-verification-closure P02 | 8 min | 2 tasks | 2 files |
 
 ## Decisions
 
