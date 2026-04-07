@@ -53,18 +53,15 @@ static int test_recalculate_max_pass_cap_and_explicit_diagnostic(void) {
 
     ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
     ecs_entity_t p1 = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
-    ecs_entity_t p2 = scene_add_point_to_sketch(&scene, sketch, vec3_make(1, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
-    if (!sketch || !p1 || !p2) return 1;
+    ecs_entity_t p2 = scene_add_point_to_sketch(&scene, sketch, vec3_make(2, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t p3 = scene_add_point_to_sketch(&scene, sketch, vec3_make(4, 0, 0), vec4_make(1, 1, 1, 1), 0.01f);
+    if (!sketch || !p1 || !p2 || !p3) return 1;
 
-    SketchGeometryStateComp *s1 = ecs_world_get_sketch_geometry_state(scene.world, p1);
-    SketchGeometryStateComp *s2 = ecs_world_get_sketch_geometry_state(scene.world, p2);
-    if (!s1 || !s2) return 1;
-    s1->fixed = true;
-    s2->fixed = true;
-
-    ecs_entity_t participants[2] = { p1, p2 };
-    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT, participants, 2, 0.0f, false);
-    if (!c) return 1;
+    ecs_entity_t c1_participants[2] = { p1, p2 };
+    ecs_entity_t c2_participants[2] = { p2, p3 };
+    ecs_entity_t c1 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT, c1_participants, 2, 0.0f, false);
+    ecs_entity_t c2 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT, c2_participants, 2, 0.0f, false);
+    if (!c1 || !c2) return 1;
 
     SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
     if (!sk) return 1;
