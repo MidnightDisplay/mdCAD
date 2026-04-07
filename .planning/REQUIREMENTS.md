@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKCH-01 | Phase 21 | Partial |
-| SKCH-02 | Phase 21 | Partial |
-| SKCH-03 | Phase 21 | Partial |
+| SKCH-01 | Phase 21 | Complete |
+| SKCH-02 | Phase 21 | Complete |
+| SKCH-03 | Phase 21 | Complete |
 | SKCH-04 | Phase 16 | Complete |
 | CONS-01 | Phase 16 | Complete |
 | CONS-02 | Phase 16 | Complete |
