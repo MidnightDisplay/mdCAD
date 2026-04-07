@@ -57,10 +57,10 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 - [x] **D-06**: Solver diagnostics dedupe identical consecutive entries while preserving append order.
 - [x] **D-07**: Live solve path uses bounded per-frame budget with graceful degradation contract.
 - [x] **D-08**: Deterministic solver regression fixtures are wired as automated acceptance gates.
-- [ ] **D-09**: Constraint participant representation supports endpoint/sub-entity metadata.
-- [ ] **D-10**: Endpoint controls are first-class selectable/pickable participants for Coincident authoring.
-- [ ] **D-11**: Coincident authoring supports endpoint-to-endpoint participant semantics through direct selection model.
-- [ ] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
+- [x] **D-09**: Constraint participant representation supports endpoint/sub-entity metadata.
+- [x] **D-10**: Endpoint controls are first-class selectable/pickable participants for Coincident authoring.
+- [x] **D-11**: Coincident authoring supports endpoint-to-endpoint participant semantics through direct selection model.
+- [x] **D-12**: Pick/render layering maintains endpoint selection priority over continuous primitives.
 
 ### Endpoint Undo Hardening (Phase 18)
 
@@ -131,10 +131,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | D-06 | Phase 20 | Complete |
 | D-07 | Phase 20 | Complete |
 | D-08 | Phase 20 | Complete |
-| D-09 | Phase 20 | Pending |
-| D-10 | Phase 20 | Pending |
-| D-11 | Phase 20 | Pending |
-| D-12 | Phase 20 | Pending |
+| D-09 | Phase 20 | Complete |
+| D-10 | Phase 20 | Complete |
+| D-11 | Phase 20 | Complete |
+| D-12 | Phase 20 | Complete |
 | PH18-01 | Phase 18 | Complete |
 | PH18-02 | Phase 18 | Complete |
 | PH18-03 | Phase 21 | Pending |

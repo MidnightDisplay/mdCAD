@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
 status: executing
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-04-07T08:52:09.842Z"
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-04-07T08:57:10.152Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 12
   completed_phases: 10
   total_plans: 33
-  completed_plans: 31
+  completed_plans: 32
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 20 (finalize-phase-17-endpoint-ux-and-verification-closure) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-07
 
@@ -72,6 +72,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 19 P01 | 3 min | 2 tasks | 2 files |
 | Phase 19 P02 | 1 min | 2 tasks | 2 files |
 | Phase 20 P01 | 3 min | 2 tasks | 2 files |
+| Phase 20-finalize-phase-17-endpoint-ux-and-verification-closure P02 | -3396 | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -129,6 +130,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 19]: Keep 19-PREP-NOTES informational-only with explicit out-of-scope boundary for Phase 19 implementation claims.
 - [Phase 20]: Use citation-first evidence reuse for D-01..D-08 and run only requirement-scoped targeted reruns when ambiguity must be resolved.
 - [Phase 20]: Keep D-09..D-12 rows explicitly present but pending in this plan so endpoint closure remains scoped to Plan 20-02.
+- [Phase 20-finalize-phase-17-endpoint-ux-and-verification-closure]: Promoted D-09..D-12 to passed only with explicit endpoint_pick automation anchors plus canonical 17-UAT tests 1-7 citations.
+- [Phase 20-finalize-phase-17-endpoint-ux-and-verification-closure]: Documented endpoint ambiguity disposition in 17-VERIFICATION.md to distinguish targeted rerun-required rows from evidence-reuse-sufficient rows.
 
 ## Accumulated Context
 
@@ -142,6 +145,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-07T08:52:09.838Z
-**Stopped At:** Completed 20-01-PLAN.md
+**Last Date:** 2026-04-07T08:57:10.148Z
+**Stopped At:** Completed 20-02-PLAN.md
 **Resume File:** None
