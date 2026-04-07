@@ -2,7 +2,7 @@
 phase: 17
 slug: constraint-driven-geometry-solving
 artifact: verification
-status: draft
+status: complete
 updated: 2026-04-07
 authoritative: true
 ---
@@ -59,6 +59,10 @@ For each requirement row, a status can only move to `Passed` when citations are 
 4. Endpoint closure targeted rerun (Plan 20-02):  
    `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure`  
    Result: **1/1 passed** (`endpoint_pick`), 0 failed.
+
+5. Final targeted closure gate (Plan 20-03):  
+   `ctest -R "scene_solver_contract|scene_solver_drag|endpoint_pick|scene_solver_diagnostics" --test-dir build-vulkan -C Release --output-on-failure`  
+   Result: **4/4 passed** (`scene_solver_contract`, `scene_solver_drag`, `endpoint_pick`, `scene_solver_diagnostics`), 0 failed.
 
 ## Endpoint Row Ambiguity Disposition (Plan 20-02)
 

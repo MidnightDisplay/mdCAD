@@ -109,7 +109,7 @@ Manual checkpoint status (historical, superseded by final closure):
 - `17-VERIFICATION.md` is authoritative for final `D-01..D-12` closure state.
 - `17-UAT.md` remains the canonical manual evidence artifact (Tests 1-7 pass).
 - Final targeted closure gate command for audit reproducibility:
-  - `ctest -R "scene_solver_contract|scene_solver_drag|endpoint_pick|scene_solver_diagnostics" --test-dir build-vulkan -C Release --output-on-failure`
+  - `ctest -R "scene_solver_contract|scene_solver_drag|endpoint_pick|scene_solver_diagnostics" --test-dir build-vulkan -C Release --output-on-failure` ✅ pass (4/4, 0 failed)
 
 ## Validation Sign-Off
 
