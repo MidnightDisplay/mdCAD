@@ -1243,6 +1243,85 @@ static int test_script_editor_launch_request_is_exposed_from_inspector_state(voi
     return 0;
 }
 
+static void test_inspector_geometry_manager_mutation_callback(void *user_data) {
+    if (!user_data) return;
+    int *counter = (int*)user_data;
+    (*counter)++;
+}
+
+static int test_geometry_manager_mutations_trigger_dirty_callback(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    selection_buffer_t selection = {0};
+    undo_redo_t undo_redo = {0};
+    ui_entity_inspector_state_t inspector = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    selection_init(&selection, &world);
+    undo_redo_init(&undo_redo, &scene, 32);
+    ui_entity_inspector_init(&inspector, &selection, &world);
+    ui_entity_inspector_set_undo_redo(&inspector, &undo_redo);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        undo_redo_shutdown(&undo_redo);
+        selection_shutdown(&selection);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int callback_count = 0;
+    ui_entity_inspector_set_sketch_geometry_mutation_callback(
+        &inspector,
+        test_inspector_geometry_manager_mutation_callback,
+        &callback_count);
+
+    SketchComp *sketch_comp = ecs_world_get_sketch(&world, sketch);
+    if (!sketch_comp) {
+        undo_redo_shutdown(&undo_redo);
+        selection_shutdown(&selection);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t point = ui_entity_inspector_geometry_manager_add_point(&inspector, &scene, sketch, sketch_comp->color);
+    ecs_entity_t line = ui_entity_inspector_geometry_manager_add_line(&inspector, &scene, sketch, sketch_comp->color);
+    ecs_entity_t arc = ui_entity_inspector_geometry_manager_add_arc(&inspector, &scene, sketch, sketch_comp->color);
+    ecs_entity_t circle = ui_entity_inspector_geometry_manager_add_circle(&inspector, &scene, sketch, sketch_comp->color);
+    if (point == 0 || line == 0 || arc == 0 || circle == 0 || callback_count != 4) {
+        undo_redo_shutdown(&undo_redo);
+        selection_shutdown(&selection);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t fix_targets[2] = { point, line };
+    int fixed_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(&inspector, &world, &scene, sketch, fix_targets, 2, true);
+    int unfixed_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(&inspector, &world, &scene, sketch, fix_targets, 2, false);
+    if (fixed_count != 2 || unfixed_count != 2 || callback_count != 6) {
+        undo_redo_shutdown(&undo_redo);
+        selection_shutdown(&selection);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t delete_targets[1] = { circle };
+    int deleted_count = ui_entity_inspector_geometry_manager_bulk_delete(
+        &inspector, &world, &scene, &selection, delete_targets, 1);
+    if (deleted_count != 1 || callback_count != 7) {
+        undo_redo_shutdown(&undo_redo);
+        selection_shutdown(&selection);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int no_op_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(&inspector, &world, &scene, sketch, NULL, 0, true);
+    undo_redo_shutdown(&undo_redo);
+    selection_shutdown(&selection);
+    ecs_world_shutdown(&world);
+    return (no_op_count == 0 && callback_count == 7) ? 0 : 1;
+}
+
 static int test_script_emit_orders_by_type_and_script_id(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1389,6 +1468,7 @@ int main(void) {
         { "test_script_io_window_request_is_exposed_from_inspector_state", test_script_io_window_request_is_exposed_from_inspector_state },
         { "test_script_apply_preserves_labels_by_script_identity", test_script_apply_preserves_labels_by_script_identity },
         { "test_script_editor_launch_request_is_exposed_from_inspector_state", test_script_editor_launch_request_is_exposed_from_inspector_state },
+        { "test_geometry_manager_mutations_trigger_dirty_callback", test_geometry_manager_mutations_trigger_dirty_callback },
         { "test_script_emit_orders_by_type_and_script_id", test_script_emit_orders_by_type_and_script_id },
         { "test_script_emit_formats_numbers_without_scientific_notation", test_script_emit_formats_numbers_without_scientific_notation },
         { "test_script_emit_noop_stability", test_script_emit_noop_stability },
