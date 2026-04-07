@@ -144,6 +144,12 @@ static struct {
     char script_io_slider_drag_before_script[16384];
 } state;
 
+static void mdcad_handle_inspector_sketch_geometry_mutation(void *user_data) {
+    ui_scene_hierarchy_state_t *hierarchy = (ui_scene_hierarchy_state_t*)user_data;
+    if (!hierarchy) return;
+    ui_scene_hierarchy_mark_dirty(hierarchy);
+}
+
 static void mdcad_script_editor_clear_error(void) {
     state.script_editor_last_error.line = 0;
     state.script_editor_last_error.column = 0;
@@ -1107,6 +1113,10 @@ static void init(void) {
     // Initialize entity management UI
     ui_entity_inspector_init(&state.entity_inspector, &state.selection, &state.ecs_world);
     ui_scene_hierarchy_init(&state.scene_hierarchy, &state.selection, &state.ecs_scene);
+    ui_entity_inspector_set_sketch_geometry_mutation_callback(
+        &state.entity_inspector,
+        mdcad_handle_inspector_sketch_geometry_mutation,
+        &state.scene_hierarchy);
     ui_entity_inspector_set_selected_constraint_ptr(&state.entity_inspector, &state.selected_constraint_entity);
 
     // Initialize slot buffer debug viewer

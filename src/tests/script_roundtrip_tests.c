@@ -1121,6 +1121,7 @@ static int test_script_io_window_request_is_exposed_from_inspector_state(void) {
     ecs_world_state_t world = {0};
     ui_entity_inspector_state_t inspector = {0};
     ui_entity_inspector_init(&inspector, &selection, &world);
+    ui_entity_inspector_set_sketch_geometry_mutation_callback(&inspector, NULL, NULL);
 
     ecs_entity_t requested = 0;
     if (ui_entity_inspector_consume_script_io_open_request(&inspector, &requested)) {
@@ -1222,6 +1223,7 @@ static int test_script_editor_launch_request_is_exposed_from_inspector_state(voi
     ecs_world_state_t world = {0};
     ui_entity_inspector_state_t inspector = {0};
     ui_entity_inspector_init(&inspector, &selection, &world);
+    ui_entity_inspector_set_sketch_geometry_mutation_callback(&inspector, NULL, NULL);
 
     ecs_entity_t requested = 0;
     if (ui_entity_inspector_consume_script_editor_open_request(&inspector, &requested)) {

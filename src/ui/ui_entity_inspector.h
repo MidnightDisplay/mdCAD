@@ -53,6 +53,8 @@ typedef struct {
     vec3_t drag_start_line_a;
     vec3_t drag_start_line_b;
     ecs_entity_t *selected_constraint_entity;
+    void (*on_sketch_geometry_mutated)(void *user_data);
+    void *on_sketch_geometry_mutated_user_data;
 } ui_entity_inspector_state_t;
 
 //------------------------------------------------------------------------------
@@ -72,6 +74,8 @@ static inline void ui_entity_inspector_init(ui_entity_inspector_state_t *state,
     state->script_editor_open_requested = false;
     state->script_io_sketch = 0;
     state->script_io_open_requested = false;
+    state->on_sketch_geometry_mutated = NULL;
+    state->on_sketch_geometry_mutated_user_data = NULL;
 }
 
 static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t *state,
@@ -82,6 +86,20 @@ static inline void ui_entity_inspector_set_undo_redo(ui_entity_inspector_state_t
 static inline void ui_entity_inspector_set_selected_constraint_ptr(ui_entity_inspector_state_t *state,
                                                                     ecs_entity_t *selected_constraint_entity) {
     state->selected_constraint_entity = selected_constraint_entity;
+}
+
+static inline void ui_entity_inspector_set_sketch_geometry_mutation_callback(
+    ui_entity_inspector_state_t *state,
+    void (*callback)(void *user_data),
+    void *user_data) {
+    if (!state) return;
+    state->on_sketch_geometry_mutated = callback;
+    state->on_sketch_geometry_mutated_user_data = user_data;
+}
+
+static inline void ui_entity_inspector_notify_sketch_geometry_mutated(ui_entity_inspector_state_t *state) {
+    if (!state || !state->on_sketch_geometry_mutated) return;
+    state->on_sketch_geometry_mutated(state->on_sketch_geometry_mutated_user_data);
 }
 
 static inline void ui_entity_inspector_request_script_editor(ui_entity_inspector_state_t *state,
