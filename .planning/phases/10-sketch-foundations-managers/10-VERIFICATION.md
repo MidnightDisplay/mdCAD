@@ -1,22 +1,22 @@
 ---
 phase: 10-sketch-foundations-managers
-verified: 2026-04-07T10:00:22Z
-status: gaps_found
-score: 7/7 must-haves verified (manual closure checkpoint mixed: 1 pass, 1 fail)
+verified: 2026-04-07T12:41:31Z
+status: passed
+score: 7/7 must-haves verified (manual closure checkpoint: required checks passed)
 re_verification:
   previous_status: gaps_found
-  previous_score: 6/7
+  previous_score: 7/7 must-haves verified (manual closure checkpoint mixed: 1 pass, 1 fail)
   gaps_closed:
-    - "User can create a sketch from Add Entity and add point/line/arc geometry to the active sketch from both entry points."
+    - "Dual-entrypoint sketch attachment refresh parity in Scene Hierarchy after GeometryManager add path."
   gaps_remaining: []
   regressions: []
 human_verification:
   - test: "Dual-entrypoint sketch attach flow"
     expected: "Adding Point/Line/Arc/Circle from both Add Entity and GeometryManager attaches to selected sketch and updates counts immediately."
-    result: fail
+    result: pass
     evidence_ref: ".planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#1-dual-entrypoint-sketch-attachment"
     why_human: "Requires running UI and confirming end-to-end interaction behavior."
-    blocker: "Scene Hierarchy refresh lag after add via Entity Inspector -> GeometryManager; new geometry entity appears only after later manipulation."
+    blocker: "none"
   - test: "GeometryManager multi-select undo UX"
     expected: "Fix/Unfix/Delete on multi-selection apply to all selected rows and one Undo reverses all rows together."
     result: pass
@@ -27,9 +27,9 @@ human_verification:
 # Phase 10: Sketch Foundations & Managers Verification Report
 
 **Phase Goal:** Users can create and manage sketch containers with core sketch geometry and immediate sketch health visibility.  
-**Verified:** 2026-04-07T10:00:22Z  
-**Status:** gaps_found  
-**Re-verification:** Yes — fresh Phase 21-01 human rerun evidence applied
+**Verified:** 2026-04-07T12:41:31Z  
+**Status:** passed  
+**Re-verification:** Yes — fresh Phase 21-05 post-fix human rerun evidence applied
 
 ## Goal Achievement
 
@@ -112,21 +112,20 @@ human_verification:
 
 **Test:** Run app, create sketch, add Point/Line/Arc/Circle from both Add Entity and GeometryManager local controls.  
 **Expected:** New geometry attaches under active sketch; sketch counts/status refresh immediately.  
-**Result:** Fail  
-**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T10:00:22.835Z`)  
-**Blocker:** Scene Hierarchy refresh lag after geometry add through Entity Inspector -> GeometryManager.
+**Result:** Pass  
+**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T12:41:31.324Z`)  
+**Blocker:** None.
 
 ### 2. Multi-select bulk action UX + undo
 
 **Test:** In GeometryManager select multiple rows via Ctrl/Shift, run Fix/Unfix/Delete, then Undo once after each action.  
 **Expected:** Each bulk action applies to all selected rows and one Undo reverts/restores the full batch.  
 **Result:** Pass  
-**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T10:00:22.835Z`)
+**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T12:41:31.324Z`)
 
 ### Gaps Summary
 
-Previous code-surface gap remains closed: GeometryManager includes local add controls (`Add Point/Line/Arc/Circle`) wired to sketch attach helpers.  
-Fresh human rerun evidence is now citation-backed in this report, but authoritative phase closure cannot be promoted to `passed` because dual-entrypoint sketch attachment still has a user-visible hierarchy refresh blocker.
+Dual-entrypoint and GeometryManager multi-select undo required checks now both pass in the fresh post-fix rerun, so authoritative Phase 10 closure is promoted to `passed` with citation-backed UAT evidence.
 
 ---
 
