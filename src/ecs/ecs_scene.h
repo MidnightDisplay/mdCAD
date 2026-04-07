@@ -299,8 +299,10 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
     bool driven);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
+static inline uint64_t scene_solver_now_ms(void);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
 static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sketch);
+static inline void scene_solver_process_auto_queue(ecs_scene_t *scene);
 static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,
                                                sketch_solver_diagnostic_severity_t severity,
@@ -2463,10 +2465,46 @@ static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sk
     if (!sk->auto_solve_pending) {
         sk->auto_solve_pending = true;
         sk->solve_request_serial++;
-        sk->auto_solve_queued_at_ms = (uint64_t)time(NULL) * 1000ULL;
+        sk->auto_solve_queued_at_ms = scene_solver_now_ms();
         sk->auto_solve_queue_token = sk->solve_request_serial;
     }
     return true;
+}
+
+static inline uint64_t scene_solver_now_ms(void) {
+    struct timespec ts;
+    if (timespec_get(&ts, TIME_UTC) == TIME_UTC) {
+        return ((uint64_t)ts.tv_sec * 1000ULL) + ((uint64_t)ts.tv_nsec / 1000000ULL);
+    }
+    return (uint64_t)time(NULL) * 1000ULL;
+}
+
+static inline void scene_solver_process_auto_queue(ecs_scene_t *scene) {
+    if (!scene || !scene->world) return;
+    ecs_world_state_t *w = scene->world;
+    uint64_t now_ms = scene_solver_now_ms();
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->SketchComp_id }
+        }
+    });
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it)) {
+        SketchComp *sketches = ecs_field(&it, SketchComp, 0);
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t sketch_entity = it.entities[i];
+            SketchComp *sk = &sketches[i];
+            if (!sk->auto_solve_enabled || !sk->auto_solve_pending) continue;
+            uint64_t queued_at = sk->auto_solve_queued_at_ms;
+            uint64_t elapsed_ms = (now_ms >= queued_at) ? (now_ms - queued_at) : 0ULL;
+            uint32_t debounce_ms = sk->auto_solve_debounce_ms > 0
+                ? sk->auto_solve_debounce_ms
+                : SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS;
+            if (elapsed_ms < debounce_ms) continue;
+            scene_solver_request_recalculate(scene, sketch_entity);
+        }
+    }
+    ecs_query_fini(q);
 }
 
 static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_entity_t sketch) {
@@ -2482,7 +2520,17 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     ecs_entity_t implicated_constraints[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS] = {0};
     int implicated_constraint_count = 0;
     bool solve_failed = false;
+    bool converged = false;
     const char *failure_reason = "Unsupported constraint participant combination.";
+    float position_tolerance = (sk->solver_position_tolerance > 0.0f)
+        ? sk->solver_position_tolerance
+        : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+    float angle_tolerance = (sk->solver_angle_tolerance > 0.0f)
+        ? sk->solver_angle_tolerance
+        : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+    uint32_t max_passes = (sk->solver_max_passes > 0)
+        ? sk->solver_max_passes
+        : SKETCH_SOLVER_DEFAULT_MAX_PASSES;
 
     ecs_iter_t children = ecs_children(scene->world->world, sketch);
     while (ecs_children_next(&children)) {
@@ -2503,78 +2551,164 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                            &candidate_count, sketch_points[i], CONSTRAINT_PARTICIPANT_ROLE_ENTITY);
     }
 
-    children = ecs_children(scene->world->world, sketch);
-    while (ecs_children_next(&children) && !solve_failed) {
-        for (int i = 0; i < children.count; i++) {
-            ecs_entity_t child = children.entities[i];
-            ConstraintComp *constraint = ecs_world_get_constraint(scene->world, child);
-            if (!constraint) continue;
+    for (uint32_t pass = 0; pass < max_passes && !solve_failed; pass++) {
+        float pass_max_position_delta = 0.0f;
+        float pass_max_angle_delta = 0.0f;
+        float pass_max_residual = 0.0f;
+        children = ecs_children(scene->world->world, sketch);
+        while (ecs_children_next(&children) && !solve_failed) {
+            for (int i = 0; i < children.count; i++) {
+                ecs_entity_t child = children.entities[i];
+                ConstraintComp *constraint = ecs_world_get_constraint(scene->world, child);
+                if (!constraint) continue;
 
-            uint32_t participant_count = constraint->participant_count;
-            if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {
-                participant_count = CONSTRAINT_MAX_PARTICIPANTS;
-            }
+                uint32_t participant_count = constraint->participant_count;
+                if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {
+                    participant_count = CONSTRAINT_MAX_PARTICIPANTS;
+                }
 
-            if (constraint->type == CONSTRAINT_COINCIDENT && participant_count == 2) {
-                ecs_entity_t pa = (ecs_entity_t)constraint->participant_descriptors[0].entity;
-                ecs_entity_t pb = (ecs_entity_t)constraint->participant_descriptors[1].entity;
-                constraint_participant_role_t role_a =
-                    (constraint_participant_role_t)constraint->participant_descriptors[0].role;
-                constraint_participant_role_t role_b =
-                    (constraint_participant_role_t)constraint->participant_descriptors[1].role;
-                int ia = scene_solver_ensure_point_candidate(scene, candidates,
-                                                             ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
-                                                             &candidate_count, pa, role_a);
-                int ib = scene_solver_ensure_point_candidate(scene, candidates,
-                                                             ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
-                                                             &candidate_count, pb, role_b);
-                if (ia < 0 || ib < 0) {
+                if (constraint->type == CONSTRAINT_COINCIDENT && participant_count == 2) {
+                    ecs_entity_t pa = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                    ecs_entity_t pb = (ecs_entity_t)constraint->participant_descriptors[1].entity;
+                    constraint_participant_role_t role_a =
+                        (constraint_participant_role_t)constraint->participant_descriptors[0].role;
+                    constraint_participant_role_t role_b =
+                        (constraint_participant_role_t)constraint->participant_descriptors[1].role;
+                    int ia = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                 ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                 &candidate_count, pa, role_a);
+                    int ib = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                 ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                 &candidate_count, pb, role_b);
+                    if (ia < 0 || ib < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsupported coincident participants: only point-point is solved in this phase.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t delta = vec3_sub(candidates[ia].point, candidates[ib].point);
+                    float distance = vec3_length(delta);
+                    if (distance > pass_max_residual) pass_max_residual = distance;
+
+                    if (candidates[ia].fixed && candidates[ib].fixed) {
+                        if (distance > position_tolerance) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied coincident constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    vec3_t before_a = candidates[ia].point;
+                    vec3_t before_b = candidates[ib].point;
+                    if (candidates[ia].fixed && !candidates[ib].fixed) {
+                        candidates[ib].point = candidates[ia].point;
+                    } else if (!candidates[ia].fixed && candidates[ib].fixed) {
+                        candidates[ia].point = candidates[ib].point;
+                    } else {
+                        vec3_t midpoint = vec3_scale(vec3_add(candidates[ia].point, candidates[ib].point), 0.5f);
+                        candidates[ia].point = midpoint;
+                        candidates[ib].point = midpoint;
+                    }
+                    float delta_a = vec3_length(vec3_sub(candidates[ia].point, before_a));
+                    float delta_b = vec3_length(vec3_sub(candidates[ib].point, before_b));
+                    if (delta_a > pass_max_position_delta) pass_max_position_delta = delta_a;
+                    if (delta_b > pass_max_position_delta) pass_max_position_delta = delta_b;
+                    continue;
+                }
+
+                if (constraint->type == CONSTRAINT_LENGTH) {
+                    if (!constraint->driven) continue;
+                    if (participant_count < 1) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving LENGTH constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    ecs_entity_t line_entity = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                    int ia = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                 ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                 &candidate_count, line_entity,
+                                                                 CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                    int ib = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                 ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                 &candidate_count, line_entity,
+                                                                 CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                    if (ia < 0 || ib < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving LENGTH constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    float desired_length = constraint->value;
+                    if (!isfinite(desired_length) || desired_length <= 0.0f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving LENGTH constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t line_delta = vec3_sub(candidates[ib].point, candidates[ia].point);
+                    float current_length = vec3_length(line_delta);
+                    float residual = fabsf(current_length - desired_length);
+                    if (residual > pass_max_residual) pass_max_residual = residual;
+
+                    if (candidates[ia].fixed && candidates[ib].fixed) {
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        continue;
+                    }
+
+                    vec3_t direction = (current_length > 1e-6f)
+                        ? vec3_scale(line_delta, 1.0f / current_length)
+                        : vec3_make(1.0f, 0.0f, 0.0f);
+                    vec3_t before_a = candidates[ia].point;
+                    vec3_t before_b = candidates[ib].point;
+                    if (candidates[ia].fixed && !candidates[ib].fixed) {
+                        candidates[ib].point = vec3_add(candidates[ia].point, vec3_scale(direction, desired_length));
+                    } else if (!candidates[ia].fixed && candidates[ib].fixed) {
+                        candidates[ia].point = vec3_sub(candidates[ib].point, vec3_scale(direction, desired_length));
+                    } else {
+                        candidates[ib].point = vec3_add(candidates[ia].point, vec3_scale(direction, desired_length));
+                    }
+                    float delta_a = vec3_length(vec3_sub(candidates[ia].point, before_a));
+                    float delta_b = vec3_length(vec3_sub(candidates[ib].point, before_b));
+                    if (delta_a > pass_max_position_delta) pass_max_position_delta = delta_a;
+                    if (delta_b > pass_max_position_delta) pass_max_position_delta = delta_b;
+                    continue;
+                }
+
+                if (constraint->type == CONSTRAINT_ANGLE) {
+                    if (!constraint->driven) continue;
                     solve_failed = true;
-                    failure_reason = "Unsupported coincident participants: only point-point is solved in this phase.";
+                    failure_reason = "Unsatisfied driving ANGLE constraint.";
                     implicated_constraints[implicated_constraint_count++] = child;
                     break;
                 }
 
-                if (candidates[ia].fixed && candidates[ib].fixed) {
-                    if (fabsf(candidates[ia].point.x - candidates[ib].point.x) > 1e-6f ||
-                        fabsf(candidates[ia].point.y - candidates[ib].point.y) > 1e-6f ||
-                        fabsf(candidates[ia].point.z - candidates[ib].point.z) > 1e-6f) {
-                        solve_failed = true;
-                        failure_reason = "Unsatisfied coincident constraint.";
-                        implicated_constraints[implicated_constraint_count++] = child;
-                        break;
-                    }
+                if (constraint->type == CONSTRAINT_FIXED) {
                     continue;
                 }
 
-                if (candidates[ia].fixed && !candidates[ib].fixed) {
-                    candidates[ib].point = candidates[ia].point;
-                    continue;
-                }
-                if (!candidates[ia].fixed && candidates[ib].fixed) {
-                    candidates[ia].point = candidates[ib].point;
-                    continue;
-                }
-
-                vec3_t midpoint = vec3_scale(vec3_add(candidates[ia].point, candidates[ib].point), 0.5f);
-                candidates[ia].point = midpoint;
-                candidates[ib].point = midpoint;
-                continue;
+                solve_failed = true;
+                failure_reason = "Constraint type not yet solved in transactional recalc.";
+                implicated_constraints[implicated_constraint_count++] = child;
+                break;
             }
+        }
 
-            if (constraint->type == CONSTRAINT_FIXED || constraint->type == CONSTRAINT_LENGTH) {
-                continue;
-            }
-
-            solve_failed = true;
-            failure_reason = "Constraint type not yet solved in transactional recalc.";
-            implicated_constraints[implicated_constraint_count++] = child;
+        if (solve_failed) break;
+        if (pass_max_position_delta <= position_tolerance &&
+            pass_max_angle_delta <= angle_tolerance &&
+            pass_max_residual <= position_tolerance) {
+            converged = true;
             break;
         }
     }
 
     sk->solve_request_serial++;
-    sk->last_solve_timestamp_ms = (uint64_t)time(NULL) * 1000ULL;
+    sk->last_solve_timestamp_ms = scene_solver_now_ms();
     sk->solver_backend_id = scene_solver_backend_id(scene);
 
     if (solve_failed) {
@@ -2583,6 +2717,35 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                              implicated_constraints,
                                              implicated_constraint_count,
                                              failure_reason);
+        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                    "solve", failure_reason,
+                                    implicated_constraint_count > 0 ? implicated_constraints[0] : 0);
+        sk->solve_completed_serial = sk->solve_request_serial;
+        scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
+        return false;
+    }
+
+    if (!converged) {
+        implicated_constraint_count = 0;
+        children = ecs_children(scene->world->world, sketch);
+        while (ecs_children_next(&children)) {
+            for (int i = 0; i < children.count; i++) {
+                ecs_entity_t child = children.entities[i];
+                if (!ecs_world_get_constraint(scene->world, child)) continue;
+                if (implicated_constraint_count >= ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) break;
+                implicated_constraints[implicated_constraint_count++] = child;
+            }
+            if (implicated_constraint_count >= ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) break;
+        }
+        scene_solver_sort_entities_unique(implicated_constraints, &implicated_constraint_count);
+        scene_solver_set_failure_implication(scene, sketch,
+                                             implicated_constraints,
+                                             implicated_constraint_count,
+                                             "max passes reached");
+        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                    "solve", "max passes reached",
+                                    implicated_constraint_count > 0 ? implicated_constraints[0] : 0);
+        sk->solve_completed_serial = sk->solve_request_serial;
         scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
         return false;
     }

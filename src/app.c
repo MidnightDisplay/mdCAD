@@ -1447,6 +1447,7 @@ static void frame(void) {
     // Update ECS world and scene
     ecs_world_progress(&state.ecs_world, dt);
     ecs_scene_update(&state.ecs_scene);
+    scene_solver_process_auto_queue(&state.ecs_scene);
 
     // Update gizmo (must be after ecs_scene_update for correct world matrices)
     {
