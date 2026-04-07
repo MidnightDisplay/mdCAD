@@ -199,12 +199,12 @@ Plans:
 **Requirements**: SKCH-01, SKCH-02, SKCH-03, PH18-03
 **Depends on:** Phase 20
 **Gap Closure:** Closes remaining partial requirements and prepares v1.2 for successful milestone re-audit.
-**Plans:** 4/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 - [x] 21-01-PLAN.md — Run fresh Phase 10 manual checklist and capture updated UAT evidence for SKCH-01/02/03 closure.
 - [x] 21-02-PLAN.md — Reconcile authoritative verification/summary artifacts and sync requirements traceability for SKCH-01/02/03/PH18-03.
 - [x] 21-03-PLAN.md — Re-run milestone audit and publish explicit Phase 21 cross-file closure matrix. (completed 2026-04-07)
 - [x] 21-04-PLAN.md — Fix SKCH-01 Scene Hierarchy dual-entrypoint refresh defect in product code (inspector mutation invalidation wiring).
-- [ ] 21-05-PLAN.md — Re-run Phase 10 manual checkpoint post-fix and promote SKCH statuses only when both required checks pass.
+- [x] 21-05-PLAN.md — Re-run Phase 10 manual checkpoint post-fix and promote SKCH statuses only when both required checks pass.
 - [ ] 21-06-PLAN.md — Re-audit milestone/validation alignment after real closure and publish updated truthful closure matrix.
