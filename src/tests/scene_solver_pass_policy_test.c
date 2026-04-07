@@ -36,8 +36,8 @@ static int test_recalculate_stops_by_tolerance(void) {
 
     SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
     if (!sk) return 1;
-    sk->solver_position_tolerance = 1e-4f;
-    sk->solver_max_passes = 10;
+    if (!scene_solver_set_position_tolerance(&scene, sketch, 1e-4f)) return 1;
+    if (!scene_solver_set_max_passes(&scene, sketch, 10u)) return 1;
 
     bool solved = scene_solver_request_recalculate(&scene, sketch);
     int ok = solved && sk->status == SKETCH_STATUS_SOLVED;
@@ -65,7 +65,7 @@ static int test_recalculate_max_pass_cap_and_explicit_diagnostic(void) {
 
     SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
     if (!sk) return 1;
-    sk->solver_max_passes = 1;
+    if (!scene_solver_set_max_passes(&scene, sketch, 1u)) return 1;
 
     bool solved = scene_solver_request_recalculate(&scene, sketch);
     int diag_count = scene_solver_diagnostic_count(&scene, sketch);

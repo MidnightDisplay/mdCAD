@@ -1138,6 +1138,55 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             }
         }
 
+        float position_tolerance = scene
+            ? scene_solver_position_tolerance(scene, e)
+            : ((sketch->solver_position_tolerance > 0.0f)
+                   ? sketch->solver_position_tolerance
+                   : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE);
+        igSetNextItemWidth(180.0f);
+        if (igInputFloat("Position Tolerance##sketch_solver_position_tol", &position_tolerance, 0.0001f, 0.001f, "%.6f",
+                         ImGuiInputTextFlags_CharsDecimal)) {
+            if (scene) {
+                scene_solver_set_position_tolerance(scene, e, position_tolerance);
+                sketch = ecs_world_get_sketch(w, e);
+            } else {
+                sketch->solver_position_tolerance =
+                    (position_tolerance > 0.0f) ? position_tolerance : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+            }
+        }
+
+        float angle_tolerance = scene
+            ? scene_solver_angle_tolerance(scene, e)
+            : ((sketch->solver_angle_tolerance > 0.0f)
+                   ? sketch->solver_angle_tolerance
+                   : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE);
+        igSetNextItemWidth(180.0f);
+        if (igInputFloat("Angle Tolerance##sketch_solver_angle_tol", &angle_tolerance, 0.0001f, 0.001f, "%.6f",
+                         ImGuiInputTextFlags_CharsDecimal)) {
+            if (scene) {
+                scene_solver_set_angle_tolerance(scene, e, angle_tolerance);
+                sketch = ecs_world_get_sketch(w, e);
+            } else {
+                sketch->solver_angle_tolerance =
+                    (angle_tolerance > 0.0f) ? angle_tolerance : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+            }
+        }
+
+        uint32_t max_passes = scene
+            ? scene_solver_max_passes(scene, e)
+            : ((sketch->solver_max_passes > 0) ? sketch->solver_max_passes : SKETCH_SOLVER_DEFAULT_MAX_PASSES);
+        int max_passes_edit = (int)max_passes;
+        igSetNextItemWidth(180.0f);
+        if (igInputInt("Max Passes##sketch_solver_max_passes", &max_passes_edit, 1, 10, 0)) {
+            if (max_passes_edit < 1) max_passes_edit = 1;
+            if (scene) {
+                scene_solver_set_max_passes(scene, e, (uint32_t)max_passes_edit);
+                sketch = ecs_world_get_sketch(w, e);
+            } else {
+                sketch->solver_max_passes = (uint32_t)max_passes_edit;
+            }
+        }
+
         igBeginDisabled(scene == NULL);
         if (igButton("Recalculate Sketch", (ImVec2){0, 0})) {
             scene_solver_request_recalculate(scene, e);

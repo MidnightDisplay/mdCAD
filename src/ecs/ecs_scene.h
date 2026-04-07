@@ -300,6 +300,12 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
 static inline uint64_t scene_solver_now_ms(void);
+static inline float scene_solver_position_tolerance(const ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_set_position_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance);
+static inline float scene_solver_angle_tolerance(const ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_set_angle_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance);
+static inline uint32_t scene_solver_max_passes(const ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_set_max_passes(ecs_scene_t *scene, ecs_entity_t sketch, uint32_t max_passes);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
 static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline void scene_solver_process_auto_queue(ecs_scene_t *scene);
@@ -2441,6 +2447,51 @@ static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene) {
         return 1;
     }
     return scene->solver_backend_id;
+}
+
+static inline float scene_solver_position_tolerance(const ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch((ecs_scene_t*)scene, sketch)) return SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+    const SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk || sk->solver_position_tolerance <= 0.0f) return SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+    return sk->solver_position_tolerance;
+}
+
+static inline bool scene_solver_set_position_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->solver_position_tolerance = (tolerance > 0.0f) ? tolerance : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+    return true;
+}
+
+static inline float scene_solver_angle_tolerance(const ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch((ecs_scene_t*)scene, sketch)) return SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+    const SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk || sk->solver_angle_tolerance <= 0.0f) return SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+    return sk->solver_angle_tolerance;
+}
+
+static inline bool scene_solver_set_angle_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->solver_angle_tolerance = (tolerance > 0.0f) ? tolerance : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+    return true;
+}
+
+static inline uint32_t scene_solver_max_passes(const ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch((ecs_scene_t*)scene, sketch)) return SKETCH_SOLVER_DEFAULT_MAX_PASSES;
+    const SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk || sk->solver_max_passes == 0) return SKETCH_SOLVER_DEFAULT_MAX_PASSES;
+    return sk->solver_max_passes;
+}
+
+static inline bool scene_solver_set_max_passes(ecs_scene_t *scene, ecs_entity_t sketch, uint32_t max_passes) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->solver_max_passes = (max_passes > 0) ? max_passes : SKETCH_SOLVER_DEFAULT_MAX_PASSES;
+    return true;
 }
 
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled) {
