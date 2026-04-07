@@ -8,16 +8,14 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
-## Current Milestone: v1.2 Sketches, Constraints, Scripting
+## Current Milestone: v1.3 (Planning Next)
 
-**Goal:** Add a constrained-sketch subsystem with solver-driven geometry and bidirectional script representation.
+**Goal:** Define and prioritize the next milestone scope after shipping v1.2.
 
-**Target features:**
-- Add sketch-level ECS management components (`SketchManager`, `GeometryManager`, `ConstraintManager`) and one solver backend.
-- Add sketch UX in Entity Inspector + viewport glyphs + Tab-driven in-context constraint menu.
-- Add constraint-capable geometry scope (points, lines, arcs/circles) with legal constraint typing and status visibility.
-- Add script editor + script serialization/reconstruction + bidirectional UI/script sync with parameter IO frontend.
-- Expand scene API for sketch, geometry, constraint, and script operations.
+**Current focus:**
+- Start a fresh requirements cycle for v1.3 based on shipped v1.2 outcomes.
+- Reassess deferred platform-expansion goals and choose delivery order.
+- Preserve v1.2 runtime stability while planning next capability expansion.
 
 ## Requirements
 
@@ -67,17 +65,17 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 
 - Milestone `v1.1` shipped with Phases 6-9 complete and archived.
 - Long-tail migration closure requirements (`TAIL-01..03`, `TRED-01..02`, `VAL-01..03`) are complete.
-- Milestone `v1.2` scope is now centered on sketch constraints and scripting workflows.
-- Phase 12 is complete and verified (`7/7` truths) after executing gap-closure plan `12-03`.
-- Phase 13 and Phase 14 verification artifacts are now backfilled and requirement-aligned (`SCRP-01..06`, `API-01..02`) through Phase 19 closure.
-- Phase 17 verification closure is now finalized through Phase 20, with authoritative requirement-level evidence for `D-01..D-12`.
-- Next active phase is Phase 21 (`traceability-closure-and-re-audit-readiness`).
+- Milestone `v1.2` shipped with Phases 10-21 complete and archived.
+- Sketch, constraint, solver, scripting, and endpoint-undo requirement sets are implemented and mapped across shipped v1.2 artifacts.
+- Phase 21 closed traceability alignment with a product fix for SKCH hierarchy refresh and final requirement status promotion for SKCH/PH18 targets.
+- Archived milestone audit for v1.2 remains `gaps_found` and is explicitly accepted as known debt at closure.
+- Next active workflow is milestone initialization for v1.3.
 
 ## Next Milestone Goals
 
-1. Define v1.2 requirements for sketch entities, solver control, constraint UX, and scripting semantics.
-2. Plan phased delivery order with Windows Vulkan as the active development/test gate.
-3. Preserve runtime visual quality while permitting broad refactors required by sketch/solver integration.
+1. Define v1.3 requirements and validate scope boundaries from current user priorities.
+2. Decide how to address accepted v1.2 audit debt versus new capability work.
+3. Plan phased delivery order while keeping Windows Vulkan as the primary development/test gate.
 
 ## Constraints
 
@@ -120,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after Phase 20 closure execution*
+*Last updated: 2026-04-07 after v1.2 milestone completion*

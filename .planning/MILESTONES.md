@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.2 Sketches, Constraints, Scripting (Shipped: 2026-04-07)
+
+**Phases completed:** 12 phases, 39 plans, 79 tasks
+
+**Key accomplishments:**
+
+- Delivered sketch entity management and GeometryManager bulk workflows with atomic undo semantics.
+- Completed full constraint authoring UX closure, including in-context menu legality filtering, glyph interaction, and dimensional edit parity.
+- Closed solver control and constrained interaction behavior with deterministic diagnostics and clear-on-success implication lifecycle.
+- Shipped standalone Script Editor and Script IO transactional integration with scene API + undo coherence.
+- Backfilled script/API verification artifacts and finalized endpoint-driven solve closure evidence (`D-01..D-12`).
+- Closed Phase 21 traceability gaps by shipping the SKCH hierarchy refresh fix and promoting SKCH/PH18 requirement alignment.
+
+**Known gaps accepted at archival:**
+
+- Archived `v1.2-MILESTONE-AUDIT.md` status is `gaps_found`; remaining debt is captured in the archived audit artifact and accepted for milestone closure.
+
+**Audit:** [v1.2-MILESTONE-AUDIT.md](milestones/v1.2-MILESTONE-AUDIT.md) — gaps_found (accepted)
+
+**Archives:**
+
+- [v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
+- [v1.2-REQUIREMENTS.md](milestones/v1.2-REQUIREMENTS.md)
+
+---
+
 ## v1.1 Long-Tail Migration (Shipped: 2026-03-30)
 
 **Phases completed:** 4 phases, 14 plans, 35 tasks

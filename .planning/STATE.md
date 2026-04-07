@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: executing
-stopped_at: Completed 21-06-PLAN.md
-last_updated: "2026-04-07T12:55:09.426Z"
-last_activity: 2026-04-07
+status: ready
+stopped_at: v1.2 milestone archived
+last_updated: "2026-04-07T13:18:00.000Z"
+last_activity: 2026-04-07 -- v1.2 archived, next milestone setup pending
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 39
-  completed_plans: 39
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,25 +20,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 21 — traceability-closure-and-re-audit-readiness
+**Current focus:** Milestone planning setup (v1.3)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-07
+Phase: None (new milestone not started)
+Plan: 0 of 0
+Status: v1.2 complete and archived
+Last activity: 2026-04-07 -- v1.2 archived
 
 ## Milestone Scope
 
-- In scope: sketch entities, geometric constraints, solver UX, and bidirectional scripting workflows.
-- Development gate: Windows MSVC + Vulkan; macOS parity validation deferred to post-feature completion.
+- In scope: define v1.3 requirements/roadmap and phase plan.
+- Deferred from v1.2: `PLAT-01`, `PLAT-02`, `CAP-01`, `CAP-02`, `CAP-03`.
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 17 --gaps`
+Next command: `/gsd-new-milestone`
 
 ## Performance Metrics
 
