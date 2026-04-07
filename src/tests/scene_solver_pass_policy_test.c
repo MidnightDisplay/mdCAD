@@ -27,7 +27,7 @@ typedef struct {
 
 static recalc_policy_t recalc_policy_default(void) {
     recalc_policy_t policy = {0};
-    policy.max_passes = 0; // RED: should be 10 by D-06
+    policy.max_passes = 10;
     policy.position_tolerance = 1e-4f;
     policy.angle_tolerance = 1e-4f;
     return policy;

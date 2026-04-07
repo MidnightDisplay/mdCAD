@@ -11,7 +11,7 @@ typedef struct {
 
 static trigger_policy_state_t trigger_policy_default(void) {
     trigger_policy_state_t state = {0};
-    state.debounce_ms = 0; // RED: should be 50ms per D-02
+    state.debounce_ms = 50;
     return state;
 }
 
