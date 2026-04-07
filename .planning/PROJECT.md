@@ -8,14 +8,14 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
-## Current Milestone: v1.3 (Planning Next)
+## Current Milestone: v1.3 Sketch Solver Audit + Constraint Expansion
 
-**Goal:** Define and prioritize the next milestone scope after shipping v1.2.
+**Goal:** Stabilize sketch solver behavior through targeted audit/fixes and add advanced line/arc constraint capabilities needed for robust sketch workflows.
 
 **Current focus:**
-- Start a fresh requirements cycle for v1.3 based on shipped v1.2 outcomes.
-- Reassess deferred platform-expansion goals and choose delivery order.
-- Preserve v1.2 runtime stability while planning next capability expansion.
+- Audit and fix solver execution semantics: auto-solve triggers, deterministic recalculate behavior, and broken constraint pathways.
+- Implement bounded multi-pass solve policy with tolerance stop criteria and configurable pass cap (default 10).
+- Add advanced constraints for arc/line-arc interactions and directional group constraints across point sets.
 
 ## Requirements
 
@@ -73,9 +73,9 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 
 ## Next Milestone Goals
 
-1. Define v1.3 requirements and validate scope boundaries from current user priorities.
-2. Decide how to address accepted v1.2 audit debt versus new capability work.
-3. Plan phased delivery order while keeping Windows Vulkan as the primary development/test gate.
+1. Close sketch solver reliability defects surfaced from interactive sketching (auto-solve, recalc convergence, and non-working constraint types).
+2. Expand solver/constraint coverage for advanced arc-line interactions and principal-direction group constraints over point selections.
+3. Preserve deterministic solve behavior and maintain Windows Vulkan as the primary development/test gate while introducing new constraint math.
 
 ## Constraints
 
@@ -118,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after v1.2 milestone completion*
+*Last updated: 2026-04-07 after v1.3 milestone kickoff*

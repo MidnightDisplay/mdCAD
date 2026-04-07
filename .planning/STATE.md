@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Sketches, Constraints, Scripting
-status: ready
-stopped_at: v1.2 milestone archived
-last_updated: "2026-04-07T13:18:00.000Z"
-last_activity: 2026-04-07 -- v1.2 archived, next milestone setup pending
+milestone: v1.3
+milestone_name: Sketch Solver Audit + Constraint Expansion
+status: defining_requirements
+stopped_at: Milestone v1.3 started
+last_updated: "2026-04-07T14:26:00.000Z"
+last_activity: 2026-04-07 -- Milestone v1.3 started
 progress:
   total_phases: 0
   completed_phases: 0
@@ -20,21 +20,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone planning setup (v1.3)
+**Current focus:** Milestone v1.3 requirement definition
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: None (new milestone not started)
-Plan: 0 of 0
-Status: v1.2 complete and archived
-Last activity: 2026-04-07 -- v1.2 archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-07 -- Milestone v1.3 started
 
 ## Milestone Scope
 
-- In scope: define v1.3 requirements/roadmap and phase plan.
-- Deferred from v1.2: `PLAT-01`, `PLAT-02`, `CAP-01`, `CAP-02`, `CAP-03`.
+- In scope: sketch solver audit/fixes and advanced constraint expansion for sketch lines/arcs.
+- Initial targets: auto-solve trigger integrity, recalc convergence policy, along-axis group constraints, line/arc advanced interactions.
 
 ## Session Continuity
 
