@@ -33,7 +33,7 @@
 
 Plans:
 - [x] 22-01-PLAN.md — Create Wave-0 solver trigger/pass-policy/contract tests and CTest wiring for Phase 22 contracts.
-- [ ] 22-02-PLAN.md — Implement scene-owned debounce queue, manual override, bounded recalc pass policy, and LENGTH/ANGLE deterministic runtime behavior.
+- [x] 22-02-PLAN.md — Implement scene-owned debounce queue, manual override, bounded recalc pass policy, and LENGTH/ANGLE deterministic runtime behavior.
 - [ ] 22-03-PLAN.md — Expose tolerance/max-pass controls in inspector and run final human verification for deterministic recalc UX.
 
 ### Phase 23: Principal-Direction Constraint Expansion
@@ -72,7 +72,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Solver Trigger + Recalculate Determinism | 1/3 | In Progress|  |
+| 22. Solver Trigger + Recalculate Determinism | 2/3 | In Progress|  |
 | 23. Principal-Direction Constraint Expansion | 0/0 | Not started | - |
 | 24. Advanced Arc + Line-Arc Constraint Expansion | 0/0 | Not started | - |
 | 25. Regression and Reliability Closure | 0/0 | Not started | - |

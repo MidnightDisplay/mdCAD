@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Sketch Solver Audit + Constraint Expansion
 status: executing
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-04-07T15:41:18.056Z"
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-04-07T15:56:19.101Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 22 (solver-trigger-recalculate-determinism) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-07
 
@@ -81,6 +81,7 @@ Next command: `/gsd-plan-phase 22`
 | Phase 21 P05 | 132s | 3 tasks | 3 files |
 | Phase 21 P06 | 113s | 2 tasks | 3 files |
 | Phase 22 P01 | 46m | 2 tasks | 4 files |
+| Phase 22-solver-trigger-recalculate-determinism P02 | 8m | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -157,6 +158,8 @@ Next command: `/gsd-plan-phase 22`
 - [Phase 21]: Kept v1.2 audit status as gaps_found due unresolved non-target verification artifact gaps, preserving truthful closure reporting.
 - [Phase 22]: Use dedicated scene_solver_trigger and scene_solver_pass_policy CTest binaries to lock D-01..D-07 behavior before runtime changes.
 - [Phase 22]: Extended scene_solver_contract_test with idempotent recalc and D-09/D-10 anchors for deterministic traceability.
+- [Phase 22]: Plan 22-02 keeps solver authority in scene_solver_* and uses app frame as a thin queue-processor caller.
+- [Phase 22]: Plan 22-02 sets per-sketch solver defaults to debounce=50ms, tolerances=1e-4, max passes=10 with explicit max-pass diagnostics.
 
 ## Accumulated Context
 
@@ -170,6 +173,6 @@ Next command: `/gsd-plan-phase 22`
 
 ## Session
 
-**Last Date:** 2026-04-07T15:41:18.052Z
-**Stopped At:** Completed 22-01-PLAN.md
+**Last Date:** 2026-04-07T15:56:19.097Z
+**Stopped At:** Completed 22-02-PLAN.md
 **Resume File:** None
