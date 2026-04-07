@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Sketches, Constraints, Scripting
-status: verifying
-stopped_at: Completed 21-03-PLAN.md
-last_updated: "2026-04-07T10:17:54.461Z"
+status: executing
+stopped_at: Completed 21-04-PLAN.md
+last_updated: "2026-04-07T11:04:15.046Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 12
-  completed_phases: 12
-  total_plans: 36
-  completed_plans: 36
+  completed_phases: 11
+  total_plans: 39
+  completed_plans: 37
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 21 (traceability-closure-and-re-audit-readiness) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Plan: 2 of 6
+Status: Ready to execute
 Last activity: 2026-04-07
 
 ## Milestone Scope
@@ -77,6 +77,7 @@ Next command: `/gsd-plan-phase 17 --gaps`
 | Phase 21 P01 | 2min | 2 tasks | 2 files |
 | Phase 21 P02 | 2m 38s | 3 tasks | 3 files |
 | Phase 21 P03 | 288s | 2 tasks | 2 files |
+| Phase 21-traceability-closure-and-re-audit-readiness P04 | 17min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -145,6 +146,8 @@ Next command: `/gsd-plan-phase 17 --gaps`
 - [Phase 21]: Normalized SKCH-01/02/03 traceability rows to Partial to prevent false complete drift before blocker resolution.
 - [Phase 21]: Kept milestone re-audit truthful by preserving SKCH partial dispositions while explicitly closing PH18-03.
 - [Phase 21]: Published explicit four-row closure matrix in 21-VALIDATION.md with requirement-to-artifact anchors and final disposition.
+- [Phase 21-traceability-closure-and-re-audit-readiness]: Use inspector callback + user-data contract to decouple sketch mutation notifications from hierarchy implementation details.
+- [Phase 21-traceability-closure-and-re-audit-readiness]: Centralize GeometryManager add/fix/unfix/delete paths into shared inspector helpers so both entrypoints trigger identical hierarchy-dirty semantics.
 
 ## Accumulated Context
 
@@ -158,6 +161,6 @@ Next command: `/gsd-plan-phase 17 --gaps`
 
 ## Session
 
-**Last Date:** 2026-04-07T10:17:54.456Z
-**Stopped At:** Completed 21-03-PLAN.md
+**Last Date:** 2026-04-07T11:04:15.042Z
+**Stopped At:** Completed 21-04-PLAN.md
 **Resume File:** None
