@@ -354,6 +354,155 @@ static inline bool ui_constraint_text_matches(const char *haystack, const char *
     return strstr(lower_hay, lower_need) != NULL;
 }
 
+static inline ecs_entity_t ui_entity_inspector_geometry_manager_add_point(ui_entity_inspector_state_t *state,
+                                                                           ecs_scene_t *scene,
+                                                                           ecs_entity_t sketch_entity,
+                                                                           vec4_t sketch_color) {
+    if (!state || !scene || sketch_entity == 0) return 0;
+    ecs_entity_t created = scene_add_point_to_sketch(scene, sketch_entity,
+        vec3_make(0.0f, 0.0f, 0.0f), sketch_color, 0.06f);
+    if (created == 0) return 0;
+    if (state->undo_redo) {
+        undo_cmd_create_entity(state->undo_redo, created);
+    }
+    scene_refresh_sketch_metadata(scene, sketch_entity);
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return created;
+}
+
+static inline ecs_entity_t ui_entity_inspector_geometry_manager_add_line(ui_entity_inspector_state_t *state,
+                                                                          ecs_scene_t *scene,
+                                                                          ecs_entity_t sketch_entity,
+                                                                          vec4_t sketch_color) {
+    if (!state || !scene || sketch_entity == 0) return 0;
+    ecs_entity_t created = scene_add_line_to_sketch(scene, sketch_entity,
+        vec3_make(-1.0f, 0.0f, 0.0f),
+        vec3_make(1.0f, 0.0f, 0.0f),
+        sketch_color, 0.03f);
+    if (created == 0) return 0;
+    if (state->undo_redo) {
+        undo_cmd_create_entity(state->undo_redo, created);
+    }
+    scene_refresh_sketch_metadata(scene, sketch_entity);
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return created;
+}
+
+static inline ecs_entity_t ui_entity_inspector_geometry_manager_add_arc(ui_entity_inspector_state_t *state,
+                                                                         ecs_scene_t *scene,
+                                                                         ecs_entity_t sketch_entity,
+                                                                         vec4_t sketch_color) {
+    if (!state || !scene || sketch_entity == 0) return 0;
+    ecs_entity_t created = scene_add_arc_to_sketch(scene, sketch_entity,
+        vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f,
+        vec3_make(0.0f, 0.0f, 1.0f), sketch_color, 0.03f);
+    if (created == 0) return 0;
+    if (state->undo_redo) {
+        undo_cmd_create_entity(state->undo_redo, created);
+    }
+    scene_refresh_sketch_metadata(scene, sketch_entity);
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return created;
+}
+
+static inline ecs_entity_t ui_entity_inspector_geometry_manager_add_circle(ui_entity_inspector_state_t *state,
+                                                                            ecs_scene_t *scene,
+                                                                            ecs_entity_t sketch_entity,
+                                                                            vec4_t sketch_color) {
+    if (!state || !scene || sketch_entity == 0) return 0;
+    ecs_entity_t created = scene_add_arc_to_sketch(scene, sketch_entity,
+        vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 6.2831853f,
+        vec3_make(0.0f, 0.0f, 1.0f), sketch_color, 0.03f);
+    if (created == 0) return 0;
+    if (state->undo_redo) {
+        undo_cmd_create_entity(state->undo_redo, created);
+    }
+    scene_refresh_sketch_metadata(scene, sketch_entity);
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return created;
+}
+
+static inline int ui_entity_inspector_geometry_manager_bulk_set_fixed(ui_entity_inspector_state_t *state,
+                                                                       ecs_world_state_t *w,
+                                                                       ecs_scene_t *scene,
+                                                                       ecs_entity_t sketch_entity,
+                                                                       const ecs_entity_t *targets,
+                                                                       int target_count,
+                                                                       bool fixed_value) {
+    if (!state || !w || !scene || sketch_entity == 0 || !targets || target_count <= 0) return 0;
+
+    bool *old_fixed = NULL;
+    if (state->undo_redo) {
+        old_fixed = (bool*)malloc((size_t)target_count * sizeof(bool));
+    }
+
+    ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+    int action_count = 0;
+    for (int i = 0; i < target_count; i++) {
+        ecs_entity_t target = targets[i];
+        if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+
+        SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
+        if (!row_state) {
+            SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
+            ecs_world_set_sketch_geometry_state(w, target, &init_state);
+            row_state = ecs_world_get_sketch_geometry_state(w, target);
+        }
+        if (!row_state) continue;
+
+        if (old_fixed) old_fixed[action_count] = row_state->fixed;
+        row_state->fixed = fixed_value;
+        action_entities[action_count++] = target;
+    }
+
+    if (state->undo_redo && action_count > 0 && old_fixed) {
+        undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, fixed_value);
+    }
+    if (old_fixed) free(old_fixed);
+
+    if (action_count <= 0) return 0;
+    scene_refresh_sketch_metadata(scene, sketch_entity);
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return action_count;
+}
+
+static inline int ui_entity_inspector_geometry_manager_bulk_delete(ui_entity_inspector_state_t *state,
+                                                                    ecs_world_state_t *w,
+                                                                    ecs_scene_t *scene,
+                                                                    selection_buffer_t *selection,
+                                                                    const ecs_entity_t *targets,
+                                                                    int target_count) {
+    if (!state || !w || !scene || !targets || target_count <= 0) return 0;
+
+    ecs_entity_t delete_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
+    int delete_count = 0;
+    for (int i = 0; i < target_count; i++) {
+        ecs_entity_t target = targets[i];
+        if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
+        delete_entities[delete_count++] = target;
+    }
+    if (delete_count <= 0) return 0;
+
+    if (state->undo_redo) {
+        undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
+    }
+
+    if (selection) {
+        for (int i = 0; i < delete_count; i++) {
+            selection_remove(selection, delete_entities[i]);
+        }
+    }
+    for (int i = 0; i < delete_count; i++) {
+        scene_remove_entity(scene, delete_entities[i]);
+    }
+    if (selection) {
+        selection_prune_dead(selection);
+    }
+
+    ui_entity_inspector_notify_sketch_geometry_mutated(state);
+    return delete_count;
+}
+
 static inline uint8_t ui_constraint_display_decimals(const ConstraintComp *constraint) {
     if (!constraint) return 0;
     return constraint->display_decimals;
@@ -431,13 +580,8 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
     igTextDisabled("Add geometry");
     igBeginDisabled(scene == NULL);
     if (igButton("Add Point##geometry_manager_add_point", (ImVec2){0, 0})) {
-        ecs_entity_t created = scene_add_point_to_sketch(scene, e,
-            vec3_make(0.0f, 0.0f, 0.0f), sketch->color, 0.06f);
+        ecs_entity_t created = ui_entity_inspector_geometry_manager_add_point(state, scene, e, sketch->color);
         if (created != 0) {
-            if (state->undo_redo) {
-                undo_cmd_create_entity(state->undo_redo, created);
-            }
-            scene_refresh_sketch_metadata(scene, e);
             sketch = ecs_world_get_sketch(w, e);
             gm_selected_entities[0] = created;
             gm_selected_count = 1;
@@ -446,15 +590,8 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
     }
     igSameLine(0, 8);
     if (igButton("Add Line##geometry_manager_add_line", (ImVec2){0, 0})) {
-        ecs_entity_t created = scene_add_line_to_sketch(scene, e,
-            vec3_make(-1.0f, 0.0f, 0.0f),
-            vec3_make(1.0f, 0.0f, 0.0f),
-            sketch->color, 0.03f);
+        ecs_entity_t created = ui_entity_inspector_geometry_manager_add_line(state, scene, e, sketch->color);
         if (created != 0) {
-            if (state->undo_redo) {
-                undo_cmd_create_entity(state->undo_redo, created);
-            }
-            scene_refresh_sketch_metadata(scene, e);
             sketch = ecs_world_get_sketch(w, e);
             gm_selected_entities[0] = created;
             gm_selected_count = 1;
@@ -463,14 +600,8 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
     }
     igSameLine(0, 8);
     if (igButton("Add Arc##geometry_manager_add_arc", (ImVec2){0, 0})) {
-        ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
-            vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f,
-            vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+        ecs_entity_t created = ui_entity_inspector_geometry_manager_add_arc(state, scene, e, sketch->color);
         if (created != 0) {
-            if (state->undo_redo) {
-                undo_cmd_create_entity(state->undo_redo, created);
-            }
-            scene_refresh_sketch_metadata(scene, e);
             sketch = ecs_world_get_sketch(w, e);
             gm_selected_entities[0] = created;
             gm_selected_count = 1;
@@ -479,14 +610,8 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
     }
     igSameLine(0, 8);
     if (igButton("Add Circle##geometry_manager_add_circle", (ImVec2){0, 0})) {
-        ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
-            vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 6.2831853f,
-            vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+        ecs_entity_t created = ui_entity_inspector_geometry_manager_add_circle(state, scene, e, sketch->color);
         if (created != 0) {
-            if (state->undo_redo) {
-                undo_cmd_create_entity(state->undo_redo, created);
-            }
-            scene_refresh_sketch_metadata(scene, e);
             sketch = ecs_world_get_sketch(w, e);
             gm_selected_entities[0] = created;
             gm_selected_count = 1;
@@ -544,82 +669,22 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
 
     igBeginDisabled(gm_selected_count <= 0);
     if (igButton("Fix##geometry_manager_bulk_fix", (ImVec2){0, 0})) {
-        if (gm_selected_count > 0) {
-            bool *old_fixed = NULL;
-            if (state->undo_redo) {
-                old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
-            }
-
-            ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-            int action_count = 0;
-            for (int i = 0; i < gm_selected_count; i++) {
-                ecs_entity_t target = gm_selected_entities[i];
-                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-
-                SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
-                if (!row_state) {
-                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
-                    ecs_world_set_sketch_geometry_state(w, target, &init_state);
-                    row_state = ecs_world_get_sketch_geometry_state(w, target);
-                }
-                if (!row_state) continue;
-
-                if (old_fixed) old_fixed[action_count] = row_state->fixed;
-                row_state->fixed = true;
-                action_entities[action_count++] = target;
-            }
-
-            if (state->undo_redo && action_count > 0 && old_fixed) {
-                undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, true);
-            }
-            if (old_fixed) free(old_fixed);
-
-            if (scene) {
-                scene_refresh_sketch_metadata(scene, e);
-                sketch = ecs_world_get_sketch(w, e);
-                section_changed = true;
-            }
+        int action_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(
+            state, w, scene, e, gm_selected_entities, gm_selected_count, true);
+        if (action_count > 0) {
+            sketch = ecs_world_get_sketch(w, e);
+            section_changed = true;
         }
     }
     igEndDisabled();
     igSameLine(0, 8);
     igBeginDisabled(gm_selected_count <= 0);
     if (igButton("Unfix##geometry_manager_bulk_unfix", (ImVec2){0, 0})) {
-        if (gm_selected_count > 0) {
-            bool *old_fixed = NULL;
-            if (state->undo_redo) {
-                old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
-            }
-
-            ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-            int action_count = 0;
-            for (int i = 0; i < gm_selected_count; i++) {
-                ecs_entity_t target = gm_selected_entities[i];
-                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-
-                SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
-                if (!row_state) {
-                    SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
-                    ecs_world_set_sketch_geometry_state(w, target, &init_state);
-                    row_state = ecs_world_get_sketch_geometry_state(w, target);
-                }
-                if (!row_state) continue;
-
-                if (old_fixed) old_fixed[action_count] = row_state->fixed;
-                row_state->fixed = false;
-                action_entities[action_count++] = target;
-            }
-
-            if (state->undo_redo && action_count > 0 && old_fixed) {
-                undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, false);
-            }
-            if (old_fixed) free(old_fixed);
-
-            if (scene) {
-                scene_refresh_sketch_metadata(scene, e);
-                sketch = ecs_world_get_sketch(w, e);
-                section_changed = true;
-            }
+        int action_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(
+            state, w, scene, e, gm_selected_entities, gm_selected_count, false);
+        if (action_count > 0) {
+            sketch = ecs_world_get_sketch(w, e);
+            section_changed = true;
         }
     }
     igEndDisabled();
@@ -642,39 +707,13 @@ static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_in
 
         igDummy((ImVec2){0.0f, 8.0f});
         if (igButton("Delete##geometry_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
-            ecs_entity_t delete_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-            int delete_count = 0;
-            for (int i = 0; i < gm_selected_count; i++) {
-                ecs_entity_t target = gm_selected_entities[i];
-                if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-                delete_entities[delete_count++] = target;
-            }
-
-            if (state->undo_redo && delete_count > 0) {
-                undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
-            }
-
-            if (state->selection) {
-                for (int i = 0; i < delete_count; i++) {
-                    selection_remove(state->selection, delete_entities[i]);
-                }
-            }
-            for (int i = 0; i < delete_count; i++) {
-                if (scene) {
-                    scene_remove_entity(scene, delete_entities[i]);
-                } else {
-                    ecs_delete(w->world, delete_entities[i]);
-                }
-            }
-            if (state->selection) {
-                selection_prune_dead(state->selection);
-            }
+            int delete_count = ui_entity_inspector_geometry_manager_bulk_delete(
+                state, w, scene, state->selection, gm_selected_entities, gm_selected_count);
 
             gm_selected_count = 0;
             gm_delete_pending_count = 0;
 
-            if (scene) {
-                scene_refresh_sketch_metadata(scene, e);
+            if (delete_count > 0) {
                 sketch = ecs_world_get_sketch(w, e);
                 section_changed = true;
             }
@@ -1195,13 +1234,8 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igTextDisabled("Add geometry");
         igBeginDisabled(scene == NULL);
         if (igButton("Add Point##geometry_manager_add_point", (ImVec2){0, 0})) {
-            ecs_entity_t created = scene_add_point_to_sketch(scene, e,
-                vec3_make(0.0f, 0.0f, 0.0f), sketch->color, 0.06f);
+            ecs_entity_t created = ui_entity_inspector_geometry_manager_add_point(state, scene, e, sketch->color);
             if (created != 0) {
-                if (state->undo_redo) {
-                    undo_cmd_create_entity(state->undo_redo, created);
-                }
-                scene_refresh_sketch_metadata(scene, e);
                 sketch = ecs_world_get_sketch(w, e);
                 gm_selected_entities[0] = created;
                 gm_selected_count = 1;
@@ -1209,15 +1243,8 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
         igSameLine(0, 8);
         if (igButton("Add Line##geometry_manager_add_line", (ImVec2){0, 0})) {
-            ecs_entity_t created = scene_add_line_to_sketch(scene, e,
-                vec3_make(-1.0f, 0.0f, 0.0f),
-                vec3_make(1.0f, 0.0f, 0.0f),
-                sketch->color, 0.03f);
+            ecs_entity_t created = ui_entity_inspector_geometry_manager_add_line(state, scene, e, sketch->color);
             if (created != 0) {
-                if (state->undo_redo) {
-                    undo_cmd_create_entity(state->undo_redo, created);
-                }
-                scene_refresh_sketch_metadata(scene, e);
                 sketch = ecs_world_get_sketch(w, e);
                 gm_selected_entities[0] = created;
                 gm_selected_count = 1;
@@ -1225,14 +1252,8 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
         igSameLine(0, 8);
         if (igButton("Add Arc##geometry_manager_add_arc", (ImVec2){0, 0})) {
-            ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
-                vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 1.5707963f,
-                vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+            ecs_entity_t created = ui_entity_inspector_geometry_manager_add_arc(state, scene, e, sketch->color);
             if (created != 0) {
-                if (state->undo_redo) {
-                    undo_cmd_create_entity(state->undo_redo, created);
-                }
-                scene_refresh_sketch_metadata(scene, e);
                 sketch = ecs_world_get_sketch(w, e);
                 gm_selected_entities[0] = created;
                 gm_selected_count = 1;
@@ -1240,14 +1261,8 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         }
         igSameLine(0, 8);
         if (igButton("Add Circle##geometry_manager_add_circle", (ImVec2){0, 0})) {
-            ecs_entity_t created = scene_add_arc_to_sketch(scene, e,
-                vec3_make(0.0f, 0.0f, 0.0f), 1.0f, 0.0f, 6.2831853f,
-                vec3_make(0.0f, 0.0f, 1.0f), sketch->color, 0.03f);
+            ecs_entity_t created = ui_entity_inspector_geometry_manager_add_circle(state, scene, e, sketch->color);
             if (created != 0) {
-                if (state->undo_redo) {
-                    undo_cmd_create_entity(state->undo_redo, created);
-                }
-                scene_refresh_sketch_metadata(scene, e);
                 sketch = ecs_world_get_sketch(w, e);
                 gm_selected_entities[0] = created;
                 gm_selected_count = 1;
@@ -1304,80 +1319,20 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
         igBeginDisabled(gm_selected_count <= 0);
         if (igButton("Fix##geometry_manager_bulk_fix", (ImVec2){0, 0})) {
-            if (gm_selected_count > 0) {
-                bool *old_fixed = NULL;
-                if (state->undo_redo) {
-                    old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
-                }
-
-                ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-                int action_count = 0;
-                for (int i = 0; i < gm_selected_count; i++) {
-                    ecs_entity_t target = gm_selected_entities[i];
-                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-
-                    SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
-                    if (!row_state) {
-                        SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
-                        ecs_world_set_sketch_geometry_state(w, target, &init_state);
-                        row_state = ecs_world_get_sketch_geometry_state(w, target);
-                    }
-                    if (!row_state) continue;
-
-                    if (old_fixed) old_fixed[action_count] = row_state->fixed;
-                    row_state->fixed = true;
-                    action_entities[action_count++] = target;
-                }
-
-                if (state->undo_redo && action_count > 0 && old_fixed) {
-                    undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, true);
-                }
-                if (old_fixed) free(old_fixed);
-
-                if (scene) {
-                    scene_refresh_sketch_metadata(scene, e);
-                    sketch = ecs_world_get_sketch(w, e);
-                }
+            int action_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(
+                state, w, scene, e, gm_selected_entities, gm_selected_count, true);
+            if (action_count > 0) {
+                sketch = ecs_world_get_sketch(w, e);
             }
         }
         igEndDisabled();
         igSameLine(0, 8);
         igBeginDisabled(gm_selected_count <= 0);
         if (igButton("Unfix##geometry_manager_bulk_unfix", (ImVec2){0, 0})) {
-            if (gm_selected_count > 0) {
-                bool *old_fixed = NULL;
-                if (state->undo_redo) {
-                    old_fixed = (bool*)malloc((size_t)gm_selected_count * sizeof(bool));
-                }
-
-                ecs_entity_t action_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-                int action_count = 0;
-                for (int i = 0; i < gm_selected_count; i++) {
-                    ecs_entity_t target = gm_selected_entities[i];
-                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-
-                    SketchGeometryStateComp *row_state = ecs_world_get_sketch_geometry_state(w, target);
-                    if (!row_state) {
-                        SketchGeometryStateComp init_state = sketch_geometry_state_comp_default();
-                        ecs_world_set_sketch_geometry_state(w, target, &init_state);
-                        row_state = ecs_world_get_sketch_geometry_state(w, target);
-                    }
-                    if (!row_state) continue;
-
-                    if (old_fixed) old_fixed[action_count] = row_state->fixed;
-                    row_state->fixed = false;
-                    action_entities[action_count++] = target;
-                }
-
-                if (state->undo_redo && action_count > 0 && old_fixed) {
-                    undo_cmd_bulk_set_sketch_fixed(state->undo_redo, action_entities, old_fixed, action_count, false);
-                }
-                if (old_fixed) free(old_fixed);
-
-                if (scene) {
-                    scene_refresh_sketch_metadata(scene, e);
-                    sketch = ecs_world_get_sketch(w, e);
-                }
+            int action_count = ui_entity_inspector_geometry_manager_bulk_set_fixed(
+                state, w, scene, e, gm_selected_entities, gm_selected_count, false);
+            if (action_count > 0) {
+                sketch = ecs_world_get_sketch(w, e);
             }
         }
         igEndDisabled();
@@ -1400,39 +1355,13 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
 
             igDummy((ImVec2){0.0f, 8.0f});
             if (igButton("Delete##geometry_manager_confirm_delete", (ImVec2){120.0f, 0.0f})) {
-                ecs_entity_t delete_entities[UI_GEOMETRY_MANAGER_MAX_ROWS];
-                int delete_count = 0;
-                for (int i = 0; i < gm_selected_count; i++) {
-                    ecs_entity_t target = gm_selected_entities[i];
-                    if (!ecs_is_alive(w->world, target) || !ecs_world_get_geometry(w, target)) continue;
-                    delete_entities[delete_count++] = target;
-                }
-
-                if (state->undo_redo && delete_count > 0) {
-                    undo_cmd_bulk_delete_entities(state->undo_redo, delete_entities, delete_count);
-                }
-
-                if (state->selection) {
-                    for (int i = 0; i < delete_count; i++) {
-                        selection_remove(state->selection, delete_entities[i]);
-                    }
-                }
-                for (int i = 0; i < delete_count; i++) {
-                    if (scene) {
-                        scene_remove_entity(scene, delete_entities[i]);
-                    } else {
-                        ecs_delete(w->world, delete_entities[i]);
-                    }
-                }
-                if (state->selection) {
-                    selection_prune_dead(state->selection);
-                }
+                int delete_count = ui_entity_inspector_geometry_manager_bulk_delete(
+                    state, w, scene, state->selection, gm_selected_entities, gm_selected_count);
 
                 gm_selected_count = 0;
                 gm_delete_pending_count = 0;
 
-                if (scene) {
-                    scene_refresh_sketch_metadata(scene, e);
+                if (delete_count > 0) {
                     sketch = ecs_world_get_sketch(w, e);
                 }
                 igCloseCurrentPopup();
