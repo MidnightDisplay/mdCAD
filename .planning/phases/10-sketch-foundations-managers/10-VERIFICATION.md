@@ -1,8 +1,8 @@
 ---
 phase: 10-sketch-foundations-managers
-verified: 2026-03-30T22:57:29Z
-status: human_needed
-score: 7/7 must-haves verified
+verified: 2026-04-07T10:00:22Z
+status: gaps_found
+score: 7/7 must-haves verified (manual closure checkpoint mixed: 1 pass, 1 fail)
 re_verification:
   previous_status: gaps_found
   previous_score: 6/7
@@ -13,18 +13,23 @@ re_verification:
 human_verification:
   - test: "Dual-entrypoint sketch attach flow"
     expected: "Adding Point/Line/Arc/Circle from both Add Entity and GeometryManager attaches to selected sketch and updates counts immediately."
+    result: fail
+    evidence_ref: ".planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#1-dual-entrypoint-sketch-attachment"
     why_human: "Requires running UI and confirming end-to-end interaction behavior."
+    blocker: "Scene Hierarchy refresh lag after add via Entity Inspector -> GeometryManager; new geometry entity appears only after later manipulation."
   - test: "GeometryManager multi-select undo UX"
     expected: "Fix/Unfix/Delete on multi-selection apply to all selected rows and one Undo reverses all rows together."
+    result: pass
+    evidence_ref: ".planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#2-geometrymanager-multi-select-undo-ux"
     why_human: "Undo semantics are wired in code, but user-visible interaction flow requires manual UI validation."
 ---
 
 # Phase 10: Sketch Foundations & Managers Verification Report
 
 **Phase Goal:** Users can create and manage sketch containers with core sketch geometry and immediate sketch health visibility.  
-**Verified:** 2026-03-30T22:57:29Z  
-**Status:** human_needed  
-**Re-verification:** Yes — after gap closure
+**Verified:** 2026-04-07T10:00:22Z  
+**Status:** gaps_found  
+**Re-verification:** Yes — fresh Phase 21-01 human rerun evidence applied
 
 ## Goal Achievement
 
@@ -101,24 +106,27 @@ human_verification:
 | `src/components/sketch_comp.h` | 23 | `constraint_count` marked placeholder | ℹ️ Info | Expected Phase 10 scope boundary; does not block required behavior. |
 | `src/ecs/ecs_scene.h` | 1214 | Placeholder status derivation comment | ℹ️ Info | Temporary derivation policy documented; still returns required taxonomy. |
 
-### Human Verification Required
+### Human Verification Results (Fresh UAT)
 
 ### 1. Dual-entrypoint sketch attachment
 
 **Test:** Run app, create sketch, add Point/Line/Arc/Circle from both Add Entity and GeometryManager local controls.  
 **Expected:** New geometry attaches under active sketch; sketch counts/status refresh immediately.  
-**Why human:** Requires interactive UI flow confirmation.
+**Result:** Fail  
+**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T10:00:22.835Z`)  
+**Blocker:** Scene Hierarchy refresh lag after geometry add through Entity Inspector -> GeometryManager.
 
 ### 2. Multi-select bulk action UX + undo
 
 **Test:** In GeometryManager select multiple rows via Ctrl/Shift, run Fix/Unfix/Delete, then Undo once after each action.  
 **Expected:** Each bulk action applies to all selected rows and one Undo reverts/restores the full batch.  
-**Why human:** End-to-end interaction semantics and UX confirmation are not fully provable via static analysis.
+**Result:** Pass  
+**Evidence:** `.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md` (latest run `2026-04-07T10:00:22.835Z`)
 
 ### Gaps Summary
 
-Previous gap is closed: GeometryManager now includes local add controls (`Add Point/Line/Arc/Circle`) wired to sketch attach helpers.  
-All must-haves are verified in code and build/validation spot-checks pass. Remaining verification is manual UI behavior confirmation.
+Previous code-surface gap remains closed: GeometryManager includes local add controls (`Add Point/Line/Arc/Circle`) wired to sketch attach helpers.  
+Fresh human rerun evidence is now citation-backed in this report, but authoritative phase closure cannot be promoted to `passed` because dual-entrypoint sketch attachment still has a user-visible hierarchy refresh blocker.
 
 ---
 
