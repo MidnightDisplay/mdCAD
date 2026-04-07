@@ -38,9 +38,13 @@ created: 2026-04-07
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 21-01-01 | 01 | 1 | SKCH-01, SKCH-02, SKCH-03 | manual + artifact traceability | `cmake --build build-vulkan --config Release --target mdCAD` (manual prep); manual run against Phase 10 smoke checklist | ✅ | ⬜ pending |
-| 21-02-01 | 02 | 2 | PH18-03 | docs parity + conditional regression | `ctest -R "endpoint_pick|scene_solver_contract|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure` *(only if mismatch appears)* | ✅ | ⬜ pending |
-| 21-03-01 | 03 | 3 | SKCH-01, SKCH-02, SKCH-03, PH18-03 | audit + cross-file closure matrix | `node ".github/get-shit-done/bin/gsd-tools.cjs" audit milestone v1.2 --refresh` *(or repo-equivalent milestone audit refresh command used in prior phases)* | ✅ | ✅ green |
+| 21-04-01 | 04 | 4 | SKCH-01 | compile + contract wiring | `cmake --build build-vulkan --config Release --target mdCAD script_roundtrip_tests` | ✅ | ⬜ pending |
+| 21-04-02 | 04 | 4 | SKCH-01 | targeted regression | `cmake --build build-vulkan --config Release --target mdCAD && ctest -R "script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
+| 21-05-01 | 05 | 5 | SKCH-01, SKCH-02, SKCH-03 | manual rerun gate + build prep | `cmake --build build-vulkan --config Release --target mdCAD` | ✅ | ⬜ pending |
+| 21-05-02 | 05 | 5 | SKCH-01, SKCH-02, SKCH-03 | authoritative docs parity | `python -c "from pathlib import Path; u=Path('.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md').read_text(encoding='utf-8'); v=Path('.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md').read_text(encoding='utf-8'); assert 'Dual-entrypoint sketch attachment' in u and 'GeometryManager multi-select undo UX' in u and 'solve status' in u and 'color policy' in u and 'geometry count' in u and 'constraint count' in u and '10-HUMAN-UAT.md' in v"` | ✅ | ⬜ pending |
+| 21-05-03 | 05 | 5 | SKCH-01, SKCH-02, SKCH-03 | requirements traceability parity | `python -c "from pathlib import Path; t=Path('.planning/REQUIREMENTS.md').read_text(encoding='utf-8'); assert '| SKCH-01 | Phase 21 |' in t and '| SKCH-02 | Phase 21 |' in t and '| SKCH-03 | Phase 21 |' in t"` | ✅ | ⬜ pending |
+| 21-06-01 | 06 | 6 | SKCH-01, SKCH-02, SKCH-03, PH18-03 | milestone re-audit parity | `python -c "from pathlib import Path; t=Path('.planning/v1.2-MILESTONE-AUDIT.md').read_text(encoding='utf-8'); assert all(x in t for x in ['SKCH-01','SKCH-02','SKCH-03','PH18-03'])"` | ✅ | ⬜ pending |
+| 21-06-02 | 06 | 6 | SKCH-01, SKCH-02, SKCH-03, PH18-03 | closure matrix parity | `python -c "from pathlib import Path; t=Path('.planning/phases/21-traceability-closure-and-re-audit-readiness/21-VALIDATION.md').read_text(encoding='utf-8'); assert 'Phase 21 Closure Matrix' in t and all(x in t for x in ['SKCH-01','SKCH-02','SKCH-03','PH18-03'])"` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
