@@ -31,7 +31,7 @@ key-decisions:
 patterns-established:
   - "Endpoint drag emits one undo entry at release boundary while mid-drag frames remain undo-silent."
   - "Non-sketch transform drag-end remains on CMD_SET_POSITION path."
-requirements-completed: []
+requirements-completed: [PH18-03]
 duration: 6m
 completed: 2026-04-04
 ---
