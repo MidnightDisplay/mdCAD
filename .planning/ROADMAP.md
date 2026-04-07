@@ -29,7 +29,12 @@
   2. User can run manual recalculate repeatedly on unchanged sketch state and receive identical/idempotent results.
   3. User can observe solves stop only when tolerance is reached or the configured pass cap is hit, with default cap behavior of 10 when not overridden.
   4. User can apply driving LENGTH and ANGLE constraints and see expected geometric effects or a clear explicit failure diagnostic.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 22-01-PLAN.md — Create Wave-0 solver trigger/pass-policy/contract tests and CTest wiring for Phase 22 contracts.
+- [ ] 22-02-PLAN.md — Implement scene-owned debounce queue, manual override, bounded recalc pass policy, and LENGTH/ANGLE deterministic runtime behavior.
+- [ ] 22-03-PLAN.md — Expose tolerance/max-pass controls in inspector and run final human verification for deterministic recalc UX.
 
 ### Phase 23: Principal-Direction Constraint Expansion
 **Goal**: Users can apply and solve principal-direction constraints across pair/group selections and mixed point participant sources.
