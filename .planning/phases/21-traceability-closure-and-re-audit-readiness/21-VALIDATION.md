@@ -88,13 +88,13 @@ Existing infrastructure covers all phase requirements:
 
 | Requirement ID | REQUIREMENTS.md Traceability Row | Authoritative Verification Artifact/Status | Summary/Frontmatter Parity | Final Disposition |
 |---|---|---|---|---|
-| SKCH-01 | `.planning/REQUIREMENTS.md` → `SKCH-01 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` frontmatter `status: gaps_found`; Human Verification Results §1 = **Fail** (`.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#1-dual-entrypoint-sketch-attachment`) | Implementation summaries exist (`10-01-SUMMARY.md`, `10-02-SUMMARY.md`) but no passed closure promotion in authoritative verification | **Partial (blocked by known SKCH-01 UAT refresh-lag defect)** |
-| SKCH-02 | `.planning/REQUIREMENTS.md` → `SKCH-02 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` Human Verification Results §2 = **Pass**, but phase-level frontmatter still `status: gaps_found` | Claimed/completed in `10-02-SUMMARY.md`; parity intentionally held to phase-level non-passed truth | **Partial (truth-preserving hold until Phase 10 full closure)** |
-| SKCH-03 | `.planning/REQUIREMENTS.md` → `SKCH-03 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` Requirements Coverage marks satisfied, while frontmatter remains `status: gaps_found` due SKCH-01 blocker | Claimed/completed in `10-01-SUMMARY.md` and `10-03-SUMMARY.md`; no contradictory frontmatter claims | **Partial (closure coupled to unresolved SKCH-01 blocker)** |
+| SKCH-01 | `.planning/REQUIREMENTS.md` → `SKCH-01 \| Phase 21 \| Complete` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` frontmatter `status: passed`; Human Verification Results §1 = **Pass** (`.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#1-dual-entrypoint-sketch-attachment`) | Implementation summaries (`10-01-SUMMARY.md`, `10-02-SUMMARY.md`) now align with authoritative passed closure promotion | **Closed (satisfied)** |
+| SKCH-02 | `.planning/REQUIREMENTS.md` → `SKCH-02 \| Phase 21 \| Complete` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` frontmatter `status: passed`; Human Verification Results §2 = **Pass** | Claimed/completed in `10-02-SUMMARY.md`; phase-level and summary parity now aligned | **Closed (satisfied)** |
+| SKCH-03 | `.planning/REQUIREMENTS.md` → `SKCH-03 \| Phase 21 \| Complete` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` Requirements Coverage marks satisfied and frontmatter is `status: passed` | Claimed/completed in `10-01-SUMMARY.md` and `10-03-SUMMARY.md`; no remaining parity mismatch | **Closed (satisfied)** |
 | PH18-03 | `.planning/REQUIREMENTS.md` → `PH18-03 \| Phase 21 \| Complete` | `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-VERIFICATION.md` frontmatter `status: passed`; Requirements Coverage marks `PH18-03` satisfied | `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-03-SUMMARY.md` frontmatter now includes `requirements-completed: [PH18-03]` | **Closed (satisfied)** |
 
-### Re-audit Completion Log (21-03)
+### Re-audit Completion Log (21-06)
 
-- Milestone audit artifact refreshed in `.planning/v1.2-MILESTONE-AUDIT.md` with explicit Phase 21 target disposition table.
-- Target requirement rows no longer use `human_needed`; SKCH rows remain explicitly `partial` with blocker citations; PH18-03 is `satisfied`.
-- Milestone remains `status: gaps_found` due truthful unresolved blockers outside closure matrix (not masked).
+- Milestone audit artifact refreshed in `.planning/v1.2-MILESTONE-AUDIT.md` with post-closure target disposition updates for SKCH-01/02/03 and PH18-03.
+- Target requirement rows now align to authoritative closure evidence: SKCH-01/02/03 = `satisfied` (Phase 10 `status: passed`), PH18-03 = `satisfied` (Phase 18 `status: passed` + summary frontmatter parity).
+- Milestone remains `status: gaps_found` truthfully due remaining non-target orphaned requirements and missing phase verification artifacts (13/14/17), not due Phase 21 target requirements.
