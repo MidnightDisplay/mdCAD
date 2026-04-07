@@ -63,25 +63,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SRLV-01 | TBD | Pending |
-| SRLV-02 | TBD | Pending |
-| SRLV-03 | TBD | Pending |
-| SRLV-04 | TBD | Pending |
-| SRLV-05 | TBD | Pending |
-| AXIS-01 | TBD | Pending |
-| AXIS-02 | TBD | Pending |
-| AXIS-03 | TBD | Pending |
-| AXIS-04 | TBD | Pending |
-| ARCI-01 | TBD | Pending |
-| ARCI-02 | TBD | Pending |
-| ARCI-03 | TBD | Pending |
-| ARCI-04 | TBD | Pending |
-| V13-01 | TBD | Pending |
+| SRLV-01 | Phase 22 | Pending |
+| SRLV-02 | Phase 22 | Pending |
+| SRLV-03 | Phase 22 | Pending |
+| SRLV-04 | Phase 23 | Pending |
+| SRLV-05 | Phase 22 | Pending |
+| AXIS-01 | Phase 23 | Pending |
+| AXIS-02 | Phase 23 | Pending |
+| AXIS-03 | Phase 23 | Pending |
+| AXIS-04 | Phase 23 | Pending |
+| ARCI-01 | Phase 24 | Pending |
+| ARCI-02 | Phase 24 | Pending |
+| ARCI-03 | Phase 24 | Pending |
+| ARCI-04 | Phase 24 | Pending |
+| V13-01 | Phase 25 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14
+- Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-04-07*
