@@ -2448,6 +2448,8 @@ static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t 
     sk->auto_solve_enabled = enabled;
     if (!enabled) {
         sk->auto_solve_pending = false;
+        sk->auto_solve_queued_at_ms = 0;
+        sk->auto_solve_queue_token = 0;
     }
     return true;
 }
@@ -2461,6 +2463,8 @@ static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sk
     if (!sk->auto_solve_pending) {
         sk->auto_solve_pending = true;
         sk->solve_request_serial++;
+        sk->auto_solve_queued_at_ms = (uint64_t)time(NULL) * 1000ULL;
+        sk->auto_solve_queue_token = sk->solve_request_serial;
     }
     return true;
 }
@@ -2469,6 +2473,9 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     if (!scene || !scene_is_sketch(scene, sketch)) return false;
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return false;
+    sk->auto_solve_pending = false;
+    sk->auto_solve_queued_at_ms = 0;
+    sk->auto_solve_queue_token = 0;
 
     ecs_entity_t sketch_points[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
     int point_count = 0;
@@ -2566,7 +2573,6 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
         }
     }
 
-    sk->auto_solve_pending = false;
     sk->solve_request_serial++;
     sk->last_solve_timestamp_ms = (uint64_t)time(NULL) * 1000ULL;
     sk->solver_backend_id = scene_solver_backend_id(scene);

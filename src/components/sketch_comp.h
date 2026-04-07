@@ -27,6 +27,10 @@ typedef enum {
 #define SKETCH_SOLVER_DIAGNOSTIC_MESSAGE_MAX 192
 #define SKETCH_SOLVER_DIAGNOSTIC_TIMESTAMP_MAX 32
 #define SKETCH_SOLVER_DIAGNOSTICS_MAX 100
+#define SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS 50u
+#define SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE 1e-4f
+#define SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE 1e-4f
+#define SKETCH_SOLVER_DEFAULT_MAX_PASSES 10u
 
 typedef struct {
     sketch_solver_diagnostic_severity_t severity;
@@ -39,9 +43,15 @@ typedef struct {
     sketch_status_t status;
     bool auto_solve_enabled;
     bool auto_solve_pending;
+    uint32_t auto_solve_debounce_ms;
+    uint64_t auto_solve_queued_at_ms;
+    uint32_t auto_solve_queue_token;
     uint32_t solve_request_serial;
     uint32_t solve_completed_serial;
     uint64_t last_solve_timestamp_ms;
+    float solver_position_tolerance;
+    float solver_angle_tolerance;
+    uint32_t solver_max_passes;
     uint32_t solver_backend_id;
     vec4_t color;               // Sketch-level inherited color
     int geometry_count;         // Derived from sketch-owned geometry children
@@ -59,9 +69,15 @@ static inline SketchComp sketch_comp_default(void) {
         .status = SKETCH_STATUS_LOOSE,
         .auto_solve_enabled = true,
         .auto_solve_pending = false,
+        .auto_solve_debounce_ms = SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS,
+        .auto_solve_queued_at_ms = 0,
+        .auto_solve_queue_token = 0,
         .solve_request_serial = 0,
         .solve_completed_serial = 0,
         .last_solve_timestamp_ms = 0,
+        .solver_position_tolerance = SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE,
+        .solver_angle_tolerance = SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE,
+        .solver_max_passes = SKETCH_SOLVER_DEFAULT_MAX_PASSES,
         .solver_backend_id = 1,
         .color = vec4_make(1.0f, 1.0f, 1.0f, 1.0f),
         .geometry_count = 0,
