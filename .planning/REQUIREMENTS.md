@@ -66,7 +66,7 @@ Requirements for the sketches/constraints/scripting milestone. Each maps to road
 
 - [x] **PH18-01**: Endpoint drags and endpoint numeric edits record endpoint-aware undo payloads at interaction boundaries (coalesced to one step per completed drag/edit session).
 - [x] **PH18-02**: Endpoint undo/redo replays through scene-authoritative sync flow, preserving endpoint-owner geometry consistency and sketch-only solver/script side effects.
-- [ ] **PH18-03**: Endpoint undo integration preserves non-sketch manipulation and script transaction invariants, including stable arc endpoint undo behavior across angular branch boundaries.
+- [x] **PH18-03**: Endpoint undo integration preserves non-sketch manipulation and script transaction invariants, including stable arc endpoint undo behavior across angular branch boundaries.
 
 ## v1.3+ Requirements (Deferred)
 
@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKCH-01 | Phase 21 | Complete |
-| SKCH-02 | Phase 21 | Complete |
-| SKCH-03 | Phase 21 | Complete |
+| SKCH-01 | Phase 21 | Partial |
+| SKCH-02 | Phase 21 | Partial |
+| SKCH-03 | Phase 21 | Partial |
 | SKCH-04 | Phase 16 | Complete |
 | CONS-01 | Phase 16 | Complete |
 | CONS-02 | Phase 16 | Complete |
@@ -137,7 +137,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | D-12 | Phase 20 | Complete |
 | PH18-01 | Phase 18 | Complete |
 | PH18-02 | Phase 18 | Complete |
-| PH18-03 | Phase 21 | Pending |
+| PH18-03 | Phase 21 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 40 total
