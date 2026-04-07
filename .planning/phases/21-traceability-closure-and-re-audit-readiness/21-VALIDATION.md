@@ -40,7 +40,7 @@ created: 2026-04-07
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 21-01-01 | 01 | 1 | SKCH-01, SKCH-02, SKCH-03 | manual + artifact traceability | `cmake --build build-vulkan --config Release --target mdCAD` (manual prep); manual run against Phase 10 smoke checklist | ✅ | ⬜ pending |
 | 21-02-01 | 02 | 2 | PH18-03 | docs parity + conditional regression | `ctest -R "endpoint_pick|scene_solver_contract|script_roundtrip_tests" --test-dir build-vulkan -C Release --output-on-failure` *(only if mismatch appears)* | ✅ | ⬜ pending |
-| 21-03-01 | 03 | 3 | SKCH-01, SKCH-02, SKCH-03, PH18-03 | audit + cross-file closure matrix | `node ".github/get-shit-done/bin/gsd-tools.cjs" audit milestone v1.2 --refresh` *(or repo-equivalent milestone audit refresh command used in prior phases)* | ✅ | ⬜ pending |
+| 21-03-01 | 03 | 3 | SKCH-01, SKCH-02, SKCH-03, PH18-03 | audit + cross-file closure matrix | `node ".github/get-shit-done/bin/gsd-tools.cjs" audit milestone v1.2 --refresh` *(or repo-equivalent milestone audit refresh command used in prior phases)* | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -77,3 +77,20 @@ Existing infrastructure covers all phase requirements:
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Phase 21 Closure Matrix
+
+| Requirement ID | REQUIREMENTS.md Traceability Row | Authoritative Verification Artifact/Status | Summary/Frontmatter Parity | Final Disposition |
+|---|---|---|---|---|
+| SKCH-01 | `.planning/REQUIREMENTS.md` → `SKCH-01 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` frontmatter `status: gaps_found`; Human Verification Results §1 = **Fail** (`.planning/phases/10-sketch-foundations-managers/10-HUMAN-UAT.md#1-dual-entrypoint-sketch-attachment`) | Implementation summaries exist (`10-01-SUMMARY.md`, `10-02-SUMMARY.md`) but no passed closure promotion in authoritative verification | **Partial (blocked by known SKCH-01 UAT refresh-lag defect)** |
+| SKCH-02 | `.planning/REQUIREMENTS.md` → `SKCH-02 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` Human Verification Results §2 = **Pass**, but phase-level frontmatter still `status: gaps_found` | Claimed/completed in `10-02-SUMMARY.md`; parity intentionally held to phase-level non-passed truth | **Partial (truth-preserving hold until Phase 10 full closure)** |
+| SKCH-03 | `.planning/REQUIREMENTS.md` → `SKCH-03 \| Phase 21 \| Partial` | `.planning/phases/10-sketch-foundations-managers/10-VERIFICATION.md` Requirements Coverage marks satisfied, while frontmatter remains `status: gaps_found` due SKCH-01 blocker | Claimed/completed in `10-01-SUMMARY.md` and `10-03-SUMMARY.md`; no contradictory frontmatter claims | **Partial (closure coupled to unresolved SKCH-01 blocker)** |
+| PH18-03 | `.planning/REQUIREMENTS.md` → `PH18-03 \| Phase 21 \| Complete` | `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-VERIFICATION.md` frontmatter `status: passed`; Requirements Coverage marks `PH18-03` satisfied | `.planning/phases/18-add-undo-steps-for-endpoint-moves/18-03-SUMMARY.md` frontmatter now includes `requirements-completed: [PH18-03]` | **Closed (satisfied)** |
+
+### Re-audit Completion Log (21-03)
+
+- Milestone audit artifact refreshed in `.planning/v1.2-MILESTONE-AUDIT.md` with explicit Phase 21 target disposition table.
+- Target requirement rows no longer use `human_needed`; SKCH rows remain explicitly `partial` with blocker citations; PH18-03 is `satisfied`.
+- Milestone remains `status: gaps_found` due truthful unresolved blockers outside closure matrix (not masked).
