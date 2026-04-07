@@ -99,18 +99,24 @@ Additional regression coverage added:
 
 - `test_endpoint_direct_geometry_edit_syncs_owner_and_entities` in `src/tests/endpoint_pick_test.c`
 
-Manual checkpoint status:
+Manual checkpoint status (historical, superseded by final closure):
 
-- ❌ still pending user approval after latest remediation pass.
-- Latest reported failures before this remediation: bare-geometry gizmo crash persisted; sketch endpoint point/owner sync still broken in interactive flow.
-- New build/test baseline is green; awaiting fresh manual recheck against updated build.
+- This Plan 17-05 note captured an intermediate state before final Phase 20 closure reconciliation.
+- Canonical manual proof remains `17-UAT.md` (`7/7` pass), and authoritative final requirement disposition is now tracked in `17-VERIFICATION.md`.
+
+## Final Closure Alignment (2026-04-07, Plan 20-03)
+
+- `17-VERIFICATION.md` is authoritative for final `D-01..D-12` closure state.
+- `17-UAT.md` remains the canonical manual evidence artifact (Tests 1-7 pass).
+- Final targeted closure gate command for audit reproducibility:
+  - `ctest -R "scene_solver_contract|scene_solver_drag|endpoint_pick|scene_solver_diagnostics" --test-dir build-vulkan -C Release --output-on-failure`
 
 ## Validation Sign-Off
 
 - [x] All planned tasks have verify steps or Wave 0 dependencies.
 - [x] Deterministic fixture coverage exists for D-01..D-12.
 - [x] No unresolved missing test references.
-- [ ] Human verification closure for D-09..D-12 endpoint UX (remediation applied; awaiting user re-check approval).
+- [x] Human verification closure for D-09..D-12 endpoint UX is satisfied via canonical `17-UAT.md` baseline and finalized in `17-VERIFICATION.md`.
 - [x] `nyquist_compliant: true` set when checks are fully wired.
 
-Approval: conditional — do **not** close Phase 17 until endpoint UX redesign gap is planned and shipped.
+Approval: final — supporting validation artifact is aligned with authoritative `17-VERIFICATION.md` closure for `D-01..D-12`.
