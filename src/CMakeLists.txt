@@ -154,6 +154,30 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     target_link_libraries(scene_solver_diagnostics PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME scene_solver_diagnostics COMMAND scene_solver_diagnostics)
+
+    add_executable(scene_solver_trigger tests/scene_solver_trigger_test.c)
+    target_compile_features(scene_solver_trigger PRIVATE c_std_11)
+    target_include_directories(scene_solver_trigger PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(scene_solver_trigger PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME scene_solver_trigger COMMAND scene_solver_trigger)
+
+    add_executable(scene_solver_pass_policy tests/scene_solver_pass_policy_test.c)
+    target_compile_features(scene_solver_pass_policy PRIVATE c_std_11)
+    target_include_directories(scene_solver_pass_policy PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(scene_solver_pass_policy PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME scene_solver_pass_policy COMMAND scene_solver_pass_policy)
 endif()
 
 # Emscripten-specific linker options
