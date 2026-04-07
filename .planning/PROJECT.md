@@ -70,7 +70,8 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.2` scope is now centered on sketch constraints and scripting workflows.
 - Phase 12 is complete and verified (`7/7` truths) after executing gap-closure plan `12-03`.
 - Phase 13 and Phase 14 verification artifacts are now backfilled and requirement-aligned (`SCRP-01..06`, `API-01..02`) through Phase 19 closure.
-- Next active phase is Phase 20 (`finalize-phase-17-endpoint-ux-and-verification-closure`).
+- Phase 17 verification closure is now finalized through Phase 20, with authoritative requirement-level evidence for `D-01..D-12`.
+- Next active phase is Phase 21 (`traceability-closure-and-re-audit-readiness`).
 
 ## Next Milestone Goals
 
@@ -119,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 after Phase 19 closure execution*
+*Last updated: 2026-04-07 after Phase 20 closure execution*
