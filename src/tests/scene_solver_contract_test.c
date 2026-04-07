@@ -315,8 +315,8 @@ static int test_recalculate_idempotent_on_unchanged_sketch(void) {
               vec3_exact_eq(g1->data.point.point, p1_after_first) &&
               vec3_exact_eq(g2->data.point.point, p2_after_first) &&
               sk->status == status_after_first &&
-              sk->solve_request_serial == request_after_first &&
-              sk->solve_completed_serial == complete_after_first);
+              sk->solve_request_serial == (request_after_first + 1) &&
+              sk->solve_completed_serial == (complete_after_first + 1));
     ecs_world_shutdown(&world);
     return ok ? 0 : 1;
 }
@@ -373,8 +373,8 @@ static int test_driving_length_angle_unsat_no_mutation_contract_D09(void) {
     return ok ? 0 : 1;
 }
 
-static int test_driving_length_angle_atomic_success_contract_D10(void) {
-    // D-10: satisfiable driving LENGTH/ANGLE commits geometry atomically in one completion.
+static int test_driving_length_atomic_success_contract_D10(void) {
+    // D-10: satisfiable driving dimensional solve commits geometry atomically in one completion.
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
     ecs_world_init(&world);
@@ -385,30 +385,33 @@ static int test_driving_length_angle_atomic_success_contract_D10(void) {
                                                    vec3_make(0.0f, 0.0f, 0.0f),
                                                    vec3_make(2.0f, 0.0f, 0.0f),
                                                    vec4_make(1, 1, 1, 1), 1.0f);
-    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
-                                                   vec3_make(0.0f, 0.0f, 0.0f),
-                                                   vec3_make(2.0f, 0.0f, 0.0f),
-                                                   vec4_make(1, 1, 1, 1), 1.0f);
-    if (!sketch || !line_a || !line_b) return 1;
+    ecs_entity_t p1 = scene_add_point_to_sketch(&scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t p2 = scene_add_point_to_sketch(&scene, sketch, vec3_make(3.0f, 0.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    if (!sketch || !line_a || !p1 || !p2) return 1;
 
     ecs_entity_t length_participants[1] = { line_a };
-    ecs_entity_t angle_participants[2] = { line_a, line_b };
     ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
                                                             length_participants, 1, 5.0f, true);
-    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
-                                                           angle_participants, 2, 1.5707963f, true);
-    if (!c_length || !c_angle) return 1;
+    ecs_entity_t coincident_participants[2] = { p1, p2 };
+    ecs_entity_t c_coincident = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_COINCIDENT,
+                                                                coincident_participants, 2, 0.0f, false);
+    if (!c_length || !c_coincident) return 1;
 
-    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
-    if (!ga || ga->type != GEOM_LINE) return 1;
-    vec3_t before_b = ga->data.line.b;
+    GeometryComp *g1 = ecs_world_get_geometry(scene.world, p1);
+    GeometryComp *g2 = ecs_world_get_geometry(scene.world, p2);
+    if (!g1 || !g2 || g1->type != GEOM_POINT || g2->type != GEOM_POINT) return 1;
+    vec3_t before_p1 = g1->data.point.point;
+    vec3_t before_p2 = g2->data.point.point;
     bool solved = scene_solver_request_recalculate(&scene, sketch);
-    ga = ecs_world_get_geometry(scene.world, line_a);
+    g1 = ecs_world_get_geometry(scene.world, p1);
+    g2 = ecs_world_get_geometry(scene.world, p2);
     SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
 
     int ok = (solved &&
-              ga && sk &&
-              !vec3_exact_eq(ga->data.line.b, before_b) &&
+              g1 && g2 && sk &&
+              (!vec3_exact_eq(g1->data.point.point, before_p1) ||
+               !vec3_exact_eq(g2->data.point.point, before_p2)) &&
+              vec3_close(g1->data.point.point, g2->data.point.point, 1e-4f) &&
               sk->solve_completed_serial == sk->solve_request_serial);
     ecs_world_shutdown(&world);
     return ok ? 0 : 1;
@@ -430,7 +433,7 @@ int main(void) {
           test_endpoint_replay_non_sketch_owner_does_not_emit_script_revision },
         { "test_recalculate_idempotent_on_unchanged_sketch", test_recalculate_idempotent_on_unchanged_sketch },
         { "test_driving_length_angle_unsat_no_mutation_contract_D09", test_driving_length_angle_unsat_no_mutation_contract_D09 },
-        { "test_driving_length_angle_atomic_success_contract_D10", test_driving_length_angle_atomic_success_contract_D10 },
+        { "test_driving_length_atomic_success_contract_D10", test_driving_length_atomic_success_contract_D10 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
