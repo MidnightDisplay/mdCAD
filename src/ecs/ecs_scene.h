@@ -412,8 +412,14 @@ static inline int scene_solver_ensure_point_candidate(ecs_scene_t *scene,
 
     if (g->type == GEOM_POINT) {
         role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
-    } else if (g->type == GEOM_LINE || g->type == GEOM_ARC) {
+    } else if (g->type == GEOM_LINE) {
         if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A && role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+            return -1;
+        }
+    } else if (g->type == GEOM_ARC) {
+        if (role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+            role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B &&
+            role != CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
             return -1;
         }
     } else {
@@ -426,9 +432,17 @@ static inline int scene_solver_ensure_point_candidate(ecs_scene_t *scene,
     entries[index].entity = entity;
     entries[index].geometry_type = g->type;
     entries[index].role = role;
-    entries[index].sub_index = (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) ? 1 : 0;
+    if (role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+        entries[index].sub_index = 1;
+    } else if (role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+        entries[index].sub_index = 2;
+    } else {
+        entries[index].sub_index = 0;
+    }
     if (g->type == GEOM_POINT) {
         entries[index].point = g->data.point.point;
+    } else if (g->type == GEOM_ARC && role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+        entries[index].point = g->data.arc.center;
     } else {
         if (!scene_entity_participant_subpoint(g, role, &entries[index].point, &entries[index].sub_index)) {
             (*io_entry_count)--;
@@ -2753,6 +2767,112 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     float delta_b = vec3_length(vec3_sub(candidates[ib].point, before_b));
                     if (delta_a > pass_max_position_delta) pass_max_position_delta = delta_a;
                     if (delta_b > pass_max_position_delta) pass_max_position_delta = delta_b;
+                    continue;
+                }
+
+                if (constraint->type == CONSTRAINT_ALONG_X ||
+                    constraint->type == CONSTRAINT_ALONG_Y ||
+                    constraint->type == CONSTRAINT_ALONG_Z) {
+                    if (constraint->driven) continue;
+                    int axis = 0;
+                    const char *along_unsat_reason = "Unsatisfied driving ALONG X constraint.";
+                    if (constraint->type == CONSTRAINT_ALONG_Y) {
+                        axis = 1;
+                        along_unsat_reason = "Unsatisfied driving ALONG Y constraint.";
+                    } else if (constraint->type == CONSTRAINT_ALONG_Z) {
+                        axis = 2;
+                        along_unsat_reason = "Unsatisfied driving ALONG Z constraint.";
+                    }
+
+                    if (participant_count < 2) {
+                        solve_failed = true;
+                        failure_reason = along_unsat_reason;
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    int along_indices[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+                    int along_count = 0;
+                    for (uint32_t p = 0; p < participant_count; p++) {
+                        ecs_entity_t participant_entity =
+                            (ecs_entity_t)constraint->participant_descriptors[p].entity;
+                        constraint_participant_role_t participant_role =
+                            (constraint_participant_role_t)constraint->participant_descriptors[p].role;
+                        int idx = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                      ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                      &candidate_count,
+                                                                      participant_entity,
+                                                                      participant_role);
+                        if (idx < 0) {
+                            solve_failed = true;
+                            failure_reason = along_unsat_reason;
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        bool seen = false;
+                        for (int ai = 0; ai < along_count; ai++) {
+                            if (along_indices[ai] == idx) {
+                                seen = true;
+                                break;
+                            }
+                        }
+                        if (!seen && along_count < (int)CONSTRAINT_MAX_PARTICIPANTS) {
+                            along_indices[along_count++] = idx;
+                        }
+                    }
+                    if (solve_failed) break;
+                    if (along_count < 2) {
+                        solve_failed = true;
+                        failure_reason = along_unsat_reason;
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    float target_coord = 0.0f;
+                    for (int ai = 0; ai < along_count; ai++) {
+                        vec3_t pt = candidates[along_indices[ai]].point;
+                        float coord = (axis == 0) ? pt.x : ((axis == 1) ? pt.y : pt.z);
+                        target_coord += coord;
+                    }
+                    target_coord /= (float)along_count;
+
+                    float residual = 0.0f;
+                    bool all_fixed = true;
+                    for (int ai = 0; ai < along_count; ai++) {
+                        scene_solver_point_candidate_t *entry = &candidates[along_indices[ai]];
+                        float coord = (axis == 0)
+                            ? entry->point.x
+                            : ((axis == 1) ? entry->point.y : entry->point.z);
+                        float abs_residual = fabsf(coord - target_coord);
+                        if (abs_residual > residual) residual = abs_residual;
+                        if (!entry->fixed) all_fixed = false;
+                    }
+                    if (residual > pass_max_residual) pass_max_residual = residual;
+
+                    if (all_fixed) {
+                        if (residual > position_tolerance) {
+                            solve_failed = true;
+                            failure_reason = along_unsat_reason;
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    for (int ai = 0; ai < along_count; ai++) {
+                        scene_solver_point_candidate_t *entry = &candidates[along_indices[ai]];
+                        if (entry->fixed) continue;
+                        vec3_t before = entry->point;
+                        if (axis == 0) {
+                            entry->point.x = target_coord;
+                        } else if (axis == 1) {
+                            entry->point.y = target_coord;
+                        } else {
+                            entry->point.z = target_coord;
+                        }
+                        float delta = vec3_length(vec3_sub(entry->point, before));
+                        if (delta > pass_max_position_delta) pass_max_position_delta = delta;
+                    }
                     continue;
                 }
 
