@@ -304,6 +304,8 @@ static inline float scene_solver_position_tolerance(const ecs_scene_t *scene, ec
 static inline bool scene_solver_set_position_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance);
 static inline float scene_solver_angle_tolerance(const ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_set_angle_tolerance(ecs_scene_t *scene, ecs_entity_t sketch, float tolerance);
+static inline uint32_t scene_solver_auto_solve_debounce_ms(const ecs_scene_t *scene, ecs_entity_t sketch);
+static inline bool scene_solver_set_auto_solve_debounce_ms(ecs_scene_t *scene, ecs_entity_t sketch, uint32_t debounce_ms);
 static inline uint32_t scene_solver_max_passes(const ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_set_max_passes(ecs_scene_t *scene, ecs_entity_t sketch, uint32_t max_passes);
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
@@ -2479,6 +2481,23 @@ static inline bool scene_solver_set_angle_tolerance(ecs_scene_t *scene, ecs_enti
     return true;
 }
 
+static inline uint32_t scene_solver_auto_solve_debounce_ms(const ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch((ecs_scene_t*)scene, sketch)) return SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS;
+    const SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS;
+    if (sk->auto_solve_debounce_ms > 100u) return 100u;
+    return sk->auto_solve_debounce_ms;
+}
+
+static inline bool scene_solver_set_auto_solve_debounce_ms(ecs_scene_t *scene, ecs_entity_t sketch, uint32_t debounce_ms) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    if (debounce_ms > 100u) debounce_ms = 100u;
+    sk->auto_solve_debounce_ms = debounce_ms;
+    return true;
+}
+
 static inline uint32_t scene_solver_max_passes(const ecs_scene_t *scene, ecs_entity_t sketch) {
     if (!scene || !scene_is_sketch((ecs_scene_t*)scene, sketch)) return SKETCH_SOLVER_DEFAULT_MAX_PASSES;
     const SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
@@ -2548,9 +2567,7 @@ static inline void scene_solver_process_auto_queue(ecs_scene_t *scene) {
             if (!sk->auto_solve_enabled || !sk->auto_solve_pending) continue;
             uint64_t queued_at = sk->auto_solve_queued_at_ms;
             uint64_t elapsed_ms = (now_ms >= queued_at) ? (now_ms - queued_at) : 0ULL;
-            uint32_t debounce_ms = sk->auto_solve_debounce_ms > 0
-                ? sk->auto_solve_debounce_ms
-                : SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS;
+            uint32_t debounce_ms = sk->auto_solve_debounce_ms;
             if (elapsed_ms < debounce_ms) continue;
             scene_solver_request_recalculate(scene, sketch_entity);
         }

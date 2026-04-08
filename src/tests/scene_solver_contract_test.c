@@ -83,6 +83,47 @@ static int test_sketch_solver_defaults_and_manual_recalc_clears_queue_metadata(v
     return ok ? 0 : 1;
 }
 
+static int test_debounce_setter_clamps_range_and_preserves_zero(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (!sketch) return 1;
+
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (sk->auto_solve_debounce_ms != 50u) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_set_auto_solve_debounce_ms(&scene, sketch, 0u)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_solver_auto_solve_debounce_ms(&scene, sketch) != 0u) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_set_auto_solve_debounce_ms(&scene, sketch, 101u)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_solver_auto_solve_debounce_ms(&scene, sketch) != 100u) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 static bool vec3_close(vec3_t a, vec3_t b, float eps) {
     return fabsf(a.x - b.x) <= eps &&
            fabsf(a.y - b.y) <= eps &&
@@ -581,6 +622,8 @@ int main(void) {
         { "test_recalculate_updates_solver_counters", test_recalculate_updates_solver_counters },
         { "test_sketch_solver_defaults_and_manual_recalc_clears_queue_metadata",
           test_sketch_solver_defaults_and_manual_recalc_clears_queue_metadata },
+        { "test_debounce_setter_clamps_range_and_preserves_zero",
+          test_debounce_setter_clamps_range_and_preserves_zero },
         { "test_recalculate_commits_coincident_solution_for_points", test_recalculate_commits_coincident_solution_for_points },
         { "test_recalculate_unsat_is_transactional_and_deterministic", test_recalculate_unsat_is_transactional_and_deterministic },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },

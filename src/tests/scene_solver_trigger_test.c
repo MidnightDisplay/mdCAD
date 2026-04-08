@@ -73,6 +73,42 @@ static int test_manual_recalculate_cancels_pending_auto_queue(void) {
     return ok ? 0 : 1;
 }
 
+static int test_zero_debounce_flushes_auto_queue_immediately(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (!sketch) return 1;
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!sk) return 1;
+
+    if (!scene_solver_set_auto_solve_debounce_ms(&scene, sketch, 0u)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_solver_auto_solve_debounce_ms(&scene, sketch) != 0u) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_request_auto(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    uint32_t completed_before = sk->solve_completed_serial;
+    scene_solver_process_auto_queue(&scene);
+    sk = ecs_world_get_sketch(scene.world, sketch);
+
+    int ok = (sk &&
+              !sk->auto_solve_pending &&
+              sk->solve_completed_serial > completed_before);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -82,6 +118,8 @@ int main(void) {
           test_auto_request_coalesces_and_only_flushes_after_debounce },
         { "test_manual_recalculate_cancels_pending_auto_queue",
           test_manual_recalculate_cancels_pending_auto_queue },
+        { "test_zero_debounce_flushes_auto_queue_immediately",
+          test_zero_debounce_flushes_auto_queue_immediately },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

@@ -1004,6 +1004,22 @@ static inline void ui_entity_inspector_draw_solver_section(ui_entity_inspector_s
         }
     }
 
+    uint32_t debounce_ms = scene
+        ? scene_solver_auto_solve_debounce_ms(scene, e)
+        : ((sketch->auto_solve_debounce_ms <= 100u) ? sketch->auto_solve_debounce_ms : 100u);
+    int debounce_ms_edit = (int)debounce_ms;
+    igSetNextItemWidth(180.0f);
+    if (igSliderInt("Debounce (ms)##sketch_solver_debounce_ms", &debounce_ms_edit, 0, 100, "%d", ImGuiSliderFlags_None)) {
+        if (debounce_ms_edit < 0) debounce_ms_edit = 0;
+        if (debounce_ms_edit > 100) debounce_ms_edit = 100;
+        if (scene) {
+            scene_solver_set_auto_solve_debounce_ms(scene, e, (uint32_t)debounce_ms_edit);
+            sketch = ecs_world_get_sketch(w, e);
+        } else {
+            sketch->auto_solve_debounce_ms = (uint32_t)debounce_ms_edit;
+        }
+    }
+
     float position_tolerance = scene
         ? scene_solver_position_tolerance(scene, e)
         : ((sketch->solver_position_tolerance > 0.0f)
