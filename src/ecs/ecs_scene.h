@@ -3142,6 +3142,138 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
 
                 if ((constraint->type == CONSTRAINT_PARALLEL ||
                      constraint->type == CONSTRAINT_PERPENDICULAR) &&
+                    participant_count >= 3) {
+                    const char *line_line_unsat_reason =
+                        (constraint->type == CONSTRAINT_PARALLEL)
+                            ? "Unsatisfied parallel constraint."
+                            : "Unsatisfied perpendicular constraint.";
+                    ecs_entity_t anchor_entity = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                    int anchor_a = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                        ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                        &candidate_count, anchor_entity,
+                                                                        CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                    int anchor_b = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                        ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                        &candidate_count, anchor_entity,
+                                                                        CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                    if (anchor_a < 0 || anchor_b < 0) {
+                        solve_failed = true;
+                        failure_reason = line_line_unsat_reason;
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t anchor_dir = vec3_sub(candidates[anchor_b].point, candidates[anchor_a].point);
+                    float anchor_len = vec3_length(anchor_dir);
+                    if (anchor_len <= 1e-6f || !isfinite(anchor_len)) {
+                        solve_failed = true;
+                        failure_reason = line_line_unsat_reason;
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    anchor_dir = vec3_scale(anchor_dir, 1.0f / anchor_len);
+
+                    bool branch_failed = false;
+                    for (uint32_t p = 1; p < participant_count; p++) {
+                        ecs_entity_t line_entity = (ecs_entity_t)constraint->participant_descriptors[p].entity;
+                        int line_a = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                         ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                         &candidate_count, line_entity,
+                                                                         CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                        int line_b = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                         ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                         &candidate_count, line_entity,
+                                                                         CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                        if (line_a < 0 || line_b < 0) {
+                            branch_failed = true;
+                            break;
+                        }
+
+                        vec3_t line_dir = vec3_sub(candidates[line_b].point, candidates[line_a].point);
+                        float line_len = vec3_length(line_dir);
+                        if (line_len <= 1e-6f || !isfinite(line_len)) {
+                            branch_failed = true;
+                            break;
+                        }
+                        line_dir = vec3_scale(line_dir, 1.0f / line_len);
+
+                        float dot = vec3_dot(anchor_dir, line_dir);
+                        if (dot > 1.0f) dot = 1.0f;
+                        if (dot < -1.0f) dot = -1.0f;
+                        float residual = (constraint->type == CONSTRAINT_PARALLEL)
+                                             ? acosf(fabsf(dot))
+                                             : fabsf(dot);
+                        if (residual > pass_max_residual) pass_max_residual = residual;
+                        if (residual > pass_max_angle_delta) pass_max_angle_delta = residual;
+                        if (residual <= angle_tolerance) continue;
+
+                        bool line_fixed = candidates[line_a].fixed && candidates[line_b].fixed;
+                        if (line_fixed) {
+                            branch_failed = true;
+                            break;
+                        }
+
+                        vec3_t target_dir = anchor_dir;
+                        if (constraint->type == CONSTRAINT_PARALLEL) {
+                            vec3_t opposite = vec3_scale(target_dir, -1.0f);
+                            target_dir = (vec3_dot(target_dir, line_dir) >= vec3_dot(opposite, line_dir))
+                                             ? target_dir
+                                             : opposite;
+                        } else {
+                            vec3_t perp_axis = vec3_cross(anchor_dir, line_dir);
+                            float perp_len = vec3_length(perp_axis);
+                            if (perp_len <= 1e-6f || !isfinite(perp_len)) {
+                                vec3_t fallback = (fabsf(anchor_dir.z) < 0.9f)
+                                                      ? vec3_make(0.0f, 0.0f, 1.0f)
+                                                      : vec3_make(0.0f, 1.0f, 0.0f);
+                                perp_axis = vec3_cross(anchor_dir, fallback);
+                                perp_len = vec3_length(perp_axis);
+                            }
+                            if (perp_len <= 1e-6f || !isfinite(perp_len)) {
+                                branch_failed = true;
+                                break;
+                            }
+                            perp_axis = vec3_scale(perp_axis, 1.0f / perp_len);
+                            vec3_t perp_dir = vec3_normalize(vec3_cross(perp_axis, anchor_dir));
+                            vec3_t perp_opposite = vec3_scale(perp_dir, -1.0f);
+                            target_dir = (vec3_dot(perp_dir, line_dir) >= vec3_dot(perp_opposite, line_dir))
+                                             ? perp_dir
+                                             : perp_opposite;
+                        }
+
+                        vec3_t before_a = candidates[line_a].point;
+                        vec3_t before_b = candidates[line_b].point;
+                        bool updated = false;
+                        if (!candidates[line_b].fixed) {
+                            candidates[line_b].point =
+                                vec3_add(candidates[line_a].point, vec3_scale(target_dir, line_len));
+                            updated = true;
+                        } else if (!candidates[line_a].fixed) {
+                            candidates[line_a].point =
+                                vec3_sub(candidates[line_b].point, vec3_scale(target_dir, line_len));
+                            updated = true;
+                        }
+                        if (!updated) {
+                            branch_failed = true;
+                            break;
+                        }
+                        float delta_a = vec3_length(vec3_sub(candidates[line_a].point, before_a));
+                        float delta_b = vec3_length(vec3_sub(candidates[line_b].point, before_b));
+                        if (delta_a > pass_max_position_delta) pass_max_position_delta = delta_a;
+                        if (delta_b > pass_max_position_delta) pass_max_position_delta = delta_b;
+                    }
+
+                    if (branch_failed) {
+                        solve_failed = true;
+                        failure_reason = line_line_unsat_reason;
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    continue;
+                }
+
+                if ((constraint->type == CONSTRAINT_PARALLEL ||
+                     constraint->type == CONSTRAINT_PERPENDICULAR) &&
                     participant_count == 2) {
                     const char *line_line_unsat_reason =
                         (constraint->type == CONSTRAINT_PARALLEL)

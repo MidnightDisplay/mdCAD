@@ -188,7 +188,15 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
         }
         return true;
     }
-    if (type == CONSTRAINT_PERPENDICULAR || type == CONSTRAINT_ANGLE) {
+    if (type == CONSTRAINT_PERPENDICULAR) {
+        if (has_subentity_point_role) return false;
+        if (sig->count < 2) return false;
+        for (uint32_t i = 0; i < sig->count; i++) {
+            if (sig->geometry_types[i] != GEOM_LINE) return false;
+        }
+        return true;
+    }
+    if (type == CONSTRAINT_ANGLE) {
         if (has_subentity_point_role) return false;
         return sig->count == 2 &&
                sig->geometry_types[0] == GEOM_LINE &&

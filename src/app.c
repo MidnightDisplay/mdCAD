@@ -870,6 +870,14 @@ static void mdcad_draw_constraint_context_menu(void) {
 
     bool applied = false;
     int legal_count = 0;
+    bool all_line_line_entities = state.constraint_menu_participant_count >= 2;
+    for (uint32_t i = 0; i < state.constraint_menu_participant_count; i++) {
+        if (state.constraint_menu_signature.geometry_types[i] != GEOM_LINE ||
+            state.constraint_menu_signature.roles[i] != CONSTRAINT_PARTICIPANT_ROLE_ENTITY) {
+            all_line_line_entities = false;
+            break;
+        }
+    }
     for (int t = 0; t < CONSTRAINT_TYPE_COUNT; t++) {
         constraint_type_t type = (constraint_type_t)t;
         if (!constraint_type_is_selection_legal(&state.constraint_menu_signature, type)) continue;
@@ -910,6 +918,10 @@ static void mdcad_draw_constraint_context_menu(void) {
     if (legal_count == 0) {
         if (state.constraint_menu_participant_count == 0) {
             igTextDisabled("Select sketch geometry to apply constraints.");
+        } else if (all_line_line_entities &&
+                   !constraint_type_is_selection_legal(&state.constraint_menu_signature, CONSTRAINT_PARALLEL) &&
+                   !constraint_type_is_selection_legal(&state.constraint_menu_signature, CONSTRAINT_PERPENDICULAR)) {
+            igTextDisabled("Invalid line-line selection: Parallel/Perpendicular require two or more line entities.");
         } else {
             igTextDisabled("No applicable constraints for current selection.");
         }
