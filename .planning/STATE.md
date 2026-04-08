@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Sketch Solver Audit + Constraint Expansion
 status: verifying
-stopped_at: Phase 24 context gathered
-last_updated: "2026-04-08T15:00:30.706Z"
+stopped_at: Phase 25 context gathered
+last_updated: "2026-04-08T18:02:07.294Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 24 — advanced-arc-line-arc-constraint-expansion
+**Current focus:** Phase 25 — regression-and-reliability-closure
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 23 (principal-direction-constraint-expansion) — COMPLETE
-Plan: 3 of 3
+Phase: 24 (advanced-arc-line-arc-constraint-expansion) — COMPLETE
+Plan: 2 of 2
 Status: Phase closed — verification complete
 Last activity: 2026-04-08
 
@@ -38,7 +38,7 @@ Last activity: 2026-04-08
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 24`
+Next command: `/gsd-plan-phase 25`
 
 ## Performance Metrics
 
@@ -183,6 +183,6 @@ Next command: `/gsd-plan-phase 24`
 
 ## Session
 
-**Last Date:** 2026-04-08T15:00:30.702Z
-**Stopped At:** Phase 24 context gathered
-**Resume File:** .planning/phases/24-advanced-arc-line-arc-constraint-expansion/24-CONTEXT.md
+**Last Date:** 2026-04-08T18:02:07.290Z
+**Stopped At:** Phase 25 context gathered
+**Resume File:** .planning/phases/25-regression-and-reliability-closure/25-CONTEXT.md
