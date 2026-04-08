@@ -482,6 +482,36 @@ static int test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09(void)
     return 0;
 }
 
+static int test_line_line_legality_allows_pair_parallel_and_perpendicular_lcon05(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 2;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[0] = 1101;
+    sig.geometry_types[1] = GEOM_LINE;
+    sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[1] = 1102;
+
+    if (!constraint_type_is_selection_legal(&sig, CONSTRAINT_PARALLEL)) return 1;
+    if (!constraint_type_is_selection_legal(&sig, CONSTRAINT_PERPENDICULAR)) return 1;
+    return 0;
+}
+
+static int test_line_line_legality_rejects_point_roles_for_parallel_and_perpendicular_lcon05(void) {
+    constraint_selection_signature_t endpoint_sig = {0};
+    endpoint_sig.count = 2;
+    endpoint_sig.geometry_types[0] = GEOM_LINE;
+    endpoint_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    endpoint_sig.entities[0] = 1201;
+    endpoint_sig.geometry_types[1] = GEOM_LINE;
+    endpoint_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    endpoint_sig.entities[1] = 1202;
+
+    if (constraint_type_is_selection_legal(&endpoint_sig, CONSTRAINT_PARALLEL)) return 1;
+    if (constraint_type_is_selection_legal(&endpoint_sig, CONSTRAINT_PERPENDICULAR)) return 1;
+    return 0;
+}
+
 static int test_endpoint_line_endpoint_to_owner_bidirectional_sync(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1813,6 +1843,10 @@ int main(void) {
           test_arci02_legality_accepts_only_line_endpoint_and_arc_endpoint_D05 },
         { "test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09",
           test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09 },
+        { "test_line_line_legality_allows_pair_parallel_and_perpendicular_lcon05",
+          test_line_line_legality_allows_pair_parallel_and_perpendicular_lcon05 },
+        { "test_line_line_legality_rejects_point_roles_for_parallel_and_perpendicular_lcon05",
+          test_line_line_legality_rejects_point_roles_for_parallel_and_perpendicular_lcon05 },
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },

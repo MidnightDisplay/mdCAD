@@ -208,6 +208,140 @@ static int test_recalculate_unsat_is_transactional_and_deterministic(void) {
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_parallel_pair_solves_feasible_lines_lcon01(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t participants[2] = { line_a, line_b };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+
+    vec3_t dir_a = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t dir_b = vec3_sub(gb->data.line.b, gb->data.line.a);
+    float len_a = vec3_length(dir_a);
+    float len_b = vec3_length(dir_b);
+    if (len_a <= 1e-6f || len_b <= 1e-6f) return 1;
+    dir_a = vec3_scale(dir_a, 1.0f / len_a);
+    dir_b = vec3_scale(dir_b, 1.0f / len_b);
+    float dot_dirs = vec3_dot(dir_a, dir_b);
+    if (dot_dirs > 1.0f) dot_dirs = 1.0f;
+    if (dot_dirs < -1.0f) dot_dirs = -1.0f;
+
+    int ok = solved && fabsf(fabsf(dot_dirs) - 1.0f) <= 1e-4f;
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_perpendicular_pair_solves_feasible_lines_lcon03(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t participants[2] = { line_a, line_b };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PERPENDICULAR, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+
+    vec3_t dir_a = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t dir_b = vec3_sub(gb->data.line.b, gb->data.line.a);
+    float len_a = vec3_length(dir_a);
+    float len_b = vec3_length(dir_b);
+    if (len_a <= 1e-6f || len_b <= 1e-6f) return 1;
+    dir_a = vec3_scale(dir_a, 1.0f / len_a);
+    dir_b = vec3_scale(dir_b, 1.0f / len_b);
+    float dot_dirs = vec3_dot(dir_a, dir_b);
+
+    int ok = solved && fabsf(dot_dirs) <= 1e-4f;
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    SketchGeometryStateComp *state_a = ecs_world_get_sketch_geometry_state(scene.world, line_a);
+    SketchGeometryStateComp *state_b = ecs_world_get_sketch_geometry_state(scene.world, line_b);
+    if (!state_a || !state_b) return 1;
+    state_a->fixed = true;
+    state_b->fixed = true;
+
+    ecs_entity_t participants[2] = { line_a, line_b };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t a0_before = ga->data.line.a;
+    vec3_t a1_before = ga->data.line.b;
+    vec3_t b0_before = gb->data.line.a;
+    vec3_t b1_before = gb->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    int ok = (!solved &&
+              ga && gb &&
+              vec3_close(ga->data.line.a, a0_before, 1e-6f) &&
+              vec3_close(ga->data.line.b, a1_before, 1e-6f) &&
+              vec3_close(gb->data.line.a, b0_before, 1e-6f) &&
+              vec3_close(gb->data.line.b, b1_before, 1e-6f) &&
+              imp && imp->active &&
+              imp->first_constraint == c &&
+              strcmp(imp->reason, "Unsatisfied parallel constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_participant_descriptor_supports_sub_entity_contract(void) {
     constraint_participant_descriptor_t descriptor =
         constraint_participant_descriptor_make((ecs_entity_t)44, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1);
@@ -1380,6 +1514,12 @@ int main(void) {
           test_debounce_setter_clamps_range_and_preserves_zero },
         { "test_recalculate_commits_coincident_solution_for_points", test_recalculate_commits_coincident_solution_for_points },
         { "test_recalculate_unsat_is_transactional_and_deterministic", test_recalculate_unsat_is_transactional_and_deterministic },
+        { "test_recalculate_parallel_pair_solves_feasible_lines_lcon01",
+          test_recalculate_parallel_pair_solves_feasible_lines_lcon01 },
+        { "test_recalculate_perpendicular_pair_solves_feasible_lines_lcon03",
+          test_recalculate_perpendicular_pair_solves_feasible_lines_lcon03 },
+        { "test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05",
+          test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05 },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
         { "test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06",
           test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06 },
