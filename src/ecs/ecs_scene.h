@@ -2732,10 +2732,181 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
 
                 if (constraint->type == CONSTRAINT_ANGLE) {
                     if (constraint->driven) continue;
-                    solve_failed = true;
-                    failure_reason = "Unsatisfied driving ANGLE constraint.";
-                    implicated_constraints[implicated_constraint_count++] = child;
-                    break;
+                    if (participant_count < 2) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    ecs_entity_t line_a_entity = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                    ecs_entity_t line_b_entity = (ecs_entity_t)constraint->participant_descriptors[1].entity;
+                    int ia0 = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                  ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                  &candidate_count, line_a_entity,
+                                                                  CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                    int ia1 = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                  ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                  &candidate_count, line_a_entity,
+                                                                  CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                    int ib0 = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                  ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                  &candidate_count, line_b_entity,
+                                                                  CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                    int ib1 = scene_solver_ensure_point_candidate(scene, candidates,
+                                                                  ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                                                                  &candidate_count, line_b_entity,
+                                                                  CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                    if (ia0 < 0 || ia1 < 0 || ib0 < 0 || ib1 < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    float desired_angle = constraint->value;
+                    if (!isfinite(desired_angle) || desired_angle < 0.0f || desired_angle > 3.14159265359f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t va = vec3_sub(candidates[ia1].point, candidates[ia0].point);
+                    vec3_t vb = vec3_sub(candidates[ib1].point, candidates[ib0].point);
+                    float len_a = vec3_length(va);
+                    float len_b = vec3_length(vb);
+                    if (len_a <= 1e-6f || len_b <= 1e-6f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t na = vec3_scale(va, 1.0f / len_a);
+                    vec3_t nb = vec3_scale(vb, 1.0f / len_b);
+                    float cos_current = vec3_dot(na, nb);
+                    if (cos_current > 1.0f) cos_current = 1.0f;
+                    if (cos_current < -1.0f) cos_current = -1.0f;
+                    float current_angle = acosf(cos_current);
+                    float residual = fabsf(current_angle - desired_angle);
+                    if (residual > pass_max_residual) pass_max_residual = residual;
+                    if (residual > pass_max_angle_delta) pass_max_angle_delta = residual;
+
+                    bool b0_fixed = candidates[ib0].fixed;
+                    bool b1_fixed = candidates[ib1].fixed;
+                    bool a0_fixed = candidates[ia0].fixed;
+                    bool a1_fixed = candidates[ia1].fixed;
+                    if ((b0_fixed && b1_fixed && a0_fixed && a1_fixed) && residual > angle_tolerance) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    if (residual <= angle_tolerance) {
+                        continue;
+                    }
+
+                    vec3_t plane_n = vec3_cross(na, nb);
+                    float plane_n_len = vec3_length(plane_n);
+                    if (plane_n_len <= 1e-6f) {
+                        vec3_t fallback = (fabsf(na.z) < 0.9f) ? vec3_make(0.0f, 0.0f, 1.0f) : vec3_make(0.0f, 1.0f, 0.0f);
+                        plane_n = vec3_cross(na, fallback);
+                        plane_n_len = vec3_length(plane_n);
+                        if (plane_n_len <= 1e-6f) {
+                            fallback = vec3_make(1.0f, 0.0f, 0.0f);
+                            plane_n = vec3_cross(na, fallback);
+                            plane_n_len = vec3_length(plane_n);
+                        }
+                    }
+                    if (plane_n_len <= 1e-6f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    plane_n = vec3_scale(plane_n, 1.0f / plane_n_len);
+                    vec3_t perp = vec3_cross(plane_n, na);
+                    float perp_len = vec3_length(perp);
+                    if (perp_len <= 1e-6f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    perp = vec3_scale(perp, 1.0f / perp_len);
+
+                    float c = cosf(desired_angle);
+                    float s = sinf(desired_angle);
+                    vec3_t dir_plus = vec3_add(vec3_scale(na, c), vec3_scale(perp, s));
+                    vec3_t dir_minus = vec3_add(vec3_scale(na, c), vec3_scale(perp, -s));
+                    float plus_len = vec3_length(dir_plus);
+                    float minus_len = vec3_length(dir_minus);
+                    if (plus_len <= 1e-6f || minus_len <= 1e-6f) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    dir_plus = vec3_scale(dir_plus, 1.0f / plus_len);
+                    dir_minus = vec3_scale(dir_minus, 1.0f / minus_len);
+                    vec3_t target_dir = (vec3_dot(dir_plus, nb) >= vec3_dot(dir_minus, nb)) ? dir_plus : dir_minus;
+
+                    vec3_t before_a0 = candidates[ia0].point;
+                    vec3_t before_a1 = candidates[ia1].point;
+                    vec3_t before_b0 = candidates[ib0].point;
+                    vec3_t before_b1 = candidates[ib1].point;
+                    bool updated = false;
+                    if (!b1_fixed) {
+                        candidates[ib1].point = vec3_add(candidates[ib0].point, vec3_scale(target_dir, len_b));
+                        updated = true;
+                    } else if (!b0_fixed) {
+                        candidates[ib0].point = vec3_sub(candidates[ib1].point, vec3_scale(target_dir, len_b));
+                        updated = true;
+                    } else if (!a1_fixed) {
+                        vec3_t target_na = vec3_sub(vec3_scale(target_dir, cosf(desired_angle)),
+                                                    vec3_scale(perp, sinf(desired_angle)));
+                        float target_na_len = vec3_length(target_na);
+                        if (target_na_len <= 1e-6f) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied driving ANGLE constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        target_na = vec3_scale(target_na, 1.0f / target_na_len);
+                        candidates[ia1].point = vec3_add(candidates[ia0].point, vec3_scale(target_na, len_a));
+                        updated = true;
+                    } else if (!a0_fixed) {
+                        vec3_t target_na = vec3_sub(vec3_scale(target_dir, cosf(desired_angle)),
+                                                    vec3_scale(perp, sinf(desired_angle)));
+                        float target_na_len = vec3_length(target_na);
+                        if (target_na_len <= 1e-6f) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied driving ANGLE constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        target_na = vec3_scale(target_na, 1.0f / target_na_len);
+                        candidates[ia0].point = vec3_sub(candidates[ia1].point, vec3_scale(target_na, len_a));
+                        updated = true;
+                    }
+
+                    if (!updated) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied driving ANGLE constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    float delta_a0 = vec3_length(vec3_sub(candidates[ia0].point, before_a0));
+                    float delta_a1 = vec3_length(vec3_sub(candidates[ia1].point, before_a1));
+                    float delta_b0 = vec3_length(vec3_sub(candidates[ib0].point, before_b0));
+                    float delta_b1 = vec3_length(vec3_sub(candidates[ib1].point, before_b1));
+                    if (delta_a0 > pass_max_position_delta) pass_max_position_delta = delta_a0;
+                    if (delta_a1 > pass_max_position_delta) pass_max_position_delta = delta_a1;
+                    if (delta_b0 > pass_max_position_delta) pass_max_position_delta = delta_b0;
+                    if (delta_b1 > pass_max_position_delta) pass_max_position_delta = delta_b1;
+                    continue;
                 }
 
                 if (constraint->type == CONSTRAINT_FIXED) {

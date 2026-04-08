@@ -378,13 +378,16 @@ static int test_driving_length_angle_unsat_no_mutation_contract_D09(void) {
                                                    vec4_make(1, 1, 1, 1), 1.0f);
     if (!sketch || !line_a || !line_b) return 1;
 
-    ecs_entity_t length_participants[1] = { line_a };
     ecs_entity_t angle_participants[2] = { line_a, line_b };
-    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
-                                                            length_participants, 1, 10.0f, false);
     ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
                                                            angle_participants, 2, 0.5f, false);
-    if (!c_length || !c_angle) return 1;
+    if (!c_angle) return 1;
+
+    SketchGeometryStateComp *sa = ecs_world_get_sketch_geometry_state(scene.world, line_a);
+    SketchGeometryStateComp *sb = ecs_world_get_sketch_geometry_state(scene.world, line_b);
+    if (!sa || !sb) return 1;
+    sa->fixed = true;
+    sb->fixed = true;
 
     GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
     GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
@@ -456,6 +459,67 @@ static int test_driving_length_atomic_success_contract_D10(void) {
     return ok ? 0 : 1;
 }
 
+static int test_driving_angle_between_two_lines_atomic_success_contract_D10(void) {
+    // D-10: satisfiable driving ANGLE between lines commits geometry atomically in one completion.
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(1.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 0.5f, false);
+    if (!c_angle) return 1;
+
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t b1_before = gb->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
+    if (!solved || !ga || !gb || !sk) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t va = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t vb = vec3_sub(gb->data.line.b, gb->data.line.a);
+    float len_a = vec3_length(va);
+    float len_b = vec3_length(vb);
+    if (len_a <= 1e-6f || len_b <= 1e-6f) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t na = vec3_scale(va, 1.0f / len_a);
+    vec3_t nb = vec3_scale(vb, 1.0f / len_b);
+    float cos_angle = vec3_dot(na, nb);
+    if (cos_angle > 1.0f) cos_angle = 1.0f;
+    if (cos_angle < -1.0f) cos_angle = -1.0f;
+    float actual_angle = acosf(cos_angle);
+
+    int ok = (solved &&
+              sk->status == SKETCH_STATUS_SOLVED &&
+              !vec3_exact_eq(gb->data.line.b, b1_before) &&
+              fabsf(actual_angle - 0.5f) <= 1e-4f &&
+              sk->solve_completed_serial == sk->solve_request_serial);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -476,6 +540,8 @@ int main(void) {
         { "test_recalculate_idempotent_on_unchanged_sketch", test_recalculate_idempotent_on_unchanged_sketch },
         { "test_driving_length_angle_unsat_no_mutation_contract_D09", test_driving_length_angle_unsat_no_mutation_contract_D09 },
         { "test_driving_length_atomic_success_contract_D10", test_driving_length_atomic_success_contract_D10 },
+        { "test_driving_angle_between_two_lines_atomic_success_contract_D10",
+          test_driving_angle_between_two_lines_atomic_success_contract_D10 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
