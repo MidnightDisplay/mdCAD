@@ -2774,15 +2774,17 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     constraint->type == CONSTRAINT_ALONG_Y ||
                     constraint->type == CONSTRAINT_ALONG_Z) {
                     if (constraint->driven) continue;
-                    int axis = 0;
+                    int free_axis = 0;
                     const char *along_unsat_reason = "Unsatisfied driving ALONG X constraint.";
                     if (constraint->type == CONSTRAINT_ALONG_Y) {
-                        axis = 1;
+                        free_axis = 1;
                         along_unsat_reason = "Unsatisfied driving ALONG Y constraint.";
                     } else if (constraint->type == CONSTRAINT_ALONG_Z) {
-                        axis = 2;
+                        free_axis = 2;
                         along_unsat_reason = "Unsatisfied driving ALONG Z constraint.";
                     }
+                    int locked_axis_a = (free_axis == 0) ? 1 : 0;
+                    int locked_axis_b = (free_axis == 2) ? 1 : 2;
 
                     if (participant_count < 2) {
                         solve_failed = true;
@@ -2828,23 +2830,32 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         break;
                     }
 
-                    float target_coord = 0.0f;
+                    float target_coord_a = 0.0f;
+                    float target_coord_b = 0.0f;
                     for (int ai = 0; ai < along_count; ai++) {
                         vec3_t pt = candidates[along_indices[ai]].point;
-                        float coord = (axis == 0) ? pt.x : ((axis == 1) ? pt.y : pt.z);
-                        target_coord += coord;
+                        float coord_a = (locked_axis_a == 0) ? pt.x : ((locked_axis_a == 1) ? pt.y : pt.z);
+                        float coord_b = (locked_axis_b == 0) ? pt.x : ((locked_axis_b == 1) ? pt.y : pt.z);
+                        target_coord_a += coord_a;
+                        target_coord_b += coord_b;
                     }
-                    target_coord /= (float)along_count;
+                    target_coord_a /= (float)along_count;
+                    target_coord_b /= (float)along_count;
 
                     float residual = 0.0f;
                     bool all_fixed = true;
                     for (int ai = 0; ai < along_count; ai++) {
                         scene_solver_point_candidate_t *entry = &candidates[along_indices[ai]];
-                        float coord = (axis == 0)
+                        float coord_a = (locked_axis_a == 0)
                             ? entry->point.x
-                            : ((axis == 1) ? entry->point.y : entry->point.z);
-                        float abs_residual = fabsf(coord - target_coord);
-                        if (abs_residual > residual) residual = abs_residual;
+                            : ((locked_axis_a == 1) ? entry->point.y : entry->point.z);
+                        float coord_b = (locked_axis_b == 0)
+                            ? entry->point.x
+                            : ((locked_axis_b == 1) ? entry->point.y : entry->point.z);
+                        float abs_residual_a = fabsf(coord_a - target_coord_a);
+                        float abs_residual_b = fabsf(coord_b - target_coord_b);
+                        if (abs_residual_a > residual) residual = abs_residual_a;
+                        if (abs_residual_b > residual) residual = abs_residual_b;
                         if (!entry->fixed) all_fixed = false;
                     }
                     if (residual > pass_max_residual) pass_max_residual = residual;
@@ -2863,13 +2874,12 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         scene_solver_point_candidate_t *entry = &candidates[along_indices[ai]];
                         if (entry->fixed) continue;
                         vec3_t before = entry->point;
-                        if (axis == 0) {
-                            entry->point.x = target_coord;
-                        } else if (axis == 1) {
-                            entry->point.y = target_coord;
-                        } else {
-                            entry->point.z = target_coord;
-                        }
+                        if (locked_axis_a == 0) entry->point.x = target_coord_a;
+                        else if (locked_axis_a == 1) entry->point.y = target_coord_a;
+                        else entry->point.z = target_coord_a;
+                        if (locked_axis_b == 0) entry->point.x = target_coord_b;
+                        else if (locked_axis_b == 1) entry->point.y = target_coord_b;
+                        else entry->point.z = target_coord_b;
                         float delta = vec3_length(vec3_sub(entry->point, before));
                         if (delta > pass_max_position_delta) pass_max_position_delta = delta;
                     }
