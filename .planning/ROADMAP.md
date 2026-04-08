@@ -15,7 +15,7 @@
 
 - [x] **Phase 22: Solver Trigger + Recalculate Determinism** - Establish trustworthy solve triggering and deterministic pass-bounded recalculate behavior.
 - [x] **Phase 23: Principal-Direction Constraint Expansion** - Deliver ALONG X/Y/Z group constraints across supported point participant types.
-- [ ] **Phase 24: Advanced Arc + Line-Arc Constraint Expansion** - Deliver arc-axis, tangency, and arc endpoint angle constraints with deterministic outcomes.
+- [x] **Phase 24: Advanced Arc + Line-Arc Constraint Expansion** - Deliver arc-axis, tangency, and arc endpoint angle constraints with deterministic outcomes.
 - [ ] **Phase 25: Regression and Reliability Closure** - Lock automated regression coverage for trigger integrity, pass policy behavior, and new constraint semantics.
 
 ## Phase Details
@@ -64,8 +64,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 24-01-PLAN.md — Add ARCI constraint families and centralized legality parity across UI/script authoring.
-- [ ] 24-02-PLAN.md — Implement ARCI runtime solve semantics with deterministic transactional diagnostics and final verification closure.
+- [x] 24-01-PLAN.md — Add ARCI constraint families and centralized legality parity across UI/script authoring.
+- [x] 24-02-PLAN.md — Implement ARCI runtime solve semantics with deterministic transactional diagnostics and final verification closure.
 
 ### Phase 25: Regression and Reliability Closure
 **Goal**: Developers can repeatedly validate solver trigger integrity and expanded constraint behavior through automated regression coverage.
@@ -75,7 +75,11 @@ Plans:
   1. Developer can run automated regression checks that verify auto-solve trigger integrity for committed sketch mutation paths.
   2. Developer can run automated regression checks that verify iterative pass behavior (tolerance stop and pass-cap stop) is enforced.
   3. Developer can run automated regression checks that cover legality and deterministic solve semantics for newly added axis and arc/line-arc constraints.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md — Run and stabilize trigger/pass-policy reliability slice with strict anti-flake evidence.
+- [ ] 25-02-PLAN.md — Execute full 7-test closure gate and complete mandatory fresh rerun evidence for V13-01.
 
 ## Progress
 
@@ -83,5 +87,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 22. Solver Trigger + Recalculate Determinism | 3/3 | Complete | 2026-04-08 |
 | 23. Principal-Direction Constraint Expansion | 3/3 | Complete | 2026-04-08 |
-| 24. Advanced Arc + Line-Arc Constraint Expansion | 0/0 | Not started | - |
+| 24. Advanced Arc + Line-Arc Constraint Expansion | 2/2 | Complete | 2026-04-08 |
 | 25. Regression and Reliability Closure | 0/0 | Not started | - |
