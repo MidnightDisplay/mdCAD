@@ -311,6 +311,12 @@ static inline bool scene_solver_set_max_passes(ecs_scene_t *scene, ecs_entity_t 
 static inline bool scene_solver_set_auto_solve(ecs_scene_t *scene, ecs_entity_t sketch, bool enabled);
 static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline void scene_solver_process_auto_queue(ecs_scene_t *scene);
+static inline bool scene_solver_set_drag_anchor(ecs_scene_t *scene,
+                                                ecs_entity_t sketch,
+                                                ecs_entity_t owner_entity,
+                                                constraint_participant_role_t role,
+                                                uint8_t sub_index);
+static inline bool scene_solver_clear_drag_anchor(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,
                                                sketch_solver_diagnostic_severity_t severity,
@@ -379,6 +385,12 @@ typedef struct {
     bool has_candidate;
     bool fixed;
 } scene_solver_point_candidate_t;
+
+typedef struct {
+    ecs_entity_t entity;
+    vec3_t normal;
+    bool fixed;
+} scene_solver_arc_normal_candidate_t;
 
 static inline int scene_solver_compare_entity_asc(const void *lhs, const void *rhs) {
     const ecs_entity_t a = *(const ecs_entity_t *)lhs;
@@ -455,6 +467,106 @@ static inline int scene_solver_ensure_point_candidate(ecs_scene_t *scene,
     entries[index].has_candidate = true;
     entries[index].fixed = state ? state->fixed : false;
     return index;
+}
+
+static inline int scene_solver_find_arc_normal_candidate(scene_solver_arc_normal_candidate_t *entries,
+                                                         int entry_count,
+                                                         ecs_entity_t entity) {
+    if (!entries || entry_count <= 0 || entity == 0) return -1;
+    for (int i = 0; i < entry_count; i++) {
+        if (entries[i].entity == entity) return i;
+    }
+    return -1;
+}
+
+static inline int scene_solver_ensure_arc_normal_candidate(ecs_scene_t *scene,
+                                                           scene_solver_arc_normal_candidate_t *entries,
+                                                           int max_entries,
+                                                           int *io_entry_count,
+                                                           ecs_entity_t entity) {
+    if (!scene || !entries || !io_entry_count || entity == 0) return -1;
+    int existing = scene_solver_find_arc_normal_candidate(entries, *io_entry_count, entity);
+    if (existing >= 0) return existing;
+    if (*io_entry_count >= max_entries) return -1;
+
+    GeometryComp *g = ecs_world_get_geometry(scene->world, entity);
+    if (!g || g->type != GEOM_ARC) return -1;
+    SketchGeometryStateComp *state = ecs_world_get_sketch_geometry_state(scene->world, entity);
+
+    int index = (*io_entry_count)++;
+    entries[index].entity = entity;
+    entries[index].normal = vec3_normalize(g->data.arc.normal);
+    entries[index].fixed = state ? state->fixed : false;
+    return index;
+}
+
+static inline bool scene_solver_extract_line_direction_from_constraint(ecs_scene_t *scene,
+                                                                       scene_solver_point_candidate_t *candidates,
+                                                                       int max_candidates,
+                                                                       int *io_candidate_count,
+                                                                       const constraint_participant_descriptor_t *descriptor,
+                                                                       vec3_t *out_direction,
+                                                                       bool *out_line_fixed) {
+    if (!scene || !candidates || !io_candidate_count || !descriptor || !out_direction || !out_line_fixed) {
+        return false;
+    }
+    ecs_entity_t line_entity = (ecs_entity_t)descriptor->entity;
+    GeometryComp *line_geom = ecs_world_get_geometry(scene->world, line_entity);
+    if (!line_geom || line_geom->type != GEOM_LINE) return false;
+
+    int ia = scene_solver_ensure_point_candidate(scene, candidates,
+                                                 max_candidates, io_candidate_count,
+                                                 line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    int ib = scene_solver_ensure_point_candidate(scene, candidates,
+                                                 max_candidates, io_candidate_count,
+                                                 line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    if (ia < 0 || ib < 0) return false;
+
+    vec3_t delta = vec3_sub(candidates[ib].point, candidates[ia].point);
+    float len = vec3_length(delta);
+    if (len <= 1e-6f || !isfinite(len)) return false;
+    *out_direction = vec3_scale(delta, 1.0f / len);
+    *out_line_fixed = candidates[ia].fixed && candidates[ib].fixed;
+    return true;
+}
+
+static inline bool scene_solver_try_set_arc_normal(scene_solver_arc_normal_candidate_t *entry,
+                                                   vec3_t target_normal,
+                                                   float angle_tolerance,
+                                                   float *io_pass_max_angle_delta,
+                                                   float *out_residual) {
+    if (!entry) return false;
+    vec3_t normalized = vec3_normalize(target_normal);
+    float len = vec3_length(normalized);
+    if (len <= 1e-6f || !isfinite(len)) return false;
+
+    float dot = vec3_dot(entry->normal, normalized);
+    if (dot > 1.0f) dot = 1.0f;
+    if (dot < -1.0f) dot = -1.0f;
+    float residual = acosf(dot);
+    if (out_residual) *out_residual = residual;
+    if (io_pass_max_angle_delta && residual > *io_pass_max_angle_delta) {
+        *io_pass_max_angle_delta = residual;
+    }
+    if (residual <= angle_tolerance) return true;
+    entry->normal = normalized;
+    return true;
+}
+
+static inline bool scene_solver_arc_tangent_direction(const scene_solver_point_candidate_t *arc_center,
+                                                      const scene_solver_point_candidate_t *arc_endpoint,
+                                                      const scene_solver_arc_normal_candidate_t *arc_normal,
+                                                      vec3_t *out_tangent) {
+    if (!arc_center || !arc_endpoint || !arc_normal || !out_tangent) return false;
+    vec3_t radial = vec3_sub(arc_endpoint->point, arc_center->point);
+    float radial_len = vec3_length(radial);
+    if (radial_len <= 1e-6f || !isfinite(radial_len)) return false;
+    radial = vec3_scale(radial, 1.0f / radial_len);
+    vec3_t tangent = vec3_cross(arc_normal->normal, radial);
+    float tangent_len = vec3_length(tangent);
+    if (tangent_len <= 1e-6f || !isfinite(tangent_len)) return false;
+    *out_tangent = vec3_scale(tangent, 1.0f / tangent_len);
+    return true;
 }
 
 static inline bool endpoint_pick_is_encoded(uint32_t pick_id) {
@@ -718,6 +830,10 @@ static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
     if (owner_renderable) owner_renderable->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, owner);
+    if (endpoint_meta->role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+        endpoint_meta->role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+        (void)scene_solver_set_drag_anchor(scene, sketch, owner, endpoint_meta->role, endpoint_meta->sub_index);
+    }
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return true;
@@ -752,6 +868,10 @@ static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *s
     if (owner_renderable) owner_renderable->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, owner);
+    if (endpoint_meta->role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+        endpoint_meta->role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+        (void)scene_solver_set_drag_anchor(scene, sketch, owner, endpoint_meta->role, endpoint_meta->sub_index);
+    }
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return true;
@@ -781,6 +901,7 @@ static inline bool scene_apply_standalone_sketch_point_world_delta(ecs_scene_t *
     RenderableComp *point_renderable = ecs_world_get_renderable(scene->world, point_entity);
     if (point_renderable) point_renderable->instance_dirty = true;
 
+    (void)scene_solver_clear_drag_anchor(scene, sketch);
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return true;
@@ -1968,6 +2089,9 @@ static inline const char* scene_constraint_name_prefix(constraint_type_t type) {
         case CONSTRAINT_LENGTH: return "Length";
         case CONSTRAINT_ANGLE: return "Angle";
         case CONSTRAINT_TANGENTIAL: return "Tangential";
+        case CONSTRAINT_ARC_AXIS_LINE: return "ArcAxisLine";
+        case CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY: return "LineArcEndpointTangency";
+        case CONSTRAINT_ARC_ENDPOINT_ANGLE: return "ArcEndpointAngle";
         default: return "Constraint";
     }
 }
@@ -2415,6 +2539,7 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
             role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
         }
         participant_ids[i] = (uint64_t)p;
+        signature.entities[i] = (uint64_t)p;
         signature.geometry_types[i] = g->type;
         signature.roles[i] = role;
         participant_descriptors[i] =
@@ -2596,6 +2721,39 @@ static inline bool scene_solver_request_auto(ecs_scene_t *scene, ecs_entity_t sk
     return true;
 }
 
+static inline bool scene_solver_set_drag_anchor(ecs_scene_t *scene,
+                                                ecs_entity_t sketch,
+                                                ecs_entity_t owner_entity,
+                                                constraint_participant_role_t role,
+                                                uint8_t sub_index) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    if (owner_entity == 0 || !ecs_is_alive(scene->world->world, owner_entity)) {
+        sk->solver_drag_anchor_valid = false;
+        sk->solver_drag_anchor_owner_entity = 0;
+        sk->solver_drag_anchor_role = (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+        sk->solver_drag_anchor_sub_index = 0;
+        return false;
+    }
+    sk->solver_drag_anchor_valid = true;
+    sk->solver_drag_anchor_owner_entity = (uint64_t)owner_entity;
+    sk->solver_drag_anchor_role = (uint8_t)role;
+    sk->solver_drag_anchor_sub_index = sub_index;
+    return true;
+}
+
+static inline bool scene_solver_clear_drag_anchor(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene || !scene_is_sketch(scene, sketch)) return false;
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (!sk) return false;
+    sk->solver_drag_anchor_valid = false;
+    sk->solver_drag_anchor_owner_entity = 0;
+    sk->solver_drag_anchor_role = (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+    sk->solver_drag_anchor_sub_index = 0;
+    return true;
+}
+
 static inline uint64_t scene_solver_now_ms(void) {
     struct timespec ts;
     if (timespec_get(&ts, TIME_UTC) == TIME_UTC) {
@@ -2634,6 +2792,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     if (!scene || !scene_is_sketch(scene, sketch)) return false;
     SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
     if (!sk) return false;
+    bool preserve_drag_anchor = sk->solver_drag_anchor_valid;
     sk->auto_solve_pending = false;
     sk->auto_solve_queued_at_ms = 0;
     sk->auto_solve_queue_token = 0;
@@ -2669,6 +2828,8 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
 
     scene_solver_point_candidate_t candidates[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
     int candidate_count = 0;
+    scene_solver_arc_normal_candidate_t arc_normal_candidates[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
+    int arc_normal_count = 0;
     for (int i = 0; i < point_count; i++) {
         scene_solver_ensure_point_candidate(scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
                                            &candidate_count, sketch_points[i], CONSTRAINT_PARTICIPANT_ROLE_ENTITY);
@@ -3097,6 +3258,568 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     continue;
                 }
 
+                if (constraint->type == CONSTRAINT_ARC_AXIS_LINE) {
+                    if (participant_count < 2) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    int line_participant = -1;
+                    int arc_participant = -1;
+                    for (uint32_t p = 0; p < participant_count; p++) {
+                        ecs_entity_t participant_entity =
+                            (ecs_entity_t)constraint->participant_descriptors[p].entity;
+                        constraint_participant_role_t participant_role =
+                            (constraint_participant_role_t)constraint->participant_descriptors[p].role;
+                        GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+                        if (!participant_geom) continue;
+                        if (participant_geom->type == GEOM_LINE &&
+                            participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                            line_participant < 0) {
+                            line_participant = (int)p;
+                        } else if (participant_geom->type == GEOM_ARC &&
+                                   participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                                   arc_participant < 0) {
+                            arc_participant = (int)p;
+                        }
+                    }
+                    if (line_participant < 0 || arc_participant < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t line_dir = vec3_make(0.0f, 0.0f, 0.0f);
+                    bool line_fixed = false;
+                    if (!scene_solver_extract_line_direction_from_constraint(
+                            scene,
+                            candidates,
+                            ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                            &candidate_count,
+                            &constraint->participant_descriptors[line_participant],
+                            &line_dir,
+                            &line_fixed)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    ecs_entity_t arc_entity = (ecs_entity_t)constraint->participant_descriptors[arc_participant].entity;
+                    int arc_normal_index = scene_solver_ensure_arc_normal_candidate(
+                        scene,
+                        arc_normal_candidates,
+                        ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &arc_normal_count,
+                        arc_entity);
+                    if (arc_normal_index < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    scene_solver_arc_normal_candidate_t *arc_normal = &arc_normal_candidates[arc_normal_index];
+
+                    float dot = vec3_dot(arc_normal->normal, line_dir);
+                    if (dot > 1.0f) dot = 1.0f;
+                    if (dot < -1.0f) dot = -1.0f;
+                    float abs_dot = fabsf(dot);
+                    if (abs_dot > 1.0f) abs_dot = 1.0f;
+                    float residual = acosf(abs_dot);
+                    if (residual > pass_max_residual) pass_max_residual = residual;
+                    if (residual > pass_max_angle_delta) pass_max_angle_delta = residual;
+                    if (residual <= angle_tolerance) {
+                        continue;
+                    }
+
+                    if (!arc_normal->fixed) {
+                        vec3_t target_normal = (dot >= 0.0f) ? line_dir : vec3_scale(line_dir, -1.0f);
+                        float normal_residual = 0.0f;
+                        if (!scene_solver_try_set_arc_normal(arc_normal, target_normal,
+                                                             angle_tolerance,
+                                                             &pass_max_angle_delta,
+                                                             &normal_residual)) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        if (normal_residual > pass_max_residual) pass_max_residual = normal_residual;
+                        continue;
+                    }
+
+                    if (line_fixed) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    ecs_entity_t line_entity = (ecs_entity_t)constraint->participant_descriptors[line_participant].entity;
+                    int line_a_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+                    int line_b_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+                    if (line_a_index < 0 || line_b_index < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    bool line_a_fixed = candidates[line_a_index].fixed;
+                    bool line_b_fixed = candidates[line_b_index].fixed;
+                    if (line_a_fixed && line_b_fixed) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t line_delta = vec3_sub(candidates[line_b_index].point, candidates[line_a_index].point);
+                    float line_len = vec3_length(line_delta);
+                    if (line_len <= 1e-6f || !isfinite(line_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    vec3_t current_line_dir = vec3_scale(line_delta, 1.0f / line_len);
+                    vec3_t line_target = (vec3_dot(current_line_dir, arc_normal->normal) >= 0.0f)
+                        ? arc_normal->normal
+                        : vec3_scale(arc_normal->normal, -1.0f);
+                    float line_target_len = vec3_length(line_target);
+                    if (line_target_len <= 1e-6f || !isfinite(line_target_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    line_target = vec3_scale(line_target, 1.0f / line_target_len);
+
+                    vec3_t before_a = candidates[line_a_index].point;
+                    vec3_t before_b = candidates[line_b_index].point;
+                    if (!line_b_fixed) {
+                        candidates[line_b_index].point =
+                            vec3_add(candidates[line_a_index].point, vec3_scale(line_target, line_len));
+                    } else {
+                        candidates[line_a_index].point =
+                            vec3_sub(candidates[line_b_index].point, vec3_scale(line_target, line_len));
+                    }
+                    float delta_a = vec3_length(vec3_sub(candidates[line_a_index].point, before_a));
+                    float delta_b = vec3_length(vec3_sub(candidates[line_b_index].point, before_b));
+                    if (delta_a > pass_max_position_delta) pass_max_position_delta = delta_a;
+                    if (delta_b > pass_max_position_delta) pass_max_position_delta = delta_b;
+                    continue;
+                }
+
+                if (constraint->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY) {
+                    if (participant_count < 2) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    int line_participant = -1;
+                    int arc_participant = -1;
+                    for (uint32_t p = 0; p < participant_count; p++) {
+                        ecs_entity_t participant_entity =
+                            (ecs_entity_t)constraint->participant_descriptors[p].entity;
+                        constraint_participant_role_t participant_role =
+                            (constraint_participant_role_t)constraint->participant_descriptors[p].role;
+                        GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+                        if (!participant_geom) continue;
+                        bool endpoint_role = participant_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                                             participant_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+                        if (participant_geom->type == GEOM_LINE && endpoint_role && line_participant < 0) {
+                            line_participant = (int)p;
+                        } else if (participant_geom->type == GEOM_ARC && endpoint_role && arc_participant < 0) {
+                            arc_participant = (int)p;
+                        }
+                    }
+                    if (line_participant < 0 || arc_participant < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    ecs_entity_t line_entity = (ecs_entity_t)constraint->participant_descriptors[line_participant].entity;
+                    constraint_participant_role_t line_role =
+                        (constraint_participant_role_t)constraint->participant_descriptors[line_participant].role;
+                    ecs_entity_t arc_entity = (ecs_entity_t)constraint->participant_descriptors[arc_participant].entity;
+                    constraint_participant_role_t arc_role =
+                        (constraint_participant_role_t)constraint->participant_descriptors[arc_participant].role;
+
+                    constraint_participant_role_t other_line_role =
+                        (line_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A)
+                            ? CONSTRAINT_PARTICIPANT_ROLE_POINT_B
+                            : CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+                    int line_endpoint_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, line_entity, line_role);
+                    int line_other_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, line_entity, other_line_role);
+                    int arc_endpoint_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, arc_entity, arc_role);
+                    int arc_center_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, arc_entity, CONSTRAINT_PARTICIPANT_ROLE_CENTER);
+                    int arc_normal_index = scene_solver_ensure_arc_normal_candidate(
+                        scene, arc_normal_candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &arc_normal_count, arc_entity);
+                    if (line_endpoint_index < 0 || line_other_index < 0 ||
+                        arc_endpoint_index < 0 || arc_center_index < 0 || arc_normal_index < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    bool line_endpoint_fixed = candidates[line_endpoint_index].fixed;
+                    bool arc_endpoint_fixed = candidates[arc_endpoint_index].fixed;
+
+                    bool drag_anchor_is_line_endpoint = false;
+                    bool drag_anchor_is_arc_endpoint = false;
+                    if (sk->solver_drag_anchor_valid &&
+                        sk->solver_drag_anchor_owner_entity != 0 &&
+                        (sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                         sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B)) {
+                        if ((ecs_entity_t)sk->solver_drag_anchor_owner_entity == line_entity &&
+                            sk->solver_drag_anchor_role == line_role) {
+                            drag_anchor_is_line_endpoint = true;
+                        } else if ((ecs_entity_t)sk->solver_drag_anchor_owner_entity == arc_entity &&
+                                   sk->solver_drag_anchor_role == arc_role) {
+                            drag_anchor_is_arc_endpoint = true;
+                        }
+                    }
+
+                    vec3_t before_line_endpoint = candidates[line_endpoint_index].point;
+                    vec3_t before_arc_endpoint = candidates[arc_endpoint_index].point;
+                    vec3_t coincidence_delta =
+                        vec3_sub(candidates[line_endpoint_index].point, candidates[arc_endpoint_index].point);
+                    float coincidence_distance = vec3_length(coincidence_delta);
+                    if (coincidence_distance > pass_max_residual) pass_max_residual = coincidence_distance;
+                    if (line_endpoint_fixed && arc_endpoint_fixed && coincidence_distance > position_tolerance) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    if (coincidence_distance > position_tolerance) {
+                        if (drag_anchor_is_line_endpoint && !arc_endpoint_fixed) {
+                            candidates[arc_endpoint_index].point = candidates[line_endpoint_index].point;
+                        } else if (drag_anchor_is_arc_endpoint && !line_endpoint_fixed) {
+                            candidates[line_endpoint_index].point = candidates[arc_endpoint_index].point;
+                        } else if (line_endpoint_fixed && !arc_endpoint_fixed) {
+                            candidates[arc_endpoint_index].point = candidates[line_endpoint_index].point;
+                        } else if (!line_endpoint_fixed && arc_endpoint_fixed) {
+                            candidates[line_endpoint_index].point = candidates[arc_endpoint_index].point;
+                        } else if (!line_endpoint_fixed && !arc_endpoint_fixed) {
+                            // Deterministic policy: line endpoint is anchor when both are editable.
+                            candidates[arc_endpoint_index].point = candidates[line_endpoint_index].point;
+                        }
+                        float delta_line_endpoint = vec3_length(
+                            vec3_sub(candidates[line_endpoint_index].point, before_line_endpoint));
+                        float delta_arc_endpoint = vec3_length(
+                            vec3_sub(candidates[arc_endpoint_index].point, before_arc_endpoint));
+                        if (delta_line_endpoint > pass_max_position_delta) pass_max_position_delta = delta_line_endpoint;
+                        if (delta_arc_endpoint > pass_max_position_delta) pass_max_position_delta = delta_arc_endpoint;
+                    }
+
+                    vec3_t shared_point = candidates[line_endpoint_index].point;
+                    vec3_t radial = vec3_sub(shared_point, candidates[arc_center_index].point);
+                    float radial_len = vec3_length(radial);
+                    vec3_t line_vec = vec3_sub(candidates[line_other_index].point, shared_point);
+                    float line_len = vec3_length(line_vec);
+                    if (radial_len <= 1e-6f || !isfinite(radial_len) ||
+                        line_len <= 1e-6f || !isfinite(line_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    scene_solver_arc_normal_candidate_t *arc_normal = &arc_normal_candidates[arc_normal_index];
+                    vec3_t tangent_dir = vec3_make(0.0f, 0.0f, 0.0f);
+                    if (!scene_solver_arc_tangent_direction(&candidates[arc_center_index],
+                                                            &candidates[arc_endpoint_index],
+                                                            arc_normal,
+                                                            &tangent_dir)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t line_dir = vec3_scale(line_vec, 1.0f / line_len);
+                    vec3_t tangent_opposite = vec3_scale(tangent_dir, -1.0f);
+                    vec3_t target_line_dir =
+                        (vec3_dot(line_dir, tangent_dir) >= vec3_dot(line_dir, tangent_opposite))
+                            ? tangent_dir
+                            : tangent_opposite;
+                    float tangent_dot = vec3_dot(line_dir, tangent_dir);
+                    if (tangent_dot > 1.0f) tangent_dot = 1.0f;
+                    if (tangent_dot < -1.0f) tangent_dot = -1.0f;
+                    float tangent_residual = acosf(fabsf(tangent_dot));
+                    if (tangent_residual > pass_max_residual) pass_max_residual = tangent_residual;
+                    if (tangent_residual > pass_max_angle_delta) pass_max_angle_delta = tangent_residual;
+                    if (tangent_residual <= angle_tolerance) {
+                        continue;
+                    }
+
+                    bool updated = false;
+                    if (drag_anchor_is_line_endpoint) {
+                        if (!candidates[line_other_index].fixed) {
+                            vec3_t before_other = candidates[line_other_index].point;
+                            candidates[line_other_index].point =
+                                vec3_add(shared_point, vec3_scale(target_line_dir, line_len));
+                            float delta_other = vec3_length(vec3_sub(candidates[line_other_index].point, before_other));
+                            if (delta_other > pass_max_position_delta) pass_max_position_delta = delta_other;
+                            updated = true;
+                        } else if (!arc_normal->fixed) {
+                            vec3_t radial_normalized = vec3_scale(radial, 1.0f / radial_len);
+                            vec3_t target_normal = vec3_cross(radial_normalized, target_line_dir);
+                            float target_normal_len = vec3_length(target_normal);
+                            if (target_normal_len <= 1e-6f || !isfinite(target_normal_len)) {
+                                solve_failed = true;
+                                failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                                implicated_constraints[implicated_constraint_count++] = child;
+                                break;
+                            }
+                            target_normal = vec3_scale(target_normal, 1.0f / target_normal_len);
+                            if (vec3_dot(target_normal, arc_normal->normal) < 0.0f) {
+                                target_normal = vec3_scale(target_normal, -1.0f);
+                            }
+                            float normal_residual = 0.0f;
+                            if (!scene_solver_try_set_arc_normal(arc_normal, target_normal,
+                                                                 angle_tolerance,
+                                                                 &pass_max_angle_delta,
+                                                                 &normal_residual)) {
+                                solve_failed = true;
+                                failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                                implicated_constraints[implicated_constraint_count++] = child;
+                                break;
+                            }
+                            if (normal_residual > pass_max_residual) pass_max_residual = normal_residual;
+                            updated = true;
+                        }
+                    } else if (drag_anchor_is_arc_endpoint) {
+                        if (!candidates[line_other_index].fixed) {
+                            vec3_t before_other = candidates[line_other_index].point;
+                            candidates[line_other_index].point =
+                                vec3_add(shared_point, vec3_scale(target_line_dir, line_len));
+                            float delta_other = vec3_length(vec3_sub(candidates[line_other_index].point, before_other));
+                            if (delta_other > pass_max_position_delta) pass_max_position_delta = delta_other;
+                            updated = true;
+                        } else if (!candidates[arc_center_index].fixed) {
+                            vec3_t before_center = candidates[arc_center_index].point;
+                            vec3_t target_center = vec3_sub(shared_point, vec3_scale(radial, 1.0f));
+                            candidates[arc_center_index].point = target_center;
+                            float delta_center = vec3_length(vec3_sub(candidates[arc_center_index].point, before_center));
+                            if (delta_center > pass_max_position_delta) pass_max_position_delta = delta_center;
+                            updated = true;
+                        }
+                    } else if (!candidates[line_other_index].fixed) {
+                        vec3_t before_other = candidates[line_other_index].point;
+                        candidates[line_other_index].point =
+                            vec3_add(shared_point, vec3_scale(target_line_dir, line_len));
+                        float delta_other = vec3_length(vec3_sub(candidates[line_other_index].point, before_other));
+                        if (delta_other > pass_max_position_delta) pass_max_position_delta = delta_other;
+                        updated = true;
+                    } else if (!arc_normal->fixed) {
+                        vec3_t radial_normalized = vec3_scale(radial, 1.0f / radial_len);
+                        vec3_t target_normal = vec3_cross(radial_normalized, target_line_dir);
+                        float target_normal_len = vec3_length(target_normal);
+                        if (target_normal_len <= 1e-6f || !isfinite(target_normal_len)) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        target_normal = vec3_scale(target_normal, 1.0f / target_normal_len);
+                        if (vec3_dot(target_normal, arc_normal->normal) < 0.0f) {
+                            target_normal = vec3_scale(target_normal, -1.0f);
+                        }
+                        float normal_residual = 0.0f;
+                        if (!scene_solver_try_set_arc_normal(arc_normal, target_normal,
+                                                             angle_tolerance,
+                                                             &pass_max_angle_delta,
+                                                             &normal_residual)) {
+                            solve_failed = true;
+                            failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        if (normal_residual > pass_max_residual) pass_max_residual = normal_residual;
+                        updated = true;
+                    }
+
+                    if (!updated) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    continue;
+                }
+
+                if (constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
+                    if (participant_count < 2) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    ecs_entity_t arc_entity_a = (ecs_entity_t)constraint->participant_descriptors[0].entity;
+                    ecs_entity_t arc_entity_b = (ecs_entity_t)constraint->participant_descriptors[1].entity;
+                    constraint_participant_role_t role_a =
+                        (constraint_participant_role_t)constraint->participant_descriptors[0].role;
+                    constraint_participant_role_t role_b =
+                        (constraint_participant_role_t)constraint->participant_descriptors[1].role;
+                    bool role_a_is_endpoint = role_a == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                                              role_a == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+                    bool role_b_is_endpoint = role_b == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                                              role_b == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+                    if (!role_a_is_endpoint || !role_b_is_endpoint ||
+                        arc_entity_a == 0 || arc_entity_b == 0 || arc_entity_a != arc_entity_b) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    int anchor_endpoint_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, arc_entity_a, role_a);
+                    int moved_endpoint_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, arc_entity_b, role_b);
+                    int center_index = scene_solver_ensure_point_candidate(
+                        scene, candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &candidate_count, arc_entity_a, CONSTRAINT_PARTICIPANT_ROLE_CENTER);
+                    int arc_normal_index = scene_solver_ensure_arc_normal_candidate(
+                        scene, arc_normal_candidates, ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
+                        &arc_normal_count, arc_entity_a);
+                    if (anchor_endpoint_index < 0 || moved_endpoint_index < 0 ||
+                        center_index < 0 || arc_normal_index < 0) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    const float pi = 3.14159265359f;
+                    float desired_angle = constraint->value;
+                    if (!isfinite(desired_angle)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    if (desired_angle < 0.0f) desired_angle = 0.0f;
+                    if (desired_angle > pi) desired_angle = pi;
+
+                    vec3_t anchor_radial = vec3_sub(candidates[anchor_endpoint_index].point,
+                                                    candidates[center_index].point);
+                    vec3_t moved_radial = vec3_sub(candidates[moved_endpoint_index].point,
+                                                   candidates[center_index].point);
+                    float anchor_len = vec3_length(anchor_radial);
+                    float moved_len = vec3_length(moved_radial);
+                    if (anchor_len <= 1e-6f || moved_len <= 1e-6f ||
+                        !isfinite(anchor_len) || !isfinite(moved_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t anchor_dir = vec3_scale(anchor_radial, 1.0f / anchor_len);
+                    vec3_t moved_dir = vec3_scale(moved_radial, 1.0f / moved_len);
+                    float current_dot = vec3_dot(anchor_dir, moved_dir);
+                    if (current_dot > 1.0f) current_dot = 1.0f;
+                    if (current_dot < -1.0f) current_dot = -1.0f;
+                    float current_angle = acosf(current_dot);
+                    float residual = fabsf(current_angle - desired_angle);
+                    if (residual > pass_max_residual) pass_max_residual = residual;
+                    if (residual > pass_max_angle_delta) pass_max_angle_delta = residual;
+                    if (residual <= angle_tolerance) {
+                        continue;
+                    }
+
+                    if (candidates[moved_endpoint_index].fixed) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+
+                    vec3_t arc_normal = arc_normal_candidates[arc_normal_index].normal;
+                    float arc_normal_len = vec3_length(arc_normal);
+                    if (arc_normal_len <= 1e-6f || !isfinite(arc_normal_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    arc_normal = vec3_scale(arc_normal, 1.0f / arc_normal_len);
+
+                    vec3_t anchor_plane = vec3_sub(anchor_dir, vec3_scale(arc_normal, vec3_dot(anchor_dir, arc_normal)));
+                    float anchor_plane_len = vec3_length(anchor_plane);
+                    if (anchor_plane_len <= 1e-6f || !isfinite(anchor_plane_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    anchor_plane = vec3_scale(anchor_plane, 1.0f / anchor_plane_len);
+                    vec3_t perp = vec3_cross(arc_normal, anchor_plane);
+                    float perp_len = vec3_length(perp);
+                    if (perp_len <= 1e-6f || !isfinite(perp_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    perp = vec3_scale(perp, 1.0f / perp_len);
+
+                    vec3_t target_plus = vec3_add(vec3_scale(anchor_plane, cosf(desired_angle)),
+                                                  vec3_scale(perp, sinf(desired_angle)));
+                    vec3_t target_minus = vec3_add(vec3_scale(anchor_plane, cosf(desired_angle)),
+                                                   vec3_scale(perp, -sinf(desired_angle)));
+                    float target_plus_len = vec3_length(target_plus);
+                    float target_minus_len = vec3_length(target_minus);
+                    if (target_plus_len <= 1e-6f || target_minus_len <= 1e-6f ||
+                        !isfinite(target_plus_len) || !isfinite(target_minus_len)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc endpoint-angle constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    target_plus = vec3_scale(target_plus, 1.0f / target_plus_len);
+                    target_minus = vec3_scale(target_minus, 1.0f / target_minus_len);
+                    vec3_t target_dir =
+                        (vec3_dot(target_plus, moved_dir) >= vec3_dot(target_minus, moved_dir))
+                            ? target_plus
+                            : target_minus;
+
+                    vec3_t before_moved = candidates[moved_endpoint_index].point;
+                    candidates[moved_endpoint_index].point =
+                        vec3_add(candidates[center_index].point, vec3_scale(target_dir, moved_len));
+                    float moved_delta = vec3_length(vec3_sub(candidates[moved_endpoint_index].point, before_moved));
+                    if (moved_delta > pass_max_position_delta) pass_max_position_delta = moved_delta;
+                    continue;
+                }
+
                 if (constraint->type == CONSTRAINT_FIXED) {
                     continue;
                 }
@@ -3132,6 +3855,12 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                     implicated_constraint_count > 0 ? implicated_constraints[0] : 0);
         sk->solve_completed_serial = sk->solve_request_serial;
         scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
+        if (!preserve_drag_anchor) {
+            sk->solver_drag_anchor_valid = false;
+            sk->solver_drag_anchor_owner_entity = 0;
+            sk->solver_drag_anchor_role = (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+            sk->solver_drag_anchor_sub_index = 0;
+        }
         return false;
     }
 
@@ -3157,9 +3886,23 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                     implicated_constraint_count > 0 ? implicated_constraints[0] : 0);
         sk->solve_completed_serial = sk->solve_request_serial;
         scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
+        if (!preserve_drag_anchor) {
+            sk->solver_drag_anchor_valid = false;
+            sk->solver_drag_anchor_owner_entity = 0;
+            sk->solver_drag_anchor_role = (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+            sk->solver_drag_anchor_sub_index = 0;
+        }
         return false;
     }
 
+    for (int i = 0; i < arc_normal_count; i++) {
+        GeometryComp *g = ecs_world_get_geometry(scene->world, arc_normal_candidates[i].entity);
+        RenderableComp *r = ecs_world_get_renderable(scene->world, arc_normal_candidates[i].entity);
+        if (!g || g->type != GEOM_ARC) continue;
+        g->data.arc.normal = vec3_normalize(arc_normal_candidates[i].normal);
+        if (r) r->instance_dirty = true;
+        scene_sync_endpoint_entities_for_owner(scene, arc_normal_candidates[i].entity);
+    }
     for (int i = 0; i < candidate_count; i++) {
         GeometryComp *g = ecs_world_get_geometry(scene->world, candidates[i].entity);
         RenderableComp *r = ecs_world_get_renderable(scene->world, candidates[i].entity);
@@ -3171,7 +3914,14 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
 
     sk->solve_completed_serial = sk->solve_request_serial;
     sketch_status_t derived_status = scene_derive_sketch_status(scene, sketch);
-    return scene_solver_apply_status(scene, sketch, derived_status);
+    bool status_applied = scene_solver_apply_status(scene, sketch, derived_status);
+    if (!preserve_drag_anchor) {
+        sk->solver_drag_anchor_valid = false;
+        sk->solver_drag_anchor_owner_entity = 0;
+        sk->solver_drag_anchor_role = (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+        sk->solver_drag_anchor_sub_index = 0;
+    }
+    return status_applied;
 }
 
 static inline bool scene_solver_add_diagnostic(ecs_scene_t *scene, ecs_entity_t sketch,

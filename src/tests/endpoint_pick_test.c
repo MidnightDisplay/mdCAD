@@ -404,6 +404,84 @@ static int test_directional_legality_rejects_raw_line_and_arc_entity_signatures_
     return 0;
 }
 
+static int test_arci01_legality_accepts_only_line_arc_entity_pair_D01(void) {
+    constraint_selection_signature_t legal_sig = {0};
+    legal_sig.count = 2;
+    legal_sig.geometry_types[0] = GEOM_LINE;
+    legal_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    legal_sig.geometry_types[1] = GEOM_ARC;
+    legal_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    legal_sig.entities[0] = 1001;
+    legal_sig.entities[1] = 1002;
+    if (!constraint_type_is_selection_legal(&legal_sig, CONSTRAINT_ARC_AXIS_LINE)) return 1;
+
+    constraint_selection_signature_t illegal_endpoint_sig = legal_sig;
+    illegal_endpoint_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    if (constraint_type_is_selection_legal(&illegal_endpoint_sig, CONSTRAINT_ARC_AXIS_LINE)) return 1;
+
+    constraint_selection_signature_t illegal_arc_arc = legal_sig;
+    illegal_arc_arc.geometry_types[0] = GEOM_ARC;
+    if (constraint_type_is_selection_legal(&illegal_arc_arc, CONSTRAINT_ARC_AXIS_LINE)) return 1;
+
+    return 0;
+}
+
+static int test_arci02_legality_accepts_only_line_endpoint_and_arc_endpoint_D05(void) {
+    constraint_selection_signature_t legal_sig = {0};
+    legal_sig.count = 2;
+    legal_sig.geometry_types[0] = GEOM_LINE;
+    legal_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    legal_sig.geometry_types[1] = GEOM_ARC;
+    legal_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    legal_sig.entities[0] = 2001;
+    legal_sig.entities[1] = 2002;
+    if (!constraint_type_is_selection_legal(&legal_sig, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY)) return 1;
+
+    constraint_selection_signature_t swapped_legal = legal_sig;
+    swapped_legal.geometry_types[0] = GEOM_ARC;
+    swapped_legal.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    swapped_legal.geometry_types[1] = GEOM_LINE;
+    swapped_legal.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    if (!constraint_type_is_selection_legal(&swapped_legal, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY)) return 1;
+
+    constraint_selection_signature_t illegal_entity = legal_sig;
+    illegal_entity.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    if (constraint_type_is_selection_legal(&illegal_entity, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY)) return 1;
+
+    constraint_selection_signature_t illegal_center = legal_sig;
+    illegal_center.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_CENTER;
+    if (constraint_type_is_selection_legal(&illegal_center, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY)) return 1;
+
+    return 0;
+}
+
+static int test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09(void) {
+    constraint_selection_signature_t legal_sig = {0};
+    legal_sig.count = 2;
+    legal_sig.geometry_types[0] = GEOM_ARC;
+    legal_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    legal_sig.geometry_types[1] = GEOM_ARC;
+    legal_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    legal_sig.entities[0] = 3001;
+    legal_sig.entities[1] = 3001;
+    if (!constraint_type_is_selection_legal(&legal_sig, CONSTRAINT_ARC_ENDPOINT_ANGLE)) return 1;
+
+    constraint_selection_signature_t reversed_sig = legal_sig;
+    reversed_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    reversed_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    if (!constraint_type_is_selection_legal(&reversed_sig, CONSTRAINT_ARC_ENDPOINT_ANGLE)) return 1;
+
+    constraint_selection_signature_t mixed_arc_sig = legal_sig;
+    mixed_arc_sig.entities[1] = 3002;
+    if (constraint_type_is_selection_legal(&mixed_arc_sig, CONSTRAINT_ARC_ENDPOINT_ANGLE)) return 1;
+
+    constraint_selection_signature_t illegal_center = legal_sig;
+    illegal_center.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_CENTER;
+    if (constraint_type_is_selection_legal(&illegal_center, CONSTRAINT_ARC_ENDPOINT_ANGLE)) return 1;
+
+    return 0;
+}
+
 static int test_endpoint_line_endpoint_to_owner_bidirectional_sync(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1729,6 +1807,12 @@ int main(void) {
           test_directional_legality_accepts_line_and_arc_landmark_roles_D02_D05 },
         { "test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06",
           test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06 },
+        { "test_arci01_legality_accepts_only_line_arc_entity_pair_D01",
+          test_arci01_legality_accepts_only_line_arc_entity_pair_D01 },
+        { "test_arci02_legality_accepts_only_line_endpoint_and_arc_endpoint_D05",
+          test_arci02_legality_accepts_only_line_endpoint_and_arc_endpoint_D05 },
+        { "test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09",
+          test_arci03_legality_accepts_same_arc_ordered_endpoint_pair_D09 },
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },

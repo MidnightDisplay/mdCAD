@@ -62,6 +62,11 @@ typedef struct {
     uint32_t diagnostics_count;
     uint32_t diagnostics_head;
     sketch_solver_diagnostic_t diagnostics[SKETCH_SOLVER_DIAGNOSTICS_MAX];
+    bool solver_drag_anchor_valid;
+    uint8_t solver_drag_anchor_role;
+    uint8_t solver_drag_anchor_sub_index;
+    uint16_t solver_drag_anchor_reserved;
+    uint64_t solver_drag_anchor_owner_entity;
 } SketchComp;
 
 static inline SketchComp sketch_comp_default(void) {

@@ -1,9 +1,9 @@
 ---
 phase: 24
 slug: advanced-arc-line-arc-constraint-expansion
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-08
 ---
 
@@ -38,10 +38,10 @@ created: 2026-04-08
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 24-01-01 | 01 | 1 | ARCI-01 | legality + transactional solve | `ctest -R "scene_solver_contract|endpoint_pick" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
-| 24-01-02 | 01 | 1 | ARCI-02 | endpoint-role legality + solve behavior | `ctest -R "scene_solver_contract|endpoint_pick" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
-| 24-02-01 | 02 | 2 | ARCI-03 | dimensional edit + ordered endpoint semantics | `ctest -R "scene_solver_contract|scene_solver_pass_policy" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
-| 24-02-02 | 02 | 2 | ARCI-04 | deterministic unsat diagnostics/implication | `ctest -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
+| 24-01-01 | 01 | 1 | ARCI-01 | legality + transactional solve | `ctest -R "scene_solver_contract|endpoint_pick" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 24-01-02 | 01 | 1 | ARCI-02 | endpoint-role legality + solve behavior | `ctest -R "scene_solver_contract|endpoint_pick" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 24-02-01 | 02 | 2 | ARCI-03 | dimensional edit + ordered endpoint semantics | `ctest -R "scene_solver_contract|scene_solver_pass_policy" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 24-02-02 | 02 | 2 | ARCI-04 | deterministic unsat diagnostics/implication | `ctest -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,9 +49,9 @@ created: 2026-04-08
 
 ## Wave 0 Requirements
 
-- [ ] `src/tests/endpoint_pick_test.c` — add ARCI legality matrix tests for required participant signatures and same-arc endpoint-pair constraints.
-- [ ] `src/tests/scene_solver_contract_test.c` — add ARCI success + fixed/fixed unsat transactional rollback tests.
-- [ ] `src/tests/scene_solver_pass_policy_test.c` or `src/tests/scene_solver_diagnostics_test.c` — lock explicit per-family unsatisfied diagnostics.
+- [x] `src/tests/endpoint_pick_test.c` — add ARCI legality matrix tests for required participant signatures and same-arc endpoint-pair constraints.
+- [x] `src/tests/scene_solver_contract_test.c` — add ARCI success + fixed/fixed unsat transactional rollback tests.
+- [x] `src/tests/scene_solver_pass_policy_test.c` or `src/tests/scene_solver_diagnostics_test.c` — lock explicit per-family unsatisfied diagnostics.
 
 ---
 
@@ -66,12 +66,12 @@ created: 2026-04-08
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verification or explicit Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers missing ARCI legality/solver/diagnostic test gaps
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 180s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verification or explicit Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers missing ARCI legality/solver/diagnostic test gaps
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete (manual checkpoint passed: Step 3 drag-anchor UX confirmed by user; full targeted gate green)
 

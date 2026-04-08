@@ -22,6 +22,7 @@ typedef enum {
 
 typedef struct {
     uint32_t count;
+    uint64_t entities[CONSTRAINT_MAX_PARTICIPANTS];
     geometry_type_t geometry_types[CONSTRAINT_MAX_PARTICIPANTS];
     constraint_participant_role_t roles[CONSTRAINT_MAX_PARTICIPANTS];
 } constraint_selection_signature_t;
@@ -40,14 +41,19 @@ static inline const char* constraint_type_display_name(constraint_type_t type) {
         "Concentric",
         "Length",
         "Angle",
-        "Tangential"
+        "Tangential",
+        "Arc Axis vs Line",
+        "Line-End Arc-End Tangency",
+        "Arc Endpoint Angle"
     };
     if (type < 0 || type >= CONSTRAINT_TYPE_COUNT) return "Constraint";
     return names[type];
 }
 
 static inline bool constraint_type_is_dimensional(constraint_type_t type) {
-    return type == CONSTRAINT_LENGTH || type == CONSTRAINT_ANGLE;
+    return type == CONSTRAINT_LENGTH ||
+           type == CONSTRAINT_ANGLE ||
+           type == CONSTRAINT_ARC_ENDPOINT_ANGLE;
 }
 
 static inline uint8_t constraint_clamp_decimals(int decimals) {
@@ -105,6 +111,9 @@ static inline uint32_t constraint_type_min_participants(constraint_type_t type) 
         case CONSTRAINT_CONCENTRIC:
         case CONSTRAINT_ANGLE:
         case CONSTRAINT_TANGENTIAL:
+        case CONSTRAINT_ARC_AXIS_LINE:
+        case CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY:
+        case CONSTRAINT_ARC_ENDPOINT_ANGLE:
             return 2;
         default:
             return 1;
@@ -208,6 +217,54 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
         if (has_subentity_point_role) return false;
         return sig->count == 1 &&
                (sig->geometry_types[0] == GEOM_LINE || sig->geometry_types[0] == GEOM_ARC);
+    }
+    if (type == CONSTRAINT_ARC_AXIS_LINE) {
+        if (sig->count != 2) return false;
+        if (has_subentity_point_role) return false;
+        bool line_arc =
+            sig->geometry_types[0] == GEOM_LINE && sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+            sig->geometry_types[1] == GEOM_ARC  && sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        bool arc_line =
+            sig->geometry_types[0] == GEOM_ARC  && sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+            sig->geometry_types[1] == GEOM_LINE && sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        return line_arc || arc_line;
+    }
+    if (type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY) {
+        if (sig->count != 2) return false;
+        bool first_line_endpoint =
+            sig->geometry_types[0] == GEOM_LINE &&
+            (sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+             sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+        bool second_line_endpoint =
+            sig->geometry_types[1] == GEOM_LINE &&
+            (sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+             sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+        bool first_arc_endpoint =
+            sig->geometry_types[0] == GEOM_ARC &&
+            (sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+             sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+        bool second_arc_endpoint =
+            sig->geometry_types[1] == GEOM_ARC &&
+            (sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+             sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+        return (first_line_endpoint && second_arc_endpoint) ||
+               (first_arc_endpoint && second_line_endpoint);
+    }
+    if (type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
+        if (sig->count != 2) return false;
+        if (sig->geometry_types[0] != GEOM_ARC || sig->geometry_types[1] != GEOM_ARC) return false;
+        bool endpoint0 =
+            sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+            sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+        bool endpoint1 =
+            sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+            sig->roles[1] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+        if (!endpoint0 || !endpoint1) return false;
+        if (sig->entities[0] != 0 && sig->entities[1] != 0 &&
+            sig->entities[0] != sig->entities[1]) {
+            return false;
+        }
+        return true;
     }
     return false;
 }

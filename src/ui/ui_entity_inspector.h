@@ -519,7 +519,8 @@ static inline float ui_constraint_angle_deg_to_rad(float degrees) {
 
 static inline float ui_constraint_user_value_from_scene(const ConstraintComp *constraint, float scene_value) {
     if (!constraint) return scene_value;
-    if (constraint->type == CONSTRAINT_ANGLE) {
+    if (constraint->type == CONSTRAINT_ANGLE ||
+        constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
         return ui_constraint_angle_rad_to_deg(scene_value);
     }
     return scene_value;
@@ -527,7 +528,8 @@ static inline float ui_constraint_user_value_from_scene(const ConstraintComp *co
 
 static inline float ui_constraint_scene_value_from_user(const ConstraintComp *constraint, float user_value) {
     if (!constraint) return user_value;
-    if (constraint->type == CONSTRAINT_ANGLE) {
+    if (constraint->type == CONSTRAINT_ANGLE ||
+        constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
         return ui_constraint_angle_deg_to_rad(user_value);
     }
     return user_value;
@@ -805,7 +807,10 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
         "Concentric",
         "Length",
         "Angle",
-        "Tangential"
+        "Tangential",
+        "Arc Axis vs Line",
+        "Line-End Arc-End Tangency",
+        "Arc Endpoint Angle"
     };
 
     igTextDisabled("Filter");
@@ -907,8 +912,10 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
                     char value_fmt[16];
                     ui_constraint_value_format(constraint, value_fmt, sizeof(value_fmt));
                     igSetNextItemWidth(140.0f);
-                    float step = (constraint->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
-                    float step_fast = (constraint->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+                    bool is_angle_dimension = (constraint->type == CONSTRAINT_ANGLE ||
+                                               constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE);
+                    float step = is_angle_dimension ? 1.0f : 0.1f;
+                    float step_fast = is_angle_dimension ? 5.0f : 1.0f;
                     if (igInputFloat(value_id, &edit_value, step, step_fast, value_fmt,
                                      ImGuiInputTextFlags_CharsDecimal)) {
                         if (scene) {
@@ -1517,7 +1524,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             "Concentric",
             "Length",
             "Angle",
-            "Tangential"
+            "Tangential",
+            "Arc Axis vs Line",
+            "Line-End Arc-End Tangency",
+            "Arc Endpoint Angle"
         };
 
         igTextDisabled("Filter");
@@ -1715,8 +1725,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                     ui_constraint_value_format(linked, value_fmt, sizeof(value_fmt));
                     igSameLine(0, 8);
                     igSetNextItemWidth(110.0f);
-                    float step = (linked->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
-                    float step_fast = (linked->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+                    bool linked_is_angle_dimension = (linked->type == CONSTRAINT_ANGLE ||
+                                                      linked->type == CONSTRAINT_ARC_ENDPOINT_ANGLE);
+                    float step = linked_is_angle_dimension ? 1.0f : 0.1f;
+                    float step_fast = linked_is_angle_dimension ? 5.0f : 1.0f;
                     if (igInputFloat("##linked_constraint_value", &edit_value, step, step_fast, value_fmt,
                                      ImGuiInputTextFlags_CharsDecimal)) {
                         if (scene) {
@@ -1757,8 +1769,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             char value_fmt[16];
             ui_constraint_value_format(constraint_entity, value_fmt, sizeof(value_fmt));
             igSetNextItemWidth(140.0f);
-            float step = (constraint_entity->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
-            float step_fast = (constraint_entity->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+            bool selected_is_angle_dimension = (constraint_entity->type == CONSTRAINT_ANGLE ||
+                                                constraint_entity->type == CONSTRAINT_ARC_ENDPOINT_ANGLE);
+            float step = selected_is_angle_dimension ? 1.0f : 0.1f;
+            float step_fast = selected_is_angle_dimension ? 5.0f : 1.0f;
             if (igInputFloat("Value##selected_constraint_value", &edit_value, step, step_fast, value_fmt,
                              ImGuiInputTextFlags_CharsDecimal)) {
                 if (scene) {

@@ -154,6 +154,10 @@ static inline float mdcad_rad_to_deg(float radians) {
     return radians * (180.0f / 3.14159265359f);
 }
 
+static inline bool mdcad_constraint_type_uses_degree_ui(constraint_type_t type) {
+    return type == CONSTRAINT_ANGLE || type == CONSTRAINT_ARC_ENDPOINT_ANGLE;
+}
+
 static inline bool mdcad_is_active_sketch_standalone_point_entity(ecs_entity_t entity, ecs_entity_t active_sketch) {
     if (entity == 0 || active_sketch == 0) return false;
     if (!scene_is_sketch(&state.ecs_scene, active_sketch)) return false;
@@ -668,6 +672,7 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
             constraint_participant_descriptor_make((uint64_t)participant_entity,
                                                    (uint8_t)participant_role,
                                                    participant_sub_index);
+        out_sig->entities[*out_participant_count] = (uint64_t)participant_entity;
         out_sig->geometry_types[*out_participant_count] = g->type;
         out_sig->roles[*out_participant_count] = participant_role;
         (*out_participant_count)++;
@@ -871,7 +876,7 @@ static void mdcad_draw_constraint_context_menu(void) {
         legal_count++;
 
         if (igMenuItem_Bool(constraint_type_display_name(type), NULL, false, true)) {
-            float initial_value = (type == CONSTRAINT_ANGLE) ? mdcad_deg_to_rad(90.0f) : 1.0f;
+            float initial_value = mdcad_constraint_type_uses_degree_ui(type) ? mdcad_deg_to_rad(90.0f) : 1.0f;
             ecs_entity_t created = scene_add_constraint_to_sketch_with_descriptors(
                 &state.ecs_scene,
                 state.constraint_menu_sketch,
@@ -958,7 +963,7 @@ static void mdcad_draw_constraint_dimension_popup(void) {
         return;
     }
 
-    bool is_angle_dimension = (constraint->type == CONSTRAINT_ANGLE);
+    bool is_angle_dimension = mdcad_constraint_type_uses_degree_ui(constraint->type);
     igText("%s", constraint_type_display_name(constraint->type));
     igTextDisabled("Units: %s", is_angle_dimension ? "deg" : "scene units");
     igSetNextItemWidth(180.0f);
@@ -1753,7 +1758,7 @@ static void frame(void) {
                                         igIsMouseDoubleClicked_Nil(ImGuiMouseButton_Left)) {
                                         state.constraint_dimension_popup_constraint = clicked_constraint;
                                         state.constraint_dimension_popup_value =
-                                            (constraint->type == CONSTRAINT_ANGLE)
+                                            mdcad_constraint_type_uses_degree_ui(constraint->type)
                                                 ? mdcad_rad_to_deg(constraint->value)
                                                 : constraint->value;
                                         state.constraint_dimension_popup_open_request = true;

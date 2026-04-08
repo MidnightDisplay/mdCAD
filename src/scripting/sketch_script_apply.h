@@ -164,19 +164,29 @@ static inline bool sketch_script_apply_create_constraints(ecs_scene_t *scene,
                                                           sketch_script_error_t *out_error) {
     for (uint32_t i = 0; i < model->constraint_count; i++) {
         const sketch_script_constraint_model_t *src = &model->constraints[i];
-        ecs_entity_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+        if (src->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY ||
+            src->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
+            sketch_script_apply_set_error(
+                out_error,
+                "Script apply does not support endpoint-role ARCI constraints without descriptor roles.");
+            return false;
+        }
+        constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
         for (uint32_t p = 0; p < src->participant_count; p++) {
-            participants[p] = sketch_script_apply_link_find(links, src->participants[p]);
-            if (participants[p] == 0) {
+            ecs_entity_t participant_entity = sketch_script_apply_link_find(links, src->participants[p]);
+            if (participant_entity == 0) {
                 sketch_script_apply_set_error(out_error, "Unresolved participant reference.");
                 return false;
             }
+            participants[p] = constraint_participant_descriptor_make((uint64_t)participant_entity,
+                                                                     CONSTRAINT_PARTICIPANT_ROLE_ENTITY,
+                                                                     0);
         }
 
-        ecs_entity_t constraint = scene_add_constraint_to_sketch(scene, sketch, src->type,
-                                                                 participants, src->participant_count,
-                                                                 src->has_value ? src->value : 0.0f,
-                                                                 src->driven);
+        ecs_entity_t constraint = scene_add_constraint_to_sketch_with_descriptors(scene, sketch, src->type,
+                                                                                   participants, src->participant_count,
+                                                                                   src->has_value ? src->value : 0.0f,
+                                                                                   src->driven);
         if (constraint == 0) {
             sketch_script_apply_set_error(out_error, "Failed creating script constraint.");
             return false;
@@ -247,6 +257,13 @@ static inline bool sketch_script_apply_validate_model_links(const sketch_script_
             sketch_script_apply_set_error(out_error, "Constraint participant count below minimum.");
             return false;
         }
+        if (constraint->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY ||
+            constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
+            sketch_script_apply_set_error(
+                out_error,
+                "Script validation does not support endpoint-role ARCI constraints without descriptor roles.");
+            return false;
+        }
         constraint_selection_signature_t sig = {0};
         sig.count = constraint->participant_count;
         for (uint32_t p = 0; p < constraint->participant_count; p++) {
@@ -255,13 +272,18 @@ static inline bool sketch_script_apply_validate_model_links(const sketch_script_
                 if (strcmp(model->entities[e].id, constraint->participants[p]) != 0) continue;
                 found = true;
                 if (model->entities[e].kind == SKETCH_SCRIPT_ENTITY_POINT) {
+                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_POINT;
+                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 } else if (model->entities[e].kind == SKETCH_SCRIPT_ENTITY_LINE) {
+                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_LINE;
+                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 } else {
+                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_ARC;
+                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 }
-                sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 break;
             }
             if (!found) {

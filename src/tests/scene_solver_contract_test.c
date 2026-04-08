@@ -981,6 +981,392 @@ static int test_recalculate_along_and_angle_coexistence_is_deterministic_D11(voi
     return ok ? 0 : 1;
 }
 
+static int test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(1.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    ecs_entity_t participants[2] = { line, arc };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ARC_AXIS_LINE, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+    vec3_t line_b_before = line_geom->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!solved || !arc_geom || arc_geom->type != GEOM_ARC || !line_geom || line_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t line_dir = vec3_normalize(vec3_sub(line_geom->data.line.b, line_geom->data.line.a));
+    vec3_t arc_normal = vec3_normalize(arc_geom->data.arc.normal);
+    float axis_dot = fabsf(vec3_dot(line_dir, arc_normal));
+    int ok = (axis_dot >= 0.999f &&
+              vec3_exact_eq(line_geom->data.line.a, line_a_before) &&
+              vec3_exact_eq(line_geom->data.line.b, line_b_before));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(1.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+    SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+    if (!line_state || !arc_state) return 1;
+    line_state->fixed = true;
+    arc_state->fixed = true;
+
+    ecs_entity_t participants[2] = { line, arc };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ARC_AXIS_LINE, participants, 2, 0.0f, false);
+    if (!c) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+    vec3_t line_b_before = line_geom->data.line.b;
+    vec3_t arc_normal_before = arc_geom->data.arc.normal;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    int ok = (!solved &&
+              line_geom && arc_geom &&
+              vec3_exact_eq(line_geom->data.line.a, line_a_before) &&
+              vec3_exact_eq(line_geom->data.line.b, line_b_before) &&
+              vec3_exact_eq(arc_geom->data.arc.normal, arc_normal_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c &&
+              strcmp(imp->reason, "Unsatisfied arc-axis-vs-line constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_line_arc_endpoint_tangency_satisfies_coincidence_then_tangent_D06_D07(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!solved || !line_geom || !arc_geom || line_geom->type != GEOM_LINE || arc_geom->type != GEOM_ARC) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t line_endpoint = line_geom->data.line.a;
+    vec3_t arc_endpoint = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &arc_endpoint, NULL)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t shared = line_endpoint;
+    vec3_t line_dir = vec3_normalize(vec3_sub(line_geom->data.line.b, shared));
+    vec3_t radial = vec3_normalize(vec3_sub(shared, arc_geom->data.arc.center));
+    vec3_t tangent = vec3_normalize(vec3_cross(vec3_normalize(arc_geom->data.arc.normal), radial));
+    float tangency_dot = fabsf(vec3_dot(line_dir, tangent));
+    int ok = (vec3_close(line_endpoint, arc_endpoint, 1e-4f) && tangency_dot >= 0.999f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_line_arc_endpoint_tangency_unsat_fixed_is_transactional_D08(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+    SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+    if (!line_state || !arc_state) return 1;
+    line_state->fixed = true;
+    arc_state->fixed = true;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+    vec3_t line_b_before = line_geom->data.line.b;
+    vec3_t arc_center_before = arc_geom->data.arc.center;
+    float arc_start_before = arc_geom->data.arc.start_angle;
+    float arc_end_before = arc_geom->data.arc.end_angle;
+    vec3_t arc_normal_before = arc_geom->data.arc.normal;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    int ok = (!solved &&
+              line_geom && arc_geom &&
+              vec3_exact_eq(line_geom->data.line.a, line_a_before) &&
+              vec3_exact_eq(line_geom->data.line.b, line_b_before) &&
+              vec3_exact_eq(arc_geom->data.arc.center, arc_center_before) &&
+              fabsf(arc_geom->data.arc.start_angle - arc_start_before) <= 1e-6f &&
+              fabsf(arc_geom->data.arc.end_angle - arc_end_before) <= 1e-6f &&
+              vec3_exact_eq(arc_geom->data.arc.normal, arc_normal_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c &&
+              strcmp(imp->reason, "Unsatisfied line-arc endpoint tangency constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anchor(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return 1;
+    if (!scene_solver_request_recalculate(&scene, sketch)) return 1;
+
+    EndPointsComp *line_endpoints = ecs_world_get_endpoints(scene.world, line);
+    endpoint_binding_t line_a_binding = {0};
+    if (!line_endpoints ||
+        !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_binding)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t line_a_endpoint = (ecs_entity_t)line_a_binding.endpoint_entity;
+    if (!line_a_endpoint || !ecs_is_alive(scene.world->world, line_a_endpoint)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+    vec3_t line_b_before = line_geom->data.line.b;
+    vec3_t drag_delta = vec3_make(0.6f, 0.4f, 0.0f);
+    vec3_t expected_anchor = vec3_add(line_a_before, drag_delta);
+
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, drag_delta)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!solved || !line_geom || !arc_geom) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t line_a_after = line_geom->data.line.a;
+    vec3_t line_b_after = line_geom->data.line.b;
+    vec3_t arc_a_after = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &arc_a_after, NULL)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t line_dir = vec3_normalize(vec3_sub(line_b_after, line_a_after));
+    vec3_t radial = vec3_normalize(vec3_sub(line_a_after, arc_geom->data.arc.center));
+    vec3_t tangent = vec3_normalize(vec3_cross(vec3_normalize(arc_geom->data.arc.normal), radial));
+    float tangency_dot = fabsf(vec3_dot(line_dir, tangent));
+
+    int ok = (vec3_close(line_a_after, expected_anchor, 1e-4f) &&
+              vec3_close(line_a_after, arc_a_after, 1e-4f) &&
+              !vec3_close(line_b_after, line_b_before, 1e-4f) &&
+              tangency_dot >= 0.999f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !arc) return 1;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1),
+    };
+    const float desired_angle = 0.5f;
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_ARC_ENDPOINT_ANGLE, desc, 2, desired_angle, false);
+    if (!c) return 1;
+
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!arc_geom || arc_geom->type != GEOM_ARC) return 1;
+    vec3_t before_a = vec3_make(0, 0, 0);
+    vec3_t before_b = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &before_a, NULL)) return 1;
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &before_b, NULL)) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!solved || !arc_geom) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t after_a = vec3_make(0, 0, 0);
+    vec3_t after_b = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &after_a, NULL)) return 1;
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &after_b, NULL)) return 1;
+
+    vec3_t center = arc_geom->data.arc.center;
+    vec3_t ra = vec3_normalize(vec3_sub(after_a, center));
+    vec3_t rb = vec3_normalize(vec3_sub(after_b, center));
+    float dot = vec3_dot(ra, rb);
+    if (dot > 1.0f) dot = 1.0f;
+    if (dot < -1.0f) dot = -1.0f;
+    float actual_angle = acosf(dot);
+
+    int ok = (vec3_close(after_a, before_a, 1e-4f) &&
+              !vec3_close(after_b, before_b, 1e-4f) &&
+              fabsf(actual_angle - desired_angle) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !arc) return 1;
+
+    SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+    if (!arc_state) return 1;
+    arc_state->fixed = true;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_ARC_ENDPOINT_ANGLE, desc, 2, 0.5f, false);
+    if (!c) return 1;
+
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!arc_geom) return 1;
+    vec3_t center_before = arc_geom->data.arc.center;
+    float start_before = arc_geom->data.arc.start_angle;
+    float end_before = arc_geom->data.arc.end_angle;
+    vec3_t normal_before = arc_geom->data.arc.normal;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    int ok = (!solved &&
+              arc_geom &&
+              vec3_exact_eq(arc_geom->data.arc.center, center_before) &&
+              fabsf(arc_geom->data.arc.start_angle - start_before) <= 1e-6f &&
+              fabsf(arc_geom->data.arc.end_angle - end_before) <= 1e-6f &&
+              vec3_exact_eq(arc_geom->data.arc.normal, normal_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c &&
+              strcmp(imp->reason, "Unsatisfied arc endpoint-angle constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -1025,6 +1411,20 @@ int main(void) {
           test_recalculate_along_z_mixed_landmarks_contract_D11 },
         { "test_recalculate_along_and_angle_coexistence_is_deterministic_D11",
           test_recalculate_along_and_angle_coexistence_is_deterministic_D11 },
+        { "test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03",
+          test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03 },
+        { "test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04",
+          test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04 },
+        { "test_arci_line_arc_endpoint_tangency_satisfies_coincidence_then_tangent_D06_D07",
+          test_arci_line_arc_endpoint_tangency_satisfies_coincidence_then_tangent_D06_D07 },
+        { "test_arci_line_arc_endpoint_tangency_unsat_fixed_is_transactional_D08",
+          test_arci_line_arc_endpoint_tangency_unsat_fixed_is_transactional_D08 },
+        { "test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anchor",
+          test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anchor },
+        { "test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11",
+          test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11 },
+        { "test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12",
+          test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

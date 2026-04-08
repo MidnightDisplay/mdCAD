@@ -518,6 +518,20 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
             if (i > 0) json_builder_append(b, ", ");
             json_builder_appendf(b, "%llu", (unsigned long long)constraint->participants[i]);
         }
+        json_builder_append(b, "],\n");
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"participant_descriptors\": [");
+        for (uint32_t i = 0; i < constraint->participant_count; i++) {
+            if (i > 0) json_builder_append(b, ", ");
+            const constraint_participant_descriptor_t *descriptor =
+                &constraint->participant_descriptors[i];
+            json_builder_appendf(
+                b,
+                "{\"entity\": %llu, \"role\": %u, \"sub_index\": %u}",
+                (unsigned long long)descriptor->entity,
+                (unsigned int)descriptor->role,
+                (unsigned int)descriptor->sub_index);
+        }
         json_builder_append(b, "]\n");
         json_write_indent(b, depth + 2);
         json_builder_append(b, "}");
@@ -1654,6 +1668,7 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
     ent->constraint = constraint_comp_default();
     ent->has_constraint = true;
     bool has_display_decimals = false;
+    bool has_participant_descriptors = false;
 
     if (!json_next_token(p)) return false;
 
@@ -1707,6 +1722,60 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
                 }
             }
             if (!json_next_token(p)) return false;  // Skip ]
+        } else if (strcmp(key, "participant_descriptors") == 0) {
+            if (p->token != JSON_TOK_LBRACKET) return false;
+            uint32_t descriptor_count = 0;
+            if (!json_next_token(p)) return false;
+            while (p->token != JSON_TOK_RBRACKET) {
+                if (p->token != JSON_TOK_LBRACE) return false;
+                constraint_participant_descriptor_t descriptor =
+                    constraint_participant_descriptor_make(0, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0);
+                if (!json_next_token(p)) return false;
+                while (p->token != JSON_TOK_RBRACE) {
+                    if (p->token != JSON_TOK_STRING) return false;
+                    char descriptor_key[64];
+                    strncpy(descriptor_key, p->str_value, sizeof(descriptor_key) - 1);
+                    descriptor_key[sizeof(descriptor_key) - 1] = '\0';
+                    if (!json_next_token(p)) return false;
+                    if (p->token != JSON_TOK_COLON) return false;
+                    if (!json_next_token(p)) return false;
+
+                    if (strcmp(descriptor_key, "entity") == 0) {
+                        if (p->token != JSON_TOK_NUMBER) return false;
+                        descriptor.entity = (uint64_t)p->num_value;
+                        if (!json_next_token(p)) return false;
+                    } else if (strcmp(descriptor_key, "role") == 0) {
+                        if (p->token != JSON_TOK_NUMBER) return false;
+                        int role = (int)p->num_value;
+                        if (role < 0 || role > 255) return false;
+                        descriptor.role = (uint8_t)role;
+                        if (!json_next_token(p)) return false;
+                    } else if (strcmp(descriptor_key, "sub_index") == 0) {
+                        if (p->token != JSON_TOK_NUMBER) return false;
+                        int sub_index = (int)p->num_value;
+                        if (sub_index < 0 || sub_index > 255) return false;
+                        descriptor.sub_index = (uint8_t)sub_index;
+                        if (!json_next_token(p)) return false;
+                    } else {
+                        if (!json_skip_value(p)) return false;
+                    }
+
+                    if (p->token == JSON_TOK_COMMA) {
+                        if (!json_next_token(p)) return false;
+                    }
+                }
+                if (p->token != JSON_TOK_RBRACE) return false;
+
+                if (descriptor_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
+                ent->constraint.participant_descriptors[descriptor_count++] = descriptor;
+                if (!json_next_token(p)) return false; // skip descriptor object
+                if (p->token == JSON_TOK_COMMA) {
+                    if (!json_next_token(p)) return false;
+                }
+            }
+            if (descriptor_count > ent->constraint.participant_count) return false;
+            has_participant_descriptors = true;
+            if (!json_next_token(p)) return false; // skip ]
         } else {
             if (!json_skip_value(p)) return false;
         }
@@ -1725,6 +1794,15 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
             ent->constraint.display_decimals = 6;
         }
         ent->constraint.value = constraint_round_to_decimals(ent->constraint.value, ent->constraint.display_decimals);
+    }
+
+    if (!has_participant_descriptors) {
+        for (uint32_t i = 0; i < ent->constraint.participant_count; i++) {
+            ent->constraint.participant_descriptors[i] =
+                constraint_participant_descriptor_make(ent->constraint.participants[i],
+                                                       CONSTRAINT_PARTICIPANT_ROLE_ENTITY,
+                                                       0);
+        }
     }
 
     return json_next_token(p);  // Skip }
@@ -2300,7 +2378,11 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         ConstraintComp *constraint = ecs_world_get_constraint(scene->world, entities[i].new_entity);
         if (!constraint) continue;
         for (uint32_t p_idx = 0; p_idx < constraint->participant_count; p_idx++) {
-            ecs_entity_t participant = scene_find_new_entity(entities, entity_count, constraint->participants[p_idx]);
+            uint64_t descriptor_old_entity = constraint->participant_descriptors[p_idx].entity;
+            if (descriptor_old_entity == 0) {
+                descriptor_old_entity = constraint->participants[p_idx];
+            }
+            ecs_entity_t participant = scene_find_new_entity(entities, entity_count, descriptor_old_entity);
             if (participant == 0) continue;
             ConstraintParticipantComp *refs = ecs_world_get_constraint_participant(scene->world, participant);
             if (!refs) {
@@ -2312,6 +2394,7 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
                 constraint_participant_add(refs, (uint64_t)entities[i].new_entity);
                 // Rewrite participants to current entity IDs so scene state is fully normalized.
                 constraint->participants[p_idx] = (uint64_t)participant;
+                constraint->participant_descriptors[p_idx].entity = (uint64_t)participant;
             }
         }
     }

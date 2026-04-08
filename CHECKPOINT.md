@@ -209,6 +209,56 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-04-08)
 
+### Phase 25 Regression and Reliability Closure (IMPLEMENTED)
+
+- Completed Phase 25 execution and promoted plans `25-01` and `25-02` to complete (2/2 plans).
+- Executed focused anti-flake reliability slice twice:
+  - `ctest --test-dir build-vulkan -C Release -R "scene_solver_trigger|scene_solver_pass_policy" --output-on-failure`
+  - Result: **2/2 passed**, then **2/2 passed**.
+- Executed full strict closure gate baseline and mandatory fresh rerun:
+  - `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag|endpoint_pick|script_roundtrip_tests" --output-on-failure`
+  - Result: **7/7 passed** baseline and **7/7 passed** fresh rerun.
+- Added/updated Phase 25 closure artifacts:
+  - `.planning/phases/25-regression-and-reliability-closure/25-01-SUMMARY.md` (new)
+  - `.planning/phases/25-regression-and-reliability-closure/25-02-SUMMARY.md` (new)
+  - `.planning/phases/25-regression-and-reliability-closure/25-VERIFICATION.md` (new, `status: passed`)
+  - `.planning/phases/25-regression-and-reliability-closure/25-VALIDATION.md` (`status: complete`, nyquist rows complete)
+- Backfilled missing Phase 24 summary artifact required by plan outputs:
+  - `.planning/phases/24-advanced-arc-line-arc-constraint-expansion/24-01-SUMMARY.md` (new)
+- Project continuity advanced after closure:
+  - `.planning/ROADMAP.md` marks Phase 25 complete (2/2 plans).
+  - `.planning/REQUIREMENTS.md` marks `V13-01` complete.
+  - `.planning/STATE.md` now reflects v1.3 phase closure state and routes next command to `/gsd-complete-milestone`.
+  - `.planning/PROJECT.md` current-state section updated to reflect Phase 25 closure and v1.3 completion readiness.
+
+### Phase 24 Advanced Arc + Line-Arc Constraint Expansion Closure (IMPLEMENTED)
+
+- Completed Phase 24 closure loop and promoted plans `24-01` and `24-02` to complete (2/2 plans).
+- Delivered ARCI families end-to-end across legality/UI/solver:
+  - `CONSTRAINT_ARC_AXIS_LINE`
+  - `CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY`
+  - `CONSTRAINT_ARC_ENDPOINT_ANGLE`
+- Solver/runtime closure:
+  - Added deterministic ARCI solve branches with transactional failure semantics and family-specific unsatisfied diagnostics.
+  - Added ARCI-02 drag-anchor aware behavior so shared endpoint drag stays usable while tangency remains stable.
+  - Preserved deterministic repeated recalc behavior under unchanged state.
+- Persistence/script parity closure:
+  - Serializer now writes/reads/remaps `participant_descriptors` for role-sensitive ARCI constraints.
+  - Script apply explicitly rejects role-sensitive ARCI constraints until script descriptor-role modeling is available.
+- Targeted closure gate re-validated on Windows Vulkan:
+  - `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag|endpoint_pick|script_roundtrip_tests" --output-on-failure`
+  - Result: **7/7 passed**.
+- Manual checkpoint follow-up accepted:
+  - ARCI-02 shared endpoint drag behavior now passes ("shared point draggable, tangency stable").
+- Added/updated Phase 24 closure artifacts:
+  - `.planning/phases/24-advanced-arc-line-arc-constraint-expansion/24-02-SUMMARY.md` (new)
+  - `.planning/phases/24-advanced-arc-line-arc-constraint-expansion/24-VERIFICATION.md` (new, `status: passed`)
+  - `.planning/phases/24-advanced-arc-line-arc-constraint-expansion/24-VALIDATION.md` (`status: complete`, rows green, approval complete)
+- Project continuity advanced to next phase:
+  - `.planning/ROADMAP.md` marks Phase 24 complete.
+  - `.planning/STATE.md` advances focus to **Phase 25** with `Next command: /gsd-plan-phase 25`.
+  - `.planning/REQUIREMENTS.md` marks `ARCI-01..04` complete.
+
 ### Phase 23 Principal-Direction Constraint Expansion Closure (IMPLEMENTED)
 
 - Completed Phase 23 closure loop and promoted plan `23-03` to complete (3/3 plans).

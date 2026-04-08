@@ -22,6 +22,9 @@ typedef enum {
     CONSTRAINT_LENGTH,
     CONSTRAINT_ANGLE,
     CONSTRAINT_TANGENTIAL,
+    CONSTRAINT_ARC_AXIS_LINE,
+    CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY,
+    CONSTRAINT_ARC_ENDPOINT_ANGLE,
     CONSTRAINT_TYPE_COUNT
 } constraint_type_t;
 
@@ -65,7 +68,9 @@ static inline ConstraintComp constraint_comp_default(void) {
 
 static inline bool constraint_comp_is_dimensional(const ConstraintComp *c) {
     if (!c) return false;
-    return c->type == CONSTRAINT_LENGTH || c->type == CONSTRAINT_ANGLE;
+    return c->type == CONSTRAINT_LENGTH ||
+           c->type == CONSTRAINT_ANGLE ||
+           c->type == CONSTRAINT_ARC_ENDPOINT_ANGLE;
 }
 
 static inline const char* constraint_type_name(constraint_type_t type) {
@@ -82,7 +87,10 @@ static inline const char* constraint_type_name(constraint_type_t type) {
         "Concentric",
         "Length",
         "Angle",
-        "Tangential"
+        "Tangential",
+        "Arc Axis vs Line",
+        "Line-End Arc-End Tangency",
+        "Arc Endpoint Angle"
     };
     if (type < 0 || type >= CONSTRAINT_TYPE_COUNT) {
         return "Constraint";
@@ -97,7 +105,9 @@ static inline ConstraintComp constraint_comp_make(constraint_type_t type,
                                                   bool driven) {
     ConstraintComp c = constraint_comp_default();
     c.type = type;
-    c.has_value = (type == CONSTRAINT_LENGTH || type == CONSTRAINT_ANGLE);
+    c.has_value = (type == CONSTRAINT_LENGTH ||
+                   type == CONSTRAINT_ANGLE ||
+                   type == CONSTRAINT_ARC_ENDPOINT_ANGLE);
     c.driven = c.has_value ? driven : false;
     c.value = c.has_value ? value : 0.0f;
     c.display_decimals = 4;

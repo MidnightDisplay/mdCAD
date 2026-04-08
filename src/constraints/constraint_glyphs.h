@@ -22,7 +22,8 @@ static inline float constraint_glyphs_angle_rad_to_deg(float radians) {
 
 static inline float constraint_glyphs_user_value_from_scene(const ConstraintComp *constraint, float scene_value) {
     if (!constraint) return scene_value;
-    if (constraint->type == CONSTRAINT_ANGLE) {
+    if (constraint->type == CONSTRAINT_ANGLE ||
+        constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
         return constraint_glyphs_angle_rad_to_deg(scene_value);
     }
     return scene_value;
@@ -312,7 +313,9 @@ static inline bool constraint_glyphs_constraints_share_participant(ecs_scene_t *
 
 static inline int constraint_glyphs_type_priority(const ConstraintComp *constraint) {
     if (!constraint) return 0;
-    if (constraint->type == CONSTRAINT_LENGTH || constraint->type == CONSTRAINT_ANGLE) {
+    if (constraint->type == CONSTRAINT_LENGTH ||
+        constraint->type == CONSTRAINT_ANGLE ||
+        constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
         return 1;
     }
     return 0;
