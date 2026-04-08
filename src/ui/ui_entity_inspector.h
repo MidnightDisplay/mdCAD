@@ -829,6 +829,7 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
     if (constraint_row_count == 0) {
         igTextDisabled("No constraints yet");
         igTextWrapped("Select sketch geometry, press C to open applicable constraints, then apply one to define sketch behavior.");
+        igTextDisabled("Directional authoring: ALONG X/Y/Z appears only for legal point participants (standalone points, line endpoints, arc endpoints/center).");
     } else {
         for (int row = 0; row < constraint_row_count; row++) {
             ecs_entity_t c_e = constraint_rows[row];
@@ -1072,8 +1073,6 @@ static inline void ui_entity_inspector_draw_solver_section(ui_entity_inspector_s
     igBeginDisabled(scene == NULL);
     if (igButton("Recalculate Sketch", (ImVec2){0, 0})) {
         scene_solver_request_recalculate(scene, e);
-        scene_solver_add_diagnostic(scene, e, SKETCH_SOLVER_DIAG_INFO,
-                                    "manual", "Manual solve requested via Recalculate Sketch.", 0);
         sketch = ecs_world_get_sketch(w, e);
     }
     igEndDisabled();
@@ -1086,6 +1085,7 @@ static inline void ui_entity_inspector_draw_solver_section(ui_entity_inspector_s
         igTextWrapped("Run Recalculate Sketch or edit sketch geometry/constraints to generate diagnostics for this sketch.");
     } else {
         igTextDisabled("Identical consecutive diagnostics are suppressed.");
+        igTextDisabled("Unsatisfied ALONG/ANGLE combinations surface explicit solver diagnostics; geometry remains transactional.");
         for (int i = 0; i < diag_count; i++) {
             const sketch_solver_diagnostic_t *diag = scene_solver_diagnostic_at(scene, e, i);
             if (!diag) continue;
@@ -1541,6 +1541,7 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         if (constraint_row_count == 0) {
             igTextDisabled("No constraints yet");
             igTextWrapped("Select sketch geometry, press C to open applicable constraints, then apply one to define sketch behavior.");
+            igTextDisabled("Directional authoring: ALONG X/Y/Z appears only for legal point participants (standalone points, line endpoints, arc endpoints/center).");
         } else {
             for (int row = 0; row < constraint_row_count; row++) {
                 ecs_entity_t c_e = constraint_rows[row];
