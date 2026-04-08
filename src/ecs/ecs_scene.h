@@ -354,6 +354,9 @@ static inline bool scene_apply_endpoint_point_world_delta(ecs_scene_t *scene,
                                                           vec3_t world_delta);
 static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *scene,
                                                                   ecs_entity_t endpoint_entity);
+static inline bool scene_apply_standalone_sketch_point_world_delta(ecs_scene_t *scene,
+                                                                    ecs_entity_t point_entity,
+                                                                    vec3_t world_delta);
 static inline bool scene_update_arc_renderable_slots(ecs_scene_t *scene, ecs_entity_t entity, RenderableComp *r, const GeometryComp *g);
 static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
                                                              const ecs_entity_t *entities,
@@ -749,6 +752,35 @@ static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *s
     if (owner_renderable) owner_renderable->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, owner);
+    scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
+    return true;
+}
+
+static inline bool scene_apply_standalone_sketch_point_world_delta(ecs_scene_t *scene,
+                                                                    ecs_entity_t point_entity,
+                                                                    vec3_t world_delta) {
+    if (!scene || point_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, point_entity)) return false;
+
+    EndPointsComp *endpoint_meta = ecs_world_get_endpoints(scene->world, point_entity);
+    if (endpoint_meta && endpoint_meta->is_endpoint_point) return false;
+
+    GeometryComp *point_geom = ecs_world_get_geometry(scene->world, point_entity);
+    TransformComp *point_xform = ecs_world_get_transform(scene->world, point_entity);
+    if (!point_geom || point_geom->type != GEOM_POINT || !point_xform) return false;
+
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, point_entity);
+    if (!scene_is_sketch(scene, sketch)) return false;
+
+    vec3_t local_delta = scene_world_delta_to_local(&point_xform->world_matrix, world_delta);
+    vec3_t next_local = vec3_add(point_geom->data.point.point, local_delta);
+    if (!isfinite(next_local.x) || !isfinite(next_local.y) || !isfinite(next_local.z)) return false;
+
+    point_geom->data.point.point = next_local;
+    RenderableComp *point_renderable = ecs_world_get_renderable(scene->world, point_entity);
+    if (point_renderable) point_renderable->instance_dirty = true;
+
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return true;

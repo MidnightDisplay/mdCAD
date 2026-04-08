@@ -1,9 +1,9 @@
 ---
 phase: 23
 slug: principal-direction-constraint-expansion
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-08
 ---
 
@@ -38,11 +38,11 @@ created: 2026-04-08
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 23-01-01 | 01 | 1 | AXIS-01, AXIS-02, AXIS-03, AXIS-04 | legality/contract | `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure` | ✅ (needs expansion) | ⬜ pending |
-| 23-01-02 | 01 | 1 | AXIS-01, AXIS-02, AXIS-03 | solver/contract | `ctest -R scene_solver_contract --test-dir build-vulkan -C Release --output-on-failure` | ✅ (needs expansion) | ⬜ pending |
-| 23-02-01 | 02 | 2 | SRLV-04 | integration/behavior | `ctest -R "scene_solver_contract|scene_solver_pass_policy" --test-dir build-vulkan -C Release --output-on-failure` | ✅ (needs expansion) | ⬜ pending |
-| 23-02-02 | 02 | 2 | SRLV-04, AXIS-01, AXIS-02, AXIS-03, AXIS-04 | targeted gate | `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_pass_policy|scene_solver_trigger|scene_solver_diagnostics|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
-| 23-03-01 | 03 | 3 | AXIS-01, AXIS-02, AXIS-03, AXIS-04, SRLV-04 | regression + UX acceptance gate | `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_pass_policy|scene_solver_trigger|scene_solver_diagnostics|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ⬜ pending |
+| 23-01-01 | 01 | 1 | AXIS-01, AXIS-02, AXIS-03, AXIS-04 | legality/contract | `ctest -R endpoint_pick --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 23-01-02 | 01 | 1 | AXIS-01, AXIS-02, AXIS-03 | solver/contract | `ctest -R scene_solver_contract --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 23-02-01 | 02 | 2 | SRLV-04 | integration/behavior | `ctest -R "scene_solver_contract|scene_solver_pass_policy" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 23-02-02 | 02 | 2 | SRLV-04, AXIS-01, AXIS-02, AXIS-03, AXIS-04 | targeted gate | `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_pass_policy|scene_solver_trigger|scene_solver_diagnostics|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
+| 23-03-01 | 03 | 3 | AXIS-01, AXIS-02, AXIS-03, AXIS-04, SRLV-04 | regression + UX acceptance gate | `ctest -R "endpoint_pick|scene_solver_contract|scene_solver_pass_policy|scene_solver_trigger|scene_solver_diagnostics|scene_solver_drag" --test-dir build-vulkan -C Release --output-on-failure` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -50,10 +50,10 @@ created: 2026-04-08
 
 ## Wave 0 Requirements
 
-- [ ] `src/tests/endpoint_pick_test.c` — legality matrix expansion for `ALONG X/Y/Z` over standalone points + endpoint/center roles.
-- [ ] `src/tests/scene_solver_contract_test.c` — deterministic ALONG axis projection behavior and ALONG+ANGLE coexistence assertions.
-- [ ] `src/tests/scene_solver_pass_policy_test.c` — bounded pass behavior when ALONG constraints are active.
-- [ ] `src/constraints/constraint_types.h` legality changes are covered by executable tests before runtime plan completion.
+- [x] `src/tests/endpoint_pick_test.c` — legality matrix expansion for `ALONG X/Y/Z` over standalone points + endpoint/center roles.
+- [x] `src/tests/scene_solver_contract_test.c` — deterministic ALONG axis projection behavior and ALONG+ANGLE coexistence assertions.
+- [x] `src/tests/scene_solver_pass_policy_test.c` — bounded pass behavior when ALONG constraints are active.
+- [x] `src/constraints/constraint_types.h` legality changes are covered by executable tests before runtime plan completion.
 
 ---
 
@@ -75,5 +75,5 @@ created: 2026-04-08
 - [x] Feedback latency < 180s in targeted runs
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete (user accepted final manual checks and standalone-point untabbed gizmo behavior fix)
 

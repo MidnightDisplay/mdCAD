@@ -14,7 +14,7 @@
 ## Phases
 
 - [x] **Phase 22: Solver Trigger + Recalculate Determinism** - Establish trustworthy solve triggering and deterministic pass-bounded recalculate behavior.
-- [ ] **Phase 23: Principal-Direction Constraint Expansion** - Deliver ALONG X/Y/Z group constraints across supported point participant types.
+- [x] **Phase 23: Principal-Direction Constraint Expansion** - Deliver ALONG X/Y/Z group constraints across supported point participant types.
 - [ ] **Phase 24: Advanced Arc + Line-Arc Constraint Expansion** - Deliver arc-axis, tangency, and arc endpoint angle constraints with deterministic outcomes.
 - [ ] **Phase 25: Regression and Reliability Closure** - Lock automated regression coverage for trigger integrity, pass policy behavior, and new constraint semantics.
 
@@ -50,7 +50,7 @@ Plans:
 Plans:
 - [x] 23-01-PLAN.md — Expand ALONG legality to descriptor-based point participants and lock shared UI/script legality contracts with tests.
 - [x] 23-02-PLAN.md — Implement scene-owned ALONG X/Y/Z transactional solve path and ALONG+ANGLE coexistence behavior with deterministic diagnostics.
-- [ ] 23-03-PLAN.md — Align directional authoring UX and complete final automated + human verification closure for AXIS/SRLV requirements.
+- [x] 23-03-PLAN.md — Align directional authoring UX and complete final automated + human verification closure for AXIS/SRLV requirements.
 
 ### Phase 24: Advanced Arc + Line-Arc Constraint Expansion
 **Goal**: Users can author and maintain advanced arc and line-arc constraints that solve predictably or fail with explicit diagnostics.
@@ -78,6 +78,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Solver Trigger + Recalculate Determinism | 3/3 | Complete | 2026-04-08 |
-| 23. Principal-Direction Constraint Expansion | 2/3 | In Progress|  |
+| 23. Principal-Direction Constraint Expansion | 3/3 | Complete | 2026-04-08 |
 | 24. Advanced Arc + Line-Arc Constraint Expansion | 0/0 | Not started | - |
 | 25. Regression and Reliability Closure | 0/0 | Not started | - |

@@ -209,6 +209,31 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-04-08)
 
+### Phase 23 Principal-Direction Constraint Expansion Closure (IMPLEMENTED)
+
+- Completed Phase 23 closure loop and promoted plan `23-03` to complete (3/3 plans).
+- Directional solver/legality closure verified and accepted:
+  - ALONG X/Y/Z legality and deterministic solve behavior across standalone points, line endpoints, and arc landmarks.
+  - ALONG + ANGLE recalc coexistence remained deterministic and functional.
+- Delivered requested sketch UX improvement:
+  - Active-sketch standalone points now support direct gizmo manipulation without `Tab`.
+  - Untabbed drag mutates `GeometryComp.point` local coordinates (not `TransformComp.position`).
+  - Drag undo records geometry-vertex commands (`CMD_SET_GEOMETRY_VERTICES`) for these standalone sketch points.
+- Added regression coverage:
+  - `src/tests/endpoint_pick_test.c` includes standalone sketch-point geometry drag + undo replay assertions.
+- Scene/runtime integration update:
+  - `src/ecs/ecs_scene.h` adds `scene_apply_standalone_sketch_point_world_delta(...)` with scene-owned solver auto-request and script re-emit side-effects.
+- Targeted closure gate re-validated on Windows Vulkan:
+  - `ctest --test-dir build-vulkan -C Release -R "endpoint_pick|scene_solver_contract|scene_solver_pass_policy|scene_solver_trigger|scene_solver_diagnostics|scene_solver_drag" --output-on-failure`
+  - Result: **6/6 passed**.
+- Added/updated Phase 23 closure artifacts:
+  - `.planning/phases/23-principal-direction-constraint-expansion/23-03-SUMMARY.md` (new)
+  - `.planning/phases/23-principal-direction-constraint-expansion/23-VERIFICATION.md` (new, `status: passed`)
+  - `.planning/phases/23-principal-direction-constraint-expansion/23-VALIDATION.md` (`status: complete`, wave/task rows green, approval complete)
+- Project continuity advanced to next phase:
+  - `.planning/ROADMAP.md` marks Phase 23 complete.
+  - `.planning/STATE.md` advances focus to **Phase 24** with `Next command: /gsd-plan-phase 24`.
+
 ### Phase 22 Solver Trigger + Recalculate Determinism Closure (IMPLEMENTED)
 
 - Completed Phase 22 closure loop and promoted plan `22-03` to complete (3/3 plans).

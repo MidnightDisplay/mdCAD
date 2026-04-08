@@ -1093,6 +1093,130 @@ static int test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position(voi
     return 0;
 }
 
+static int test_standalone_sketch_point_drag_records_geometry_vertex_undo(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    if (sketch == 0) return 1;
+    ecs_entity_t point = scene_add_point_to_sketch(
+        &scene, sketch, vec3_make(0.25f, -0.5f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 0.06f);
+    if (point == 0) return 1;
+
+    GeometryComp *point_geom = ecs_world_get_geometry(&world, point);
+    TransformComp *point_xform = ecs_world_get_transform(&world, point);
+    EndPointsComp *point_endpoint_meta = ecs_world_get_endpoints(&world, point);
+    if (!point_geom || point_geom->type != GEOM_POINT || !point_xform) return 1;
+    if (point_endpoint_meta && point_endpoint_meta->is_endpoint_point) return 1;
+
+    vec3_t old_local = point_geom->data.point.point;
+    if (fabsf(point_xform->position.x) > 1e-6f ||
+        fabsf(point_xform->position.y) > 1e-6f ||
+        fabsf(point_xform->position.z) > 1e-6f) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_apply_standalone_sketch_point_world_delta(&scene, point, vec3_make(0.35f, 0.2f, 0.0f))) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_apply_standalone_sketch_point_world_delta(&scene, point, vec3_make(-0.1f, 0.15f, 0.0f))) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    point_geom = ecs_world_get_geometry(&world, point);
+    point_xform = ecs_world_get_transform(&world, point);
+    if (!point_geom || point_geom->type != GEOM_POINT || !point_xform) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t new_local = point_geom->data.point.point;
+    if (fabsf(new_local.x - old_local.x) <= 1e-6f &&
+        fabsf(new_local.y - old_local.y) <= 1e-6f &&
+        fabsf(new_local.z - old_local.z) <= 1e-6f) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (fabsf(point_xform->position.x) > 1e-6f ||
+        fabsf(point_xform->position.y) > 1e-6f ||
+        fabsf(point_xform->position.z) > 1e-6f) {
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    int vertex_index = 0;
+    undo_cmd_set_geometry_vertices(&undo, point, &vertex_index, &old_local, &new_local, 1);
+    if (undo.count != 1 || undo.commands[0].type != CMD_SET_GEOMETRY_VERTICES) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    point_geom = ecs_world_get_geometry(&world, point);
+    if (!point_geom || point_geom->type != GEOM_POINT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(point_geom->data.point.point.x - old_local.x) > 1e-5f ||
+        fabsf(point_geom->data.point.point.y - old_local.y) > 1e-5f ||
+        fabsf(point_geom->data.point.point.z - old_local.z) > 1e-5f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!undo_redo_redo(&undo)) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    point_geom = ecs_world_get_geometry(&world, point);
+    if (!point_geom || point_geom->type != GEOM_POINT) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (fabsf(point_geom->data.point.point.x - new_local.x) > 1e-5f ||
+        fabsf(point_geom->data.point.point.y - new_local.y) > 1e-5f ||
+        fabsf(point_geom->data.point.point.z - new_local.z) > 1e-5f) {
+        undo_redo_shutdown(&undo);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 static int test_endpoint_arc_undo_preserves_angle_branch_without_inversion(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1618,6 +1742,7 @@ int main(void) {
         { "test_non_sketch_drag_release_records_legacy_position_undo", test_non_sketch_drag_release_records_legacy_position_undo },
         { "test_endpoint_drag_records_only_on_release_boundary", test_endpoint_drag_records_only_on_release_boundary },
         { "test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position", test_endpoint_drag_start_snapshot_uses_endpoint_geometry_position },
+        { "test_standalone_sketch_point_drag_records_geometry_vertex_undo", test_standalone_sketch_point_drag_records_geometry_vertex_undo },
         { "test_endpoint_arc_undo_preserves_angle_branch_without_inversion", test_endpoint_arc_undo_preserves_angle_branch_without_inversion },
         { "test_bulk_delete_undo_restores_endpoint_owner_sync_metadata", test_bulk_delete_undo_restores_endpoint_owner_sync_metadata },
         { "test_endpoint_pick_lookup_decodes_encoded_pick_ids", test_endpoint_pick_lookup_decodes_encoded_pick_ids },
