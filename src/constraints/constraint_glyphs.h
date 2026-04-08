@@ -16,6 +16,18 @@
 
 #define CONSTRAINT_GLYPHS_MAX 1024
 
+static inline float constraint_glyphs_angle_rad_to_deg(float radians) {
+    return radians * (180.0f / 3.14159265359f);
+}
+
+static inline float constraint_glyphs_user_value_from_scene(const ConstraintComp *constraint, float scene_value) {
+    if (!constraint) return scene_value;
+    if (constraint->type == CONSTRAINT_ANGLE) {
+        return constraint_glyphs_angle_rad_to_deg(scene_value);
+    }
+    return scene_value;
+}
+
 typedef struct {
     uint32_t pick_id;
     ecs_entity_t constraint_entity;
@@ -395,7 +407,8 @@ static inline void constraint_glyphs_draw_overlay(constraint_glyph_state_t *stat
         if (constraint_comp_is_dimensional(constraint)) {
             char value_text[64];
             uint8_t decimals = constraint->display_decimals;
-            constraint_format_value(value_text, sizeof(value_text), constraint->value, decimals);
+            float display_value = constraint_glyphs_user_value_from_scene(constraint, constraint->value);
+            constraint_format_value(value_text, sizeof(value_text), display_value, decimals);
 
             ImVec2_c text_size = igCalcTextSize(value_text, NULL, false, -1.0f);
             float bg_w = text_size.x + 16.0f;
