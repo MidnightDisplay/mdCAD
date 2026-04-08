@@ -704,6 +704,87 @@ static int test_driving_angle_90_degree_default_radians_contract_D10(void) {
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_along_x_arc_center_descriptor_contract_D11(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t p = scene_add_point_to_sketch(&scene, sketch, vec3_make(3.0f, 1.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(2.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(1.0f, 1.0f, 0.0f), 1.0f,
+                                               0.0f, 1.5707963f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !p || !line || !arc) return 1;
+
+    constraint_participant_descriptor_t along_desc[3] = {
+        constraint_participant_descriptor_make((uint64_t)p, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_CENTER, 0),
+    };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch_with_descriptors(&scene, sketch, CONSTRAINT_ALONG_X, along_desc, 3, 0.0f, false);
+    if (!c_along) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *gp = ecs_world_get_geometry(scene.world, p);
+    GeometryComp *gl = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, arc);
+    if (!gp || !gl || !ga || gp->type != GEOM_POINT || gl->type != GEOM_LINE || ga->type != GEOM_ARC) return 1;
+
+    int ok = (solved &&
+              fabsf(gp->data.point.point.x - gl->data.line.a.x) <= 1e-4f &&
+              fabsf(gp->data.point.point.x - ga->data.arc.center.x) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_along_x_unsat_fixed_is_transactional_contract_D11(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t p1 = scene_add_point_to_sketch(&scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t p2 = scene_add_point_to_sketch(&scene, sketch, vec3_make(2.0f, 0.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    if (!sketch || !p1 || !p2) return 1;
+
+    SketchGeometryStateComp *s1 = ecs_world_get_sketch_geometry_state(scene.world, p1);
+    SketchGeometryStateComp *s2 = ecs_world_get_sketch_geometry_state(scene.world, p2);
+    if (!s1 || !s2) return 1;
+    s1->fixed = true;
+    s2->fixed = true;
+
+    ecs_entity_t participants[2] = { p1, p2 };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X, participants, 2, 0.0f, false);
+    if (!c_along) return 1;
+
+    GeometryComp *g1 = ecs_world_get_geometry(scene.world, p1);
+    GeometryComp *g2 = ecs_world_get_geometry(scene.world, p2);
+    if (!g1 || !g2 || g1->type != GEOM_POINT || g2->type != GEOM_POINT) return 1;
+    vec3_t before_1 = g1->data.point.point;
+    vec3_t before_2 = g2->data.point.point;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    g1 = ecs_world_get_geometry(scene.world, p1);
+    g2 = ecs_world_get_geometry(scene.world, p2);
+    int ok = (!solved &&
+              g1 && g2 &&
+              vec3_exact_eq(g1->data.point.point, before_1) &&
+              vec3_exact_eq(g2->data.point.point, before_2) &&
+              imp && imp->active &&
+              imp->first_constraint == c_along &&
+              strcmp(imp->reason, "Unsatisfied driving ALONG X constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -734,6 +815,10 @@ int main(void) {
           test_driving_angle_between_two_lines_atomic_success_contract_D10 },
         { "test_driving_angle_90_degree_default_radians_contract_D10",
           test_driving_angle_90_degree_default_radians_contract_D10 },
+        { "test_recalculate_along_x_arc_center_descriptor_contract_D11",
+          test_recalculate_along_x_arc_center_descriptor_contract_D11 },
+        { "test_recalculate_along_x_unsat_fixed_is_transactional_contract_D11",
+          test_recalculate_along_x_unsat_fixed_is_transactional_contract_D11 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
