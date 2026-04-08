@@ -77,33 +77,33 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LCON-01 | Phase TBD | Pending |
-| LCON-02 | Phase TBD | Pending |
-| LCON-03 | Phase TBD | Pending |
-| LCON-04 | Phase TBD | Pending |
-| LCON-05 | Phase TBD | Pending |
-| ALIN-01 | Phase TBD | Pending |
-| ALIN-02 | Phase TBD | Pending |
-| ALIN-03 | Phase TBD | Pending |
-| ALIN-04 | Phase TBD | Pending |
-| TRDG-01 | Phase TBD | Pending |
-| TRDG-02 | Phase TBD | Pending |
-| TRDG-03 | Phase TBD | Pending |
-| TRDG-04 | Phase TBD | Pending |
-| GZM-01 | Phase TBD | Pending |
-| GZM-02 | Phase TBD | Pending |
-| GZM-03 | Phase TBD | Pending |
-| GZM-04 | Phase TBD | Pending |
-| SDOC-01 | Phase TBD | Pending |
-| SDOC-02 | Phase TBD | Pending |
-| SDOC-03 | Phase TBD | Pending |
-| V14-01 | Phase TBD | Pending |
-| V14-02 | Phase TBD | Pending |
+| LCON-01 | Phase 26 | Pending |
+| LCON-02 | Phase 26 | Pending |
+| LCON-03 | Phase 26 | Pending |
+| LCON-04 | Phase 26 | Pending |
+| LCON-05 | Phase 26 | Pending |
+| ALIN-01 | Phase 27 | Pending |
+| ALIN-02 | Phase 27 | Pending |
+| ALIN-03 | Phase 27 | Pending |
+| ALIN-04 | Phase 27 | Pending |
+| TRDG-01 | Phase 28 | Pending |
+| TRDG-02 | Phase 28 | Pending |
+| TRDG-03 | Phase 28 | Pending |
+| TRDG-04 | Phase 28 | Pending |
+| GZM-01 | Phase 29 | Pending |
+| GZM-02 | Phase 29 | Pending |
+| GZM-03 | Phase 29 | Pending |
+| GZM-04 | Phase 29 | Pending |
+| SDOC-01 | Phase 30 | Pending |
+| SDOC-02 | Phase 30 | Pending |
+| SDOC-03 | Phase 30 | Pending |
+| V14-01 | Phase 30 | Pending |
+| V14-02 | Phase 30 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️
+- Mapped to phases: 22
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-08*
