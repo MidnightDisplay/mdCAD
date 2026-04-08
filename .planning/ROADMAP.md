@@ -88,7 +88,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 26. Line-Line Constraint Coverage | 2/2 | Complete   | 2026-04-08 |
+| 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 0/TBD | Not started | - |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
