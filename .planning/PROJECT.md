@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
 
-**Current focus:** Defining v1.4 requirements and roadmap (`/gsd-new-milestone`).
+**Current focus:** Phase 26 complete; preparing Phase 27 principal-axis ALONG reliability execution.
 
 ## Requirements
 
@@ -40,10 +40,10 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Phase 9 long-tail validation/performance and boundary finalization gates (`VAL-01`, `VAL-02`, `VAL-03`, `TRED-02`) are satisfied with final verification pass — Validated in Phase 9: long-tail-validation-performance-gates-and-boundary-finalization
 - ✓ Constraint UX closure unified glyph and manager participant highlighting semantics and closed Phase 11 verification/validation evidence debt (`SKCH-04`, `CONS-01`, `CONS-02`, `CONS-03`, `CONS-04`, `CONS-05`) — Validated in Phase 16: constraint-ux-closure-and-verification
 - ✓ Solver-control and constrained-interaction requirements (`SOLV-01`, `SOLV-02`, `SOLV-03`, `SOLV-04`, `API-03`) are fully verified, including implication clear-on-success lifecycle closure — Validated in Phase 12: solver-control-and-constrained-interaction
+- ✓ Line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and multi-line groups are legality-validated, deterministic, and transactional (`LCON-01..05`) — Validated in Phase 26: line-line-constraint-coverage
 
 ### Active
 
-- [ ] Add `PARALLEL` and `PERPENDICULAR` constraints for line pairs and multi-line groups in active sketches.
 - [ ] Fix `ALONG X/Y/Z` line behavior so principal-axis intent is preserved without unsatisfied-driving solver failures.
 - [ ] Harden arc/line tangency and mixed-constraint drag robustness so valid drags remain solvable and deterministic.
 - [ ] Correct active-sketch line gizmo behavior to drive geometry endpoints (`A`/`B`) and anchor gizmo at line midpoint.
@@ -72,6 +72,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.3` is complete: Phases 22-25 closed with deterministic solver reliability and advanced arc/line-arc constraint behavior verified.
 - Requirement `V13-01` was validated in Phase 25 with strict seven-test closure gate evidence and mandatory fresh rerun pass.
 - Milestone `v1.4` is now initialized for a bug-fix and robustness cycle focused on solver reliability and sketch-line gizmo correction.
+- Phase 26 is complete: line-line `PARALLEL`/`PERPENDICULAR` pair and group behavior now meets deterministic legality/runtime contracts with passing targeted verification.
 
 ## Next Milestone Goals
 
@@ -123,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after v1.4 milestone initialization*
+*Last updated: 2026-04-08 after Phase 26 completion*
