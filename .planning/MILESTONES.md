@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.3 Sketch Solver Audit + Constraint Expansion (Shipped: 2026-04-08)
+
+**Phases completed:** 4 phases, 10 plans, 21 tasks
+
+**Key accomplishments:**
+
+- Locked deterministic solver trigger and pass-policy behavior with focused anti-flake reruns on Windows Vulkan.
+- Delivered principal-direction ALONG X/Y/Z group constraints across standalone points, line endpoints, and arc landmarks.
+- Delivered advanced ARCI constraints (arc-axis, line-end/arc-end tangency, arc endpoint-angle) with deterministic transactional solve semantics.
+- Closed ARCI drag-anchor UX so shared-point tangency interactions remain draggable and stable.
+- Finalized strict seven-test regression closure gate with mandatory fresh rerun (`7/7` baseline + `7/7` fresh).
+- Marked all v1.3 requirements complete (`14/14`), including reliability closure requirement `V13-01`.
+
+**Audit:** No formal `v1.3-MILESTONE-AUDIT.md` file was present at archival time (user-approved proceed-anyway path).
+
+**Archives:**
+
+- [v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
+- [v1.3-REQUIREMENTS.md](milestones/v1.3-REQUIREMENTS.md)
+
+---
+
 ## v1.2 Sketches, Constraints, Scripting (Shipped: 2026-04-07)
 
 **Phases completed:** 12 phases, 39 plans, 79 tasks

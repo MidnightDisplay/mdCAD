@@ -8,14 +8,11 @@ mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of So
 
 Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
 
-## Current Milestone: v1.3 Sketch Solver Audit + Constraint Expansion
+## Milestone Status
 
-**Goal:** Stabilize sketch solver behavior through targeted audit/fixes and add advanced line/arc constraint capabilities needed for robust sketch workflows.
+**Shipped:** `v1.3` — Sketch Solver Audit + Constraint Expansion (2026-04-08)
 
-**Current focus:**
-- Audit and fix solver execution semantics: auto-solve triggers, deterministic recalculate behavior, and broken constraint pathways.
-- Implement bounded multi-pass solve policy with tolerance stop criteria and configurable pass cap (default 400).
-- Add advanced constraints for arc/line-arc interactions and directional group constraints across point sets.
+**Current focus:** Preparing `v1.4` milestone definition (`/gsd-new-milestone`).
 
 ## Requirements
 
@@ -69,7 +66,9 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Sketch, constraint, solver, scripting, and endpoint-undo requirement sets are implemented and mapped across shipped v1.2 artifacts.
 - Phase 21 closed traceability alignment with a product fix for SKCH hierarchy refresh and final requirement status promotion for SKCH/PH18 targets.
 - Archived milestone audit for v1.2 remains `gaps_found` and is explicitly accepted as known debt at closure.
-- Next active workflow is milestone initialization for v1.3.
+- Milestone `v1.3` is complete: Phases 22-25 closed with deterministic solver reliability and advanced arc/line-arc constraint behavior verified.
+- Requirement `V13-01` was validated in Phase 25 with strict seven-test closure gate evidence and mandatory fresh rerun pass.
+- Next active workflow is v1.4 initialization (`/gsd-new-milestone`).
 
 ## Next Milestone Goals
 
@@ -118,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after v1.3 milestone kickoff*
+*Last updated: 2026-04-08 after v1.3 milestone completion*

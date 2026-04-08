@@ -2,34 +2,34 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Sketch Solver Audit + Constraint Expansion
-status: verifying
-stopped_at: Phase 25 context gathered
-last_updated: "2026-04-08T18:02:07.294Z"
-last_activity: 2026-04-08
+status: v1.3 milestone complete
+stopped_at: Milestone archived
+last_updated: "2026-04-08T18:47:48.344Z"
+last_activity: 2026-04-08 -- v1.3 milestone archived
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 7
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-07)
+See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 25 — regression-and-reliability-closure
+**Current focus:** v1.4 milestone initialization
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 24 (advanced-arc-line-arc-constraint-expansion) — COMPLETE
+Phase: 25 (Regression and Reliability Closure) — COMPLETE
 Plan: 2 of 2
-Status: Phase closed — verification complete
-Last activity: 2026-04-08
+Status: v1.3 milestone archived and tagged-ready
+Last activity: 2026-04-08 -- v1.3 milestone archived
 
 ## Milestone Scope
 
@@ -38,7 +38,7 @@ Last activity: 2026-04-08
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 25`
+Next command: `/gsd-new-milestone`
 
 ## Performance Metrics
 
@@ -88,6 +88,8 @@ Next command: `/gsd-plan-phase 25`
 | Phase 23 P03 | planned | 2 tasks | 4 files |
 | Phase 23 P01 | 1 | 2 tasks | 4 files |
 | Phase 23 P02 | 8m | 2 tasks | 3 files |
+| Phase 25 P01 | 2 min | 2 tasks | 1 files |
+| Phase 25 P02 | 3 min | 2 tasks | 1 files |
 
 ## Decisions
 
@@ -170,6 +172,8 @@ Next command: `/gsd-plan-phase 25`
 - [Phase 23]: Keep legality centralized in constraint_type_is_selection_legal and validate scene descriptor entrypoints with executable tests.
 - [Phase 23]: Plan 23-02 keeps ALONG X/Y/Z runtime solve authority in scene_solver_* with deterministic mean-axis projection and transactional unsatisfied diagnostics.
 - [Phase 23]: Plan 23-02 closes SRLV-04 by adding executable ALONG+ANGLE coexistence and ALONG pass-policy regression coverage.
+- [Phase 25]: Phase 25 closure gate remained exact seven-test scope with strict pass/fail. — Preserved D-01..D-04 guardrails while executing closure evidence loop.
+- [Phase 25]: Mandatory fresh rerun required for closure sign-off. — Ensures deterministic closure evidence at completion time per D-09.
 
 ## Accumulated Context
 
@@ -183,6 +187,6 @@ Next command: `/gsd-plan-phase 25`
 
 ## Session
 
-**Last Date:** 2026-04-08T18:02:07.290Z
-**Stopped At:** Phase 25 context gathered
-**Resume File:** .planning/phases/25-regression-and-reliability-closure/25-CONTEXT.md
+**Last Date:** 2026-04-08T18:30:54.515Z
+**Stopped At:** Completed 25-02-PLAN.md
+**Resume File:** None
