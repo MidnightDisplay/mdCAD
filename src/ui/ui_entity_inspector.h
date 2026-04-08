@@ -23,6 +23,7 @@
 #include "../undo_redo_exec.h"
 #include <ctype.h>
 #include <float.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -508,6 +509,30 @@ static inline uint8_t ui_constraint_display_decimals(const ConstraintComp *const
     return constraint->display_decimals;
 }
 
+static inline float ui_constraint_angle_rad_to_deg(float radians) {
+    return radians * (180.0f / 3.14159265359f);
+}
+
+static inline float ui_constraint_angle_deg_to_rad(float degrees) {
+    return degrees * (3.14159265359f / 180.0f);
+}
+
+static inline float ui_constraint_user_value_from_scene(const ConstraintComp *constraint, float scene_value) {
+    if (!constraint) return scene_value;
+    if (constraint->type == CONSTRAINT_ANGLE) {
+        return ui_constraint_angle_rad_to_deg(scene_value);
+    }
+    return scene_value;
+}
+
+static inline float ui_constraint_scene_value_from_user(const ConstraintComp *constraint, float user_value) {
+    if (!constraint) return user_value;
+    if (constraint->type == CONSTRAINT_ANGLE) {
+        return ui_constraint_angle_deg_to_rad(user_value);
+    }
+    return user_value;
+}
+
 static inline void ui_constraint_value_format(const ConstraintComp *constraint,
                                               char *out_fmt, size_t out_fmt_size) {
     constraint_build_float_format(out_fmt, out_fmt_size, ui_constraint_display_decimals(constraint));
@@ -517,7 +542,8 @@ static inline void ui_constraint_value_text(const ConstraintComp *constraint,
                                             char *out_text, size_t out_text_size) {
     if (!constraint || !out_text || out_text_size == 0) return;
     constraint_format_value(out_text, out_text_size,
-                            constraint->value, ui_constraint_display_decimals(constraint));
+                            ui_constraint_user_value_from_scene(constraint, constraint->value),
+                            ui_constraint_display_decimals(constraint));
 }
 
 static inline bool ui_entity_inspector_draw_sketch_geometry_manager(ui_entity_inspector_state_t *state,
@@ -873,20 +899,23 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
                     }
                 }
 
-            if (constraint_type_is_dimensional(constraint->type)) {
-                char value_id[96];
-                snprintf(value_id, sizeof(value_id), "Value##constraint_value_%llu", (unsigned long long)c_e);
-                float edit_value = constraint->value;
-                char value_fmt[16];
-                ui_constraint_value_format(constraint, value_fmt, sizeof(value_fmt));
-                igSetNextItemWidth(140.0f);
-                if (igInputFloat(value_id, &edit_value, 0.1f, 1.0f, value_fmt,
-                                 ImGuiInputTextFlags_CharsDecimal)) {
-                    if (scene) {
-                        scene_constraint_set_dimensional_value(scene, c_e, edit_value, constraint->driven);
-                        section_changed = true;
+                if (constraint_type_is_dimensional(constraint->type)) {
+                    char value_id[96];
+                    snprintf(value_id, sizeof(value_id), "Value##constraint_value_%llu", (unsigned long long)c_e);
+                    float edit_value = ui_constraint_user_value_from_scene(constraint, constraint->value);
+                    char value_fmt[16];
+                    ui_constraint_value_format(constraint, value_fmt, sizeof(value_fmt));
+                    igSetNextItemWidth(140.0f);
+                    float step = (constraint->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
+                    float step_fast = (constraint->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+                    if (igInputFloat(value_id, &edit_value, step, step_fast, value_fmt,
+                                     ImGuiInputTextFlags_CharsDecimal)) {
+                        if (scene) {
+                            scene_constraint_set_dimensional_value(
+                                scene, c_e, ui_constraint_scene_value_from_user(constraint, edit_value), constraint->driven);
+                            section_changed = true;
+                        }
                     }
-                }
                 igSameLine(0, 8);
                 char driven_id[96];
                 snprintf(driven_id, sizeof(driven_id), "Driven##constraint_driven_%llu", (unsigned long long)c_e);
@@ -942,6 +971,145 @@ static inline bool ui_entity_inspector_draw_sketch_constraint_manager(ui_entity_
     return section_changed;
 }
 
+static inline void ui_entity_inspector_draw_solver_section(ui_entity_inspector_state_t *state,
+                                                           ecs_world_state_t *w,
+                                                           ecs_entity_t e,
+                                                           SketchComp **sketch_ref,
+                                                           ecs_scene_t *scene) {
+    if (!state || !w || !sketch_ref || !(*sketch_ref)) return;
+    SketchComp *sketch = *sketch_ref;
+    static ecs_entity_t solver_clear_pending_sketch = 0;
+
+    igTextDisabled("Solver");
+    igText("Backend: %s", scene ? scene_solver_backend_name(scene) : "ConstraintSketchSolverV1");
+    igTextDisabled("Backend ID: %u", scene ? scene_solver_backend_id(scene) : 1u);
+    igText("Status: %s", sketch_status_name(sketch->status));
+    if (sketch->last_solve_timestamp_ms > 0) {
+        igTextDisabled("Last solve (epoch ms): %llu",
+                       (unsigned long long)sketch->last_solve_timestamp_ms);
+    } else {
+        igTextDisabled("Last solve: never");
+    }
+
+    bool auto_solve_enabled = sketch->auto_solve_enabled;
+    if (igCheckbox("Auto-solve##sketch_solver_auto", &auto_solve_enabled)) {
+        if (scene) {
+            scene_solver_set_auto_solve(scene, e, auto_solve_enabled);
+            if (auto_solve_enabled) {
+                scene_solver_request_auto(scene, e);
+            }
+            sketch = ecs_world_get_sketch(w, e);
+        } else {
+            sketch->auto_solve_enabled = auto_solve_enabled;
+        }
+    }
+
+    float position_tolerance = scene
+        ? scene_solver_position_tolerance(scene, e)
+        : ((sketch->solver_position_tolerance > 0.0f)
+               ? sketch->solver_position_tolerance
+               : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE);
+    igSetNextItemWidth(180.0f);
+    if (igInputFloat("Position Tolerance##sketch_solver_position_tol", &position_tolerance, 0.0001f, 0.001f, "%.6f",
+                     ImGuiInputTextFlags_CharsDecimal)) {
+        if (scene) {
+            scene_solver_set_position_tolerance(scene, e, position_tolerance);
+            sketch = ecs_world_get_sketch(w, e);
+        } else {
+            sketch->solver_position_tolerance =
+                (position_tolerance > 0.0f) ? position_tolerance : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
+        }
+    }
+
+    float angle_tolerance = scene
+        ? scene_solver_angle_tolerance(scene, e)
+        : ((sketch->solver_angle_tolerance > 0.0f)
+               ? sketch->solver_angle_tolerance
+               : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE);
+    igSetNextItemWidth(180.0f);
+    if (igInputFloat("Angle Tolerance##sketch_solver_angle_tol", &angle_tolerance, 0.0001f, 0.001f, "%.6f",
+                     ImGuiInputTextFlags_CharsDecimal)) {
+        if (scene) {
+            scene_solver_set_angle_tolerance(scene, e, angle_tolerance);
+            sketch = ecs_world_get_sketch(w, e);
+        } else {
+            sketch->solver_angle_tolerance =
+                (angle_tolerance > 0.0f) ? angle_tolerance : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
+        }
+    }
+
+    uint32_t max_passes = scene
+        ? scene_solver_max_passes(scene, e)
+        : ((sketch->solver_max_passes > 0) ? sketch->solver_max_passes : SKETCH_SOLVER_DEFAULT_MAX_PASSES);
+    int max_passes_edit = (int)max_passes;
+    igSetNextItemWidth(180.0f);
+    if (igInputInt("Max Passes##sketch_solver_max_passes", &max_passes_edit, 1, 10, 0)) {
+        if (max_passes_edit < 1) max_passes_edit = 1;
+        if (scene) {
+            scene_solver_set_max_passes(scene, e, (uint32_t)max_passes_edit);
+            sketch = ecs_world_get_sketch(w, e);
+        } else {
+            sketch->solver_max_passes = (uint32_t)max_passes_edit;
+        }
+    }
+
+    igBeginDisabled(scene == NULL);
+    if (igButton("Recalculate Sketch", (ImVec2){0, 0})) {
+        scene_solver_request_recalculate(scene, e);
+        scene_solver_add_diagnostic(scene, e, SKETCH_SOLVER_DIAG_INFO,
+                                    "manual", "Manual solve requested via Recalculate Sketch.", 0);
+        sketch = ecs_world_get_sketch(w, e);
+    }
+    igEndDisabled();
+
+    igDummy((ImVec2){0.0f, 8.0f});
+    igTextDisabled("Diagnostics");
+    int diag_count = scene ? scene_solver_diagnostic_count(scene, e) : 0;
+    if (diag_count <= 0) {
+        igTextDisabled("No solver diagnostics yet");
+        igTextWrapped("Run Recalculate Sketch or edit sketch geometry/constraints to generate diagnostics for this sketch.");
+    } else {
+        igTextDisabled("Identical consecutive diagnostics are suppressed.");
+        for (int i = 0; i < diag_count; i++) {
+            const sketch_solver_diagnostic_t *diag = scene_solver_diagnostic_at(scene, e, i);
+            if (!diag) continue;
+            const char *level = scene_solver_diagnostic_level_name(diag->severity);
+            const char *ts = diag->timestamp[0] ? diag->timestamp : "n/a";
+            igText("[%s] %s", level, ts);
+            igSameLine(0, 8.0f);
+            igTextWrapped("%s", diag->message[0] ? diag->message : "(no message)");
+        }
+    }
+
+    igBeginDisabled(scene == NULL);
+    if (igButton("Clear Diagnostics History##sketch_solver_clear", (ImVec2){0, 0})) {
+        solver_clear_pending_sketch = e;
+        igOpenPopup_Str("Clear Diagnostics History##sketch_solver_clear_popup", 0);
+    }
+    igEndDisabled();
+
+    if (igBeginPopupModal("Clear Diagnostics History##sketch_solver_clear_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        igTextWrapped("Clear Diagnostics History: Clear all saved solver diagnostics for this sketch? This action cannot be undone.");
+        igDummy((ImVec2){0.0f, 8.0f});
+        if (igButton("Clear Diagnostics History##sketch_solver_confirm_clear", (ImVec2){220.0f, 0.0f})) {
+            if (scene && solver_clear_pending_sketch != 0) {
+                scene_solver_clear_diagnostics(scene, solver_clear_pending_sketch);
+                sketch = ecs_world_get_sketch(w, solver_clear_pending_sketch);
+            }
+            solver_clear_pending_sketch = 0;
+            igCloseCurrentPopup();
+        }
+        igSameLine(0, 8);
+        if (igButton("Cancel##sketch_solver_cancel_clear", (ImVec2){120.0f, 0.0f})) {
+            solver_clear_pending_sketch = 0;
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+
+    *sketch_ref = sketch;
+}
+
 //------------------------------------------------------------------------------
 // Internal: Draw single entity inspector
 //------------------------------------------------------------------------------
@@ -968,7 +1136,6 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
     static int cm_type_filter = 0;
     static char cm_search_filter[128] = "";
     static ecs_entity_t cm_delete_pending_constraint = 0;
-    static ecs_entity_t solver_clear_pending_sketch = 0;
 
     SketchComp *sketch = ecs_world_get_sketch(w, e);
     ecs_scene_t *scene = NULL;
@@ -1114,131 +1281,11 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igSeparator();
         igDummy((ImVec2){0.0f, 8.0f});
 
-        igTextDisabled("Solver");
-        igText("Backend: %s", scene ? scene_solver_backend_name(scene) : "ConstraintSketchSolverV1");
-        igTextDisabled("Backend ID: %u", scene ? scene_solver_backend_id(scene) : 1u);
-        igText("Status: %s", sketch_status_name(sketch->status));
-        if (sketch->last_solve_timestamp_ms > 0) {
-            igTextDisabled("Last solve (epoch ms): %llu",
-                           (unsigned long long)sketch->last_solve_timestamp_ms);
+        bool suppress_solver_in_inspector = (state->active_sketch_workspace_open && state->active_sketch == e);
+        if (!suppress_solver_in_inspector) {
+            ui_entity_inspector_draw_solver_section(state, w, e, &sketch, scene);
         } else {
-            igTextDisabled("Last solve: never");
-        }
-
-        bool auto_solve_enabled = sketch->auto_solve_enabled;
-        if (igCheckbox("Auto-solve##sketch_solver_auto", &auto_solve_enabled)) {
-            if (scene) {
-                scene_solver_set_auto_solve(scene, e, auto_solve_enabled);
-                if (auto_solve_enabled) {
-                    scene_solver_request_auto(scene, e);
-                }
-                sketch = ecs_world_get_sketch(w, e);
-            } else {
-                sketch->auto_solve_enabled = auto_solve_enabled;
-            }
-        }
-
-        float position_tolerance = scene
-            ? scene_solver_position_tolerance(scene, e)
-            : ((sketch->solver_position_tolerance > 0.0f)
-                   ? sketch->solver_position_tolerance
-                   : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE);
-        igSetNextItemWidth(180.0f);
-        if (igInputFloat("Position Tolerance##sketch_solver_position_tol", &position_tolerance, 0.0001f, 0.001f, "%.6f",
-                         ImGuiInputTextFlags_CharsDecimal)) {
-            if (scene) {
-                scene_solver_set_position_tolerance(scene, e, position_tolerance);
-                sketch = ecs_world_get_sketch(w, e);
-            } else {
-                sketch->solver_position_tolerance =
-                    (position_tolerance > 0.0f) ? position_tolerance : SKETCH_SOLVER_DEFAULT_POSITION_TOLERANCE;
-            }
-        }
-
-        float angle_tolerance = scene
-            ? scene_solver_angle_tolerance(scene, e)
-            : ((sketch->solver_angle_tolerance > 0.0f)
-                   ? sketch->solver_angle_tolerance
-                   : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE);
-        igSetNextItemWidth(180.0f);
-        if (igInputFloat("Angle Tolerance##sketch_solver_angle_tol", &angle_tolerance, 0.0001f, 0.001f, "%.6f",
-                         ImGuiInputTextFlags_CharsDecimal)) {
-            if (scene) {
-                scene_solver_set_angle_tolerance(scene, e, angle_tolerance);
-                sketch = ecs_world_get_sketch(w, e);
-            } else {
-                sketch->solver_angle_tolerance =
-                    (angle_tolerance > 0.0f) ? angle_tolerance : SKETCH_SOLVER_DEFAULT_ANGLE_TOLERANCE;
-            }
-        }
-
-        uint32_t max_passes = scene
-            ? scene_solver_max_passes(scene, e)
-            : ((sketch->solver_max_passes > 0) ? sketch->solver_max_passes : SKETCH_SOLVER_DEFAULT_MAX_PASSES);
-        int max_passes_edit = (int)max_passes;
-        igSetNextItemWidth(180.0f);
-        if (igInputInt("Max Passes##sketch_solver_max_passes", &max_passes_edit, 1, 10, 0)) {
-            if (max_passes_edit < 1) max_passes_edit = 1;
-            if (scene) {
-                scene_solver_set_max_passes(scene, e, (uint32_t)max_passes_edit);
-                sketch = ecs_world_get_sketch(w, e);
-            } else {
-                sketch->solver_max_passes = (uint32_t)max_passes_edit;
-            }
-        }
-
-        igBeginDisabled(scene == NULL);
-        if (igButton("Recalculate Sketch", (ImVec2){0, 0})) {
-            scene_solver_request_recalculate(scene, e);
-            scene_solver_add_diagnostic(scene, e, SKETCH_SOLVER_DIAG_INFO,
-                                        "manual", "Manual solve requested via Recalculate Sketch.", 0);
-            sketch = ecs_world_get_sketch(w, e);
-        }
-        igEndDisabled();
-
-        igDummy((ImVec2){0.0f, 8.0f});
-        igTextDisabled("Diagnostics");
-        int diag_count = scene ? scene_solver_diagnostic_count(scene, e) : 0;
-        if (diag_count <= 0) {
-            igTextDisabled("No solver diagnostics yet");
-            igTextWrapped("Run Recalculate Sketch or edit sketch geometry/constraints to generate diagnostics for this sketch.");
-        } else {
-            igTextDisabled("Identical consecutive diagnostics are suppressed.");
-            for (int i = 0; i < diag_count; i++) {
-                const sketch_solver_diagnostic_t *diag = scene_solver_diagnostic_at(scene, e, i);
-                if (!diag) continue;
-                const char *level = scene_solver_diagnostic_level_name(diag->severity);
-                const char *ts = diag->timestamp[0] ? diag->timestamp : "n/a";
-                igText("[%s] %s", level, ts);
-                igSameLine(0, 8.0f);
-                igTextWrapped("%s", diag->message[0] ? diag->message : "(no message)");
-            }
-        }
-
-        igBeginDisabled(scene == NULL);
-        if (igButton("Clear Diagnostics History##sketch_solver_clear", (ImVec2){0, 0})) {
-            solver_clear_pending_sketch = e;
-            igOpenPopup_Str("Clear Diagnostics History##sketch_solver_clear_popup", 0);
-        }
-        igEndDisabled();
-
-        if (igBeginPopupModal("Clear Diagnostics History##sketch_solver_clear_popup", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            igTextWrapped("Clear Diagnostics History: Clear all saved solver diagnostics for this sketch? This action cannot be undone.");
-            igDummy((ImVec2){0.0f, 8.0f});
-            if (igButton("Clear Diagnostics History##sketch_solver_confirm_clear", (ImVec2){220.0f, 0.0f})) {
-                if (scene && solver_clear_pending_sketch != 0) {
-                    scene_solver_clear_diagnostics(scene, solver_clear_pending_sketch);
-                    sketch = ecs_world_get_sketch(w, solver_clear_pending_sketch);
-                }
-                solver_clear_pending_sketch = 0;
-                igCloseCurrentPopup();
-            }
-            igSameLine(0, 8);
-            if (igButton("Cancel##sketch_solver_cancel_clear", (ImVec2){120.0f, 0.0f})) {
-                solver_clear_pending_sketch = 0;
-                igCloseCurrentPopup();
-            }
-            igEndPopup();
+            igTextDisabled("Solver controls moved to Active Sketch Workspace.");
         }
     }
 
@@ -1646,15 +1693,18 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
                 }
 
                 if (constraint_type_is_dimensional(linked->type)) {
-                    float edit_value = linked->value;
+                    float edit_value = ui_constraint_user_value_from_scene(linked, linked->value);
                     char value_fmt[16];
                     ui_constraint_value_format(linked, value_fmt, sizeof(value_fmt));
                     igSameLine(0, 8);
                     igSetNextItemWidth(110.0f);
-                    if (igInputFloat("##linked_constraint_value", &edit_value, 0.1f, 1.0f, value_fmt,
+                    float step = (linked->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
+                    float step_fast = (linked->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+                    if (igInputFloat("##linked_constraint_value", &edit_value, step, step_fast, value_fmt,
                                      ImGuiInputTextFlags_CharsDecimal)) {
                         if (scene) {
-                            scene_constraint_set_dimensional_value(scene, linked_constraint, edit_value, linked->driven);
+                            scene_constraint_set_dimensional_value(
+                                scene, linked_constraint, ui_constraint_scene_value_from_user(linked, edit_value), linked->driven);
                         }
                     }
                 }
@@ -1686,14 +1736,17 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         igText("Participants: %u", constraint_entity->participant_count);
 
         if (constraint_type_is_dimensional(constraint_entity->type)) {
-            float edit_value = constraint_entity->value;
+            float edit_value = ui_constraint_user_value_from_scene(constraint_entity, constraint_entity->value);
             char value_fmt[16];
             ui_constraint_value_format(constraint_entity, value_fmt, sizeof(value_fmt));
             igSetNextItemWidth(140.0f);
-            if (igInputFloat("Value##selected_constraint_value", &edit_value, 0.1f, 1.0f, value_fmt,
+            float step = (constraint_entity->type == CONSTRAINT_ANGLE) ? 1.0f : 0.1f;
+            float step_fast = (constraint_entity->type == CONSTRAINT_ANGLE) ? 5.0f : 1.0f;
+            if (igInputFloat("Value##selected_constraint_value", &edit_value, step, step_fast, value_fmt,
                              ImGuiInputTextFlags_CharsDecimal)) {
                 if (scene) {
-                    scene_constraint_set_dimensional_value(scene, e, edit_value, constraint_entity->driven);
+                    scene_constraint_set_dimensional_value(
+                        scene, e, ui_constraint_scene_value_from_user(constraint_entity, edit_value), constraint_entity->driven);
                 }
             }
             igSameLine(0, 8);
@@ -2269,6 +2322,10 @@ static inline void ui_entity_inspector_draw(ui_entity_inspector_state_t *state) 
                 }
 
                 if (active_sketch) {
+                    ui_entity_inspector_draw_solver_section(state, state->world, sketch_entity, &active_sketch, scene);
+                    igDummy((ImVec2){0.0f, 10.0f});
+                    igSeparator();
+                    igDummy((ImVec2){0.0f, 10.0f});
                     ui_entity_inspector_draw_sketch_geometry_manager(state, sketch_entity, &active_sketch, scene, true);
                     igDummy((ImVec2){0.0f, 10.0f});
                     ui_entity_inspector_draw_sketch_constraint_manager(state, sketch_entity, &active_sketch, scene, true);

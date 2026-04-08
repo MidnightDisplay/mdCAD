@@ -520,6 +520,58 @@ static int test_driving_angle_between_two_lines_atomic_success_contract_D10(void
     return ok ? 0 : 1;
 }
 
+static int test_driving_angle_90_degree_default_radians_contract_D10(void) {
+    // Regression: 90° UX default must feed solver as pi/2 radians.
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(0.5f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    const float desired_angle = 1.57079632679f; // 90 degrees
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, desired_angle, false);
+    if (!c_angle) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!solved || !ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t va = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t vb = vec3_sub(gb->data.line.b, gb->data.line.a);
+    float len_a = vec3_length(va);
+    float len_b = vec3_length(vb);
+    if (len_a <= 1e-6f || len_b <= 1e-6f) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t na = vec3_scale(va, 1.0f / len_a);
+    vec3_t nb = vec3_scale(vb, 1.0f / len_b);
+    float cos_angle = vec3_dot(na, nb);
+    if (cos_angle > 1.0f) cos_angle = 1.0f;
+    if (cos_angle < -1.0f) cos_angle = -1.0f;
+    float actual_angle = acosf(cos_angle);
+
+    int ok = fabsf(actual_angle - desired_angle) <= 1e-4f;
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -542,6 +594,8 @@ int main(void) {
         { "test_driving_length_atomic_success_contract_D10", test_driving_length_atomic_success_contract_D10 },
         { "test_driving_angle_between_two_lines_atomic_success_contract_D10",
           test_driving_angle_between_two_lines_atomic_success_contract_D10 },
+        { "test_driving_angle_90_degree_default_radians_contract_D10",
+          test_driving_angle_90_degree_default_radians_contract_D10 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

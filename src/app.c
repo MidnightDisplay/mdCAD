@@ -46,6 +46,7 @@
 #include "gizmo/gizmo.h"
 
 #include <string.h>
+#include <math.h>
 
 //------------------------------------------------------------------------------
 // Application state
@@ -143,6 +144,14 @@ static struct {
     char script_io_slider_drag_input_id[SCRIPT_LOCAL_ID_MAX];
     char script_io_slider_drag_before_script[16384];
 } state;
+
+static inline float mdcad_deg_to_rad(float degrees) {
+    return degrees * (3.14159265359f / 180.0f);
+}
+
+static inline float mdcad_rad_to_deg(float radians) {
+    return radians * (180.0f / 3.14159265359f);
+}
 
 static void mdcad_handle_inspector_sketch_geometry_mutation(void *user_data) {
     ui_scene_hierarchy_state_t *hierarchy = (ui_scene_hierarchy_state_t*)user_data;
@@ -822,7 +831,7 @@ static void mdcad_draw_constraint_context_menu(void) {
         legal_count++;
 
         if (igMenuItem_Bool(constraint_type_display_name(type), NULL, false, true)) {
-            float initial_value = (type == CONSTRAINT_ANGLE) ? 90.0f : 1.0f;
+            float initial_value = (type == CONSTRAINT_ANGLE) ? mdcad_deg_to_rad(90.0f) : 1.0f;
             ecs_entity_t created = scene_add_constraint_to_sketch_with_descriptors(
                 &state.ecs_scene,
                 state.constraint_menu_sketch,
@@ -909,13 +918,17 @@ static void mdcad_draw_constraint_dimension_popup(void) {
         return;
     }
 
+    bool is_angle_dimension = (constraint->type == CONSTRAINT_ANGLE);
     igText("%s", constraint_type_display_name(constraint->type));
+    igTextDisabled("Units: %s", is_angle_dimension ? "deg" : "scene units");
     igSetNextItemWidth(180.0f);
     char value_fmt[16];
     uint8_t decimals = constraint->display_decimals;
     constraint_build_float_format(value_fmt, sizeof(value_fmt), decimals);
+    float step = is_angle_dimension ? 1.0f : 0.1f;
+    float step_fast = is_angle_dimension ? 5.0f : 1.0f;
     igInputFloat("Value##constraint_dimension_popup_value",
-                 &state.constraint_dimension_popup_value, 0.1f, 1.0f, value_fmt,
+                 &state.constraint_dimension_popup_value, step, step_fast, value_fmt,
                  ImGuiInputTextFlags_CharsDecimal);
 
     bool close_popup = false;
@@ -935,18 +948,24 @@ static void mdcad_draw_constraint_dimension_popup(void) {
     }
 
     if (igButton("Accept##constraint_dimension_popup_accept", (ImVec2){100.0f, 0.0f})) {
+        float value_for_solver = is_angle_dimension
+            ? mdcad_deg_to_rad(state.constraint_dimension_popup_value)
+            : state.constraint_dimension_popup_value;
         scene_constraint_set_dimensional_value(
             &state.ecs_scene,
             state.constraint_dimension_popup_constraint,
-            state.constraint_dimension_popup_value,
+            value_for_solver,
             constraint->driven);
         close_popup = true;
     }
     if (igIsKeyPressed_Bool(ImGuiKey_Enter, false) || igIsKeyPressed_Bool(ImGuiKey_KeypadEnter, false)) {
+        float value_for_solver = is_angle_dimension
+            ? mdcad_deg_to_rad(state.constraint_dimension_popup_value)
+            : state.constraint_dimension_popup_value;
         scene_constraint_set_dimensional_value(
             &state.ecs_scene,
             state.constraint_dimension_popup_constraint,
-            state.constraint_dimension_popup_value,
+            value_for_solver,
             constraint->driven);
         close_popup = true;
     }
@@ -1678,7 +1697,10 @@ static void frame(void) {
                                     if (constraint && constraint_type_is_dimensional(constraint->type) &&
                                         igIsMouseDoubleClicked_Nil(ImGuiMouseButton_Left)) {
                                         state.constraint_dimension_popup_constraint = clicked_constraint;
-                                        state.constraint_dimension_popup_value = constraint->value;
+                                        state.constraint_dimension_popup_value =
+                                            (constraint->type == CONSTRAINT_ANGLE)
+                                                ? mdcad_rad_to_deg(constraint->value)
+                                                : constraint->value;
                                         state.constraint_dimension_popup_open_request = true;
                                         state.constraint_dimension_popup_open = false;
                                     }
