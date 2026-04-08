@@ -45,7 +45,12 @@ Plans:
   2. User can apply ALONG Y and ALONG Z to point pairs and point groups with deterministic directional solve behavior.
   3. User can use directional group constraints with standalone points, line endpoints, and arc landmark points in supported combinations.
   4. User can recalculate sketches containing ALONG X/Y/Z and ANGLE constraints and complete solve attempts without broken/non-functional pathways.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — Expand ALONG legality to descriptor-based point participants and lock shared UI/script legality contracts with tests.
+- [ ] 23-02-PLAN.md — Implement scene-owned ALONG X/Y/Z transactional solve path and ALONG+ANGLE coexistence behavior with deterministic diagnostics.
+- [ ] 23-03-PLAN.md — Align directional authoring UX and complete final automated + human verification closure for AXIS/SRLV requirements.
 
 ### Phase 24: Advanced Arc + Line-Arc Constraint Expansion
 **Goal**: Users can author and maintain advanced arc and line-arc constraints that solve predictably or fail with explicit diagnostics.
