@@ -1,57 +1,46 @@
-# Architecture Research: v1.2 Sketches, Constraints, Scripting
+# Architecture Research: v1.4 Solver Robustness + Sketch Gizmo Corrections
 
-**Domain:** Integrating constrained sketches into existing mdCAD ECS/runtime  
-**Researched:** 2026-03-30  
-**Confidence:** High for integration shape, medium for solver backend specifics
+**Domain:** Integration strategy for v1.4 solver/gizmo/doc scope  
+**Researched:** 2026-04-08  
+**Confidence:** High
 
-## Recommended integration shape
+## Integration Points
 
-Use ECS for state ownership, and add focused orchestration modules for solver/script/glyph behavior.
+- Keep authoring flow: selection -> legality check -> scene constraint add -> solver recalc -> diagnostics.
+- Keep drag flow mediated through solver feasibility (`scene_solver_can_apply_drag(...)`) with transactional commit semantics.
+- Keep failure implication lifecycle as authoritative UX feedback contract.
 
-### New component families (proposed)
+## Module Touchpoints
 
-1. `SketchComp` (status, autosolve, color, versioning)
-2. `SketchRefComp` (geometry belongs-to sketch mapping)
-3. `SketchGeomFlagsComp` (fixed/loose metadata)
-4. `ConstraintComp` (type, participants, value, driven flag)
-5. `SolverStateComp` (dirty, last solve result, diagnostics summary)
-6. `ScriptComp` (source text/hash + sync metadata)
+### Primary
 
-### New module boundaries (proposed)
+- `src/ecs/ecs_scene.h` (solver runtime branches + transactional hardening)
+- `src/constraints/constraint_types.h` (legality/runtime parity)
+- `src/app.c` (active-sketch line gizmo routing to geometry endpoints)
+- `src/gizmo/gizmo.h` (midpoint anchor behavior)
 
-1. `src\sketch\sketch_registry.h` — ownership and indexing helpers
-2. `src\sketch\sketch_constraints.h` — legality matrix + mutation helpers
-3. `src\sketch\sketch_solver_orchestrator.h` — dirty-queue solve/apply lifecycle
-4. `src\sketch\sketch_script_sync.h` — bidirectional scene<->script synchronization
-5. `src\sketch\sketch_glyphs.h` — viewport glyph generation + picking integration
-6. `src\ui\ui_sketch_inspector.h` — manager panels in Entity Inspector
-7. `src\ui\ui_sketch_script_editor.h` — standalone script editor + IO panel
+### Tests
 
-## Data-flow contract
+- `src/tests/scene_solver_contract_test.c`
+- `src/tests/scene_solver_pass_policy_test.c`
+- `src/tests/scene_solver_drag_test.c`
+- `src/tests/scene_solver_diagnostics_test.c`
+- `src/tests/endpoint_pick_test.c`
 
-All sketch mutations should flow through one transactional path:
+### Documentation
 
-`UI or Script event -> sketch transaction -> legality validation -> ECS mutation -> solve trigger -> status/log update -> render/pick refresh -> script sync`
+- Add `docs/SOLVER_ARCHITECTURE.md`.
 
-This is critical for undo/redo coherence and avoiding script feedback loops.
+## Build Order (recommended)
 
-## Build order recommendation
+1. Legality/runtime parity for new line-line constraints.
+2. Runtime solver implementation for parallel/perpendicular.
+3. ALONG line semantics fix + mixed-constraint determinism.
+4. Tangency drag hardening + transactional rollback guarantees.
+5. Active-sketch line gizmo midpoint/endpoints behavior fix.
+6. Solver architecture docs + TL;DR primer.
 
-1. Data model + ownership components.
-2. Constraint CRUD + legality matrix.
-3. Solver orchestration with one backend.
-4. Glyph rendering/picking integration.
-5. Script serialization + parser + sync.
-6. Undo/redo unification for sketch transactions.
-7. Hardening and performance validation.
+## Verification Hooks
 
-## Refactor guidance
-
-Aggressive refactor is justified for:
-
-- undo/redo transaction coherence
-- centralized pick routing for glyph/geometry/gizmo priority
-- clear module boundaries around sketch subsystems
-
-Avoid destabilizing refactors to unrelated rendering or platform bootstrap paths in same wave.
-
+- Use targeted strict CTest gates and mandatory fresh reruns for determinism.
+- Include manual checkpoint for active-sketch line midpoint/endpoints UX behavior.

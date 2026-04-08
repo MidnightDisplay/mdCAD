@@ -1,49 +1,43 @@
-# Stack Research: v1.2 Sketches, Constraints, Scripting
+# Stack Research: v1.4 Solver Robustness + Sketch Gizmo Corrections
 
-**Domain:** New feature milestone for constrained sketches + scripting in mdCAD  
-**Researched:** 2026-03-30  
-**Confidence:** Medium (final library lock requires spike validation in this repo)
+**Domain:** Solver robustness and sketch-line gizmo corrections in mdCAD  
+**Researched:** 2026-04-08  
+**Confidence:** High
 
-## Recommendations
+## Keep / Reuse
 
-### Solver
+- Keep C-first architecture, CMake + CTest workflow, and current core deps (`cglm`, Flecs, Sokol, cimgui, cJSON).
+- Keep `scene_solver_*` APIs as runtime solver authority and `constraint_type_is_selection_legal(...)` as legality gate.
+- Keep Windows Vulkan path as milestone validation gate.
 
-Use a **project-owned solver interface** first, then lock one backend after a short spike.
+## Recommended Additions (internal only)
 
-| Option | Fit | License | Notes |
-|---|---|---|---|
-| C-first lightweight backend (preferred) | Best alignment with C-first codebase | Must be permissive | Validate capability for FIXED/COINCIDENT/PARALLEL/PERPENDICULAR/LENGTH/ANGLE and arc/circle support |
-| Ceres (fallback) | Strong nonlinear solve capability | BSD-3-Clause | Requires a C++ island wrapper and ABI boundary |
-| In-house minimal solver | Full control | Project license | Only if off-the-shelf options fail acceptance criteria |
+- Add focused tests for line-line constraints, line ALONG semantics, tangency drag robustness, and active-sketch line gizmo behavior.
+- Add `docs/SOLVER_ARCHITECTURE.md` as the human-facing solver map + TL;DR primer.
 
-**Recommendation:** keep backend swappable behind `src\solver\` API and lock one solver during the first implementation phase.
+## Verification Tooling
 
-### Scripting runtime
+- Continue targeted CTest gates with deterministic reruns.
+- Ensure v1.4 validation includes:
+  - `scene_solver_contract`
+  - `scene_solver_pass_policy`
+  - `scene_solver_drag`
+  - `scene_solver_diagnostics`
+  - `endpoint_pick`
 
-| Runtime | Recommendation | Why |
-|---|---|---|
-| Lua 5.4.x | Primary | Small, embeddable in C, permissive, cross-platform friendly |
-| Duktape / QuickJS | Alternative | Viable but more runtime complexity vs Lua for this milestone |
+## Documentation Tooling
 
-**Recommendation:** lock **Lua 5.4.x** and implement a deterministic mdCAD sketch script format that round-trips cleanly.
+- Keep Markdown docs in `docs/`.
+- Use lightweight diagrams and direct file/function cross-references.
 
-### Rendering/UI support
+## Do Not Add
 
-- Reuse existing Sokol + ImGui + pick buffer stack.
-- Add in-house constraint glyph batching/picking; no new UI framework.
-- Keep dimension labels/editing in existing ImGui workflows first.
+- No C++ dependency expansion for solver work.
+- No external heavy solver framework for this milestone.
+- No build-system migration or test-runner churn.
+- No platform-gate change away from Windows Vulkan.
 
-## What not to add in v1.2
+## Risk Notes
 
-- No GPL/viral-licensed dependencies.
-- No full CAD kernel adoption for this milestone.
-- No multi-solver feature set in first release slice.
-- No scripting runtime that cannot reasonably target iOS/web later.
-
-## Adoption checks (must pass before lock)
-
-1. Builds on Windows MSVC + Vulkan path.
-2. Permissive license confirmed.
-3. Can represent required initial constraints and return actionable diagnostics.
-4. Can be packaged in current CMake workflow without major build instability.
-
+- Biggest risk is behavior drift between legality and runtime solve paths.
+- Mitigation: test-first contracts and deterministic ordering rules.
