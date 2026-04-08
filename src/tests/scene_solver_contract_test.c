@@ -378,6 +378,154 @@ static int test_recalculate_parallel_pair_creation_is_selection_order_invariant_
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_parallel_group_solves_feasible_lines_lcon02(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.5f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_c = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 2.0f, 0.0f),
+                                                   vec3_make(1.5f, 4.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b || !line_c) return 1;
+
+    ecs_entity_t participants[3] = { line_a, line_b, line_c };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 3, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    GeometryComp *gc = ecs_world_get_geometry(scene.world, line_c);
+    if (!ga || !gb || !gc || ga->type != GEOM_LINE || gb->type != GEOM_LINE || gc->type != GEOM_LINE) return 1;
+
+    vec3_t dir_a = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t dir_b = vec3_sub(gb->data.line.b, gb->data.line.a);
+    vec3_t dir_c = vec3_sub(gc->data.line.b, gc->data.line.a);
+    float len_a = vec3_length(dir_a);
+    float len_b = vec3_length(dir_b);
+    float len_c = vec3_length(dir_c);
+    if (len_a <= 1e-6f || len_b <= 1e-6f || len_c <= 1e-6f) return 1;
+    dir_a = vec3_scale(dir_a, 1.0f / len_a);
+    dir_b = vec3_scale(dir_b, 1.0f / len_b);
+    dir_c = vec3_scale(dir_c, 1.0f / len_c);
+    float dot_ab = vec3_dot(dir_a, dir_b);
+    float dot_ac = vec3_dot(dir_a, dir_c);
+    if (dot_ab > 1.0f) dot_ab = 1.0f;
+    if (dot_ab < -1.0f) dot_ab = -1.0f;
+    if (dot_ac > 1.0f) dot_ac = 1.0f;
+    if (dot_ac < -1.0f) dot_ac = -1.0f;
+
+    int ok = solved &&
+             fabsf(fabsf(dot_ab) - 1.0f) <= 1e-4f &&
+             fabsf(fabsf(dot_ac) - 1.0f) <= 1e-4f;
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_perpendicular_group_anchor_semantics_lcon04(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t anchor = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_c = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(2.0f, -1.0f, 0.0f),
+                                                   vec3_make(3.0f, 1.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !anchor || !line_b || !line_c) return 1;
+
+    ecs_entity_t participants[3] = { line_c, anchor, line_b };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PERPENDICULAR, participants, 3, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, anchor);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    GeometryComp *gc = ecs_world_get_geometry(scene.world, line_c);
+    if (!ga || !gb || !gc || ga->type != GEOM_LINE || gb->type != GEOM_LINE || gc->type != GEOM_LINE) return 1;
+
+    vec3_t dir_a = vec3_sub(ga->data.line.b, ga->data.line.a);
+    vec3_t dir_b = vec3_sub(gb->data.line.b, gb->data.line.a);
+    vec3_t dir_c = vec3_sub(gc->data.line.b, gc->data.line.a);
+    float len_a = vec3_length(dir_a);
+    float len_b = vec3_length(dir_b);
+    float len_c = vec3_length(dir_c);
+    if (len_a <= 1e-6f || len_b <= 1e-6f || len_c <= 1e-6f) return 1;
+    dir_a = vec3_scale(dir_a, 1.0f / len_a);
+    dir_b = vec3_scale(dir_b, 1.0f / len_b);
+    dir_c = vec3_scale(dir_c, 1.0f / len_c);
+    float dot_ab = vec3_dot(dir_a, dir_b);
+    float dot_ac = vec3_dot(dir_a, dir_c);
+
+    int ok = solved &&
+             fabsf(dot_ab) <= 1e-4f &&
+             fabsf(dot_ac) <= 1e-4f;
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_perpendicular_group_creation_is_selection_order_invariant_lcon04(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(1.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_c = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, -1.0f, 0.0f),
+                                                   vec3_make(1.0f, -2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b || !line_c) return 1;
+
+    ecs_entity_t order1[3] = { line_c, line_a, line_b };
+    ecs_entity_t order2[3] = { line_b, line_c, line_a };
+    ecs_entity_t c1 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PERPENDICULAR, order1, 3, 0.0f, false);
+    ecs_entity_t c2 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PERPENDICULAR, order2, 3, 0.0f, false);
+    if (!c1 || !c2) return 1;
+
+    ConstraintComp *cc1 = ecs_world_get_constraint(scene.world, c1);
+    ConstraintComp *cc2 = ecs_world_get_constraint(scene.world, c2);
+    int ok = (cc1 && cc2 &&
+              cc1->participant_count == 3 &&
+              cc2->participant_count == 3 &&
+              cc1->participant_descriptors[0].entity == cc2->participant_descriptors[0].entity &&
+              cc1->participant_descriptors[1].entity == cc2->participant_descriptors[1].entity &&
+              cc1->participant_descriptors[2].entity == cc2->participant_descriptors[2].entity &&
+              cc1->participant_descriptors[0].role == cc2->participant_descriptors[0].role &&
+              cc1->participant_descriptors[1].role == cc2->participant_descriptors[1].role &&
+              cc1->participant_descriptors[2].role == cc2->participant_descriptors[2].role);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_participant_descriptor_supports_sub_entity_contract(void) {
     constraint_participant_descriptor_t descriptor =
         constraint_participant_descriptor_make((ecs_entity_t)44, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1);
@@ -1558,6 +1706,12 @@ int main(void) {
           test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05 },
         { "test_recalculate_parallel_pair_creation_is_selection_order_invariant_lcon05",
           test_recalculate_parallel_pair_creation_is_selection_order_invariant_lcon05 },
+        { "test_recalculate_parallel_group_solves_feasible_lines_lcon02",
+          test_recalculate_parallel_group_solves_feasible_lines_lcon02 },
+        { "test_recalculate_perpendicular_group_anchor_semantics_lcon04",
+          test_recalculate_perpendicular_group_anchor_semantics_lcon04 },
+        { "test_recalculate_perpendicular_group_creation_is_selection_order_invariant_lcon04",
+          test_recalculate_perpendicular_group_creation_is_selection_order_invariant_lcon04 },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
         { "test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06",
           test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06 },

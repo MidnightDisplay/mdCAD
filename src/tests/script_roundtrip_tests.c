@@ -337,6 +337,84 @@ static int test_script_preview_parse_rejects_illegal_constraint_participants(voi
     return error.message[0] != '\0' ? 0 : 1;
 }
 
+static int test_script_roundtrip_parallel_perpendicular_group_constraints_lcon04(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch_a = scene_add_sketch(&scene, "SketchA", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    ecs_entity_t sketch_b = scene_add_sketch(&scene, "SketchB", "", vec4_make(1.0f, 1.0f, 1.0f, 1.0f));
+    if (sketch_a == 0 || sketch_b == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script_text =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {3, 0, 0} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 1, 0}, b = {2, 2, 0} },\n"
+        "    { id = \"geometry_3\", type = \"line\", a = {0, -1, 0}, b = {2, -2, 0} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Parallel\", participants = {\"geometry_1\", \"geometry_2\", \"geometry_3\"} },\n"
+        "    { id = \"constraint_2\", type = \"Perpendicular\", participants = {\"geometry_3\", \"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch_a, script_text, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int parallel_count_a = 0;
+    int perpendicular_count_a = 0;
+    ecs_iter_t it = ecs_children(scene.world->world, sketch_a);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ConstraintComp *constraint = ecs_world_get_constraint(scene.world, it.entities[i]);
+            if (!constraint) continue;
+            if (constraint->type == CONSTRAINT_PARALLEL && constraint->participant_count == 3) parallel_count_a++;
+            if (constraint->type == CONSTRAINT_PERPENDICULAR && constraint->participant_count == 3) perpendicular_count_a++;
+        }
+    }
+    if (parallel_count_a != 1 || perpendicular_count_a != 1) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char emitted[8192] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch_a, emitted, sizeof(emitted), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (strstr(emitted, "type = \"Parallel\"") == NULL || strstr(emitted, "type = \"Perpendicular\"") == NULL) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_script_apply_commit(&scene, sketch_b, emitted, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int parallel_count_b = 0;
+    int perpendicular_count_b = 0;
+    it = ecs_children(scene.world->world, sketch_b);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ConstraintComp *constraint = ecs_world_get_constraint(scene.world, it.entities[i]);
+            if (!constraint) continue;
+            if (constraint->type == CONSTRAINT_PARALLEL && constraint->participant_count == 3) parallel_count_b++;
+            if (constraint->type == CONSTRAINT_PERPENDICULAR && constraint->participant_count == 3) perpendicular_count_b++;
+        }
+    }
+
+    ecs_world_shutdown(&world);
+    return (parallel_count_b == 1 && perpendicular_count_b == 1) ? 0 : 1;
+}
+
 static int test_script_parse_rejects_unexpected_tokens_between_blocks(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1453,6 +1531,8 @@ int main(void) {
         { "test_script_apply_commit_is_atomic_on_unresolved_reference", test_script_apply_commit_is_atomic_on_unresolved_reference },
         { "test_script_preview_parse_preserves_committed_scene_on_failure", test_script_preview_parse_preserves_committed_scene_on_failure },
         { "test_script_preview_parse_rejects_illegal_constraint_participants", test_script_preview_parse_rejects_illegal_constraint_participants },
+        { "test_script_roundtrip_parallel_perpendicular_group_constraints_lcon04",
+          test_script_roundtrip_parallel_perpendicular_group_constraints_lcon04 },
         { "test_script_parse_rejects_unexpected_tokens_between_blocks", test_script_parse_rejects_unexpected_tokens_between_blocks },
         { "test_script_apply_commit_keeps_last_valid_scene_on_failure", test_script_apply_commit_keeps_last_valid_scene_on_failure },
         { "test_script_apply_undo_redo_single_step", test_script_apply_undo_redo_single_step },

@@ -512,6 +512,41 @@ static int test_line_line_legality_rejects_point_roles_for_parallel_and_perpendi
     return 0;
 }
 
+static int test_line_line_legality_allows_group_parallel_and_perpendicular_lcon04(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 3;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[0] = 1301;
+    sig.geometry_types[1] = GEOM_LINE;
+    sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[1] = 1302;
+    sig.geometry_types[2] = GEOM_LINE;
+    sig.roles[2] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[2] = 1303;
+
+    if (!constraint_type_is_selection_legal(&sig, CONSTRAINT_PARALLEL)) return 1;
+    if (!constraint_type_is_selection_legal(&sig, CONSTRAINT_PERPENDICULAR)) return 1;
+    return 0;
+}
+
+static int test_line_line_legality_rejects_group_perpendicular_with_non_line_participant_lcon05(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 3;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[0] = 1401;
+    sig.geometry_types[1] = GEOM_LINE;
+    sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[1] = 1402;
+    sig.geometry_types[2] = GEOM_ARC;
+    sig.roles[2] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    sig.entities[2] = 1403;
+
+    if (constraint_type_is_selection_legal(&sig, CONSTRAINT_PERPENDICULAR)) return 1;
+    return 0;
+}
+
 static int test_endpoint_line_endpoint_to_owner_bidirectional_sync(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1847,6 +1882,10 @@ int main(void) {
           test_line_line_legality_allows_pair_parallel_and_perpendicular_lcon05 },
         { "test_line_line_legality_rejects_point_roles_for_parallel_and_perpendicular_lcon05",
           test_line_line_legality_rejects_point_roles_for_parallel_and_perpendicular_lcon05 },
+        { "test_line_line_legality_allows_group_parallel_and_perpendicular_lcon04",
+          test_line_line_legality_allows_group_parallel_and_perpendicular_lcon04 },
+        { "test_line_line_legality_rejects_group_perpendicular_with_non_line_participant_lcon05",
+          test_line_line_legality_rejects_group_perpendicular_with_non_line_participant_lcon05 },
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },

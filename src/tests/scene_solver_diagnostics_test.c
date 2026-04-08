@@ -289,6 +289,51 @@ static int test_line_line_perpendicular_unsat_reports_family_specific_diagnostic
     return ok ? 0 : 1;
 }
 
+static int test_line_line_group_perpendicular_unsat_reports_family_specific_diagnostic_lcon05(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t anchor = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 2.0f, 0.0f),
+                                                   vec3_make(2.0f, 3.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_c = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, -2.0f, 0.0f),
+                                                   vec3_make(2.0f, -1.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !anchor || !line_b || !line_c) return 1;
+
+    SketchGeometryStateComp *state_a = ecs_world_get_sketch_geometry_state(scene.world, anchor);
+    SketchGeometryStateComp *state_b = ecs_world_get_sketch_geometry_state(scene.world, line_b);
+    SketchGeometryStateComp *state_c = ecs_world_get_sketch_geometry_state(scene.world, line_c);
+    if (!state_a || !state_b || !state_c) return 1;
+    state_a->fixed = true;
+    state_b->fixed = true;
+    state_c->fixed = true;
+
+    ecs_entity_t participants[3] = { line_c, anchor, line_b };
+    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PERPENDICULAR, participants, 3, 0.0f, false);
+    if (!c) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    int diag_count = scene_solver_diagnostic_count(&scene, sketch);
+    const sketch_solver_diagnostic_t *last =
+        scene_solver_diagnostic_at(&scene, sketch, diag_count > 0 ? diag_count - 1 : -1);
+    int ok = (!solved &&
+              diag_count > 0 &&
+              last &&
+              strcmp(last->message, "Unsatisfied perpendicular constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -304,6 +349,8 @@ int main(void) {
           test_line_line_parallel_unsat_reports_family_specific_diagnostic_lcon05 },
         { "test_line_line_perpendicular_unsat_reports_family_specific_diagnostic_lcon05",
           test_line_line_perpendicular_unsat_reports_family_specific_diagnostic_lcon05 },
+        { "test_line_line_group_perpendicular_unsat_reports_family_specific_diagnostic_lcon05",
+          test_line_line_group_perpendicular_unsat_reports_family_specific_diagnostic_lcon05 },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
