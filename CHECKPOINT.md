@@ -207,6 +207,33 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
+## Most Recent Changes (2026-04-08)
+
+### Phase 22 Solver Trigger + Recalculate Determinism Closure (IMPLEMENTED)
+
+- Completed Phase 22 closure loop and promoted plan `22-03` to complete (3/3 plans).
+- Final user-approved solver defaults locked:
+  - `Debounce`: `0ms` (immediate auto-solve queue flush)
+  - `Max Passes`: `400`
+  - Tolerances remain unchanged (`1e-4` position/angle defaults).
+- Runtime + test alignment delivered:
+  - `src/components/sketch_comp.h` now defaults to `SKETCH_SOLVER_DEFAULT_DEBOUNCE_MS = 0u` and `SKETCH_SOLVER_DEFAULT_MAX_PASSES = 400u`.
+  - `src/tests/scene_solver_contract_test.c` default assertions updated to match shipped defaults.
+- Targeted solver gate re-validated on Windows Vulkan:
+  - `ctest --test-dir build-vulkan -C Release -R "scene_solver_trigger|scene_solver_pass_policy|scene_solver_contract|scene_solver_diagnostics|scene_solver_drag" --output-on-failure`
+  - Result: **5/5 passed**.
+- Added/updated Phase 22 closure artifacts:
+  - `.planning/phases/22-solver-trigger-recalculate-determinism/22-03-SUMMARY.md` (new)
+  - `.planning/phases/22-solver-trigger-recalculate-determinism/22-VERIFICATION.md` (new, `status: passed`)
+  - `.planning/phases/22-solver-trigger-recalculate-determinism/22-VALIDATION.md` (`status: complete`, verification rows green, approval complete)
+  - `.planning/phases/22-solver-trigger-recalculate-determinism/22-CONTEXT.md`, `22-RESEARCH.md`, `22-DISCUSSION-LOG.md` aligned to final default semantics.
+- Project continuity advanced to next phase:
+  - `.planning/ROADMAP.md` marks Phase 22 complete and updates progress table.
+  - `.planning/STATE.md` advances focus to **Phase 23** with `Next command: /gsd-plan-phase 23`.
+  - `.planning/REQUIREMENTS.md` and `.planning/PROJECT.md` now reflect default pass cap `400`.
+
+### Archived baseline notes
+
 ## Most Recent Changes (2026-04-02)
 
 ### Phase 15 Validation & Acceptance Closure (IMPLEMENTED)

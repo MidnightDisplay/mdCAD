@@ -10,13 +10,13 @@
 ### Locked Decisions
 ### Auto-solve trigger semantics
 - **D-01:** Auto-solve should use a **short debounce queue** rather than immediate per-mutation solve.
-- **D-02:** Debounce default is **50ms**.
+- **D-02:** Debounce default is **0ms**.
 - **D-03:** If new mutations arrive while auto-solve is pending, requests are **coalesced** into the pending solve (no request fan-out).
 - **D-04:** Manual **Recalculate Sketch** runs immediately and **clears pending auto-solve queue**.
 
 ### Recalculate pass policy
 - **D-05:** Phase 22 must expose **position + angle tolerances in UI** (not internal-only hidden tolerances).
-- **D-06:** Default max pass count is **10**.
+- **D-06:** Default max pass count is **400**.
 - **D-07:** If pass-cap is hit without convergence, solver status becomes **Error** with explicit `"max passes reached"` diagnostic.
 - **D-08:** On successful convergence, prior failure implication highlighting clears **immediately** (preserve existing successful-solve clear contract).
 
@@ -30,7 +30,7 @@
 
 ### the agent's Discretion
 - Exact field names and storage location for the new tolerance UI-exposed values.
-- Exact queue flush implementation details, provided 50ms debounce + coalescing + manual override semantics remain intact.
+- Exact queue flush implementation details, provided default-immediate debounce semantics (0ms), coalescing, and manual override semantics remain intact.
 - Exact diagnostic message text for max-pass failures, as long as explicit reason is present and testable.
 
 ### Deferred Ideas (OUT OF SCOPE)
@@ -45,7 +45,7 @@
 |----|-------------|------------------|
 | SRLV-01 | User can rely on auto-solve to trigger after committed sketch mutations, including constraint add/remove/edit and geometry move operations. | Debounced scene-owned auto-solve scheduler pattern, callsite inventory, and coalescing/manual-clear behavior recommendations. |
 | SRLV-02 | User can run manual recalculate and get deterministic, idempotent results for unchanged sketch state. | Deterministic pass-loop contract, stable ordering/epsilon guidance, and explicit test map for repeat recalc identity. |
-| SRLV-03 | Solver runs iterative passes until tolerance is satisfied or max pass count is reached, with configurable pass cap (default `10`). | Solver config extension (position/angle tolerances + max pass), max-pass error contract, and UI exposure strategy. |
+| SRLV-03 | Solver runs iterative passes until tolerance is satisfied or max pass count is reached, with configurable pass cap (default `400`). | Solver config extension (position/angle tolerances + max pass), max-pass error contract, and UI exposure strategy. |
 | SRLV-05 | Driving `LENGTH` and `ANGLE` constraints produce expected geometric effects or explicit failure diagnostics. | Atomic transactional solve commit/no-mutation failure pattern and targeted tests for satisfiable/unsatisfiable LENGTH+ANGLE pathways. |
 </phase_requirements>
 

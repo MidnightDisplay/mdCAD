@@ -13,7 +13,7 @@
 
 ## Phases
 
-- [ ] **Phase 22: Solver Trigger + Recalculate Determinism** - Establish trustworthy solve triggering and deterministic pass-bounded recalculate behavior.
+- [x] **Phase 22: Solver Trigger + Recalculate Determinism** - Establish trustworthy solve triggering and deterministic pass-bounded recalculate behavior.
 - [ ] **Phase 23: Principal-Direction Constraint Expansion** - Deliver ALONG X/Y/Z group constraints across supported point participant types.
 - [ ] **Phase 24: Advanced Arc + Line-Arc Constraint Expansion** - Deliver arc-axis, tangency, and arc endpoint angle constraints with deterministic outcomes.
 - [ ] **Phase 25: Regression and Reliability Closure** - Lock automated regression coverage for trigger integrity, pass policy behavior, and new constraint semantics.
@@ -27,14 +27,14 @@
 **Success Criteria** (what must be TRUE):
   1. User can commit sketch mutations (constraint add/remove/edit, geometry move) and auto-solve reliably runs without manual fallback.
   2. User can run manual recalculate repeatedly on unchanged sketch state and receive identical/idempotent results.
-  3. User can observe solves stop only when tolerance is reached or the configured pass cap is hit, with default cap behavior of 10 when not overridden.
+  3. User can observe solves stop only when tolerance is reached or the configured pass cap is hit, with default cap behavior of 400 when not overridden.
   4. User can apply driving LENGTH and ANGLE constraints and see expected geometric effects or a clear explicit failure diagnostic.
 **Plans**: 3 plans
 
 Plans:
 - [x] 22-01-PLAN.md — Create Wave-0 solver trigger/pass-policy/contract tests and CTest wiring for Phase 22 contracts.
 - [x] 22-02-PLAN.md — Implement scene-owned debounce queue, manual override, bounded recalc pass policy, and LENGTH/ANGLE deterministic runtime behavior.
-- [ ] 22-03-PLAN.md — Expose tolerance/max-pass controls in inspector and run final human verification for deterministic recalc UX.
+- [x] 22-03-PLAN.md — Expose tolerance/max-pass controls in inspector, lock approved defaults, and run final human verification for deterministic recalc UX.
 
 ### Phase 23: Principal-Direction Constraint Expansion
 **Goal**: Users can apply and solve principal-direction constraints across pair/group selections and mixed point participant sources.
@@ -72,7 +72,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Solver Trigger + Recalculate Determinism | 2/3 | In Progress|  |
+| 22. Solver Trigger + Recalculate Determinism | 3/3 | Complete | 2026-04-08 |
 | 23. Principal-Direction Constraint Expansion | 0/0 | Not started | - |
 | 24. Advanced Arc + Line-Arc Constraint Expansion | 0/0 | Not started | - |
 | 25. Regression and Reliability Closure | 0/0 | Not started | - |

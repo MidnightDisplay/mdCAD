@@ -56,8 +56,8 @@ static int test_sketch_solver_defaults_and_manual_recalc_clears_queue_metadata(v
     SketchComp *sk = ecs_world_get_sketch(scene.world, sketch);
     if (!sk) return 1;
 
-    int ok = (sk->auto_solve_debounce_ms == 50u &&
-              sk->solver_max_passes == 10u &&
+    int ok = (sk->auto_solve_debounce_ms == 0u &&
+              sk->solver_max_passes == 400u &&
               fabsf(sk->solver_position_tolerance - 1e-4f) <= 1e-7f &&
               fabsf(sk->solver_angle_tolerance - 1e-4f) <= 1e-7f);
     if (!ok) {
@@ -97,7 +97,7 @@ static int test_debounce_setter_clamps_range_and_preserves_zero(void) {
         ecs_world_shutdown(&world);
         return 1;
     }
-    if (sk->auto_solve_debounce_ms != 50u) {
+    if (sk->auto_solve_debounce_ms != 0u) {
         ecs_world_shutdown(&world);
         return 1;
     }

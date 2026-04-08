@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Sketch Solver Audit + Constraint Expansion
 status: executing
-stopped_at: Completed 22-02-PLAN.md
-last_updated: "2026-04-07T15:56:19.101Z"
-last_activity: 2026-04-07
+stopped_at: Completed 22-03-PLAN.md
+last_updated: "2026-04-08T10:55:44.7622395+01:00"
+last_activity: 2026-04-08
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 22 — solver-trigger-recalculate-determinism
+**Current focus:** Phase 23 — principal-direction-constraint-expansion
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 22 (solver-trigger-recalculate-determinism) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-07
+Phase: 23 (principal-direction-constraint-expansion) — READY FOR PLANNING
+Plan: 0 of ?
+Status: Not started
+Last activity: 2026-04-08
 
 ## Milestone Scope
 
@@ -38,7 +38,7 @@ Last activity: 2026-04-07
 
 ## Session Continuity
 
-Next command: `/gsd-plan-phase 22`
+Next command: `/gsd-plan-phase 23`
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Next command: `/gsd-plan-phase 22`
 | Phase 21 P06 | 113s | 2 tasks | 3 files |
 | Phase 22 P01 | 46m | 2 tasks | 4 files |
 | Phase 22-solver-trigger-recalculate-determinism P02 | 8m | 2 tasks | 6 files |
+| Phase 22-solver-trigger-recalculate-determinism P03 | multi-session | 2 tasks | 13 files |
 
 ## Decisions
 
@@ -159,7 +160,7 @@ Next command: `/gsd-plan-phase 22`
 - [Phase 22]: Use dedicated scene_solver_trigger and scene_solver_pass_policy CTest binaries to lock D-01..D-07 behavior before runtime changes.
 - [Phase 22]: Extended scene_solver_contract_test with idempotent recalc and D-09/D-10 anchors for deterministic traceability.
 - [Phase 22]: Plan 22-02 keeps solver authority in scene_solver_* and uses app frame as a thin queue-processor caller.
-- [Phase 22]: Plan 22-02 sets per-sketch solver defaults to debounce=50ms, tolerances=1e-4, max passes=10 with explicit max-pass diagnostics.
+- [Phase 22]: Plan 22-02 introduced per-sketch solver defaults and bounded diagnostics policy; defaults were later finalized to debounce=0ms and max passes=400 with tolerance defaults unchanged.
 
 ## Accumulated Context
 

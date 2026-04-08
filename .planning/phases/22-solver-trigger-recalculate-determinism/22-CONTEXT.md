@@ -16,14 +16,14 @@ This phase hardens existing solver behavior. It does **not** add new grouped axi
 ## Implementation Decisions
 
 ### Auto-solve trigger semantics
-- **D-01:** Auto-solve should use a **short debounce queue** rather than immediate per-mutation solve.
-- **D-02:** Debounce default is **50ms**.
+- **D-01:** Auto-solve should use a **scene-owned queue with configurable debounce** (`0ms` allows immediate flush) rather than direct UI-side solve logic.
+- **D-02:** Debounce default is **0ms**.
 - **D-03:** If new mutations arrive while auto-solve is pending, requests are **coalesced** into the pending solve (no request fan-out).
 - **D-04:** Manual **Recalculate Sketch** runs immediately and **clears pending auto-solve queue**.
 
 ### Recalculate pass policy
 - **D-05:** Phase 22 must expose **position + angle tolerances in UI** (not internal-only hidden tolerances).
-- **D-06:** Default max pass count is **10**.
+- **D-06:** Default max pass count is **400**.
 - **D-07:** If pass-cap is hit without convergence, solver status becomes **Error** with explicit `"max passes reached"` diagnostic.
 - **D-08:** On successful convergence, prior failure implication highlighting clears **immediately** (preserve existing successful-solve clear contract).
 
@@ -37,7 +37,7 @@ This phase hardens existing solver behavior. It does **not** add new grouped axi
 
 ### the agent's Discretion
 - Exact field names and storage location for the new tolerance UI-exposed values.
-- Exact queue flush implementation details, provided 50ms debounce + coalescing + manual override semantics remain intact.
+- Exact queue flush implementation details, provided 0ms default-immediate semantics (or configured debounce), coalescing, and manual override semantics remain intact.
 - Exact diagnostic message text for max-pass failures, as long as explicit reason is present and testable.
 
 </decisions>

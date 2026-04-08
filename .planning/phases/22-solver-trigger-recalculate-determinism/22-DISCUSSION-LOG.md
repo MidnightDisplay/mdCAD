@@ -15,10 +15,11 @@
 |--------|-------------|----------|
 | Run immediately on each committed mutation | Fire solve per commit without queueing | |
 | Queue per sketch and flush once per frame | Coalesce requests to frame-level flush | |
-| Queue with short debounce window (e.g., 50-100ms) | Delay solve briefly to absorb burst edits | ✓ |
+| Queue with short debounce window (e.g., 50-100ms) | Delay solve briefly to absorb burst edits | |
+| Queue with configurable debounce where 0ms disables debounce | Coalesce requests while allowing immediate default behavior | ✓ |
 
-**User's choice:** Queue with short debounce window.
-**Notes:** User requested discussing all areas in order and chose debounce over immediate execution.
+**User's choice:** Queue with configurable debounce where 0ms disables debounce.
+**Notes:** Initial phase choice favored short debounce; final closure approval locked 0ms default.
 
 | Option | Description | Selected |
 |--------|-------------|----------|
@@ -32,11 +33,11 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | 75ms | Moderate default debounce | |
-| 50ms | Lower latency debounce | ✓ |
+| 0ms | Immediate flush (debounce disabled) | ✓ |
 | 100ms | More batching, lower frequency | |
 
-**User's choice:** 50ms default debounce.
-**Notes:** User preferred lower-latency queue flush.
+**User's choice:** 0ms default debounce (debounce disabled).
+**Notes:** Updated during final checkpoint closure approval.
 
 | Option | Description | Selected |
 |--------|-------------|----------|
@@ -62,12 +63,12 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| 10 | Default pass cap | ✓ |
-| 15 | Higher cap | |
-| 20 | Highest cap | |
+| 400 | Default pass cap | ✓ |
+| 200 | Lower cap | |
+| 100 | Minimal cap | |
 
-**User's choice:** 10 pass default.
-**Notes:** Matches milestone baseline expectation.
+**User's choice:** 400 pass default.
+**Notes:** Updated during final checkpoint closure approval.
 
 | Option | Description | Selected |
 |--------|-------------|----------|

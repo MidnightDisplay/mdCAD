@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current focus:**
 - Audit and fix solver execution semantics: auto-solve triggers, deterministic recalculate behavior, and broken constraint pathways.
-- Implement bounded multi-pass solve policy with tolerance stop criteria and configurable pass cap (default 10).
+- Implement bounded multi-pass solve policy with tolerance stop criteria and configurable pass cap (default 400).
 - Add advanced constraints for arc/line-arc interactions and directional group constraints across point sets.
 
 ## Requirements

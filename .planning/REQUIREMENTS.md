@@ -11,7 +11,7 @@ Requirements for the sketch solver audit and advanced constraint expansion miles
 
 - [x] **SRLV-01**: User can rely on auto-solve to trigger after committed sketch mutations, including constraint add/remove/edit and geometry move operations.
 - [x] **SRLV-02**: User can run manual recalculate and get deterministic, idempotent results for unchanged sketch state.
-- [x] **SRLV-03**: Solver runs iterative passes until tolerance is satisfied or max pass count is reached, with configurable pass cap (default `10`).
+- [x] **SRLV-03**: Solver runs iterative passes until tolerance is satisfied or max pass count is reached, with configurable pass cap (default `400`).
 - [ ] **SRLV-04**: Recalculate remains functional when `ALONG X`, `ALONG Y`, `ALONG Z`, and `ANGLE` constraints are present.
 - [x] **SRLV-05**: Driving `LENGTH` and `ANGLE` constraints produce expected geometric effects or explicit failure diagnostics.
 
