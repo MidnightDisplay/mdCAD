@@ -12,7 +12,9 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Shipped:** `v1.3` — Sketch Solver Audit + Constraint Expansion (2026-04-08)
 
-**Current focus:** Preparing `v1.4` milestone definition (`/gsd-new-milestone`).
+**Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
+
+**Current focus:** Defining v1.4 requirements and roadmap (`/gsd-new-milestone`).
 
 ## Requirements
 
@@ -41,10 +43,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Add sketch entity system with solver status, geometry/constraint management, and fix/loose workflow controls.
-- [ ] Add bidirectional sketch scripting subsystem with script editor, parser, serializer, and IO parameter UI.
-- [ ] Expand scene API + undo integration for sketch/constraint/script operations.
-- [ ] Add constraint-focused example sketches/scripts for validation and debugging.
+- [ ] Add `PARALLEL` and `PERPENDICULAR` constraints for line pairs and multi-line groups in active sketches.
+- [ ] Fix `ALONG X/Y/Z` line behavior so principal-axis intent is preserved without unsatisfied-driving solver failures.
+- [ ] Harden arc/line tangency and mixed-constraint drag robustness so valid drags remain solvable and deterministic.
+- [ ] Correct active-sketch line gizmo behavior to drive geometry endpoints (`A`/`B`) and anchor gizmo at line midpoint.
+- [ ] Add human-facing solver architecture documentation with literature references, code-structure mapping, and a TL;DR implementation primer for key constraints.
 
 ### Out of Scope
 
@@ -68,13 +71,15 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Archived milestone audit for v1.2 remains `gaps_found` and is explicitly accepted as known debt at closure.
 - Milestone `v1.3` is complete: Phases 22-25 closed with deterministic solver reliability and advanced arc/line-arc constraint behavior verified.
 - Requirement `V13-01` was validated in Phase 25 with strict seven-test closure gate evidence and mandatory fresh rerun pass.
-- Next active workflow is v1.4 initialization (`/gsd-new-milestone`).
+- Milestone `v1.4` is now initialized for a bug-fix and robustness cycle focused on solver reliability and sketch-line gizmo correction.
 
 ## Next Milestone Goals
 
-1. Close sketch solver reliability defects surfaced from interactive sketching (auto-solve, recalc convergence, and non-working constraint types).
-2. Expand solver/constraint coverage for advanced arc-line interactions and principal-direction group constraints over point selections.
-3. Preserve deterministic solve behavior and maintain Windows Vulkan as the primary development/test gate while introducing new constraint math.
+1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.
+2. Add missing line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and group selections.
+3. Fix line-based `ALONG X/Y/Z` behavior to match principal-axis intent and avoid immediate unsatisfied-driving solver breakdowns.
+4. Correct active-sketch line gizmo semantics to manipulate geometry endpoints directly and position gizmo at line midpoint.
+5. Publish clear solver architecture documentation (easy-read) with literature links, code map references, and a practical TL;DR on constraint implementation.
 
 ## Constraints
 
@@ -98,6 +103,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
 | Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Completed in v1.1 |
 | Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
+| Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Active for v1.4 |
 
 ## Evolution
 
@@ -117,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after v1.3 milestone completion*
+*Last updated: 2026-04-08 after v1.4 milestone initialization*

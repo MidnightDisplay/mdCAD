@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Sketch Solver Audit + Constraint Expansion
-status: v1.3 milestone complete
-stopped_at: Milestone archived
-last_updated: "2026-04-08T18:47:48.344Z"
-last_activity: 2026-04-08 -- v1.3 milestone archived
+milestone: v1.4
+milestone_name: Solver Robustness + Sketch Gizmo Corrections
+status: Defining requirements
+stopped_at: Milestone initialized
+last_updated: "2026-04-08T20:35:00.000Z"
+last_activity: 2026-04-08 -- v1.4 milestone started
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,25 +20,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** v1.4 milestone initialization
+**Current focus:** v1.4 requirements definition and roadmap creation
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 25 (Regression and Reliability Closure) — COMPLETE
-Plan: 2 of 2
-Status: v1.3 milestone archived and tagged-ready
-Last activity: 2026-04-08 -- v1.3 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-08 -- v1.4 milestone started
 
 ## Milestone Scope
 
-- In scope: sketch solver audit/fixes and advanced constraint expansion for sketch lines/arcs.
-- Initial targets: auto-solve trigger integrity, recalc convergence policy, along-axis group constraints, line/arc advanced interactions.
+- In scope: solver robustness and correctness fixes for sketch constraints plus targeted sketch-line gizmo behavior correction.
+- Initial targets: line-line parallel/perpendicular constraints, line ALONG X/Y/Z fix, arc-line tangency robustness, deterministic mixed-constraint drags, solver architecture docs.
 
 ## Session Continuity
 
-Next command: `/gsd-new-milestone`
+Next command: `/gsd-plan-phase 26`
 
 ## Performance Metrics
 
