@@ -35,7 +35,10 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
   2. User can apply `PARALLEL`/`PERPENDICULAR` to supported multi-line selections and all participants satisfy the relation after solve.
   3. Equivalent line selections produce the same solved outcome regardless of selection order.
   4. Invalid line-line selections are rejected at legality time with explicit feedback instead of ambiguous solver failure.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 26-01-PLAN.md — Pair line-line legality/runtime parity with transactional diagnostics and deterministic tests.
+- [ ] 26-02-PLAN.md — Group line-line canonical anchor semantics, explicit legality UX, and deterministic rerun closure.
 
 ### Phase 27: Principal-Axis Line ALONG Reliability
 **Goal**: Users can constrain lines to principal axes (`ALONG X/Y/Z`) without immediate solver failure and with deterministic behavior in mixed constraints.
@@ -85,7 +88,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 26. Line-Line Constraint Coverage | 0/TBD | Not started | - |
+| 26. Line-Line Constraint Coverage | 0/2 | Not started | - |
 | 27. Principal-Axis Line ALONG Reliability | 0/TBD | Not started | - |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
