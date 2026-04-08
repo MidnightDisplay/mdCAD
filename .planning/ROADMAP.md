@@ -48,7 +48,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Expand ALONG legality to descriptor-based point participants and lock shared UI/script legality contracts with tests.
+- [x] 23-01-PLAN.md — Expand ALONG legality to descriptor-based point participants and lock shared UI/script legality contracts with tests.
 - [ ] 23-02-PLAN.md — Implement scene-owned ALONG X/Y/Z transactional solve path and ALONG+ANGLE coexistence behavior with deterministic diagnostics.
 - [ ] 23-03-PLAN.md — Align directional authoring UX and complete final automated + human verification closure for AXIS/SRLV requirements.
 
@@ -78,6 +78,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Solver Trigger + Recalculate Determinism | 3/3 | Complete | 2026-04-08 |
-| 23. Principal-Direction Constraint Expansion | 0/0 | Not started | - |
+| 23. Principal-Direction Constraint Expansion | 1/3 | In Progress|  |
 | 24. Advanced Arc + Line-Arc Constraint Expansion | 0/0 | Not started | - |
 | 25. Regression and Reliability Closure | 0/0 | Not started | - |

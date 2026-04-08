@@ -17,10 +17,10 @@ Requirements for the sketch solver audit and advanced constraint expansion miles
 
 ### Principal-Direction Group Constraints
 
-- [ ] **AXIS-01**: User can apply `ALONG X` to pairs and groups of point participants to constrain them along principal X direction.
-- [ ] **AXIS-02**: User can apply `ALONG Y` to pairs and groups of point participants to constrain them along principal Y direction.
-- [ ] **AXIS-03**: User can apply `ALONG Z` to pairs and groups of point participants to constrain them along principal Z direction.
-- [ ] **AXIS-04**: Directional group constraints support standalone points, line endpoints, and arc landmark points.
+- [x] **AXIS-01**: User can apply `ALONG X` to pairs and groups of point participants to constrain them along principal X direction.
+- [x] **AXIS-02**: User can apply `ALONG Y` to pairs and groups of point participants to constrain them along principal Y direction.
+- [x] **AXIS-03**: User can apply `ALONG Z` to pairs and groups of point participants to constrain them along principal Z direction.
+- [x] **AXIS-04**: Directional group constraints support standalone points, line endpoints, and arc landmark points.
 
 ### Advanced Arc and Line-Arc Constraints
 
@@ -68,10 +68,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRLV-03 | Phase 22 | Complete |
 | SRLV-04 | Phase 23 | Pending |
 | SRLV-05 | Phase 22 | Complete |
-| AXIS-01 | Phase 23 | Pending |
-| AXIS-02 | Phase 23 | Pending |
-| AXIS-03 | Phase 23 | Pending |
-| AXIS-04 | Phase 23 | Pending |
+| AXIS-01 | Phase 23 | Complete |
+| AXIS-02 | Phase 23 | Complete |
+| AXIS-03 | Phase 23 | Complete |
+| AXIS-04 | Phase 23 | Complete |
 | ARCI-01 | Phase 24 | Pending |
 | ARCI-02 | Phase 24 | Pending |
 | ARCI-03 | Phase 24 | Pending |

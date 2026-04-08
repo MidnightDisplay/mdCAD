@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Sketch Solver Audit + Constraint Expansion
-status: planning
-stopped_at: Planned 23-01/23-02/23-03
-last_updated: "2026-04-08T11:28:00+01:00"
+status: verifying
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-04-08T10:40:22.425Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 23 (principal-direction-constraint-expansion) — PLANNED
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-08
 
 ## Milestone Scope
@@ -86,6 +86,7 @@ Next command: `/gsd-execute-phase 23`
 | Phase 23 P01 | planned | 2 tasks | 4 files |
 | Phase 23 P02 | planned | 2 tasks | 3 files |
 | Phase 23 P03 | planned | 2 tasks | 4 files |
+| Phase 23 P01 | 1 | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -164,6 +165,8 @@ Next command: `/gsd-execute-phase 23`
 - [Phase 22]: Extended scene_solver_contract_test with idempotent recalc and D-09/D-10 anchors for deterministic traceability.
 - [Phase 22]: Plan 22-02 keeps solver authority in scene_solver_* and uses app frame as a thin queue-processor caller.
 - [Phase 22]: Plan 22-02 introduced per-sketch solver defaults and bounded diagnostics policy; defaults were later finalized to debounce=0ms and max passes=400 with tolerance defaults unchanged.
+- [Phase 23]: Keep legacy single-line ALONG legality while expanding ALONG pair/group legality to point-like participant signatures.
+- [Phase 23]: Keep legality centralized in constraint_type_is_selection_legal and validate scene descriptor entrypoints with executable tests.
 
 ## Accumulated Context
 
@@ -177,6 +180,6 @@ Next command: `/gsd-execute-phase 23`
 
 ## Session
 
-**Last Date:** 2026-04-07T15:56:19.097Z
-**Stopped At:** Completed 22-02-PLAN.md
+**Last Date:** 2026-04-08T10:40:22.421Z
+**Stopped At:** Completed 23-01-PLAN.md
 **Resume File:** None
