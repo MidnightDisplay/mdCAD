@@ -61,7 +61,11 @@ Plans:
   2. User can constrain line-end and arc-end tangency at a shared point and solver preserves tangency by moving geometry as needed.
   3. User can apply and edit a single-arc start/end angle constraint and resulting geometry updates remain deterministic.
   4. User receives explicit diagnostics when advanced arc/line-arc constraints are unsatisfiable instead of silent or ambiguous failures.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — Add ARCI constraint families and centralized legality parity across UI/script authoring.
+- [ ] 24-02-PLAN.md — Implement ARCI runtime solve semantics with deterministic transactional diagnostics and final verification closure.
 
 ### Phase 25: Regression and Reliability Closure
 **Goal**: Developers can repeatedly validate solver trigger integrity and expanded constraint behavior through automated regression coverage.
