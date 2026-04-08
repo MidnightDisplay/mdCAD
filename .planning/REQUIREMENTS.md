@@ -9,11 +9,11 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Line-Line Constraint Coverage
 
-- [ ] **LCON-01**: User can apply `PARALLEL` between two sketch lines and get a solved result when geometry is feasible.
+- [x] **LCON-01**: User can apply `PARALLEL` between two sketch lines and get a solved result when geometry is feasible.
 - [ ] **LCON-02**: User can apply `PARALLEL` to multi-line groups and all participating lines remain parallel after solve.
-- [ ] **LCON-03**: User can apply `PERPENDICULAR` between two sketch lines and get a solved result when geometry is feasible.
+- [x] **LCON-03**: User can apply `PERPENDICULAR` between two sketch lines and get a solved result when geometry is feasible.
 - [ ] **LCON-04**: User can apply `PERPENDICULAR` to supported multi-line selections with deterministic runtime behavior.
-- [ ] **LCON-05**: User gets explicit legality feedback for invalid line-line constraint selections instead of solver-side ambiguous failure.
+- [x] **LCON-05**: User gets explicit legality feedback for invalid line-line constraint selections instead of solver-side ambiguous failure.
 
 ### Principal-Axis Line Semantics
 
@@ -77,11 +77,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LCON-01 | Phase 26 | Pending |
+| LCON-01 | Phase 26 | Complete |
 | LCON-02 | Phase 26 | Pending |
-| LCON-03 | Phase 26 | Pending |
+| LCON-03 | Phase 26 | Complete |
 | LCON-04 | Phase 26 | Pending |
-| LCON-05 | Phase 26 | Pending |
+| LCON-05 | Phase 26 | Complete |
 | ALIN-01 | Phase 27 | Pending |
 | ALIN-02 | Phase 27 | Pending |
 | ALIN-03 | Phase 27 | Pending |
