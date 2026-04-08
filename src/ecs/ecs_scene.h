@@ -400,6 +400,18 @@ static inline int scene_solver_compare_entity_asc(const void *lhs, const void *r
     return 0;
 }
 
+static inline int scene_constraint_descriptor_compare(const constraint_participant_descriptor_t *lhs,
+                                                      const constraint_participant_descriptor_t *rhs) {
+    if (!lhs || !rhs) return 0;
+    if (lhs->entity < rhs->entity) return -1;
+    if (lhs->entity > rhs->entity) return 1;
+    if (lhs->role < rhs->role) return -1;
+    if (lhs->role > rhs->role) return 1;
+    if (lhs->sub_index < rhs->sub_index) return -1;
+    if (lhs->sub_index > rhs->sub_index) return 1;
+    return 0;
+}
+
 static inline int scene_solver_find_point_candidate(scene_solver_point_candidate_t *entries,
                                                     int entry_count,
                                                     ecs_entity_t entity,
@@ -2506,7 +2518,6 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
                                                           bool driven) {
     if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
     if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
-    if (participant_count < constraint_type_min_participants(type)) return 0;
 
     constraint_selection_signature_t signature = {0};
     signature.count = participant_count;
@@ -2545,6 +2556,56 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
         participant_descriptors[i] =
             constraint_participant_descriptor_make((uint64_t)p, (uint8_t)role, participants[i].sub_index);
     }
+
+    if (type == CONSTRAINT_PARALLEL || type == CONSTRAINT_PERPENDICULAR) {
+        for (uint32_t i = 1; i < participant_count; i++) {
+            uint32_t j = i;
+            while (j > 0 &&
+                   scene_constraint_descriptor_compare(&participant_descriptors[j - 1],
+                                                      &participant_descriptors[j]) > 0) {
+                constraint_participant_descriptor_t tmp_desc = participant_descriptors[j - 1];
+                participant_descriptors[j - 1] = participant_descriptors[j];
+                participant_descriptors[j] = tmp_desc;
+
+                uint64_t tmp_id = participant_ids[j - 1];
+                participant_ids[j - 1] = participant_ids[j];
+                participant_ids[j] = tmp_id;
+
+                uint64_t tmp_entity = signature.entities[j - 1];
+                signature.entities[j - 1] = signature.entities[j];
+                signature.entities[j] = tmp_entity;
+
+                geometry_type_t tmp_geom = signature.geometry_types[j - 1];
+                signature.geometry_types[j - 1] = signature.geometry_types[j];
+                signature.geometry_types[j] = tmp_geom;
+
+                constraint_participant_role_t tmp_role = signature.roles[j - 1];
+                signature.roles[j - 1] = signature.roles[j];
+                signature.roles[j] = tmp_role;
+                j--;
+            }
+        }
+
+        uint32_t write = 0;
+        for (uint32_t read = 0; read < participant_count; read++) {
+            bool duplicate = (write > 0 &&
+                              scene_constraint_descriptor_compare(&participant_descriptors[write - 1],
+                                                                 &participant_descriptors[read]) == 0);
+            if (duplicate) continue;
+            if (write != read) {
+                participant_descriptors[write] = participant_descriptors[read];
+                participant_ids[write] = participant_ids[read];
+                signature.entities[write] = signature.entities[read];
+                signature.geometry_types[write] = signature.geometry_types[read];
+                signature.roles[write] = signature.roles[read];
+            }
+            write++;
+        }
+        participant_count = write;
+        signature.count = participant_count;
+    }
+
+    if (participant_count < constraint_type_min_participants(type)) return 0;
     if (!constraint_type_is_selection_legal(&signature, type)) return 0;
 
     ecs_entity_t constraint_e = scene_add_anchor(scene, "", "");

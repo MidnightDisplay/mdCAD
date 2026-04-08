@@ -342,6 +342,42 @@ static int test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05(vo
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_parallel_pair_creation_is_selection_order_invariant_lcon05(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(2.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t forward[2] = { line_a, line_b };
+    ecs_entity_t reverse[2] = { line_b, line_a };
+    ecs_entity_t c1 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, forward, 2, 0.0f, false);
+    ecs_entity_t c2 = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, reverse, 2, 0.0f, false);
+    if (!c1 || !c2) return 1;
+
+    ConstraintComp *cc1 = ecs_world_get_constraint(scene.world, c1);
+    ConstraintComp *cc2 = ecs_world_get_constraint(scene.world, c2);
+    int ok = (cc1 && cc2 &&
+              cc1->participant_count == 2 &&
+              cc2->participant_count == 2 &&
+              cc1->participant_descriptors[0].entity == cc2->participant_descriptors[0].entity &&
+              cc1->participant_descriptors[1].entity == cc2->participant_descriptors[1].entity &&
+              cc1->participant_descriptors[0].role == cc2->participant_descriptors[0].role &&
+              cc1->participant_descriptors[1].role == cc2->participant_descriptors[1].role);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_participant_descriptor_supports_sub_entity_contract(void) {
     constraint_participant_descriptor_t descriptor =
         constraint_participant_descriptor_make((ecs_entity_t)44, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1);
@@ -1520,6 +1556,8 @@ int main(void) {
           test_recalculate_perpendicular_pair_solves_feasible_lines_lcon03 },
         { "test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05",
           test_recalculate_parallel_pair_unsat_fixed_is_transactional_lcon05 },
+        { "test_recalculate_parallel_pair_creation_is_selection_order_invariant_lcon05",
+          test_recalculate_parallel_pair_creation_is_selection_order_invariant_lcon05 },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
         { "test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06",
           test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06 },
