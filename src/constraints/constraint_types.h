@@ -115,6 +115,29 @@ static inline bool constraint_type_allows_geometry(geometry_type_t type) {
     return type == GEOM_POINT || type == GEOM_LINE || type == GEOM_ARC;
 }
 
+static inline bool constraint_participant_role_is_subentity_point(constraint_participant_role_t role) {
+    return role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+           role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B ||
+           role == CONSTRAINT_PARTICIPANT_ROLE_CENTER;
+}
+
+static inline bool constraint_participant_signature_is_point_like(geometry_type_t geom,
+                                                                  constraint_participant_role_t role) {
+    if (geom == GEOM_POINT) {
+        return role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    }
+    if (geom == GEOM_LINE) {
+        return role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+               role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    }
+    if (geom == GEOM_ARC) {
+        return role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+               role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B ||
+               role == CONSTRAINT_PARTICIPANT_ROLE_CENTER;
+    }
+    return false;
+}
+
 static inline bool constraint_type_is_selection_legal(constraint_selection_signature_t *sig,
                                                       constraint_type_t type) {
     if (!sig || sig->count == 0 || sig->count > CONSTRAINT_MAX_PARTICIPANTS) return false;
@@ -125,9 +148,7 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
 
     bool has_subentity_point_role = false;
     for (uint32_t i = 0; i < sig->count; i++) {
-        if (sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
-            sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_POINT_B ||
-            sig->roles[i] == CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+        if (constraint_participant_role_is_subentity_point(sig->roles[i])) {
             has_subentity_point_role = true;
             break;
         }
@@ -164,8 +185,18 @@ static inline bool constraint_type_is_selection_legal(constraint_selection_signa
                sig->geometry_types[1] == GEOM_LINE;
     }
     if (type == CONSTRAINT_ALONG_X || type == CONSTRAINT_ALONG_Y || type == CONSTRAINT_ALONG_Z) {
-        if (has_subentity_point_role) return false;
-        return sig->count == 1 && sig->geometry_types[0] == GEOM_LINE;
+        bool legacy_single_line =
+            sig->count == 1 &&
+            sig->geometry_types[0] == GEOM_LINE &&
+            sig->roles[0] == CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        if (legacy_single_line) return true;
+        if (sig->count < 2) return false;
+        for (uint32_t i = 0; i < sig->count; i++) {
+            if (!constraint_participant_signature_is_point_like(sig->geometry_types[i], sig->roles[i])) {
+                return false;
+            }
+        }
+        return true;
     }
     if (type == CONSTRAINT_CORADIAL || type == CONSTRAINT_CONCENTRIC || type == CONSTRAINT_TANGENTIAL) {
         if (has_subentity_point_role) return false;

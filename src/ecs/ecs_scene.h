@@ -2351,10 +2351,19 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
         if (ecs_world_get_parent(scene->world, p) != sketch) return 0;
         if (role == CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED) role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
         if (g->type == GEOM_LINE || g->type == GEOM_ARC) {
-            if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
-                role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
-                role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
-                return 0;
+            if (g->type == GEOM_LINE) {
+                if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                    return 0;
+                }
+            } else {
+                if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B &&
+                    role != CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
+                    return 0;
+                }
             }
         } else {
             role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
@@ -4273,6 +4282,24 @@ static inline void ecs_scene_populate_pick_buffer(ecs_scene_t *scene, pick_buffe
 // Find entity by pick ID (returns 0 if not found)
 static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, uint32_t pick_id) {
     if (pick_id == 0) return 0;
+
+    if (endpoint_pick_is_encoded(pick_id)) {
+        uint32_t owner_pick_id = 0u;
+        constraint_participant_role_t role = CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED;
+        if (endpoint_pick_decode(pick_id, &owner_pick_id, &role)) {
+            ecs_entity_t owner = ecs_scene_find_entity_by_pick_id(scene, owner_pick_id);
+            if (owner != 0) {
+                EndPointsComp *endpoints = ecs_world_get_endpoints(scene->world, owner);
+                endpoint_binding_t binding = {0};
+                if (endpoints && endpoints_comp_find_binding(endpoints, role, &binding)) {
+                    ecs_entity_t endpoint_entity = (ecs_entity_t)binding.endpoint_entity;
+                    if (endpoint_entity != 0 && ecs_is_alive(scene->world->world, endpoint_entity)) {
+                        return endpoint_entity;
+                    }
+                }
+            }
+        }
+    }
 
     ecs_world_state_t *w = scene->world;
 
