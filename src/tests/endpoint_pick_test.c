@@ -314,6 +314,96 @@ static int test_endpoint_point_context_keeps_coincident_for_endpoint_pairs(void)
     return 0;
 }
 
+static int test_directional_legality_accepts_point_pair_group_signatures_D01_D04(void) {
+    constraint_selection_signature_t pair_sig = {0};
+    pair_sig.count = 2;
+    pair_sig.geometry_types[0] = GEOM_POINT;
+    pair_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    pair_sig.geometry_types[1] = GEOM_POINT;
+    pair_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+
+    if (!constraint_type_is_selection_legal(&pair_sig, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&pair_sig, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&pair_sig, CONSTRAINT_ALONG_Z)) return 1;
+
+    constraint_selection_signature_t group_sig = {0};
+    group_sig.count = 3;
+    group_sig.geometry_types[0] = GEOM_POINT;
+    group_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    group_sig.geometry_types[1] = GEOM_POINT;
+    group_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    group_sig.geometry_types[2] = GEOM_POINT;
+    group_sig.roles[2] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+
+    if (!constraint_type_is_selection_legal(&group_sig, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&group_sig, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&group_sig, CONSTRAINT_ALONG_Z)) return 1;
+    return 0;
+}
+
+static int test_directional_legality_accepts_line_and_arc_landmark_roles_D02_D05(void) {
+    constraint_selection_signature_t line_arc_sig = {0};
+    line_arc_sig.count = 3;
+    line_arc_sig.geometry_types[0] = GEOM_LINE;
+    line_arc_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    line_arc_sig.geometry_types[1] = GEOM_LINE;
+    line_arc_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    line_arc_sig.geometry_types[2] = GEOM_ARC;
+    line_arc_sig.roles[2] = CONSTRAINT_PARTICIPANT_ROLE_CENTER;
+
+    if (!constraint_type_is_selection_legal(&line_arc_sig, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&line_arc_sig, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&line_arc_sig, CONSTRAINT_ALONG_Z)) return 1;
+
+    constraint_selection_signature_t mixed_sig = {0};
+    mixed_sig.count = 3;
+    mixed_sig.geometry_types[0] = GEOM_POINT;
+    mixed_sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    mixed_sig.geometry_types[1] = GEOM_LINE;
+    mixed_sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    mixed_sig.geometry_types[2] = GEOM_ARC;
+    mixed_sig.roles[2] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+
+    if (!constraint_type_is_selection_legal(&mixed_sig, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&mixed_sig, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&mixed_sig, CONSTRAINT_ALONG_Z)) return 1;
+    return 0;
+}
+
+static int test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06(void) {
+    constraint_selection_signature_t raw_line_pair = {0};
+    raw_line_pair.count = 2;
+    raw_line_pair.geometry_types[0] = GEOM_LINE;
+    raw_line_pair.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    raw_line_pair.geometry_types[1] = GEOM_LINE;
+    raw_line_pair.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+
+    if (constraint_type_is_selection_legal(&raw_line_pair, CONSTRAINT_ALONG_X)) return 1;
+    if (constraint_type_is_selection_legal(&raw_line_pair, CONSTRAINT_ALONG_Y)) return 1;
+    if (constraint_type_is_selection_legal(&raw_line_pair, CONSTRAINT_ALONG_Z)) return 1;
+
+    constraint_selection_signature_t raw_arc_pair = {0};
+    raw_arc_pair.count = 2;
+    raw_arc_pair.geometry_types[0] = GEOM_ARC;
+    raw_arc_pair.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    raw_arc_pair.geometry_types[1] = GEOM_ARC;
+    raw_arc_pair.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+
+    if (constraint_type_is_selection_legal(&raw_arc_pair, CONSTRAINT_ALONG_X)) return 1;
+    if (constraint_type_is_selection_legal(&raw_arc_pair, CONSTRAINT_ALONG_Y)) return 1;
+    if (constraint_type_is_selection_legal(&raw_arc_pair, CONSTRAINT_ALONG_Z)) return 1;
+
+    constraint_selection_signature_t legacy_line = {0};
+    legacy_line.count = 1;
+    legacy_line.geometry_types[0] = GEOM_LINE;
+    legacy_line.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_Z)) return 1;
+
+    return 0;
+}
+
 static int test_endpoint_line_endpoint_to_owner_bidirectional_sync(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1509,6 +1599,12 @@ int main(void) {
         { "test_endpoint_pick_collision_deterministic_repeated_sampling", test_endpoint_pick_collision_deterministic_repeated_sampling },
         { "test_endpoint_point_context_filters_line_only_constraints", test_endpoint_point_context_filters_line_only_constraints },
         { "test_endpoint_point_context_keeps_coincident_for_endpoint_pairs", test_endpoint_point_context_keeps_coincident_for_endpoint_pairs },
+        { "test_directional_legality_accepts_point_pair_group_signatures_D01_D04",
+          test_directional_legality_accepts_point_pair_group_signatures_D01_D04 },
+        { "test_directional_legality_accepts_line_and_arc_landmark_roles_D02_D05",
+          test_directional_legality_accepts_line_and_arc_landmark_roles_D02_D05 },
+        { "test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06",
+          test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06 },
         { "test_endpoint_line_endpoint_to_owner_bidirectional_sync", test_endpoint_line_endpoint_to_owner_bidirectional_sync },
         { "test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync", test_endpoint_arc_endpoint_center_to_owner_bidirectional_sync },
         { "test_endpoint_direct_geometry_edit_syncs_owner_and_entities", test_endpoint_direct_geometry_edit_syncs_owner_and_entities },

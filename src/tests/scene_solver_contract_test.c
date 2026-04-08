@@ -217,6 +217,97 @@ static int test_participant_descriptor_supports_sub_entity_contract(void) {
     return 0;
 }
 
+static int test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t p = scene_add_point_to_sketch(&scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec4_make(1, 1, 1, 1), 0.01f);
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(2.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(1.0f, 1.0f, 0.0f), 1.0f,
+                                               0.0f, 1.5707963f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !p || !line || !arc) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    constraint_participant_descriptor_t mixed[3] = {
+        constraint_participant_descriptor_make((uint64_t)p, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_CENTER, 0),
+    };
+
+    ecs_entity_t along = scene_add_constraint_to_sketch_with_descriptors(&scene, sketch, CONSTRAINT_ALONG_X, mixed, 3, 0.0f, false);
+    if (!along) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ConstraintComp *constraint = ecs_world_get_constraint(scene.world, along);
+    int ok = (constraint &&
+              constraint->participant_count == 3 &&
+              constraint->participant_descriptors[0].role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+              constraint->participant_descriptors[1].role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+              constraint->participant_descriptors[2].role == CONSTRAINT_PARTICIPANT_ROLE_CENTER);
+
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_scene_constraint_creation_rejects_directional_raw_entity_signatures_D03_D06(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(1.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(1.0f, 1.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc_a = scene_add_arc_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f), 1.0f,
+                                                 0.0f, 1.5707963f, vec3_make(0.0f, 0.0f, 1.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc_b = scene_add_arc_to_sketch(&scene, sketch,
+                                                 vec3_make(2.0f, 0.0f, 0.0f), 1.0f,
+                                                 0.0f, 1.5707963f, vec3_make(0.0f, 0.0f, 1.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b || !arc_a || !arc_b) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    constraint_participant_descriptor_t raw_lines[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+    };
+    constraint_participant_descriptor_t raw_arcs[2] = {
+        constraint_participant_descriptor_make((uint64_t)arc_a, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)arc_b, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+    };
+
+    ecs_entity_t along_raw_line =
+        scene_add_constraint_to_sketch_with_descriptors(&scene, sketch, CONSTRAINT_ALONG_Y, raw_lines, 2, 0.0f, false);
+    ecs_entity_t along_raw_arc =
+        scene_add_constraint_to_sketch_with_descriptors(&scene, sketch, CONSTRAINT_ALONG_Z, raw_arcs, 2, 0.0f, false);
+
+    int ok = (along_raw_line == 0 && along_raw_arc == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_failure_implication_dedupes_participants(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -627,6 +718,10 @@ int main(void) {
         { "test_recalculate_commits_coincident_solution_for_points", test_recalculate_commits_coincident_solution_for_points },
         { "test_recalculate_unsat_is_transactional_and_deterministic", test_recalculate_unsat_is_transactional_and_deterministic },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
+        { "test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06",
+          test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06 },
+        { "test_scene_constraint_creation_rejects_directional_raw_entity_signatures_D03_D06",
+          test_scene_constraint_creation_rejects_directional_raw_entity_signatures_D03_D06 },
         { "test_failure_implication_dedupes_participants", test_failure_implication_dedupes_participants },
         { "test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects",
           test_endpoint_replay_undo_redo_triggers_sketch_solver_and_script_side_effects },
