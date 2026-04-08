@@ -526,6 +526,60 @@ static int test_recalculate_perpendicular_group_creation_is_selection_order_inva
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_group_line_line_rerun_is_deterministic_lcon04(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f),
+                                                   vec3_make(3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(2.5f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_c = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, -1.0f, 0.0f),
+                                                   vec3_make(2.0f, -2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b || !line_c) return 1;
+
+    ecs_entity_t parallel_group[3] = { line_a, line_b, line_c };
+    if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, parallel_group, 3, 0.0f, false)) return 1;
+
+    bool solved_first = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    GeometryComp *gc = ecs_world_get_geometry(scene.world, line_c);
+    if (!ga || !gb || !gc) return 1;
+    vec3_t a0_after_first = ga->data.line.a;
+    vec3_t a1_after_first = ga->data.line.b;
+    vec3_t b0_after_first = gb->data.line.a;
+    vec3_t b1_after_first = gb->data.line.b;
+    vec3_t c0_after_first = gc->data.line.a;
+    vec3_t c1_after_first = gc->data.line.b;
+
+    bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    gc = ecs_world_get_geometry(scene.world, line_c);
+    if (!ga || !gb || !gc) return 1;
+
+    int ok = (solved_first &&
+              solved_second &&
+              vec3_close(ga->data.line.a, a0_after_first, 1e-6f) &&
+              vec3_close(ga->data.line.b, a1_after_first, 1e-6f) &&
+              vec3_close(gb->data.line.a, b0_after_first, 1e-6f) &&
+              vec3_close(gb->data.line.b, b1_after_first, 1e-6f) &&
+              vec3_close(gc->data.line.a, c0_after_first, 1e-6f) &&
+              vec3_close(gc->data.line.b, c1_after_first, 1e-6f));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_participant_descriptor_supports_sub_entity_contract(void) {
     constraint_participant_descriptor_t descriptor =
         constraint_participant_descriptor_make((ecs_entity_t)44, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1);
@@ -1712,6 +1766,8 @@ int main(void) {
           test_recalculate_perpendicular_group_anchor_semantics_lcon04 },
         { "test_recalculate_perpendicular_group_creation_is_selection_order_invariant_lcon04",
           test_recalculate_perpendicular_group_creation_is_selection_order_invariant_lcon04 },
+        { "test_recalculate_group_line_line_rerun_is_deterministic_lcon04",
+          test_recalculate_group_line_line_rerun_is_deterministic_lcon04 },
         { "test_participant_descriptor_supports_sub_entity_contract", test_participant_descriptor_supports_sub_entity_contract },
         { "test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06",
           test_scene_constraint_creation_accepts_directional_descriptor_participants_D01_D06 },

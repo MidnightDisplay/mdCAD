@@ -354,12 +354,14 @@ static int test_script_roundtrip_parallel_perpendicular_group_constraints_lcon04
         "return {\n"
         "  entities = {\n"
         "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {3, 0, 0} },\n"
-        "    { id = \"geometry_2\", type = \"line\", a = {0, 1, 0}, b = {2, 2, 0} },\n"
-        "    { id = \"geometry_3\", type = \"line\", a = {0, -1, 0}, b = {2, -2, 0} }\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 1, 0}, b = {2.5, 2.0, 0} },\n"
+        "    { id = \"geometry_3\", type = \"line\", a = {0, -1, 0}, b = {2.0, -2.0, 0} },\n"
+        "    { id = \"geometry_4\", type = \"line\", a = {1.0, 1.0, 0}, b = {2.0, 2.0, 0} },\n"
+        "    { id = \"geometry_5\", type = \"line\", a = {1.0, -1.0, 0}, b = {2.0, -3.0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
         "    { id = \"constraint_1\", type = \"Parallel\", participants = {\"geometry_1\", \"geometry_2\", \"geometry_3\"} },\n"
-        "    { id = \"constraint_2\", type = \"Perpendicular\", participants = {\"geometry_3\", \"geometry_1\", \"geometry_2\"} }\n"
+        "    { id = \"constraint_2\", type = \"Perpendicular\", participants = {\"geometry_1\", \"geometry_4\", \"geometry_5\"} }\n"
         "  }\n"
         "}";
     sketch_script_error_t err = {0};
