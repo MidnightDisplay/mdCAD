@@ -18,7 +18,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 
 ## Phases
 
-- [ ] **Phase 26: Line-Line Constraint Coverage** - Deliver pair/group parallel-perpendicular constraints with legality/runtime parity.
+- [x] **Phase 26: Line-Line Constraint Coverage** - Deliver pair/group parallel-perpendicular constraints with legality/runtime parity. (completed 2026-04-08)
 - [ ] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving.
 - [ ] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability.
 - [ ] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics.
@@ -38,7 +38,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 **Plans**: 2 plans
 Plans:
 - [x] 26-01-PLAN.md — Pair line-line legality/runtime parity with transactional diagnostics and deterministic tests.
-- [ ] 26-02-PLAN.md — Group line-line canonical anchor semantics, explicit legality UX, and deterministic rerun closure.
+- [x] 26-02-PLAN.md — Group line-line canonical anchor semantics, explicit legality UX, and deterministic rerun closure.
 
 ### Phase 27: Principal-Axis Line ALONG Reliability
 **Goal**: Users can constrain lines to principal axes (`ALONG X/Y/Z`) without immediate solver failure and with deterministic behavior in mixed constraints.
@@ -88,7 +88,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 26. Line-Line Constraint Coverage | 1/2 | In Progress|  |
+| 26. Line-Line Constraint Coverage | 2/2 | Complete   | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 0/TBD | Not started | - |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
