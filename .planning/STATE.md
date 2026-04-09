@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: executing
-stopped_at: Completed 30-01-PLAN.md
-last_updated: "2026-04-09T14:04:00.865Z"
+status: verifying
+stopped_at: Completed 30-02-PLAN.md
+last_updated: "2026-04-09T14:11:16.651Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 80
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 30 (deterministic-closure-gate-windows-vulkan-solver-docs) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-09
 
 Progress: [████████░░] 80%
@@ -65,6 +65,7 @@ Progress: [████████░░] 80%
 | Phase 28 P01 | 16 | 3 tasks | 4 files |
 | Phase 28 P02 | 22min | 3 tasks | 3 files |
 | Phase 30 P01 | 142s | 2 tasks | 3 files |
+| Phase 30 P02 | 14min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 28]: Validate D-08 ordering determinism per orientation before mirrored parity invariant comparison.
 - [Phase 30]: Published solver architecture doc with locked section flow and code anchors from app orchestration to scene solver diagnostics.
 - [Phase 30]: Added one solver architecture cross-link in QUICKSTART and one in VULKAN_WINDOWS while preserving Windows Vulkan sign-off scope.
+- [Phase 30]: Locked one canonical CTest regex command string for the 7-test deterministic gate artifacts.
+- [Phase 30]: Required Windows Vulkan closure sequence to run build plus baseline and immediate rerun using identical command.
+- [Phase 30]: Kept closure sign-off scope Windows Vulkan only and deferred cross-platform expansion.
 
 ### Pending Todos
 
@@ -101,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-09T14:04:00.862Z
-Stopped at: Completed 30-01-PLAN.md
+Last session: 2026-04-09T14:11:16.648Z
+Stopped at: Completed 30-02-PLAN.md
 Resume file: None

@@ -22,7 +22,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 - [x] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving. (completed 2026-04-09)
 - [x] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability. (completed 2026-04-09)
 - [x] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics. (completed 2026-04-09)
-- [ ] **Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs** - Close targeted tests/docs and enforce deterministic milestone sign-off.
+- [x] **Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs** - Close targeted tests/docs and enforce deterministic milestone sign-off. (completed 2026-04-09)
 
 ## Phase Details
 
@@ -94,7 +94,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 30-01-PLAN.md — Publish practical solver architecture docs with code anchors, references, and TL;DR debug primer.
-- [ ] 30-02-PLAN.md — Lock canonical Windows Vulkan deterministic closure gate and capture baseline+rerun verification contract.
+- [x] 30-02-PLAN.md — Lock canonical Windows Vulkan deterministic closure gate and capture baseline+rerun verification contract.
 
 ## Progress
 
@@ -104,5 +104,5 @@ Plans:
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
 | 28. Tangency Drag Robustness | 2/2 | Complete    | 2026-04-09 |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 2/2 | Complete | 2026-04-09 |
-| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 1/2 | In Progress|  |
+| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 2/2 | Complete   | 2026-04-09 |
 

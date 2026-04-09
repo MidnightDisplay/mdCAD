@@ -44,8 +44,8 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Validation and Regression
 
-- [ ] **V14-01**: Developer can run targeted automated tests covering new line-line constraints, line ALONG semantics, tangency robustness, and active-sketch line gizmo behavior.
-- [ ] **V14-02**: Developer can run milestone closure reruns on Windows Vulkan and obtain deterministic pass results suitable for sign-off.
+- [x] **V14-01**: Developer can run targeted automated tests covering new line-line constraints, line ALONG semantics, tangency robustness, and active-sketch line gizmo behavior.
+- [x] **V14-02**: Developer can run milestone closure reruns on Windows Vulkan and obtain deterministic pass results suitable for sign-off.
 
 ## v1.5+ Requirements (Deferred)
 
@@ -97,8 +97,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SDOC-01 | Phase 30 | Complete |
 | SDOC-02 | Phase 30 | Complete |
 | SDOC-03 | Phase 30 | Complete |
-| V14-01 | Phase 30 | Pending |
-| V14-02 | Phase 30 | Pending |
+| V14-01 | Phase 30 | Complete |
+| V14-02 | Phase 30 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 22 total
