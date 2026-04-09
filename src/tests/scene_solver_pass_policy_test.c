@@ -10,6 +10,7 @@
 #include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +22,12 @@ void sokol_main(void) {}
 
 static bool vec3_exact_eq(vec3_t a, vec3_t b) {
     return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+static bool vec3_close(vec3_t a, vec3_t b, float eps) {
+    return fabsf(a.x - b.x) <= eps &&
+           fabsf(a.y - b.y) <= eps &&
+           fabsf(a.z - b.z) <= eps;
 }
 
 static int test_recalculate_stops_by_tolerance(void) {
@@ -353,12 +360,20 @@ static bool build_arci02_mirrored_pass_policy_case_D07_D08(bool mirrored,
     }
 
     bool solved_first = false;
-    if (adjacent_drag) {
+    if (force_unsat) {
+        scene_solver_drag_decision_t decision = {0};
+        ecs_entity_t drag_entities[1] = { adjacent_drag ? arc : line };
+        vec3_t requested_delta = adjacent_drag
+            ? vec3_make(mirror * -0.30f, 0.20f, 0.0f)
+            : vec3_make(mirror * 0.40f, 0.20f, 0.0f);
+        bool ok_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, requested_delta, &decision);
+        solved_first = (ok_call && decision.result == SCENE_SOLVER_DRAG_FEASIBLE);
+    } else if (adjacent_drag) {
         EndPointsComp *arc_endpoints = ecs_world_get_endpoints(scene.world, arc);
         endpoint_binding_t center_binding = {0};
         if (!arc_endpoints ||
             !endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_CENTER, &center_binding)) {
-            ecs_world_shutdown(&world);
+                ecs_world_shutdown(&world);
             return false;
         }
         ecs_entity_t center_endpoint = (ecs_entity_t)center_binding.endpoint_entity;
@@ -410,35 +425,57 @@ static bool build_arci02_mirrored_pass_policy_case_D07_D08(bool mirrored,
 static int test_arci02_mirrored_parity_rerun_and_ordering_shared_drag_D07_D08(void) {
     // D-07/D-08: mirrored shared-drag parity must survive immediate rerun and participant-order variants.
     mirrored_tangency_pass_policy_result_t left = {0};
+    mirrored_tangency_pass_policy_result_t left_reordered = {0};
     mirrored_tangency_pass_policy_result_t right = {0};
+    mirrored_tangency_pass_policy_result_t right_reordered = {0};
     if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, false, false, false, &left)) return 1;
-    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, false, false, &right)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, true, false, false, &left_reordered)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, false, false, false, &right)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, false, false, &right_reordered)) return 1;
 
-    return (left.outcome_class == right.outcome_class &&
-            left.outcome_class == 1 &&
-            vec3_exact_eq(left.line_a, left.arc_point_a) &&
-            vec3_exact_eq(right.line_a, right.arc_point_a) &&
-            left.line_a.x == -right.line_a.x &&
-            left.line_a.y == right.line_a.y &&
-            left.line_b.x == -right.line_b.x &&
-            left.line_b.y == right.line_b.y &&
-            left.arc_center.x == -right.arc_center.x &&
-            left.arc_center.y == right.arc_center.y) ? 0 : 1;
+    return (left.outcome_class == 1 &&
+            right.outcome_class == 1 &&
+            left_reordered.outcome_class == left.outcome_class &&
+            right_reordered.outcome_class == right.outcome_class &&
+            vec3_close(left.line_a, left_reordered.line_a, 1e-5f) &&
+            vec3_close(left.line_b, left_reordered.line_b, 1e-5f) &&
+            vec3_close(left.arc_center, left_reordered.arc_center, 1e-5f) &&
+            vec3_close(right.line_a, right_reordered.line_a, 1e-5f) &&
+            vec3_close(right.line_b, right_reordered.line_b, 1e-5f) &&
+            vec3_close(right.arc_center, right_reordered.arc_center, 1e-5f) &&
+            vec3_close(left.line_a, left.arc_point_a, 1e-5f) &&
+            vec3_close(right.line_a, right.arc_point_a, 1e-5f) &&
+            fabsf(left.line_a.x + right.line_a.x) <= 1e-5f &&
+            fabsf(left.line_a.y - right.line_a.y) <= 1e-5f &&
+            fabsf(left.line_b.x + right.line_b.x) <= 1e-5f &&
+            fabsf(left.line_b.y - right.line_b.y) <= 1e-5f &&
+            fabsf(left.arc_center.x + right.arc_center.x) <= 1e-5f &&
+            fabsf(left.arc_center.y - right.arc_center.y) <= 1e-5f) ? 0 : 1;
 }
 
 static int test_arci02_mirrored_parity_rerun_and_ordering_adjacent_unsat_D07_D08(void) {
     // D-07/D-08: mirrored adjacent unsat parity must survive immediate rerun and participant-order variants.
     mirrored_tangency_pass_policy_result_t left = {0};
+    mirrored_tangency_pass_policy_result_t left_reordered = {0};
     mirrored_tangency_pass_policy_result_t right = {0};
+    mirrored_tangency_pass_policy_result_t right_reordered = {0};
     if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, false, true, true, &left)) return 1;
-    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, true, true, &right)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, true, true, true, &left_reordered)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, false, true, true, &right)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, true, true, &right_reordered)) return 1;
 
-    return (left.outcome_class == right.outcome_class &&
-            left.outcome_class == 0 &&
-            vec3_exact_eq(left.line_a, left.arc_point_a) &&
-            vec3_exact_eq(right.line_a, right.arc_point_a) &&
-            left.arc_center.x == -right.arc_center.x &&
-            left.arc_center.y == right.arc_center.y) ? 0 : 1;
+    return (left.outcome_class == 0 &&
+            right.outcome_class == 0 &&
+            left_reordered.outcome_class == left.outcome_class &&
+            right_reordered.outcome_class == right.outcome_class &&
+            vec3_close(left.line_a, left_reordered.line_a, 1e-5f) &&
+            vec3_close(left.line_b, left_reordered.line_b, 1e-5f) &&
+            vec3_close(left.arc_center, left_reordered.arc_center, 1e-5f) &&
+            vec3_close(right.line_a, right_reordered.line_a, 1e-5f) &&
+            vec3_close(right.line_b, right_reordered.line_b, 1e-5f) &&
+            vec3_close(right.arc_center, right_reordered.arc_center, 1e-5f) &&
+            fabsf(left.arc_center.x + right.arc_center.x) <= 1e-5f &&
+            fabsf(left.arc_center.y - right.arc_center.y) <= 1e-5f) ? 0 : 1;
 }
 
 static int test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic(void) {

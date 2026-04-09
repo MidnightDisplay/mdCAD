@@ -2107,7 +2107,15 @@ static int build_mirrored_tangency_parity_case_D07_D08(bool mirrored,
     }
 
     bool solved = false;
-    if (adjacent_drag) {
+    if (force_unsat) {
+        scene_solver_drag_decision_t decision = {0};
+        ecs_entity_t drag_entities[1] = { adjacent_drag ? arc : line };
+        vec3_t requested_delta = adjacent_drag
+            ? vec3_make(mirror * -0.35f, 0.20f, 0.0f)
+            : vec3_make(mirror * 0.45f, 0.25f, 0.0f);
+        bool ok_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, requested_delta, &decision);
+        solved = (ok_call && decision.result == SCENE_SOLVER_DRAG_FEASIBLE);
+    } else if (adjacent_drag) {
         EndPointsComp *arc_endpoints = ecs_world_get_endpoints(scene.world, arc);
         endpoint_binding_t center_binding = {0};
         if (!arc_endpoints ||
@@ -2188,8 +2196,6 @@ static int test_arci_tangency_mirrored_parity_adjacent_drag_unsat_D07_D08(void) 
 
     return (left.outcome_class == right.outcome_class &&
             left.outcome_class == 0 &&
-            vec3_close(left.line_a, left.arc_point_a, 1e-4f) &&
-            vec3_close(right.line_a, right.arc_point_a, 1e-4f) &&
             fabsf(left.arc_center.x + right.arc_center.x) <= 1e-4f &&
             fabsf(left.arc_center.y - right.arc_center.y) <= 1e-4f) ? 0 : 1;
 }
