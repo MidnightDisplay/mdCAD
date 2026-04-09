@@ -404,6 +404,18 @@ static int test_directional_legality_rejects_raw_line_and_arc_entity_signatures_
     return 0;
 }
 
+static int test_directional_legality_keeps_legacy_single_line_entity_signature_parity_alin01_alin03(void) {
+    constraint_selection_signature_t legacy_line = {0};
+    legacy_line.count = 1;
+    legacy_line.geometry_types[0] = GEOM_LINE;
+    legacy_line.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_X)) return 1;
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_Y)) return 1;
+    if (!constraint_type_is_selection_legal(&legacy_line, CONSTRAINT_ALONG_Z)) return 1;
+    return 0;
+}
+
 static int test_arci01_legality_accepts_only_line_arc_entity_pair_D01(void) {
     constraint_selection_signature_t legal_sig = {0};
     legal_sig.count = 2;
@@ -1872,6 +1884,8 @@ int main(void) {
           test_directional_legality_accepts_line_and_arc_landmark_roles_D02_D05 },
         { "test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06",
           test_directional_legality_rejects_raw_line_and_arc_entity_signatures_D03_D06 },
+        { "test_directional_legality_keeps_legacy_single_line_entity_signature_parity_alin01_alin03",
+          test_directional_legality_keeps_legacy_single_line_entity_signature_parity_alin01_alin03 },
         { "test_arci01_legality_accepts_only_line_arc_entity_pair_D01",
           test_arci01_legality_accepts_only_line_arc_entity_pair_D01 },
         { "test_arci02_legality_accepts_only_line_endpoint_and_arc_endpoint_D05",

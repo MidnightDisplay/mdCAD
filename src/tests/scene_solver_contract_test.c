@@ -1353,6 +1353,130 @@ static int test_recalculate_along_and_angle_coexistence_is_deterministic_D11(voi
     return ok ? 0 : 1;
 }
 
+static int test_recalculate_along_x_single_legacy_line_entity_solves_alin01(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 1.0f, 2.0f),
+                                                 vec3_make(5.0f, 3.0f, 4.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    ecs_entity_t participants[1] = { line };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X, participants, 1, 0.0f, false);
+    if (!c_along) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *gl = ecs_world_get_geometry(scene.world, line);
+    if (!gl || gl->type != GEOM_LINE) return 1;
+
+    int ok = (solved &&
+              fabsf(gl->data.line.a.y - gl->data.line.b.y) <= 1e-4f &&
+              fabsf(gl->data.line.a.z - gl->data.line.b.z) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_along_y_single_legacy_line_entity_solves_alin02(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(1.0f, 0.0f, 2.0f),
+                                                 vec3_make(3.0f, 5.0f, 4.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    ecs_entity_t participants[1] = { line };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_Y, participants, 1, 0.0f, false);
+    if (!c_along) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *gl = ecs_world_get_geometry(scene.world, line);
+    if (!gl || gl->type != GEOM_LINE) return 1;
+
+    int ok = (solved &&
+              fabsf(gl->data.line.a.x - gl->data.line.b.x) <= 1e-4f &&
+              fabsf(gl->data.line.a.z - gl->data.line.b.z) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_along_z_single_legacy_line_entity_solves_alin03(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(1.0f, 2.0f, 0.0f),
+                                                 vec3_make(3.0f, 4.0f, 5.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    ecs_entity_t participants[1] = { line };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_Z, participants, 1, 0.0f, false);
+    if (!c_along) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *gl = ecs_world_get_geometry(scene.world, line);
+    if (!gl || gl->type != GEOM_LINE) return 1;
+
+    int ok = (solved &&
+              fabsf(gl->data.line.a.x - gl->data.line.b.x) <= 1e-4f &&
+              fabsf(gl->data.line.a.y - gl->data.line.b.y) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_transactional_alin01(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 1.0f, 2.0f),
+                                                 vec3_make(5.0f, 3.0f, 4.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+    if (!line_state) return 1;
+    line_state->fixed = true;
+
+    ecs_entity_t participants[1] = { line };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X, participants, 1, 0.0f, false);
+    if (!c_along) return 1;
+
+    GeometryComp *gl = ecs_world_get_geometry(scene.world, line);
+    if (!gl || gl->type != GEOM_LINE) return 1;
+    vec3_t a_before = gl->data.line.a;
+    vec3_t b_before = gl->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    gl = ecs_world_get_geometry(scene.world, line);
+    int ok = (!solved &&
+              gl &&
+              vec3_exact_eq(gl->data.line.a, a_before) &&
+              vec3_exact_eq(gl->data.line.b, b_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c_along &&
+              strcmp(imp->reason, "Unsatisfied driving ALONG X constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1799,6 +1923,14 @@ int main(void) {
           test_recalculate_along_z_mixed_landmarks_contract_D11 },
         { "test_recalculate_along_and_angle_coexistence_is_deterministic_D11",
           test_recalculate_along_and_angle_coexistence_is_deterministic_D11 },
+        { "test_recalculate_along_x_single_legacy_line_entity_solves_alin01",
+          test_recalculate_along_x_single_legacy_line_entity_solves_alin01 },
+        { "test_recalculate_along_y_single_legacy_line_entity_solves_alin02",
+          test_recalculate_along_y_single_legacy_line_entity_solves_alin02 },
+        { "test_recalculate_along_z_single_legacy_line_entity_solves_alin03",
+          test_recalculate_along_z_single_legacy_line_entity_solves_alin03 },
+        { "test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_transactional_alin01",
+          test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_transactional_alin01 },
         { "test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03",
           test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03 },
         { "test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04",
