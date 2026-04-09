@@ -19,7 +19,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 ## Phases
 
 - [x] **Phase 26: Line-Line Constraint Coverage** - Deliver pair/group parallel-perpendicular constraints with legality/runtime parity. (completed 2026-04-08)
-- [ ] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving.
+- [x] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving. (completed 2026-04-09)
 - [ ] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability.
 - [ ] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics.
 - [ ] **Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs** - Close targeted tests/docs and enforce deterministic milestone sign-off.
@@ -51,7 +51,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 27-01-PLAN.md — ALONG X/Y/Z line runtime normalization and legality/runtime parity reliability.
-- [ ] 27-02-PLAN.md — Mixed ALONG+LENGTH+ANGLE+connectivity determinism and transactional diagnostics closure.
+- [x] 27-02-PLAN.md — Mixed ALONG+LENGTH+ANGLE+connectivity determinism and transactional diagnostics closure.
 
 ### Phase 28: Tangency Drag Robustness
 **Goal**: Users can create and edit arc-line tangency constraints with stable, transactional, deterministic drag behavior.
@@ -92,7 +92,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
-| 27. Principal-Axis Line ALONG Reliability | 1/2 | In Progress|  |
+| 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete   | 2026-04-09 |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |

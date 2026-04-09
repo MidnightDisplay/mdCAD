@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: executing
-stopped_at: Completed 27-01-PLAN.md
-last_updated: "2026-04-09T09:31:25.920Z"
+status: verifying
+stopped_at: Completed 27-02-PLAN.md
+last_updated: "2026-04-09T09:48:37.984Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 27 (principal-axis-line-along-reliability) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-09
 
 Progress: [░░░░░░░░░░] 0%
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 26 P01 | 12 min | 3 tasks | 5 files |
 | Phase 26 P02 | 45 | 3 tasks | 7 files |
 | Phase 27 P01 | 9 min | 3 tasks | 3 files |
+| Phase 27 P02 | 13 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 26]: Constraint menu now surfaces explicit invalid line-line legality feedback when Parallel/Perpendicular signatures are unsupported.
 - [Phase 27]: ALONG runtime now expands line ENTITY participants to POINT_A/POINT_B descriptors before candidate resolution, restoring legality/runtime parity for legacy single-line signatures.
 - [Phase 27]: ALONG constraints now validate participant sufficiency after deterministic normalization/dedup instead of raw participant count checks.
+- [Phase 27]: Canonicalized ANGLE participant ordering by entity ID in runtime recalc to preserve mixed ALONG selection-order determinism.
+- [Phase 27]: Added explicit ALONG X/Y/Z unsatisfied diagnostics assertions to keep mixed transactional failures family-specific.
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T09:31:25.917Z
-Stopped at: Completed 27-01-PLAN.md
+Last session: 2026-04-09T09:48:37.981Z
+Stopped at: Completed 27-02-PLAN.md
 Resume file: None
