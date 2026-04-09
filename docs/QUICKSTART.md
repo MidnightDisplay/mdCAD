@@ -21,6 +21,8 @@ ninja -C build -d stats && ./build/bin/mdCAD
 
 The standalone harness is the primary regression and benchmark surface for this phase. Launching `mdCAD` afterward is an optional manual smoke pass that remains secondary.
 
+Solver debugging map: [`docs/solver/SOLVER_ARCHITECTURE.md`](solver/SOLVER_ARCHITECTURE.md) provides code anchors for authoring, recalculate, diagnostics, and UI feedback flow.
+
 ### macOS / Ninja
 
 Build the standalone harness:

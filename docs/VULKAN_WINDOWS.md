@@ -2,6 +2,8 @@
 
 This document explains the Vulkan backend implementation for mdCAD on Windows, covering both MinGW (default Vulkan) and Visual Studio 2026 (optional Vulkan) builds.
 
+For solver-side debugging in the Windows Vulkan sign-off workflow, see [`docs/solver/SOLVER_ARCHITECTURE.md`](solver/SOLVER_ARCHITECTURE.md) for authoring/recalculate/diagnostics/UI feedback code anchors.
+
 ## Overview
 
 mdCAD uses [Sokol](https://github.com/floooh/sokol) as its cross-platform graphics abstraction layer. Sokol supports multiple backends:
