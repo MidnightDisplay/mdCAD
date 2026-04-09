@@ -104,5 +104,5 @@ Plans:
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
 | 28. Tangency Drag Robustness | 2/2 | Complete    | 2026-04-09 |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 2/2 | Complete | 2026-04-09 |
-| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 2/2 | Complete   | 2026-04-09 |
+| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 2/2 | Complete    | 2026-04-09 |
 
