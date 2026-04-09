@@ -19,6 +19,10 @@ void sokol_main(void) {}
 }
 #endif
 
+static bool vec3_exact_eq(vec3_t a, vec3_t b) {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
 static int test_recalculate_stops_by_tolerance(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -284,6 +288,159 @@ static int test_arci02_repeated_recalc_is_deterministic_after_anchor_drag(void) 
     return ok ? 0 : 1;
 }
 
+typedef struct {
+    int outcome_class;
+    vec3_t line_a;
+    vec3_t line_b;
+    vec3_t arc_center;
+    vec3_t arc_point_a;
+} mirrored_tangency_pass_policy_result_t;
+
+static bool build_arci02_mirrored_pass_policy_case_D07_D08(bool mirrored,
+                                                           bool reverse_participant_order,
+                                                           bool adjacent_drag,
+                                                           bool force_unsat,
+                                                           mirrored_tangency_pass_policy_result_t *out_result) {
+    if (!out_result) return false;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    float mirror = mirrored ? -1.0f : 1.0f;
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(mirror * 2.0f, -2.0f, 0.0f),
+                                                 vec3_make(mirror * 2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               mirrored ? 3.14159265359f : 0.0f,
+                                               mirrored ? 2.14159265359f : 1.0f,
+                                               vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    if (reverse_participant_order) {
+        constraint_participant_descriptor_t tmp = desc[0];
+        desc[0] = desc[1];
+        desc[1] = tmp;
+    }
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c || !scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    if (force_unsat) {
+        SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+        SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+        if (!line_state || !arc_state) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+        line_state->fixed = true;
+        arc_state->fixed = true;
+    }
+
+    bool solved_first = false;
+    if (adjacent_drag) {
+        EndPointsComp *arc_endpoints = ecs_world_get_endpoints(scene.world, arc);
+        endpoint_binding_t center_binding = {0};
+        if (!arc_endpoints ||
+            !endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_CENTER, &center_binding)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+        ecs_entity_t center_endpoint = (ecs_entity_t)center_binding.endpoint_entity;
+        vec3_t drag_delta = vec3_make(mirror * -0.30f, 0.20f, 0.0f);
+        if (!scene_apply_endpoint_point_world_delta(&scene, center_endpoint, drag_delta)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+        solved_first = scene_solver_request_recalculate(&scene, sketch);
+    } else {
+        EndPointsComp *line_endpoints = ecs_world_get_endpoints(scene.world, line);
+        endpoint_binding_t line_a_binding = {0};
+        if (!line_endpoints ||
+            !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_binding)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+        ecs_entity_t line_a_endpoint = (ecs_entity_t)line_a_binding.endpoint_entity;
+        vec3_t drag_delta = vec3_make(mirror * 0.40f, 0.20f, 0.0f);
+        if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, drag_delta)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+        solved_first = scene_solver_request_recalculate(&scene, sketch);
+    }
+
+    bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom || line_geom->type != GEOM_LINE || arc_geom->type != GEOM_ARC) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+    vec3_t arc_point_a = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &arc_point_a, NULL)) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    out_result->outcome_class = (solved_first && solved_second) ? 1 : 0;
+    out_result->line_a = line_geom->data.line.a;
+    out_result->line_b = line_geom->data.line.b;
+    out_result->arc_center = arc_geom->data.arc.center;
+    out_result->arc_point_a = arc_point_a;
+    ecs_world_shutdown(&world);
+    return true;
+}
+
+static int test_arci02_mirrored_parity_rerun_and_ordering_shared_drag_D07_D08(void) {
+    // D-07/D-08: mirrored shared-drag parity must survive immediate rerun and participant-order variants.
+    mirrored_tangency_pass_policy_result_t left = {0};
+    mirrored_tangency_pass_policy_result_t right = {0};
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, false, false, false, &left)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, false, false, &right)) return 1;
+
+    return (left.outcome_class == right.outcome_class &&
+            left.outcome_class == 1 &&
+            vec3_exact_eq(left.line_a, left.arc_point_a) &&
+            vec3_exact_eq(right.line_a, right.arc_point_a) &&
+            left.line_a.x == -right.line_a.x &&
+            left.line_a.y == right.line_a.y &&
+            left.line_b.x == -right.line_b.x &&
+            left.line_b.y == right.line_b.y &&
+            left.arc_center.x == -right.arc_center.x &&
+            left.arc_center.y == right.arc_center.y) ? 0 : 1;
+}
+
+static int test_arci02_mirrored_parity_rerun_and_ordering_adjacent_unsat_D07_D08(void) {
+    // D-07/D-08: mirrored adjacent unsat parity must survive immediate rerun and participant-order variants.
+    mirrored_tangency_pass_policy_result_t left = {0};
+    mirrored_tangency_pass_policy_result_t right = {0};
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(false, false, true, true, &left)) return 1;
+    if (!build_arci02_mirrored_pass_policy_case_D07_D08(true, true, true, true, &right)) return 1;
+
+    return (left.outcome_class == right.outcome_class &&
+            left.outcome_class == 0 &&
+            vec3_exact_eq(left.line_a, left.arc_point_a) &&
+            vec3_exact_eq(right.line_a, right.arc_point_a) &&
+            left.arc_center.x == -right.arc_center.x &&
+            left.arc_center.y == right.arc_center.y) ? 0 : 1;
+}
+
 static int test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -362,6 +519,10 @@ int main(void) {
           test_arci02_repeated_recalc_is_deterministic },
         { "test_arci02_repeated_recalc_is_deterministic_after_anchor_drag",
           test_arci02_repeated_recalc_is_deterministic_after_anchor_drag },
+        { "test_arci02_mirrored_parity_rerun_and_ordering_shared_drag_D07_D08",
+          test_arci02_mirrored_parity_rerun_and_ordering_shared_drag_D07_D08 },
+        { "test_arci02_mirrored_parity_rerun_and_ordering_adjacent_unsat_D07_D08",
+          test_arci02_mirrored_parity_rerun_and_ordering_adjacent_unsat_D07_D08 },
         { "test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic",
           test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic },
     };
