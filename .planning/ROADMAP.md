@@ -48,7 +48,10 @@ Plans:
   1. User can apply `ALONG X` to a sketch line without immediate unsatisfied-driving failure.
   2. User can apply `ALONG Y` and `ALONG Z` to sketch lines with the same no-immediate-failure behavior.
   3. User can combine line `ALONG` with `LENGTH`, `ANGLE`, and connectivity constraints and get deterministic solved outcomes in feasible setups.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — ALONG X/Y/Z line runtime normalization and legality/runtime parity reliability.
+- [ ] 27-02-PLAN.md — Mixed ALONG+LENGTH+ANGLE+connectivity determinism and transactional diagnostics closure.
 
 ### Phase 28: Tangency Drag Robustness
 **Goal**: Users can create and edit arc-line tangency constraints with stable, transactional, deterministic drag behavior.
