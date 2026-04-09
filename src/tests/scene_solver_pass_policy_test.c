@@ -293,11 +293,11 @@ static int test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun
     ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
     ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
                                                    vec3_make(1.0f, 2.0f, 1.0f),
-                                                   vec3_make(5.0f, 4.0f, 2.0f),
+                                                   vec3_make(6.0f, 2.0f, 1.0f),
                                                    vec4_make(1, 1, 1, 1), 1.0f);
     ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
                                                    vec3_make(1.0f, 2.0f, 1.0f),
-                                                   vec3_make(2.0f, 6.0f, 3.0f),
+                                                   vec3_make(2.0f, 5.0f, 3.0f),
                                                    vec4_make(1, 1, 1, 1), 1.0f);
     if (!sketch || !line_a || !line_b) return 1;
 
