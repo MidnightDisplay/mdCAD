@@ -92,7 +92,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
-| 27. Principal-Axis Line ALONG Reliability | 0/TBD | Not started | - |
+| 27. Principal-Axis Line ALONG Reliability | 0/2 | Planned    |  |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
