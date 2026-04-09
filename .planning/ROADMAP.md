@@ -76,7 +76,10 @@ Plans:
   2. User dragging the active-sketch line gizmo translates endpoints `A` and `B` together as rigid geometry.
   3. User sees endpoint-driven behavior only for active-sketch lines; non-active or non-line selections preserve existing semantics.
   4. User can undo/redo a completed active-sketch line drag as one coherent interaction restoring exact endpoint geometry.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 29-01-PLAN.md — Midpoint anchoring and eligible active-sketch line endpoint-authority drag routing with mixed-selection guardrails.
+- [ ] 29-02-PLAN.md — Grouped single-interaction undo/redo for active-sketch line drags with deterministic rerun closure.
 **UI hint**: yes
 
 ### Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs
@@ -97,6 +100,6 @@ Plans:
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
 | 28. Tangency Drag Robustness | 2/2 | Complete    | 2026-04-09 |
-| 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
+| 29. Active-Sketch Line Gizmo Endpoint Authority | 0/2 | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
 
