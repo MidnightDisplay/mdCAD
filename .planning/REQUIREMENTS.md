@@ -38,9 +38,9 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Solver Architecture Documentation
 
-- [ ] **SDOC-01**: Developer can read an easy-to-follow solver architecture overview that maps authoring, solve, diagnostics, and UI feedback flow.
-- [ ] **SDOC-02**: Developer can use references to relevant literature and direct code-structure anchors (files/functions) to understand implementation intent.
-- [ ] **SDOC-03**: Developer can use a TL;DR primer that explains how key constraints are implemented and where to start when debugging failures.
+- [x] **SDOC-01**: Developer can read an easy-to-follow solver architecture overview that maps authoring, solve, diagnostics, and UI feedback flow.
+- [x] **SDOC-02**: Developer can use references to relevant literature and direct code-structure anchors (files/functions) to understand implementation intent.
+- [x] **SDOC-03**: Developer can use a TL;DR primer that explains how key constraints are implemented and where to start when debugging failures.
 
 ### Validation and Regression
 
@@ -94,9 +94,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | GZM-02 | Phase 29 | Complete |
 | GZM-03 | Phase 29 | Complete |
 | GZM-04 | Phase 29 | Complete |
-| SDOC-01 | Phase 30 | Pending |
-| SDOC-02 | Phase 30 | Pending |
-| SDOC-03 | Phase 30 | Pending |
+| SDOC-01 | Phase 30 | Complete |
+| SDOC-02 | Phase 30 | Complete |
+| SDOC-03 | Phase 30 | Complete |
 | V14-01 | Phase 30 | Pending |
 | V14-02 | Phase 30 | Pending |
 

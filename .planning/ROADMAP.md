@@ -93,7 +93,7 @@ Plans:
   4. Developer can use solver architecture docs with literature references, code/file anchors, and a TL;DR implementation primer to debug key constraints.
 **Plans**: 2 plans
 Plans:
-- [ ] 30-01-PLAN.md — Publish practical solver architecture docs with code anchors, references, and TL;DR debug primer.
+- [x] 30-01-PLAN.md — Publish practical solver architecture docs with code anchors, references, and TL;DR debug primer.
 - [ ] 30-02-PLAN.md — Lock canonical Windows Vulkan deterministic closure gate and capture baseline+rerun verification contract.
 
 ## Progress
@@ -104,5 +104,5 @@ Plans:
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
 | 28. Tangency Drag Robustness | 2/2 | Complete    | 2026-04-09 |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 2/2 | Complete | 2026-04-09 |
-| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
+| 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 1/2 | In Progress|  |
 
