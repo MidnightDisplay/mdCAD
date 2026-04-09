@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: verifying
-stopped_at: Phase 28 planned
-last_updated: "2026-04-09T10:30:21.220Z"
+status: executing
+stopped_at: Completed 28-01-PLAN.md
+last_updated: "2026-04-09T11:21:26.753Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 27 — principal-axis-line-along-reliability
+**Current focus:** Phase 28 — tangency-drag-robustness
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 28
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 28 (tangency-drag-robustness) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-09
 
 Progress: [░░░░░░░░░░] 0%
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 26 P02 | 45 | 3 tasks | 7 files |
 | Phase 27 P01 | 9 min | 3 tasks | 3 files |
 | Phase 27 P02 | 13 min | 3 tasks | 4 files |
+| Phase 28 P01 | 16 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,8 @@ Recent decisions affecting current work:
 - [Phase 27]: ALONG constraints now validate participant sufficiency after deterministic normalization/dedup instead of raw participant count checks.
 - [Phase 27]: Canonicalized ANGLE participant ordering by entity ID in runtime recalc to preserve mixed ALONG selection-order determinism.
 - [Phase 27]: Added explicit ALONG X/Y/Z unsatisfied diagnostics assertions to keep mixed transactional failures family-specific.
+- [Phase 28]: Kept tangency drag-authority hardening scoped to line-arc endpoint tangency branch.
+- [Phase 28]: Covered adjacent drag authority in-plan via arc-center adjacent handle while preserving family-specific diagnostics.
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T10:30:21.217Z
-Stopped at: Phase 28 planned
-Resume file: .planning/phases/28-tangency-drag-robustness/28-01-PLAN.md
+Last session: 2026-04-09T11:21:26.750Z
+Stopped at: Completed 28-01-PLAN.md
+Resume file: None

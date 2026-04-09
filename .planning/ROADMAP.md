@@ -64,7 +64,7 @@ Plans:
   4. Equivalent mirrored drag interactions in mixed-constraint sketches produce consistent feasibility outcomes.
 **Plans**: 2 plans
 Plans:
-- [ ] 28-01-PLAN.md — Tangency drag-authority/shared-adjacent feasibility hardening with transactional rollback and responsiveness guarantees.
+- [x] 28-01-PLAN.md — Tangency drag-authority/shared-adjacent feasibility hardening with transactional rollback and responsiveness guarantees.
 - [ ] 28-02-PLAN.md — Mirrored tangency interaction determinism parity and deterministic closure rerun evidence capture.
 
 ### Phase 29: Active-Sketch Line Gizmo Endpoint Authority
@@ -96,7 +96,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
-| 28. Tangency Drag Robustness | 0/TBD | Not started | - |
+| 28. Tangency Drag Robustness | 1/2 | In Progress|  |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
 

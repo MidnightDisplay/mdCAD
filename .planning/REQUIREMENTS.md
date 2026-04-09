@@ -24,9 +24,9 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Arc-Line Tangency and Drag Robustness
 
-- [ ] **TRDG-01**: User can author line-end/arc-end tangency in common fillet-like corner setups and receive stable solved geometry when feasible.
-- [ ] **TRDG-02**: User can drag shared and adjacent participants in tangency-constrained setups without solver deadlock in feasible cases.
-- [ ] **TRDG-03**: User receives transactional rollback and clear diagnostics for infeasible tangency edits, with solver responsiveness preserved for subsequent edits.
+- [x] **TRDG-01**: User can author line-end/arc-end tangency in common fillet-like corner setups and receive stable solved geometry when feasible.
+- [x] **TRDG-02**: User can drag shared and adjacent participants in tangency-constrained setups without solver deadlock in feasible cases.
+- [x] **TRDG-03**: User receives transactional rollback and clear diagnostics for infeasible tangency edits, with solver responsiveness preserved for subsequent edits.
 - [ ] **TRDG-04**: User gets consistent drag feasibility outcomes for equivalent mirrored interactions in mixed-constraint sketches.
 
 ### Active-Sketch Line Gizmo Behavior
@@ -86,9 +86,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | ALIN-02 | Phase 27 | Complete |
 | ALIN-03 | Phase 27 | Complete |
 | ALIN-04 | Phase 27 | Complete |
-| TRDG-01 | Phase 28 | Pending |
-| TRDG-02 | Phase 28 | Pending |
-| TRDG-03 | Phase 28 | Pending |
+| TRDG-01 | Phase 28 | Complete |
+| TRDG-02 | Phase 28 | Complete |
+| TRDG-03 | Phase 28 | Complete |
 | TRDG-04 | Phase 28 | Pending |
 | GZM-01 | Phase 29 | Pending |
 | GZM-02 | Phase 29 | Pending |
