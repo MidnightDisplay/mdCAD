@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
 
-**Current focus:** Phase 26 complete; preparing Phase 27 principal-axis ALONG reliability execution.
+**Current focus:** Phase 27 complete; preparing Phase 28 tangency drag robustness execution.
 
 ## Requirements
 
@@ -44,7 +44,6 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Fix `ALONG X/Y/Z` line behavior so principal-axis intent is preserved without unsatisfied-driving solver failures.
 - [ ] Harden arc/line tangency and mixed-constraint drag robustness so valid drags remain solvable and deterministic.
 - [ ] Correct active-sketch line gizmo behavior to drive geometry endpoints (`A`/`B`) and anchor gizmo at line midpoint.
 - [ ] Add human-facing solver architecture documentation with literature references, code-structure mapping, and a TL;DR implementation primer for key constraints.
@@ -73,7 +72,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Requirement `V13-01` was validated in Phase 25 with strict seven-test closure gate evidence and mandatory fresh rerun pass.
 - Milestone `v1.4` is now initialized for a bug-fix and robustness cycle focused on solver reliability and sketch-line gizmo correction.
 - Phase 26 is complete: line-line `PARALLEL`/`PERPENDICULAR` pair and group behavior now meets deterministic legality/runtime contracts with passing targeted verification.
-
+- Phase 27 is complete: principal-axis ALONG line reliability now meets deterministic legality/runtime and mixed-constraint contracts with passing verification.`r`n
 ## Next Milestone Goals
 
 1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.
@@ -124,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 26 completion*
+*Last updated: 2026-04-09 after Phase 27 completion*
