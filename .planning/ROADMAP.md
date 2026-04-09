@@ -62,7 +62,10 @@ Plans:
   2. User can drag shared or adjacent tangency participants in feasible setups without solver deadlock.
   3. Infeasible tangency edits rollback transactionally, surface clear diagnostics, and keep solver responsive for subsequent edits.
   4. Equivalent mirrored drag interactions in mixed-constraint sketches produce consistent feasibility outcomes.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 28-01-PLAN.md — Tangency drag-authority/shared-adjacent feasibility hardening with transactional rollback and responsiveness guarantees.
+- [ ] 28-02-PLAN.md — Mirrored tangency interaction determinism parity and deterministic closure rerun evidence capture.
 
 ### Phase 29: Active-Sketch Line Gizmo Endpoint Authority
 **Goal**: Users get correct active-sketch line interaction behavior where gizmo movement is geometry-authoritative and midpoint-anchored.
