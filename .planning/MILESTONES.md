@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.4 Solver Robustness + Sketch Gizmo Corrections (Shipped: 2026-04-09)
+
+**Phases completed:** 5 phases, 10 plans, 22 tasks
+
+**Key accomplishments:**
+
+- Delivered pair/group line-line `PARALLEL` and `PERPENDICULAR` constraints with deterministic legality/runtime parity and explicit diagnostics.
+- Stabilized line `ALONG X/Y/Z` behavior (including mixed-constraint stacks) through deterministic participant normalization and ordering safeguards.
+- Hardened arc-line endpoint tangency drag behavior with transactional rollback semantics, explicit unsatisfied diagnostics, and mirrored interaction parity checks.
+- Corrected active-sketch line gizmo behavior to midpoint anchoring with endpoint-authority dragging and grouped undo/redo interaction coherence.
+- Published `docs/solver/SOLVER_ARCHITECTURE.md` with practical code anchors, literature references, and a TL;DR debug primer, then cross-linked it from runbooks.
+- Closed v1.4 with deterministic Windows Vulkan sign-off using build + canonical seven-test baseline + immediate rerun (`7/7` then `7/7`).
+
+**Audit:** No formal `v1.4-MILESTONE-AUDIT.md` file was present at archival time (user-approved proceed-anyway path).
+
+**Archives:**
+
+- [v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md)
+- [v1.4-REQUIREMENTS.md](milestones/v1.4-REQUIREMENTS.md)
+
+---
+
 ## v1.3 Sketch Solver Audit + Constraint Expansion (Shipped: 2026-04-08)
 
 **Phases completed:** 4 phases, 10 plans, 21 tasks

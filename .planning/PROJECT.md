@@ -10,11 +10,9 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.3` — Sketch Solver Audit + Constraint Expansion (2026-04-08)
+**Shipped:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections (2026-04-09)
 
-**Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
-
-**Current focus:** Phase 30 complete; v1.4 scope ready for milestone closure.
+**Current focus:** Preparing `v1.5` milestone definition (`/gsd-new-milestone`).
 
 ## Requirements
 
@@ -48,7 +46,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- None — v1.4 phase scope is complete and ready for milestone closeout.
+- None — next milestone requirements are pending definition via `/gsd-new-milestone`.
 
 ### Out of Scope
 
@@ -72,19 +70,16 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Archived milestone audit for v1.2 remains `gaps_found` and is explicitly accepted as known debt at closure.
 - Milestone `v1.3` is complete: Phases 22-25 closed with deterministic solver reliability and advanced arc/line-arc constraint behavior verified.
 - Requirement `V13-01` was validated in Phase 25 with strict seven-test closure gate evidence and mandatory fresh rerun pass.
-- Milestone `v1.4` is now initialized for a bug-fix and robustness cycle focused on solver reliability and sketch-line gizmo correction.
-- Phase 26 is complete: line-line `PARALLEL`/`PERPENDICULAR` pair and group behavior now meets deterministic legality/runtime contracts with passing targeted verification.
-- Phase 27 is complete: principal-axis ALONG line reliability now meets deterministic legality/runtime and mixed-constraint contracts with passing verification.
-- Phase 28 is complete: tangency drag robustness now meets transactional shared/adjacent drag reliability, mirrored parity determinism, and explicit unsatisfied diagnostics contracts.
-- Phase 29 is complete: active-sketch line gizmo midpoint anchoring + endpoint-authority routing and grouped undo/redo interaction coherence are implemented and verified.
-- Phase 30 is complete: deterministic Windows Vulkan closure gate + solver architecture docs are implemented and verified; v1.4 phase goals are complete.
+- Milestone `v1.4` is complete: Phases 26-30 shipped with all plans closed (`10/10`) and all v1.4 requirements complete (`22/22`).
+- v1.4 delivered line-line `PARALLEL`/`PERPENDICULAR` coverage, principal-axis ALONG reliability, tangency drag robustness, and active-sketch line gizmo endpoint-authority behavior.
+- v1.4 closure is deterministic on Windows Vulkan with build + canonical seven-test baseline + immediate rerun pass evidence captured in phase verification artifacts.
+- Solver architecture documentation is now published with practical code anchors, literature references, and a targeted debugging primer.
 ## Next Milestone Goals
 
-1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.
-2. Add missing line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and group selections.
-3. Fix line-based `ALONG X/Y/Z` behavior to match principal-axis intent and avoid immediate unsatisfied-driving solver breakdowns.
-4. Correct active-sketch line gizmo semantics to manipulate geometry endpoints directly and position gizmo at line midpoint.
-5. Publish clear solver architecture documentation (easy-read) with literature links, code map references, and a practical TL;DR on constraint implementation.
+1. Define the next solver/constraint milestone scope from fresh user priorities and archived observations.
+2. Decide which deferred capability items (`CAP-01..03`) are promoted into active requirements for v1.5.
+3. Decide whether to promote platform-expansion validation (`PLAT-01`, `PLAT-02`) into near-term scope.
+4. Preserve deterministic Windows Vulkan closure policy as baseline for any new solver work.
 
 ## Constraints
 
@@ -108,8 +103,8 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Close milestone only after native Windows Vulkan rerun resolves benchmark-noise gate ambiguity | Gate reliability matters more than low-iteration convenience | Confirmed in Phase 5 with 2,000,000-iteration rerun |
 | Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Completed in v1.1 |
 | Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
-| Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Active for v1.4 |
-| Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Confirmed in Phase 30 |
+| Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Completed in v1.4 |
+| Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Completed in v1.4 |
 
 ## Evolution
 
@@ -129,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after Phase 30 completion*
+*Last updated: 2026-04-09 after v1.4 milestone completion*

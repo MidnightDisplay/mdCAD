@@ -2,70 +2,46 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: verifying
-stopped_at: Phase 30 complete
-last_updated: "2026-04-09T14:21:53.319Z"
-last_activity: 2026-04-09
+status: v1.4 milestone complete
+stopped_at: Milestone archived
+last_updated: "2026-04-09T16:30:00.000Z"
+last_activity: 2026-04-09 -- v1.4 milestone archived
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 10
   completed_plans: 10
-  percent: 80
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-08)
+See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 30 — deterministic-closure-gate-windows-vulkan-solver-docs
+**Current focus:** Preparing next milestone definition (`/gsd-new-milestone`)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 30
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-09
+Phase: 30 (Deterministic Closure Gate + Solver Docs) — COMPLETE
+Plan: 2 of 2
+Status: v1.4 milestone archived and tagged-ready
+Last activity: 2026-04-09 -- v1.4 milestone archived
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
 - In scope: solver robustness fixes plus active-sketch line gizmo correction and solver architecture documentation.
-- Deterministic reliability remains mandatory, with explicit Windows Vulkan rerun sign-off gate in final phase.
+- Deterministic reliability remained mandatory and closed with explicit Windows Vulkan baseline + immediate rerun sign-off.
 
-## Performance Metrics
+## Session Continuity
 
-**Velocity:**
-
-- Total plans completed: historical backlog retained in prior milestone records
-- Average duration: mixed (see prior milestone artifacts)
-- Total execution time: cumulative across v1.0-v1.3
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 26-30 (v1.4) | 0 | 0 | - |
-
-**Recent Trend:**
-
-- Last 5 plans: see v1.3 closure artifacts
-- Trend: Stable
-
-| Phase 26 P01 | 12 min | 3 tasks | 5 files |
-| Phase 26 P02 | 45 | 3 tasks | 7 files |
-| Phase 27 P01 | 9 min | 3 tasks | 3 files |
-| Phase 27 P02 | 13 min | 3 tasks | 4 files |
-| Phase 28 P01 | 16 | 3 tasks | 4 files |
-| Phase 28 P02 | 22min | 3 tasks | 3 files |
-| Phase 30 P01 | 142s | 2 tasks | 3 files |
-| Phase 30 P02 | 14min | 2 tasks | 2 files |
+Next command: `/gsd-new-milestone`
 
 ## Accumulated Context
 
@@ -94,10 +70,11 @@ Recent decisions affecting current work:
 - [Phase 30]: Locked one canonical CTest regex command string for the 7-test deterministic gate artifacts.
 - [Phase 30]: Required Windows Vulkan closure sequence to run build plus baseline and immediate rerun using identical command.
 - [Phase 30]: Kept closure sign-off scope Windows Vulkan only and deferred cross-platform expansion.
+- [Milestone v1.4]: Archival completed with roadmap/requirements snapshots and milestone index entry.
 
 ### Pending Todos
 
-- Start Phase 30 discuss/planning for deterministic closure gate + solver docs.
+- Start next milestone discovery and requirements workflow.
 
 ### Blockers/Concerns
 
@@ -106,5 +83,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-04-09T14:21:53.316Z
-Stopped at: Phase 30 complete
-Resume file: .planning/phases/30-deterministic-closure-gate-windows-vulkan-solver-docs/30-VERIFICATION.md
+Stopped at: Milestone archived
+Resume file: None
