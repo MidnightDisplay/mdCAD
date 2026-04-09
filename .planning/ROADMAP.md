@@ -91,7 +91,10 @@ Plans:
   2. Re-running the targeted closure suite produces deterministic pass results suitable for sign-off.
   3. Developer can run milestone closure reruns on Windows Vulkan and obtain deterministic pass results for final gate approval.
   4. Developer can use solver architecture docs with literature references, code/file anchors, and a TL;DR implementation primer to debug key constraints.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 30-01-PLAN.md — Publish practical solver architecture docs with code anchors, references, and TL;DR debug primer.
+- [ ] 30-02-PLAN.md — Lock canonical Windows Vulkan deterministic closure gate and capture baseline+rerun verification contract.
 
 ## Progress
 
