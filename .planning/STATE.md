@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: verifying
-stopped_at: Phase 27 context gathered
-last_updated: "2026-04-09T08:52:59.735Z"
-last_activity: 2026-04-08
+status: executing
+stopped_at: Completed 27-01-PLAN.md
+last_updated: "2026-04-09T09:31:25.920Z"
+last_activity: 2026-04-09
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 0
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 26 — line-line-constraint-coverage
+**Current focus:** Phase 27 — principal-axis-line-along-reliability
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 27
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-08
+Phase: 27 (principal-axis-line-along-reliability) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-09
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase 26 P01 | 12 min | 3 tasks | 5 files |
 | Phase 26 P02 | 45 | 3 tasks | 7 files |
+| Phase 27 P01 | 9 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 26]: Line-line symmetric constraints now canonicalize participant descriptors by stable entity/role/sub-index ordering to preserve selection-order invariance.
 - [Phase 26]: Group PERPENDICULAR uses canonical first participant as deterministic anchor for 3+ line selections.
 - [Phase 26]: Constraint menu now surfaces explicit invalid line-line legality feedback when Parallel/Perpendicular signatures are unsupported.
+- [Phase 27]: ALONG runtime now expands line ENTITY participants to POINT_A/POINT_B descriptors before candidate resolution, restoring legality/runtime parity for legacy single-line signatures.
+- [Phase 27]: ALONG constraints now validate participant sufficiency after deterministic normalization/dedup instead of raw participant count checks.
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T08:52:59.728Z
-Stopped at: Phase 27 context gathered
-Resume file: .planning/phases/27-principal-axis-line-along-reliability/27-CONTEXT.md
+Last session: 2026-04-09T09:31:25.917Z
+Stopped at: Completed 27-01-PLAN.md
+Resume file: None

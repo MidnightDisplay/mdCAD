@@ -50,7 +50,7 @@ Plans:
   3. User can combine line `ALONG` with `LENGTH`, `ANGLE`, and connectivity constraints and get deterministic solved outcomes in feasible setups.
 **Plans**: 2 plans
 Plans:
-- [ ] 27-01-PLAN.md — ALONG X/Y/Z line runtime normalization and legality/runtime parity reliability.
+- [x] 27-01-PLAN.md — ALONG X/Y/Z line runtime normalization and legality/runtime parity reliability.
 - [ ] 27-02-PLAN.md — Mixed ALONG+LENGTH+ANGLE+connectivity determinism and transactional diagnostics closure.
 
 ### Phase 28: Tangency Drag Robustness
@@ -92,7 +92,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
-| 27. Principal-Axis Line ALONG Reliability | 0/2 | Planned    |  |
+| 27. Principal-Axis Line ALONG Reliability | 1/2 | In Progress|  |
 | 28. Tangency Drag Robustness | 0/TBD | Not started | - |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |

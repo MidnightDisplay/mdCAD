@@ -17,9 +17,9 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Principal-Axis Line Semantics
 
-- [ ] **ALIN-01**: User can apply `ALONG X` to sketch lines without immediate unsatisfied-driving solver failure.
-- [ ] **ALIN-02**: User can apply `ALONG Y` to sketch lines without immediate unsatisfied-driving solver failure.
-- [ ] **ALIN-03**: User can apply `ALONG Z` to sketch lines without immediate unsatisfied-driving solver failure.
+- [x] **ALIN-01**: User can apply `ALONG X` to sketch lines without immediate unsatisfied-driving solver failure.
+- [x] **ALIN-02**: User can apply `ALONG Y` to sketch lines without immediate unsatisfied-driving solver failure.
+- [x] **ALIN-03**: User can apply `ALONG Z` to sketch lines without immediate unsatisfied-driving solver failure.
 - [ ] **ALIN-04**: User can combine line `ALONG` constraints with `LENGTH`, `ANGLE`, and connectivity constraints and still get deterministic solve outcomes in feasible cases.
 
 ### Arc-Line Tangency and Drag Robustness
@@ -82,9 +82,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | LCON-03 | Phase 26 | Complete |
 | LCON-04 | Phase 26 | Complete |
 | LCON-05 | Phase 26 | Complete |
-| ALIN-01 | Phase 27 | Pending |
-| ALIN-02 | Phase 27 | Pending |
-| ALIN-03 | Phase 27 | Pending |
+| ALIN-01 | Phase 27 | Complete |
+| ALIN-02 | Phase 27 | Complete |
+| ALIN-03 | Phase 27 | Complete |
 | ALIN-04 | Phase 27 | Pending |
 | TRDG-01 | Phase 28 | Pending |
 | TRDG-02 | Phase 28 | Pending |
