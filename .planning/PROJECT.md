@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
 
-**Current focus:** Phase 27 complete; preparing Phase 28 tangency drag robustness execution.
+**Current focus:** Phase 28 complete; preparing Phase 29 active-sketch line gizmo endpoint authority.
 
 ## Requirements
 
@@ -41,10 +41,10 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Constraint UX closure unified glyph and manager participant highlighting semantics and closed Phase 11 verification/validation evidence debt (`SKCH-04`, `CONS-01`, `CONS-02`, `CONS-03`, `CONS-04`, `CONS-05`) — Validated in Phase 16: constraint-ux-closure-and-verification
 - ✓ Solver-control and constrained-interaction requirements (`SOLV-01`, `SOLV-02`, `SOLV-03`, `SOLV-04`, `API-03`) are fully verified, including implication clear-on-success lifecycle closure — Validated in Phase 12: solver-control-and-constrained-interaction
 - ✓ Line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and multi-line groups are legality-validated, deterministic, and transactional (`LCON-01..05`) — Validated in Phase 26: line-line-constraint-coverage
+- ✓ Arc-line tangency drag robustness now satisfies stable feasible drags, transactional infeasible rollback, explicit diagnostics, and mirrored determinism (`TRDG-01..04`) — Validated in Phase 28: tangency-drag-robustness
 
 ### Active
 
-- [ ] Harden arc/line tangency and mixed-constraint drag robustness so valid drags remain solvable and deterministic.
 - [ ] Correct active-sketch line gizmo behavior to drive geometry endpoints (`A`/`B`) and anchor gizmo at line midpoint.
 - [ ] Add human-facing solver architecture documentation with literature references, code-structure mapping, and a TL;DR implementation primer for key constraints.
 
@@ -73,6 +73,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.4` is now initialized for a bug-fix and robustness cycle focused on solver reliability and sketch-line gizmo correction.
 - Phase 26 is complete: line-line `PARALLEL`/`PERPENDICULAR` pair and group behavior now meets deterministic legality/runtime contracts with passing targeted verification.
 - Phase 27 is complete: principal-axis ALONG line reliability now meets deterministic legality/runtime and mixed-constraint contracts with passing verification.
+- Phase 28 is complete: tangency drag robustness now meets transactional shared/adjacent drag reliability, mirrored parity determinism, and explicit unsatisfied diagnostics contracts.
 ## Next Milestone Goals
 
 1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.
@@ -123,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after Phase 27 completion*
+*Last updated: 2026-04-09 after Phase 28 completion*
