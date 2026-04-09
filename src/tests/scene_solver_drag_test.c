@@ -10,6 +10,7 @@
 #include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +19,83 @@ void sokol_main(void) {}
 #ifdef __cplusplus
 }
 #endif
+
+static bool vec3_close(vec3_t a, vec3_t b, float eps) {
+    return fabsf(a.x - b.x) <= eps &&
+           fabsf(a.y - b.y) <= eps &&
+           fabsf(a.z - b.z) <= eps;
+}
+
+static bool test_setup_tangency_scene(ecs_world_state_t *world,
+                                      ecs_scene_t *scene,
+                                      ecs_entity_t *out_sketch,
+                                      ecs_entity_t *out_line,
+                                      ecs_entity_t *out_arc) {
+    if (!world || !scene || !out_sketch || !out_line || !out_arc) return false;
+    memset(world, 0, sizeof(*world));
+    memset(scene, 0, sizeof(*scene));
+    ecs_world_init(world);
+    ecs_scene_init(scene, world);
+
+    ecs_entity_t sketch = scene_add_sketch(scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return false;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return false;
+    if (!scene_solver_request_recalculate(scene, sketch)) return false;
+
+    *out_sketch = sketch;
+    *out_line = line;
+    *out_arc = arc;
+    return true;
+}
+
+static bool test_get_endpoint_entity(ecs_scene_t *scene,
+                                     ecs_entity_t owner,
+                                     constraint_participant_role_t role,
+                                     ecs_entity_t *out_endpoint) {
+    if (!scene || !out_endpoint) return false;
+    EndPointsComp *owner_endpoints = ecs_world_get_endpoints(scene->world, owner);
+    endpoint_binding_t binding = {0};
+    if (!owner_endpoints || !endpoints_comp_find_binding(owner_endpoints, role, &binding)) {
+        return false;
+    }
+    ecs_entity_t endpoint = (ecs_entity_t)binding.endpoint_entity;
+    if (!endpoint || !ecs_is_alive(scene->world->world, endpoint)) return false;
+    *out_endpoint = endpoint;
+    return true;
+}
+
+static bool test_assert_tangency_still_satisfied(ecs_scene_t *scene, ecs_entity_t line, ecs_entity_t arc) {
+    GeometryComp *line_geom = ecs_world_get_geometry(scene->world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene->world, arc);
+    if (!line_geom || !arc_geom || line_geom->type != GEOM_LINE || arc_geom->type != GEOM_ARC) return false;
+
+    vec3_t line_a = line_geom->data.line.a;
+    vec3_t line_b = line_geom->data.line.b;
+    vec3_t arc_a = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &arc_a, NULL)) return false;
+
+    vec3_t line_dir = vec3_normalize(vec3_sub(line_b, line_a));
+    vec3_t radial = vec3_normalize(vec3_sub(line_a, arc_geom->data.arc.center));
+    vec3_t tangent = vec3_normalize(vec3_cross(vec3_normalize(arc_geom->data.arc.normal), radial));
+    float tangency_dot = fabsf(vec3_dot(line_dir, tangent));
+
+    return vec3_close(line_a, arc_a, 1e-4f) && tangency_dot >= 0.999f;
+}
 
 static int test_drag_fixed_geometry_is_unsat_with_zero_projection(void) {
     ecs_world_state_t world = {0};
@@ -110,6 +188,153 @@ static int test_drag_rejected_diagnostic_payload_baseline(void) {
             strstr(event.message, "Drag rejected") != NULL) ? 0 : 1;
 }
 
+static int test_drag_tangency_shared_endpoint_drag_feasible_preserves_shared_authority(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+
+    ecs_entity_t line_a_endpoint = 0;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_endpoint)) return 1;
+
+    vec3_t drag_delta = vec3_make(0.35f, 0.25f, 0.0f);
+    vec3_t expected = vec3_add(line_a_before, drag_delta);
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, drag_delta)) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    vec3_t line_a_after = line_geom ? line_geom->data.line.a : vec3_make(0, 0, 0);
+
+    int ok = (solved &&
+              line_geom &&
+              vec3_close(line_a_after, expected, 1e-4f) &&
+              test_assert_tangency_still_satisfied(&scene, line, arc));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_drag_tangency_adjacent_endpoint_drag_feasible_preserves_adjacent_authority(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    vec3_t line_b_before = line_geom->data.line.b;
+
+    ecs_entity_t line_b_endpoint = 0;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &line_b_endpoint)) return 1;
+
+    vec3_t drag_delta = vec3_make(0.55f, -0.25f, 0.0f);
+    vec3_t expected = vec3_add(line_b_before, drag_delta);
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_b_endpoint, drag_delta)) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    vec3_t line_b_after = line_geom ? line_geom->data.line.b : vec3_make(0, 0, 0);
+
+    int ok = (solved &&
+              line_geom &&
+              vec3_close(line_b_after, expected, 1e-4f) &&
+              test_assert_tangency_still_satisfied(&scene, line, arc));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_drag_tangency_shared_endpoint_infeasible_rolls_back_transactionally(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+    SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+    if (!line_state || !arc_state) return 1;
+    line_state->fixed = true;
+    arc_state->fixed = true;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+    vec3_t line_b_before = line_geom->data.line.b;
+    vec3_t center_before = arc_geom->data.arc.center;
+    float start_before = arc_geom->data.arc.start_angle;
+    float end_before = arc_geom->data.arc.end_angle;
+    vec3_t normal_before = arc_geom->data.arc.normal;
+
+    ecs_entity_t line_a_endpoint = 0;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_endpoint)) return 1;
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, vec3_make(0.3f, 0.2f, 0.0f))) return 1;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+
+    int ok = (!solved &&
+              line_geom &&
+              arc_geom &&
+              vec3_close(line_geom->data.line.a, line_a_before, 1e-6f) &&
+              vec3_close(line_geom->data.line.b, line_b_before, 1e-6f) &&
+              vec3_close(arc_geom->data.arc.center, center_before, 1e-6f) &&
+              fabsf(arc_geom->data.arc.start_angle - start_before) <= 1e-6f &&
+              fabsf(arc_geom->data.arc.end_angle - end_before) <= 1e-6f &&
+              vec3_close(arc_geom->data.arc.normal, normal_before, 1e-6f) &&
+              imp &&
+              imp->active &&
+              strcmp(imp->reason, "Unsatisfied line-arc endpoint tangency constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_drag_tangency_post_failure_followup_feasible_is_responsive(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+    SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+    if (!line_state || !arc_state) return 1;
+
+    ecs_entity_t line_a_endpoint = 0;
+    ecs_entity_t line_b_endpoint = 0;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_endpoint)) return 1;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &line_b_endpoint)) return 1;
+
+    line_state->fixed = true;
+    arc_state->fixed = true;
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, vec3_make(0.3f, 0.2f, 0.0f))) return 1;
+    bool failed = !scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    if (!failed || !imp || !imp->active) return 1;
+
+    line_state->fixed = false;
+    arc_state->fixed = false;
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom) return 1;
+    vec3_t line_b_before = line_geom->data.line.b;
+    vec3_t drag_delta = vec3_make(0.4f, -0.15f, 0.0f);
+    vec3_t expected = vec3_add(line_b_before, drag_delta);
+
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_b_endpoint, drag_delta)) return 1;
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+
+    int ok = (solved &&
+              line_geom &&
+              vec3_close(line_geom->data.line.b, expected, 1e-4f) &&
+              test_assert_tangency_still_satisfied(&scene, line, arc));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -119,6 +344,14 @@ int main(void) {
         { "test_drag_feasible_large_delta_is_bounded_projection", test_drag_feasible_large_delta_is_bounded_projection },
         { "test_drag_unsat_preserves_last_valid_geometry_state", test_drag_unsat_preserves_last_valid_geometry_state },
         { "test_drag_rejected_diagnostic_payload_baseline", test_drag_rejected_diagnostic_payload_baseline },
+        { "test_drag_tangency_shared_endpoint_drag_feasible_preserves_shared_authority",
+          test_drag_tangency_shared_endpoint_drag_feasible_preserves_shared_authority },
+        { "test_drag_tangency_adjacent_endpoint_drag_feasible_preserves_adjacent_authority",
+          test_drag_tangency_adjacent_endpoint_drag_feasible_preserves_adjacent_authority },
+        { "test_drag_tangency_shared_endpoint_infeasible_rolls_back_transactionally",
+          test_drag_tangency_shared_endpoint_infeasible_rolls_back_transactionally },
+        { "test_drag_tangency_post_failure_followup_feasible_is_responsive",
+          test_drag_tangency_post_failure_followup_feasible_is_responsive },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

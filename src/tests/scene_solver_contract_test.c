@@ -1971,6 +1971,83 @@ static int test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anch
     return ok ? 0 : 1;
 }
 
+static int test_arci_line_arc_endpoint_tangency_adjacent_arc_center_drag_anchor(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.0f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return 1;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return 1;
+    if (!scene_solver_request_recalculate(&scene, sketch)) return 1;
+
+    EndPointsComp *arc_endpoints = ecs_world_get_endpoints(scene.world, arc);
+    endpoint_binding_t center_binding = {0};
+    if (!arc_endpoints ||
+        !endpoints_comp_find_binding(arc_endpoints, CONSTRAINT_PARTICIPANT_ROLE_CENTER, &center_binding)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t center_endpoint = (ecs_entity_t)center_binding.endpoint_entity;
+    if (!center_endpoint || !ecs_is_alive(scene.world->world, center_endpoint)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    GeometryComp *arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!line_geom || !arc_geom) return 1;
+    vec3_t center_before = arc_geom->data.arc.center;
+    vec3_t drag_delta = vec3_make(-0.45f, 0.3f, 0.0f);
+    vec3_t expected_center = vec3_add(center_before, drag_delta);
+
+    if (!scene_apply_endpoint_point_world_delta(&scene, center_endpoint, drag_delta)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    arc_geom = ecs_world_get_geometry(scene.world, arc);
+    if (!solved || !line_geom || !arc_geom) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t line_a_after = line_geom->data.line.a;
+    vec3_t line_b_after = line_geom->data.line.b;
+    vec3_t arc_a_after = vec3_make(0, 0, 0);
+    if (!scene_entity_participant_subpoint(arc_geom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &arc_a_after, NULL)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t line_dir = vec3_normalize(vec3_sub(line_b_after, line_a_after));
+    vec3_t radial = vec3_normalize(vec3_sub(line_a_after, arc_geom->data.arc.center));
+    vec3_t tangent = vec3_normalize(vec3_cross(vec3_normalize(arc_geom->data.arc.normal), radial));
+    float tangency_dot = fabsf(vec3_dot(line_dir, tangent));
+
+    int ok = (vec3_close(arc_geom->data.arc.center, expected_center, 1e-4f) &&
+              vec3_close(line_a_after, arc_a_after, 1e-4f) &&
+              tangency_dot >= 0.999f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -2158,6 +2235,8 @@ int main(void) {
           test_arci_line_arc_endpoint_tangency_unsat_fixed_is_transactional_D08 },
         { "test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anchor",
           test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anchor },
+        { "test_arci_line_arc_endpoint_tangency_adjacent_arc_center_drag_anchor",
+          test_arci_line_arc_endpoint_tangency_adjacent_arc_center_drag_anchor },
         { "test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11",
           test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11 },
         { "test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12",
