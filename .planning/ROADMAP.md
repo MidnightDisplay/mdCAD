@@ -20,7 +20,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 
 - [x] **Phase 26: Line-Line Constraint Coverage** - Deliver pair/group parallel-perpendicular constraints with legality/runtime parity. (completed 2026-04-08)
 - [x] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving. (completed 2026-04-09)
-- [ ] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability.
+- [x] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability. (completed 2026-04-09)
 - [ ] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics.
 - [ ] **Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs** - Close targeted tests/docs and enforce deterministic milestone sign-off.
 
@@ -65,7 +65,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 28-01-PLAN.md — Tangency drag-authority/shared-adjacent feasibility hardening with transactional rollback and responsiveness guarantees.
-- [ ] 28-02-PLAN.md — Mirrored tangency interaction determinism parity and deterministic closure rerun evidence capture.
+- [x] 28-02-PLAN.md — Mirrored tangency interaction determinism parity and deterministic closure rerun evidence capture.
 
 ### Phase 29: Active-Sketch Line Gizmo Endpoint Authority
 **Goal**: Users get correct active-sketch line interaction behavior where gizmo movement is geometry-authoritative and midpoint-anchored.
@@ -96,7 +96,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
-| 28. Tangency Drag Robustness | 1/2 | In Progress|  |
+| 28. Tangency Drag Robustness | 2/2 | Complete   | 2026-04-09 |
 | 29. Active-Sketch Line Gizmo Endpoint Authority | 0/TBD | Not started | - |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
 
