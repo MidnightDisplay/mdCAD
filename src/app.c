@@ -102,6 +102,9 @@ static struct {
     ecs_entity_t *gizmo_drag_entities;
     int gizmo_drag_entity_count;
     bool gizmo_drag_direct_point_mode;
+    bool *gizmo_drag_active_sketch_line_eligible;
+    vec3_t *gizmo_drag_start_line_a;
+    vec3_t *gizmo_drag_start_line_b;
     // Geometry mode drag snapshots
     vec3_t *gizmo_drag_start_vertices;
     int *gizmo_drag_vertex_indices;
@@ -181,6 +184,15 @@ static inline bool mdcad_selection_is_active_sketch_standalone_points(ecs_entity
         }
     }
     return true;
+}
+
+static inline bool mdcad_is_active_sketch_line_entity(ecs_entity_t entity, ecs_entity_t active_sketch) {
+    if (entity == 0 || active_sketch == 0) return false;
+    if (!scene_is_sketch(&state.ecs_scene, active_sketch)) return false;
+    if (!ecs_is_alive(state.ecs_world.world, entity)) return false;
+    if (scene_get_parent(&state.ecs_scene, entity) != active_sketch) return false;
+    GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+    return geom && geom->type == GEOM_LINE;
 }
 
 static inline bool mdcad_apply_active_sketch_point_delta(const ecs_entity_t *entities,
@@ -1707,13 +1719,20 @@ static void frame(void) {
                                                         !state.gizmo.vertex_mode.active)) &&
                                                       mdcad_selection_is_active_sketch_standalone_points(
                                                           state.entity_inspector.active_sketch));
-                            if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE || direct_point_mode) {
+                            bool entity_drag_capture_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE ||
+                                                             direct_point_mode ||
+                                                             (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                                                              !state.gizmo.vertex_mode.active));
+                            if (entity_drag_capture_mode) {
                                 state.gizmo_drag_direct_point_mode = direct_point_mode;
                                 // Snapshot entity positions
                                 int count = state.selection.count;
                                 state.gizmo_drag_entity_count = count;
                                 state.gizmo_drag_entities = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
                                 state.gizmo_drag_start_positions = (vec3_t*)malloc(count * sizeof(vec3_t));
+                                state.gizmo_drag_active_sketch_line_eligible = (bool*)calloc((size_t)count, sizeof(bool));
+                                state.gizmo_drag_start_line_a = (vec3_t*)malloc(count * sizeof(vec3_t));
+                                state.gizmo_drag_start_line_b = (vec3_t*)malloc(count * sizeof(vec3_t));
                                 for (int i = 0; i < count; i++) {
                                     ecs_entity_t e = state.selection.entities[i];
                                     state.gizmo_drag_entities[i] = e;
@@ -1726,6 +1745,20 @@ static void frame(void) {
                                     } else {
                                         state.gizmo_drag_start_positions[i] =
                                             record_drag_start_position_for_entity(&state.ecs_scene, e);
+                                        bool eligible_line =
+                                            mdcad_is_active_sketch_line_entity(e, state.entity_inspector.active_sketch) &&
+                                            (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE ||
+                                             (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                                              !state.gizmo.vertex_mode.active));
+                                        state.gizmo_drag_active_sketch_line_eligible[i] = eligible_line;
+                                        if (eligible_line) {
+                                            const GeometryComp *line_geom = ecs_world_get_geometry(state.ecs_scene.world, e);
+                                            state.gizmo_drag_start_line_a[i] = line_geom->data.line.a;
+                                            state.gizmo_drag_start_line_b[i] = line_geom->data.line.b;
+                                        } else {
+                                            state.gizmo_drag_start_line_a[i] = vec3_make(0.0f, 0.0f, 0.0f);
+                                            state.gizmo_drag_start_line_b[i] = vec3_make(0.0f, 0.0f, 0.0f);
+                                        }
                                     }
                                 }
                             } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
@@ -1805,7 +1838,9 @@ static void frame(void) {
                 bool constrained_sketch_drag = false;
                 ecs_entity_t drag_sketch = 0;
                 bool entity_drag_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE ||
-                                         state.gizmo_drag_direct_point_mode);
+                                         state.gizmo_drag_direct_point_mode ||
+                                         (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
+                                          !state.gizmo.vertex_mode.active));
 
                 if (entity_drag_mode && state.gizmo_drag_entity_count > 0) {
                     ecs_entity_t first = state.gizmo_drag_entities[0];
@@ -1853,12 +1888,18 @@ static void frame(void) {
                         mdcad_apply_active_sketch_point_delta(state.gizmo_drag_entities,
                                                               state.gizmo_drag_entity_count,
                                                               delta);
-                    } else if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
-                        // Apply delta to all selected entities (endpoint points route through owner geometry sync)
-                        scene_apply_transform_delta_for_selection(&state.ecs_scene,
-                                                                  state.gizmo_drag_entities,
-                                                                  state.gizmo_drag_entity_count,
-                                                                  delta);
+                    } else if (entity_drag_mode) {
+                        for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                            ecs_entity_t e = state.gizmo_drag_entities[i];
+                            bool eligible_line =
+                                state.gizmo_drag_active_sketch_line_eligible &&
+                                state.gizmo_drag_active_sketch_line_eligible[i];
+                            if (eligible_line) {
+                                scene_apply_active_sketch_line_world_delta(&state.ecs_scene, e, delta);
+                            } else {
+                                scene_apply_transform_delta_for_selection(&state.ecs_scene, &e, 1, delta);
+                            }
+                        }
                     } else if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE &&
                                state.gizmo.vertex_mode.active) {
                         // Apply delta to selected vertices
@@ -1905,8 +1946,74 @@ static void frame(void) {
                                                                &old_local,
                                                                &new_local, 1);
                             }
-                        } else if (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE) {
+                        } else if (entity_drag_mode) {
+                            const float eps = 1e-6f;
+                            int changed_line_count = 0;
                             for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                                if (!state.gizmo_drag_active_sketch_line_eligible ||
+                                    !state.gizmo_drag_active_sketch_line_eligible[i]) {
+                                    continue;
+                                }
+                                ecs_entity_t e = state.gizmo_drag_entities[i];
+                                const GeometryComp *line_geom = ecs_world_get_geometry(state.ecs_scene.world, e);
+                                if (!line_geom || line_geom->type != GEOM_LINE) continue;
+                                vec3_t old_a = state.gizmo_drag_start_line_a[i];
+                                vec3_t old_b = state.gizmo_drag_start_line_b[i];
+                                vec3_t new_a = line_geom->data.line.a;
+                                vec3_t new_b = line_geom->data.line.b;
+                                if (fabsf(old_a.x - new_a.x) <= eps &&
+                                    fabsf(old_a.y - new_a.y) <= eps &&
+                                    fabsf(old_a.z - new_a.z) <= eps &&
+                                    fabsf(old_b.x - new_b.x) <= eps &&
+                                    fabsf(old_b.y - new_b.y) <= eps &&
+                                    fabsf(old_b.z - new_b.z) <= eps) {
+                                    continue;
+                                }
+                                changed_line_count++;
+                            }
+
+                            if (changed_line_count > 0) {
+                                cmd_bulk_line_endpoint_item_t *items =
+                                    (cmd_bulk_line_endpoint_item_t*)malloc(sizeof(cmd_bulk_line_endpoint_item_t) * (size_t)changed_line_count);
+                                int write_index = 0;
+                                for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                                    if (!state.gizmo_drag_active_sketch_line_eligible ||
+                                        !state.gizmo_drag_active_sketch_line_eligible[i]) {
+                                        continue;
+                                    }
+                                    ecs_entity_t e = state.gizmo_drag_entities[i];
+                                    const GeometryComp *line_geom = ecs_world_get_geometry(state.ecs_scene.world, e);
+                                    if (!line_geom || line_geom->type != GEOM_LINE) continue;
+                                    vec3_t old_a = state.gizmo_drag_start_line_a[i];
+                                    vec3_t old_b = state.gizmo_drag_start_line_b[i];
+                                    vec3_t new_a = line_geom->data.line.a;
+                                    vec3_t new_b = line_geom->data.line.b;
+                                    if (fabsf(old_a.x - new_a.x) <= eps &&
+                                        fabsf(old_a.y - new_a.y) <= eps &&
+                                        fabsf(old_a.z - new_a.z) <= eps &&
+                                        fabsf(old_b.x - new_b.x) <= eps &&
+                                        fabsf(old_b.y - new_b.y) <= eps &&
+                                        fabsf(old_b.z - new_b.z) <= eps) {
+                                        continue;
+                                    }
+                                    items[write_index].entity_id = (uint64_t)e;
+                                    items[write_index].old_a = old_a;
+                                    items[write_index].old_b = old_b;
+                                    items[write_index].new_a = new_a;
+                                    items[write_index].new_b = new_b;
+                                    write_index++;
+                                }
+                                if (write_index > 0) {
+                                    undo_cmd_push_bulk_line_endpoints(&state.undo_redo, items, write_index);
+                                }
+                                free(items);
+                            }
+
+                            for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+                                if (state.gizmo_drag_active_sketch_line_eligible &&
+                                    state.gizmo_drag_active_sketch_line_eligible[i]) {
+                                    continue;
+                                }
                                 ecs_entity_t e = state.gizmo_drag_entities[i];
                                 record_drag_end_move_for_entity(&state.undo_redo,
                                                                  &state.ecs_scene,
@@ -1942,6 +2049,9 @@ static void frame(void) {
                     // Free drag arrays
                     free(state.gizmo_drag_entities); state.gizmo_drag_entities = NULL;
                     free(state.gizmo_drag_start_positions); state.gizmo_drag_start_positions = NULL;
+                    free(state.gizmo_drag_active_sketch_line_eligible); state.gizmo_drag_active_sketch_line_eligible = NULL;
+                    free(state.gizmo_drag_start_line_a); state.gizmo_drag_start_line_a = NULL;
+                    free(state.gizmo_drag_start_line_b); state.gizmo_drag_start_line_b = NULL;
                     state.gizmo_drag_entity_count = 0;
                     state.gizmo_drag_direct_point_mode = false;
                     free(state.gizmo_drag_vertex_indices); state.gizmo_drag_vertex_indices = NULL;
@@ -1977,6 +2087,9 @@ static void cleanup(void) {
     gizmo_shutdown(&state.gizmo);
     free(state.gizmo_drag_entities);
     free(state.gizmo_drag_start_positions);
+    free(state.gizmo_drag_active_sketch_line_eligible);
+    free(state.gizmo_drag_start_line_a);
+    free(state.gizmo_drag_start_line_b);
     free(state.gizmo_drag_vertex_indices);
     free(state.gizmo_drag_start_vertices);
 

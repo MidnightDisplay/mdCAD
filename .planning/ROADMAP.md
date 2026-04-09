@@ -10,7 +10,7 @@
 
 ## Current Status
 
-v1.4 roadmap is active. Next step: `/gsd-plan-phase 26`.
+v1.4 roadmap is active. Next step: `/gsd-discuss-phase 30`.
 
 ## Overview
 
@@ -21,7 +21,7 @@ v1.4 is a robustness-first milestone focused on solver correctness, deterministi
 - [x] **Phase 26: Line-Line Constraint Coverage** - Deliver pair/group parallel-perpendicular constraints with legality/runtime parity. (completed 2026-04-08)
 - [x] **Phase 27: Principal-Axis Line ALONG Reliability** - Fix ALONG X/Y/Z line behavior for deterministic mixed-constraint solving. (completed 2026-04-09)
 - [x] **Phase 28: Tangency Drag Robustness** - Harden arc-line tangency and mixed-constraint drag transactional reliability. (completed 2026-04-09)
-- [ ] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics.
+- [x] **Phase 29: Active-Sketch Line Gizmo Endpoint Authority** - Correct midpoint anchoring and endpoint-driven gizmo interaction semantics. (completed 2026-04-09)
 - [ ] **Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs** - Close targeted tests/docs and enforce deterministic milestone sign-off.
 
 ## Phase Details
@@ -78,8 +78,8 @@ Plans:
   4. User can undo/redo a completed active-sketch line drag as one coherent interaction restoring exact endpoint geometry.
 **Plans**: 2 plans
 Plans:
-- [ ] 29-01-PLAN.md — Midpoint anchoring and eligible active-sketch line endpoint-authority drag routing with mixed-selection guardrails.
-- [ ] 29-02-PLAN.md — Grouped single-interaction undo/redo for active-sketch line drags with deterministic rerun closure.
+- [x] 29-01-PLAN.md — Midpoint anchoring and eligible active-sketch line endpoint-authority drag routing with mixed-selection guardrails.
+- [x] 29-02-PLAN.md — Grouped single-interaction undo/redo for active-sketch line drags with deterministic rerun closure.
 **UI hint**: yes
 
 ### Phase 30: Deterministic Closure Gate (Windows Vulkan) + Solver Docs
@@ -100,6 +100,6 @@ Plans:
 | 26. Line-Line Constraint Coverage | 2/2 | Complete    | 2026-04-08 |
 | 27. Principal-Axis Line ALONG Reliability | 2/2 | Complete    | 2026-04-09 |
 | 28. Tangency Drag Robustness | 2/2 | Complete    | 2026-04-09 |
-| 29. Active-Sketch Line Gizmo Endpoint Authority | 0/2 | Not started | - |
+| 29. Active-Sketch Line Gizmo Endpoint Authority | 2/2 | Complete | 2026-04-09 |
 | 30. Deterministic Closure Gate (Windows Vulkan) + Solver Docs | 0/TBD | Not started | - |
 

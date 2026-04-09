@@ -31,10 +31,10 @@ Requirements for the solver robustness and sketch-line gizmo correction mileston
 
 ### Active-Sketch Line Gizmo Behavior
 
-- [ ] **GZM-01**: User sees the gizmo anchored at the midpoint of the selected line when that line belongs to the active sketch.
-- [ ] **GZM-02**: User moving an active-sketch line with the gizmo updates the line geometry endpoints (`A` and `B`) in sync as a rigid translation.
-- [ ] **GZM-03**: User sees active-sketch line endpoint-driven gizmo behavior only for active-sketch lines; non-active or non-line selections keep existing semantics.
-- [ ] **GZM-04**: User can undo and redo a completed active-sketch line gizmo drag as a coherent single interaction that restores exact endpoint geometry.
+- [x] **GZM-01**: User sees the gizmo anchored at the midpoint of the selected line when that line belongs to the active sketch.
+- [x] **GZM-02**: User moving an active-sketch line with the gizmo updates the line geometry endpoints (`A` and `B`) in sync as a rigid translation.
+- [x] **GZM-03**: User sees active-sketch line endpoint-driven gizmo behavior only for active-sketch lines; non-active or non-line selections keep existing semantics.
+- [x] **GZM-04**: User can undo and redo a completed active-sketch line gizmo drag as a coherent single interaction that restores exact endpoint geometry.
 
 ### Solver Architecture Documentation
 
@@ -90,10 +90,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | TRDG-02 | Phase 28 | Complete |
 | TRDG-03 | Phase 28 | Complete |
 | TRDG-04 | Phase 28 | Complete |
-| GZM-01 | Phase 29 | Pending |
-| GZM-02 | Phase 29 | Pending |
-| GZM-03 | Phase 29 | Pending |
-| GZM-04 | Phase 29 | Pending |
+| GZM-01 | Phase 29 | Complete |
+| GZM-02 | Phase 29 | Complete |
+| GZM-03 | Phase 29 | Complete |
+| GZM-04 | Phase 29 | Complete |
 | SDOC-01 | Phase 30 | Pending |
 | SDOC-02 | Phase 30 | Pending |
 | SDOC-03 | Phase 30 | Pending |

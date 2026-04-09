@@ -7,6 +7,7 @@
 #include "../scripting/sketch_script_apply.h"
 #include "../scripting/sketch_script_emit.h"
 #include "../undo_redo_exec.h"
+#include "../gizmo/gizmo.h"
 #include "../ui/ui_entity_inspector.h"
 #include <stdio.h>
 #include <math.h>
@@ -18,6 +19,26 @@ void sokol_main(void) {}
 #ifdef __cplusplus
 }
 #endif
+
+static bool test_vec3_close(vec3_t a, vec3_t b, float eps) {
+    return fabsf(a.x - b.x) <= eps &&
+           fabsf(a.y - b.y) <= eps &&
+           fabsf(a.z - b.z) <= eps;
+}
+
+static bool test_line_endpoint_entity(ecs_world_state_t *world,
+                                      ecs_entity_t line,
+                                      constraint_participant_role_t role,
+                                      ecs_entity_t *out_endpoint_entity) {
+    if (!world || line == 0 || !out_endpoint_entity) return false;
+    EndPointsComp *endpoints = ecs_world_get_endpoints(world, line);
+    endpoint_binding_t binding = {0};
+    if (!endpoints || !endpoints_comp_find_binding(endpoints, role, &binding)) return false;
+    ecs_entity_t endpoint = (ecs_entity_t)binding.endpoint_entity;
+    if (endpoint == 0 || !ecs_is_alive(world->world, endpoint)) return false;
+    *out_endpoint_entity = endpoint;
+    return true;
+}
 
 static int test_endpoint_pick_id_encode_decode_roundtrip(void) {
     uint32_t entity_pick_id = 42u;
@@ -1860,6 +1881,256 @@ static int test_bulk_delete_undo_restores_endpoint_pick_id_mapping(void) {
     return 0;
 }
 
+static int test_gizmo_midpoint_single_active_sketch_line_center(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    ecs_entity_t line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(2.0f, 4.0f, 0.0f), vec3_make(6.0f, 8.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!sketch || !line) return 1;
+
+    selection_buffer_t sel = {0};
+    selection_init(&sel, &world);
+    selection_add(&sel, line);
+    gizmo_t gizmo = {0};
+    gizmo_init(&gizmo);
+
+    gizmo_update(&gizmo, &sel, &scene, vec3_make(0.0f, 0.0f, 10.0f), 0.785398f, 1.0f);
+    vec3_t expected = vec3_make(4.0f, 6.0f, 0.0f);
+    int ok = test_vec3_close(gizmo.center, expected, 1e-4f) ? 0 : 1;
+
+    selection_shutdown(&sel);
+    gizmo_shutdown(&gizmo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return ok;
+}
+
+static int test_gizmo_midpoint_multi_active_sketch_lines_average(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    ecs_entity_t line1 = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(2.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    ecs_entity_t line2 = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(4.0f, 0.0f, 0.0f), vec3_make(8.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!sketch || !line1 || !line2) return 1;
+
+    selection_buffer_t sel = {0};
+    selection_init(&sel, &world);
+    selection_add(&sel, line1);
+    selection_add(&sel, line2);
+    gizmo_t gizmo = {0};
+    gizmo_init(&gizmo);
+
+    gizmo_update(&gizmo, &sel, &scene, vec3_make(0.0f, 0.0f, 10.0f), 0.785398f, 1.0f);
+    vec3_t expected = vec3_make(3.5f, 0.0f, 0.0f);
+    int ok = test_vec3_close(gizmo.center, expected, 1e-4f) ? 0 : 1;
+
+    selection_shutdown(&sel);
+    gizmo_shutdown(&gizmo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return ok;
+}
+
+static int test_active_sketch_line_rigid_delta_single_interaction_undo(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    ecs_entity_t line1 = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(2.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    ecs_entity_t line2 = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 2.0f, 0.0f), vec3_make(2.0f, 2.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!sketch || !line1 || !line2) return 1;
+
+    GeometryComp *g1 = ecs_world_get_geometry(&world, line1);
+    GeometryComp *g2 = ecs_world_get_geometry(&world, line2);
+    if (!g1 || !g2 || g1->type != GEOM_LINE || g2->type != GEOM_LINE) return 1;
+    vec3_t l1_old_a = g1->data.line.a;
+    vec3_t l1_old_b = g1->data.line.b;
+    vec3_t l2_old_a = g2->data.line.a;
+    vec3_t l2_old_b = g2->data.line.b;
+
+    vec3_t delta = vec3_make(0.3f, -0.4f, 0.0f);
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line1, delta)) return 1;
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line2, delta)) return 1;
+
+    g1 = ecs_world_get_geometry(&world, line1);
+    g2 = ecs_world_get_geometry(&world, line2);
+    if (!g1 || !g2) return 1;
+    if (!test_vec3_close(g1->data.line.a, vec3_add(l1_old_a, delta), 1e-4f) ||
+        !test_vec3_close(g1->data.line.b, vec3_add(l1_old_b, delta), 1e-4f) ||
+        !test_vec3_close(g2->data.line.a, vec3_add(l2_old_a, delta), 1e-4f) ||
+        !test_vec3_close(g2->data.line.b, vec3_add(l2_old_b, delta), 1e-4f)) {
+        return 1;
+    }
+
+    cmd_bulk_line_endpoint_item_t items[2] = {0};
+    items[0].entity_id = (uint64_t)line1;
+    items[0].old_a = l1_old_a;
+    items[0].old_b = l1_old_b;
+    items[0].new_a = g1->data.line.a;
+    items[0].new_b = g1->data.line.b;
+    items[1].entity_id = (uint64_t)line2;
+    items[1].old_a = l2_old_a;
+    items[1].old_b = l2_old_b;
+    items[1].new_a = g2->data.line.a;
+    items[1].new_b = g2->data.line.b;
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+    if (!undo_cmd_push_bulk_line_endpoints(&undo, items, 2)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (undo.count != 1 || undo.current != 1 || undo.commands[0].type != CMD_BULK_LINE_ENDPOINTS) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    g1 = ecs_world_get_geometry(&world, line1);
+    g2 = ecs_world_get_geometry(&world, line2);
+    if (!g1 || !g2 ||
+        !test_vec3_close(g1->data.line.a, l1_old_a, 1e-6f) ||
+        !test_vec3_close(g1->data.line.b, l1_old_b, 1e-6f) ||
+        !test_vec3_close(g2->data.line.a, l2_old_a, 1e-6f) ||
+        !test_vec3_close(g2->data.line.b, l2_old_b, 1e-6f)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_mixed_selection_guardrail_redo_exact_endpoints(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(0.2f, 0.7f, 1.0f, 1.0f));
+    ecs_entity_t active_line = scene_add_line_to_sketch(
+        &scene, sketch, vec3_make(0.0f, 0.0f, 0.0f), vec3_make(1.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    ecs_entity_t non_sketch_line = scene_add_line(
+        &scene, vec3_make(5.0f, 0.0f, 0.0f), vec3_make(6.0f, 0.0f, 0.0f),
+        vec4_make(1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+    if (!sketch || !active_line || !non_sketch_line) return 1;
+
+    GeometryComp *active_geom = ecs_world_get_geometry(&world, active_line);
+    GeometryComp *non_geom = ecs_world_get_geometry(&world, non_sketch_line);
+    if (!active_geom || !non_geom || active_geom->type != GEOM_LINE || non_geom->type != GEOM_LINE) return 1;
+
+    vec3_t old_a = active_geom->data.line.a;
+    vec3_t old_b = active_geom->data.line.b;
+    vec3_t non_old_a = non_geom->data.line.a;
+    vec3_t non_old_b = non_geom->data.line.b;
+    TransformComp *non_xform_before = ecs_world_get_transform(&world, non_sketch_line);
+    if (!non_xform_before) return 1;
+    vec3_t non_old_pos = non_xform_before->position;
+
+    vec3_t delta = vec3_make(0.25f, 0.15f, 0.0f);
+    if (!scene_apply_active_sketch_line_world_delta(&scene, active_line, delta)) return 1;
+    ecs_entity_t single_non[1] = { non_sketch_line };
+    if (!scene_apply_transform_delta_for_selection(&scene, single_non, 1, delta)) return 1;
+
+    active_geom = ecs_world_get_geometry(&world, active_line);
+    non_geom = ecs_world_get_geometry(&world, non_sketch_line);
+    TransformComp *non_xform_after = ecs_world_get_transform(&world, non_sketch_line);
+    if (!active_geom || !non_geom || !non_xform_after) return 1;
+
+    vec3_t new_a = active_geom->data.line.a;
+    vec3_t new_b = active_geom->data.line.b;
+    if (!test_vec3_close(new_a, vec3_add(old_a, delta), 1e-4f) ||
+        !test_vec3_close(new_b, vec3_add(old_b, delta), 1e-4f)) {
+        return 1;
+    }
+
+    if (!test_vec3_close(non_geom->data.line.a, non_old_a, 1e-6f) ||
+        !test_vec3_close(non_geom->data.line.b, non_old_b, 1e-6f) ||
+        !test_vec3_close(non_xform_after->position, vec3_add(non_old_pos, delta), 1e-6f)) {
+        return 1;
+    }
+
+    undo_redo_t undo = {0};
+    undo_redo_init(&undo, &scene, 8);
+
+    cmd_bulk_line_endpoint_item_t one = {0};
+    one.entity_id = (uint64_t)active_line;
+    one.old_a = old_a;
+    one.old_b = old_b;
+    one.new_a = new_a;
+    one.new_b = new_b;
+    if (!undo_cmd_push_bulk_line_endpoints(&undo, &one, 1)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    record_drag_end_move_for_entity(&undo, &scene, non_sketch_line, non_old_pos, vec3_make(0, 0, 0));
+    if (undo.count != 2 || undo.commands[0].type != CMD_BULK_LINE_ENDPOINTS || undo.commands[1].type != CMD_SET_POSITION) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    if (!undo_redo_undo(&undo) || !undo_redo_undo(&undo) || !undo_redo_redo(&undo) || !undo_redo_redo(&undo)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    active_geom = ecs_world_get_geometry(&world, active_line);
+    if (!active_geom || !test_vec3_close(active_geom->data.line.a, new_a, 1e-6f) ||
+        !test_vec3_close(active_geom->data.line.b, new_b, 1e-6f)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    ecs_entity_t endpoint_a = 0;
+    ecs_entity_t endpoint_b = 0;
+    if (!test_line_endpoint_entity(&world, active_line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &endpoint_a) ||
+        !test_line_endpoint_entity(&world, active_line, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, &endpoint_b)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    GeometryComp *endpoint_a_geom = ecs_world_get_geometry(&world, endpoint_a);
+    GeometryComp *endpoint_b_geom = ecs_world_get_geometry(&world, endpoint_b);
+    if (!endpoint_a_geom || endpoint_a_geom->type != GEOM_POINT ||
+        !endpoint_b_geom || endpoint_b_geom->type != GEOM_POINT) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+    if (!test_vec3_close(endpoint_a_geom->data.point.point, new_a, 1e-6f) ||
+        !test_vec3_close(endpoint_b_geom->data.point.point, new_b, 1e-6f)) {
+        undo_redo_shutdown(&undo);
+        return 1;
+    }
+
+    undo_redo_shutdown(&undo);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -1921,6 +2192,14 @@ int main(void) {
           test_bulk_delete_undo_restores_arc_endpoint_sync_for_center_drag },
         { "test_bulk_delete_undo_restores_endpoint_pick_id_mapping",
           test_bulk_delete_undo_restores_endpoint_pick_id_mapping },
+        { "test_gizmo_midpoint_single_active_sketch_line_center",
+          test_gizmo_midpoint_single_active_sketch_line_center },
+        { "test_gizmo_midpoint_multi_active_sketch_lines_average",
+          test_gizmo_midpoint_multi_active_sketch_lines_average },
+        { "test_active_sketch_line_rigid_delta_single_interaction_undo",
+          test_active_sketch_line_rigid_delta_single_interaction_undo },
+        { "test_mixed_selection_guardrail_redo_exact_endpoints",
+          test_mixed_selection_guardrail_redo_exact_endpoints },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

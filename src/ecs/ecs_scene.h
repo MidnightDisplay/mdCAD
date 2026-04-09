@@ -363,6 +363,9 @@ static inline bool scene_sync_owner_geometry_from_endpoint_entity(ecs_scene_t *s
 static inline bool scene_apply_standalone_sketch_point_world_delta(ecs_scene_t *scene,
                                                                     ecs_entity_t point_entity,
                                                                     vec3_t world_delta);
+static inline bool scene_apply_active_sketch_line_world_delta(ecs_scene_t *scene,
+                                                               ecs_entity_t line_entity,
+                                                               vec3_t world_delta);
 static inline bool scene_update_arc_renderable_slots(ecs_scene_t *scene, ecs_entity_t entity, RenderableComp *r, const GeometryComp *g);
 static inline bool scene_apply_transform_delta_for_selection(ecs_scene_t *scene,
                                                              const ecs_entity_t *entities,
@@ -913,6 +916,40 @@ static inline bool scene_apply_standalone_sketch_point_world_delta(ecs_scene_t *
     RenderableComp *point_renderable = ecs_world_get_renderable(scene->world, point_entity);
     if (point_renderable) point_renderable->instance_dirty = true;
 
+    (void)scene_solver_clear_drag_anchor(scene, sketch);
+    scene_solver_request_auto(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
+    return true;
+}
+
+static inline bool scene_apply_active_sketch_line_world_delta(ecs_scene_t *scene,
+                                                               ecs_entity_t line_entity,
+                                                               vec3_t world_delta) {
+    if (!scene || line_entity == 0) return false;
+    if (!ecs_is_alive(scene->world->world, line_entity)) return false;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene->world, line_entity);
+    TransformComp *line_xform = ecs_world_get_transform(scene->world, line_entity);
+    if (!line_geom || line_geom->type != GEOM_LINE || !line_xform) return false;
+
+    ecs_entity_t sketch = scene_find_parent_sketch(scene, line_entity);
+    if (!scene_is_sketch(scene, sketch)) return false;
+
+    vec3_t local_delta = scene_world_delta_to_local(&line_xform->world_matrix, world_delta);
+    vec3_t next_a = vec3_add(line_geom->data.line.a, local_delta);
+    vec3_t next_b = vec3_add(line_geom->data.line.b, local_delta);
+    if (!isfinite(next_a.x) || !isfinite(next_a.y) || !isfinite(next_a.z) ||
+        !isfinite(next_b.x) || !isfinite(next_b.y) || !isfinite(next_b.z)) {
+        return false;
+    }
+
+    line_geom->data.line.a = next_a;
+    line_geom->data.line.b = next_b;
+
+    RenderableComp *line_renderable = ecs_world_get_renderable(scene->world, line_entity);
+    if (line_renderable) line_renderable->instance_dirty = true;
+
+    scene_sync_endpoint_entities_for_owner(scene, line_entity);
     (void)scene_solver_clear_drag_anchor(scene, sketch);
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);

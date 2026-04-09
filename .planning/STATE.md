@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: verifying
-stopped_at: Phase 29 planned
-last_updated: "2026-04-09T12:29:08.369Z"
-last_activity: 2026-04-09
+status: ready_for_next_phase
+stopped_at: Phase 29 complete
+last_updated: "2026-04-09T13:20:00.000Z"
+last_activity: 2026-04-09 -- Phase 29 execution complete and verified
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 6
-  percent: 0
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 28 — tangency-drag-robustness
+**Current focus:** Phase 30 preparation — deterministic closure gate + solver docs
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 29
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-09
+Phase: 29 (active-sketch-line-gizmo-endpoint-authority) — COMPLETE
+Plan: 2 of 2
+Status: Phase 29 complete, verification passed
+Last activity: 2026-04-09 -- Phase 29 execution complete and deterministic rerun passed
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████████░░] 80%
 
 ## Milestone Scope
 
@@ -90,7 +90,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Start Phase 30 discuss/planning for deterministic closure gate + solver docs.
 
 ### Blockers/Concerns
 
@@ -98,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T12:29:08.366Z
-Stopped at: Phase 29 planned
-Resume file: .planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-01-PLAN.md
+Last session: 2026-04-09T13:20:00.000Z
+Stopped at: Phase 29 complete
+Resume file: .planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-VERIFICATION.md

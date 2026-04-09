@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
 
-**Current focus:** Phase 28 complete; preparing Phase 29 active-sketch line gizmo endpoint authority.
+**Current focus:** Phase 29 complete; preparing Phase 30 deterministic closure gate + solver docs.
 
 ## Requirements
 
@@ -42,6 +42,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Solver-control and constrained-interaction requirements (`SOLV-01`, `SOLV-02`, `SOLV-03`, `SOLV-04`, `API-03`) are fully verified, including implication clear-on-success lifecycle closure — Validated in Phase 12: solver-control-and-constrained-interaction
 - ✓ Line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and multi-line groups are legality-validated, deterministic, and transactional (`LCON-01..05`) — Validated in Phase 26: line-line-constraint-coverage
 - ✓ Arc-line tangency drag robustness now satisfies stable feasible drags, transactional infeasible rollback, explicit diagnostics, and mirrored determinism (`TRDG-01..04`) — Validated in Phase 28: tangency-drag-robustness
+- ✓ Active-sketch line gizmo behavior now satisfies midpoint anchoring, endpoint-authority drag semantics, mixed-selection guardrails, and grouped undo/redo interaction coherence (`GZM-01..04`) — Validated in Phase 29: active-sketch-line-gizmo-endpoint-authority
 
 ### Active
 
@@ -74,6 +75,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Phase 26 is complete: line-line `PARALLEL`/`PERPENDICULAR` pair and group behavior now meets deterministic legality/runtime contracts with passing targeted verification.
 - Phase 27 is complete: principal-axis ALONG line reliability now meets deterministic legality/runtime and mixed-constraint contracts with passing verification.
 - Phase 28 is complete: tangency drag robustness now meets transactional shared/adjacent drag reliability, mirrored parity determinism, and explicit unsatisfied diagnostics contracts.
+- Phase 29 is complete: active-sketch line gizmo midpoint anchoring + endpoint-authority routing and grouped undo/redo interaction coherence are implemented and verified.
 ## Next Milestone Goals
 
 1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.

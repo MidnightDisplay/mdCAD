@@ -124,6 +124,27 @@ static inline vec3_t gizmo_entity_world_center(ecs_world_state_t *world, ecs_ent
     return xform->position;
 }
 
+static inline bool gizmo_active_sketch_line_midpoint(ecs_world_state_t *world,
+                                                      ecs_entity_t entity,
+                                                      vec3_t *out_midpoint) {
+    if (!world || entity == 0 || !out_midpoint) return false;
+    if (!ecs_is_alive(world->world, entity)) return false;
+
+    const GeometryComp *geom = ecs_world_get_geometry(world, entity);
+    if (!geom || geom->type != GEOM_LINE) return false;
+
+    ecs_entity_t parent = ecs_world_get_parent(world, entity);
+    if (parent == 0 || !ecs_is_alive(world->world, parent)) return false;
+    if (ecs_world_get_sketch(world, parent) == NULL) return false;
+
+    const TransformComp *xform = ecs_world_get_transform(world, entity);
+    if (!xform) return false;
+    vec3_t world_a = mat4_mul_point(xform->world_matrix, geom->data.line.a);
+    vec3_t world_b = mat4_mul_point(xform->world_matrix, geom->data.line.b);
+    *out_midpoint = vec3_scale(vec3_add(world_a, world_b), 0.5f);
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Init
 //------------------------------------------------------------------------------
@@ -256,13 +277,31 @@ static inline void gizmo_update(gizmo_t *g,
             }
         }
     } else {
-        // Transform mode: center at average of selected entity positions
-        vec3_t sum = vec3_make(0, 0, 0);
+        // Transform mode and geometry mode without vertex sub-mode:
+        // active-sketch lines contribute midpoint anchors.
+        vec3_t line_midpoint_sum = vec3_make(0, 0, 0);
+        int line_midpoint_count = 0;
+        vec3_t fallback_sum = vec3_make(0, 0, 0);
+        int fallback_count = 0;
         for (int i = 0; i < selection->count; i++) {
             ecs_entity_t e = selection->entities[i];
-            sum = vec3_add(sum, gizmo_entity_world_center(world, e));
+            vec3_t midpoint = vec3_make(0, 0, 0);
+            if (gizmo_active_sketch_line_midpoint(world, e, &midpoint)) {
+                line_midpoint_sum = vec3_add(line_midpoint_sum, midpoint);
+                line_midpoint_count++;
+            } else {
+                fallback_sum = vec3_add(fallback_sum, gizmo_entity_world_center(world, e));
+                fallback_count++;
+            }
         }
-        g->center = vec3_scale(sum, 1.0f / (float)selection->count);
+
+        if (line_midpoint_count > 0) {
+            g->center = vec3_scale(line_midpoint_sum, 1.0f / (float)line_midpoint_count);
+        } else if (fallback_count > 0) {
+            g->center = vec3_scale(fallback_sum, 1.0f / (float)fallback_count);
+        } else {
+            g->center = vec3_make(0, 0, 0);
+        }
     }
 
     // Constant screen size: scale = dist * tan(fov/2) * 0.15

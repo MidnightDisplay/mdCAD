@@ -207,6 +207,39 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
+## Most Recent Changes (2026-04-09)
+
+### Phase 29 Active-Sketch Line Gizmo Endpoint Authority (IMPLEMENTED)
+
+- Completed Phase 29 execution and promoted plans `29-01` and `29-02` to complete (2/2 plans).
+- Delivered midpoint-anchored gizmo behavior for active-sketch lines:
+  - Single selected active-sketch line uses exact line midpoint.
+  - Multi-line active-sketch selection uses average of selected line midpoints.
+- Implemented endpoint-authority drag routing for eligible active-sketch lines:
+  - Added `scene_apply_active_sketch_line_world_delta(...)` to rigidly translate line endpoints `A`/`B`.
+  - Mixed selection drag now routes eligible active-sketch lines through endpoint-authority path and preserves legacy fallback behavior for non-eligible entities.
+- Implemented grouped undo/redo for eligible line drags:
+  - Added `CMD_BULK_LINE_ENDPOINTS` command model and replay handlers.
+  - One completed eligible drag now records as one grouped interaction with exact endpoint restore on undo/redo.
+  - Replay path synchronizes endpoint entities and triggers solver/script refresh.
+- Added/updated automated coverage in:
+  - `src/tests/endpoint_pick_test.c`
+  - `src/tests/scene_solver_drag_test.c`
+- Build + deterministic targeted gate validated on Windows Vulkan:
+  - `cmake --build build-vulkan --config Release`
+  - `ctest --test-dir build-vulkan -C Release -R "endpoint_pick|scene_solver_drag" --output-on-failure`
+  - Immediate rerun of the same gate: **pass/pass**
+- Added Phase 29 execution artifacts:
+  - `.planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-01-SUMMARY.md`
+  - `.planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-02-SUMMARY.md`
+  - `.planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-VERIFICATION.md`
+  - `.planning/phases/29-active-sketch-line-gizmo-endpoint-authority/29-VALIDATION.md` updated to complete/Nyquist compliant.
+- Lifecycle continuity updated:
+  - `.planning/ROADMAP.md` marks Phase 29 complete (2/2 plans).
+  - `.planning/REQUIREMENTS.md` marks `GZM-01..04` complete.
+  - `.planning/STATE.md` advances to Phase 30 readiness.
+  - `.planning/PROJECT.md` current focus updated to Phase 30 preparation.
+
 ## Most Recent Changes (2026-04-08)
 
 ### Phase 25 Regression and Reliability Closure (IMPLEMENTED)

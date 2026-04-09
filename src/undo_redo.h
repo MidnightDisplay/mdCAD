@@ -70,6 +70,7 @@ typedef enum {
     CMD_SET_LINE_WIDTH,
     CMD_SET_POINT_SIZE,
     CMD_SET_LINE_ENDPOINTS,   // For line A/B points
+    CMD_BULK_LINE_ENDPOINTS,  // For grouped line endpoint edits
     CMD_SET_POINT_POSITION,   // For point geometry position
 
     // Renderable properties
@@ -255,6 +256,17 @@ typedef struct {
 
 typedef struct {
     uint64_t entity_id;
+    vec3_t old_a, old_b;
+    vec3_t new_a, new_b;
+} cmd_bulk_line_endpoint_item_t;
+
+typedef struct {
+    cmd_bulk_line_endpoint_item_t *items;
+    int count;
+} cmd_bulk_line_endpoints_t;
+
+typedef struct {
+    uint64_t entity_id;
     bool old_value;
     bool new_value;
 } cmd_set_visible_t;
@@ -332,6 +344,7 @@ typedef struct {
         cmd_set_color_t set_color;
         cmd_set_float_t set_float;   // line_width, point_size
         cmd_set_line_endpoints_t set_endpoints;
+        cmd_bulk_line_endpoints_t bulk_line_endpoints;
         cmd_set_visible_t set_visible;
         cmd_set_parent_t set_parent;
         cmd_bulk_set_color_t bulk_color;
@@ -437,6 +450,10 @@ static inline void undo_command_free(undo_command_t *cmd) {
         case CMD_BULK_SET_VISIBLE:
             if (cmd->data.bulk_visible.entity_ids) free(cmd->data.bulk_visible.entity_ids);
             if (cmd->data.bulk_visible.old_visible) free(cmd->data.bulk_visible.old_visible);
+            break;
+
+        case CMD_BULK_LINE_ENDPOINTS:
+            if (cmd->data.bulk_line_endpoints.items) free(cmd->data.bulk_line_endpoints.items);
             break;
 
         case CMD_BULK_SET_SKETCH_FIXED:
@@ -586,6 +603,7 @@ static inline const char* undo_cmd_name(undo_cmd_type_t type) {
         case CMD_SET_LINE_WIDTH: return "Change Line Width";
         case CMD_SET_POINT_SIZE: return "Change Point Size";
         case CMD_SET_LINE_ENDPOINTS: return "Edit Line";
+        case CMD_BULK_LINE_ENDPOINTS: return "Edit Lines";
         case CMD_SET_POINT_POSITION: return "Move Point";
         case CMD_SET_VISIBLE: return "Toggle Visibility";
         case CMD_SET_PARENT: return "Reparent";

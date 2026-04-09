@@ -861,6 +861,23 @@ static inline void undo_cmd_set_line_endpoints(undo_redo_t *ur, ecs_entity_t e,
     undo_redo_push(ur, &cmd);
 }
 
+static inline bool undo_cmd_push_bulk_line_endpoints(undo_redo_t *ur,
+                                                      const cmd_bulk_line_endpoint_item_t *items,
+                                                      int count) {
+    if (!ur || !items || count <= 0) return false;
+    undo_command_t cmd = {0};
+    cmd.type = CMD_BULK_LINE_ENDPOINTS;
+    cmd.data.bulk_line_endpoints.items =
+        (cmd_bulk_line_endpoint_item_t*)malloc(sizeof(cmd_bulk_line_endpoint_item_t) * (size_t)count);
+    if (!cmd.data.bulk_line_endpoints.items) return false;
+    memcpy(cmd.data.bulk_line_endpoints.items,
+           items,
+           sizeof(cmd_bulk_line_endpoint_item_t) * (size_t)count);
+    cmd.data.bulk_line_endpoints.count = count;
+    undo_redo_push(ur, &cmd);
+    return true;
+}
+
 // Record point position change (geometry point, not transform)
 static inline void undo_cmd_set_point_position(undo_redo_t *ur, ecs_entity_t e, vec3_t old_pos, vec3_t new_pos) {
     if (!ur) return;
@@ -1197,6 +1214,43 @@ static inline bool undo_replay_endpoint_participant_move(ecs_scene_t *scene,
     return true;
 }
 
+static inline void undo_apply_bulk_line_endpoints(ecs_scene_t *scene,
+                                                   const cmd_bulk_line_endpoints_t *bulk,
+                                                   bool use_new_value) {
+    if (!scene || !scene->world || !bulk || !bulk->items || bulk->count <= 0) return;
+    ecs_entity_t sketches[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
+    int sketch_count = 0;
+    for (int i = 0; i < bulk->count; i++) {
+        const cmd_bulk_line_endpoint_item_t *item = &bulk->items[i];
+        ecs_entity_t line = (ecs_entity_t)item->entity_id;
+        if (line == 0 || !ecs_is_alive(scene->world->world, line)) continue;
+        GeometryComp *g = ecs_world_get_geometry(scene->world, line);
+        if (!g || g->type != GEOM_LINE) continue;
+        g->data.line.a = use_new_value ? item->new_a : item->old_a;
+        g->data.line.b = use_new_value ? item->new_b : item->old_b;
+        RenderableComp *r = ecs_world_get_renderable(scene->world, line);
+        if (r) r->instance_dirty = true;
+        scene_sync_endpoint_entities_for_owner(scene, line);
+
+        ecs_entity_t sketch = scene_find_parent_sketch(scene, line);
+        if (!scene_is_sketch(scene, sketch) || sketch == 0) continue;
+        bool seen = false;
+        for (int s = 0; s < sketch_count; s++) {
+            if (sketches[s] == sketch) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen && sketch_count < ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS) {
+            sketches[sketch_count++] = sketch;
+        }
+    }
+    for (int s = 0; s < sketch_count; s++) {
+        scene_solver_request_auto(scene, sketches[s]);
+        scene_script_reemit_for_sketch(scene, sketches[s]);
+    }
+}
+
 // ============================================================================
 // Apply Command (for redo)
 // ============================================================================
@@ -1314,6 +1368,11 @@ static inline void undo_apply_command(undo_redo_t *ur, undo_command_t *cmd) {
             }
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
+            break;
+        }
+
+        case CMD_BULK_LINE_ENDPOINTS: {
+            undo_apply_bulk_line_endpoints(scene, &cmd->data.bulk_line_endpoints, true);
             break;
         }
 
@@ -1585,6 +1644,11 @@ static inline void undo_unapply_command(undo_redo_t *ur, undo_command_t *cmd) {
             }
             RenderableComp *r = ecs_world_get_renderable(w, e);
             if (r) r->instance_dirty = true;
+            break;
+        }
+
+        case CMD_BULK_LINE_ENDPOINTS: {
+            undo_apply_bulk_line_endpoints(scene, &cmd->data.bulk_line_endpoints, false);
             break;
         }
 

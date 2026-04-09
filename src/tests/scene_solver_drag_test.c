@@ -328,6 +328,49 @@ static int test_drag_tangency_post_failure_followup_feasible_is_responsive(void)
     return ok ? 0 : 1;
 }
 
+static int test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                 vec3_make(0.0f, 0.0f, 0.0f),
+                                                 vec3_make(1.0f, 0.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    vec3_t old_a = line_geom->data.line.a;
+    vec3_t old_b = line_geom->data.line.b;
+
+    scene_solver_drag_decision_t decision = {0};
+    ecs_entity_t drag_entities[1] = { line };
+    if (!scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, vec3_make(10.0f, 0.0f, 0.0f), &decision)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (decision.result != SCENE_SOLVER_DRAG_FEASIBLE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line, decision.projected_delta)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    vec3_t expected_a = vec3_add(old_a, decision.projected_delta);
+    vec3_t expected_b = vec3_add(old_b, decision.projected_delta);
+    int ok = line_geom &&
+             vec3_close(line_geom->data.line.a, expected_a, 1e-4f) &&
+             vec3_close(line_geom->data.line.b, expected_b, 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -345,6 +388,8 @@ int main(void) {
           test_drag_tangency_shared_endpoint_infeasible_rolls_back_transactionally },
         { "test_drag_tangency_post_failure_followup_feasible_is_responsive",
           test_drag_tangency_post_failure_followup_feasible_is_responsive },
+        { "test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints",
+          test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
