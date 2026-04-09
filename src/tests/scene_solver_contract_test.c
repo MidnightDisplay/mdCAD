@@ -1477,6 +1477,240 @@ static int test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_tra
     return ok ? 0 : 1;
 }
 
+static int test_alin04_mixed_along_x_length_angle_connectivity_rerun_is_deterministic(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 2.0f, 1.0f),
+                                                   vec3_make(5.0f, 4.0f, 2.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 2.0f, 1.0f),
+                                                   vec3_make(2.0f, 6.0f, 3.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t along_participants[1] = { line_a };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X,
+                                                           along_participants, 1, 0.0f, false);
+    ecs_entity_t length_participants[1] = { line_a };
+    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                            length_participants, 1, 5.0f, false);
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 1.57079632679f, false);
+    constraint_participant_descriptor_t coincident_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c_coincident = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_COINCIDENT, coincident_desc, 2, 0.0f, false);
+    if (!c_along || !c_length || !c_angle || !c_coincident) return 1;
+
+    bool solved_first = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!solved_first || !ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t a0_after_first = ga->data.line.a;
+    vec3_t a1_after_first = ga->data.line.b;
+    vec3_t b0_after_first = gb->data.line.a;
+    vec3_t b1_after_first = gb->data.line.b;
+
+    bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    int ok = (solved_second &&
+              ga && gb &&
+              vec3_exact_eq(ga->data.line.a, a0_after_first) &&
+              vec3_exact_eq(ga->data.line.b, a1_after_first) &&
+              vec3_exact_eq(gb->data.line.a, b0_after_first) &&
+              vec3_exact_eq(gb->data.line.b, b1_after_first));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static bool build_alin04_mixed_along_y_order_variant(bool reverse_along_order,
+                                                     bool reverse_angle_order,
+                                                     bool reverse_create_order,
+                                                     vec3_t *line_a0,
+                                                     vec3_t *line_a1,
+                                                     vec3_t *line_b0,
+                                                     vec3_t *line_b1) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(2.0f, 1.0f, 3.0f),
+                                                   vec3_make(4.0f, 5.0f, 1.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(2.0f, 1.0f, 3.0f),
+                                                   vec3_make(0.0f, 3.0f, 4.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    constraint_participant_descriptor_t along_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 0),
+    };
+    if (reverse_along_order) {
+        constraint_participant_descriptor_t tmp = along_desc[0];
+        along_desc[0] = along_desc[1];
+        along_desc[1] = tmp;
+    }
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    if (reverse_angle_order) {
+        ecs_entity_t tmp = angle_participants[0];
+        angle_participants[0] = angle_participants[1];
+        angle_participants[1] = tmp;
+    }
+    constraint_participant_descriptor_t coincident_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+
+    ecs_entity_t c_along = 0;
+    ecs_entity_t c_length = 0;
+    ecs_entity_t c_angle = 0;
+    ecs_entity_t c_coincident = 0;
+    if (!reverse_create_order) {
+        c_along = scene_add_constraint_to_sketch_with_descriptors(
+            &scene, sketch, CONSTRAINT_ALONG_Y, along_desc, 2, 0.0f, false);
+        ecs_entity_t length_participants[1] = { line_a };
+        c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                  length_participants, 1, 4.47213595f, false);
+        c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                 angle_participants, 2, 1.57079632679f, false);
+        c_coincident = scene_add_constraint_to_sketch_with_descriptors(
+            &scene, sketch, CONSTRAINT_COINCIDENT, coincident_desc, 2, 0.0f, false);
+    } else {
+        c_coincident = scene_add_constraint_to_sketch_with_descriptors(
+            &scene, sketch, CONSTRAINT_COINCIDENT, coincident_desc, 2, 0.0f, false);
+        c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                 angle_participants, 2, 1.57079632679f, false);
+        ecs_entity_t length_participants[1] = { line_a };
+        c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                  length_participants, 1, 4.47213595f, false);
+        c_along = scene_add_constraint_to_sketch_with_descriptors(
+            &scene, sketch, CONSTRAINT_ALONG_Y, along_desc, 2, 0.0f, false);
+    }
+    if (!c_along || !c_length || !c_angle || !c_coincident) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    bool ok = solved && ga && gb && ga->type == GEOM_LINE && gb->type == GEOM_LINE;
+    if (ok) {
+        *line_a0 = ga->data.line.a;
+        *line_a1 = ga->data.line.b;
+        *line_b0 = gb->data.line.a;
+        *line_b1 = gb->data.line.b;
+    }
+
+    ecs_world_shutdown(&world);
+    return ok;
+}
+
+static int test_alin04_mixed_along_y_equivalent_orderings_match_exact_endpoints(void) {
+    vec3_t a0_ref = vec3_make(0, 0, 0);
+    vec3_t a1_ref = vec3_make(0, 0, 0);
+    vec3_t b0_ref = vec3_make(0, 0, 0);
+    vec3_t b1_ref = vec3_make(0, 0, 0);
+    vec3_t a0_variant = vec3_make(0, 0, 0);
+    vec3_t a1_variant = vec3_make(0, 0, 0);
+    vec3_t b0_variant = vec3_make(0, 0, 0);
+    vec3_t b1_variant = vec3_make(0, 0, 0);
+
+    bool ok_ref = build_alin04_mixed_along_y_order_variant(false, false, false,
+                                                           &a0_ref, &a1_ref, &b0_ref, &b1_ref);
+    bool ok_variant = build_alin04_mixed_along_y_order_variant(true, true, true,
+                                                               &a0_variant, &a1_variant, &b0_variant, &b1_variant);
+    if (!ok_ref || !ok_variant) return 1;
+
+    return (vec3_exact_eq(a0_ref, a0_variant) &&
+            vec3_exact_eq(a1_ref, a1_variant) &&
+            vec3_exact_eq(b0_ref, b0_variant) &&
+            vec3_exact_eq(b1_ref, b1_variant)) ? 0 : 1;
+}
+
+static int test_alin04_mixed_along_z_fixed_unsat_is_transactional(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 1.0f, 0.0f),
+                                                   vec3_make(3.0f, 4.0f, 1.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(2.0f, 0.0f, 1.0f),
+                                                   vec3_make(4.0f, 1.0f, 3.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    SketchGeometryStateComp *state_a = ecs_world_get_sketch_geometry_state(scene.world, line_a);
+    SketchGeometryStateComp *state_b = ecs_world_get_sketch_geometry_state(scene.world, line_b);
+    if (!state_a || !state_b) return 1;
+    state_a->fixed = true;
+    state_b->fixed = true;
+
+    ecs_entity_t along_participants[1] = { line_a };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_Z,
+                                                           along_participants, 1, 0.0f, false);
+    ecs_entity_t length_participants[1] = { line_a };
+    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                            length_participants, 1, 10.0f, false);
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 0.2f, false);
+    constraint_participant_descriptor_t coincident_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 0),
+    };
+    ecs_entity_t c_coincident = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_COINCIDENT, coincident_desc, 2, 0.0f, false);
+    if (!c_along || !c_length || !c_angle || !c_coincident) return 1;
+
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t a0_before = ga->data.line.a;
+    vec3_t a1_before = ga->data.line.b;
+    vec3_t b0_before = gb->data.line.a;
+    vec3_t b1_before = gb->data.line.b;
+
+    bool solved = scene_solver_request_recalculate(&scene, sketch);
+    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    int ok = (!solved &&
+              ga && gb &&
+              vec3_exact_eq(ga->data.line.a, a0_before) &&
+              vec3_exact_eq(ga->data.line.b, a1_before) &&
+              vec3_exact_eq(gb->data.line.a, b0_before) &&
+              vec3_exact_eq(gb->data.line.b, b1_before) &&
+              imp && imp->active &&
+              imp->first_constraint == c_along &&
+              strcmp(imp->reason, "Unsatisfied driving ALONG Z constraint.") == 0);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -1931,6 +2165,12 @@ int main(void) {
           test_recalculate_along_z_single_legacy_line_entity_solves_alin03 },
         { "test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_transactional_alin01",
           test_recalculate_along_x_single_legacy_line_entity_fixed_unsat_is_transactional_alin01 },
+        { "test_alin04_mixed_along_x_length_angle_connectivity_rerun_is_deterministic",
+          test_alin04_mixed_along_x_length_angle_connectivity_rerun_is_deterministic },
+        { "test_alin04_mixed_along_y_equivalent_orderings_match_exact_endpoints",
+          test_alin04_mixed_along_y_equivalent_orderings_match_exact_endpoints },
+        { "test_alin04_mixed_along_z_fixed_unsat_is_transactional",
+          test_alin04_mixed_along_z_fixed_unsat_is_transactional },
         { "test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03",
           test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference_D02_D03 },
         { "test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04",

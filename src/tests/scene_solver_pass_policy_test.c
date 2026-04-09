@@ -284,6 +284,70 @@ static int test_arci02_repeated_recalc_is_deterministic_after_anchor_drag(void) 
     return ok ? 0 : 1;
 }
 
+static int test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 2.0f, 1.0f),
+                                                   vec3_make(5.0f, 4.0f, 2.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(1.0f, 2.0f, 1.0f),
+                                                   vec3_make(2.0f, 6.0f, 3.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return 1;
+
+    ecs_entity_t along_participants[1] = { line_a };
+    ecs_entity_t c_along = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X,
+                                                           along_participants, 1, 0.0f, false);
+    ecs_entity_t length_participants[1] = { line_a };
+    ecs_entity_t c_length = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_LENGTH,
+                                                            length_participants, 1, 5.0f, false);
+    ecs_entity_t angle_participants[2] = { line_a, line_b };
+    ecs_entity_t c_angle = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ANGLE,
+                                                           angle_participants, 2, 1.57079632679f, false);
+    constraint_participant_descriptor_t coincident_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c_coincident = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_COINCIDENT, coincident_desc, 2, 0.0f, false);
+    if (!c_along || !c_length || !c_angle || !c_coincident) return 1;
+
+    bool solved_first = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ga = ecs_world_get_geometry(scene.world, line_a);
+    GeometryComp *gb = ecs_world_get_geometry(scene.world, line_b);
+    if (!solved_first || !ga || !gb || ga->type != GEOM_LINE || gb->type != GEOM_LINE) return 1;
+    vec3_t a0_after_first = ga->data.line.a;
+    vec3_t a1_after_first = ga->data.line.b;
+    vec3_t b0_after_first = gb->data.line.a;
+    vec3_t b1_after_first = gb->data.line.b;
+
+    bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+    ga = ecs_world_get_geometry(scene.world, line_a);
+    gb = ecs_world_get_geometry(scene.world, line_b);
+    int ok = (solved_second &&
+              ga && gb &&
+              a0_after_first.x == ga->data.line.a.x &&
+              a0_after_first.y == ga->data.line.a.y &&
+              a0_after_first.z == ga->data.line.a.z &&
+              a1_after_first.x == ga->data.line.b.x &&
+              a1_after_first.y == ga->data.line.b.y &&
+              a1_after_first.z == ga->data.line.b.z &&
+              b0_after_first.x == gb->data.line.a.x &&
+              b0_after_first.y == gb->data.line.a.y &&
+              b0_after_first.z == gb->data.line.a.z &&
+              b1_after_first.x == gb->data.line.b.x &&
+              b1_after_first.y == gb->data.line.b.y &&
+              b1_after_first.z == gb->data.line.b.z);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -298,6 +362,8 @@ int main(void) {
           test_arci02_repeated_recalc_is_deterministic },
         { "test_arci02_repeated_recalc_is_deterministic_after_anchor_drag",
           test_arci02_repeated_recalc_is_deterministic_after_anchor_drag },
+        { "test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic",
+          test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
