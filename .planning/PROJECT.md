@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections
 
-**Current focus:** Phase 29 complete; preparing Phase 30 deterministic closure gate + solver docs.
+**Current focus:** Phase 30 complete; v1.4 scope ready for milestone closure.
 
 ## Requirements
 
@@ -43,11 +43,12 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Line-line `PARALLEL` and `PERPENDICULAR` constraints for pair and multi-line groups are legality-validated, deterministic, and transactional (`LCON-01..05`) — Validated in Phase 26: line-line-constraint-coverage
 - ✓ Arc-line tangency drag robustness now satisfies stable feasible drags, transactional infeasible rollback, explicit diagnostics, and mirrored determinism (`TRDG-01..04`) — Validated in Phase 28: tangency-drag-robustness
 - ✓ Active-sketch line gizmo behavior now satisfies midpoint anchoring, endpoint-authority drag semantics, mixed-selection guardrails, and grouped undo/redo interaction coherence (`GZM-01..04`) — Validated in Phase 29: active-sketch-line-gizmo-endpoint-authority
+- ✓ Human-facing solver architecture docs now provide practical code anchors, literature-backed context, and a TL;DR debug primer (`SDOC-01..03`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
+- ✓ Deterministic Windows Vulkan closure gate now enforces build + canonical 7-test baseline + immediate rerun sign-off (`V14-01..02`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
 
 ### Active
 
-- [ ] Correct active-sketch line gizmo behavior to drive geometry endpoints (`A`/`B`) and anchor gizmo at line midpoint.
-- [ ] Add human-facing solver architecture documentation with literature references, code-structure mapping, and a TL;DR implementation primer for key constraints.
+- None — v1.4 phase scope is complete and ready for milestone closeout.
 
 ### Out of Scope
 
@@ -76,6 +77,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Phase 27 is complete: principal-axis ALONG line reliability now meets deterministic legality/runtime and mixed-constraint contracts with passing verification.
 - Phase 28 is complete: tangency drag robustness now meets transactional shared/adjacent drag reliability, mirrored parity determinism, and explicit unsatisfied diagnostics contracts.
 - Phase 29 is complete: active-sketch line gizmo midpoint anchoring + endpoint-authority routing and grouped undo/redo interaction coherence are implemented and verified.
+- Phase 30 is complete: deterministic Windows Vulkan closure gate + solver architecture docs are implemented and verified; v1.4 phase goals are complete.
 ## Next Milestone Goals
 
 1. Close sketch solver reliability defects surfaced during interactive sketching, especially non-working or unstable line/arc constraint combinations.
@@ -107,6 +109,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Scope v1.1 to long-tail migration plus full thin-entrypoint reduction | Maximizes migration debt burn-down while retaining native gate confidence | Completed in v1.1 |
 | Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
 | Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Active for v1.4 |
+| Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Confirmed in Phase 30 |
 
 ## Evolution
 
@@ -126,4 +129,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after Phase 28 completion*
+*Last updated: 2026-04-09 after Phase 30 completion*
