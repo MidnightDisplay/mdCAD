@@ -3917,6 +3917,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     bool arc_endpoint_fixed = candidates[arc_endpoint_index].fixed;
 
                     bool drag_anchor_is_line_endpoint = false;
+                    bool drag_anchor_is_line_adjacent_endpoint = false;
                     bool drag_anchor_is_arc_endpoint = false;
                     if (sk->solver_drag_anchor_valid &&
                         sk->solver_drag_anchor_owner_entity != 0 &&
@@ -3925,6 +3926,9 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         if ((ecs_entity_t)sk->solver_drag_anchor_owner_entity == line_entity &&
                             sk->solver_drag_anchor_role == line_role) {
                             drag_anchor_is_line_endpoint = true;
+                        } else if ((ecs_entity_t)sk->solver_drag_anchor_owner_entity == line_entity &&
+                                   sk->solver_drag_anchor_role == other_line_role) {
+                            drag_anchor_is_line_adjacent_endpoint = true;
                         } else if ((ecs_entity_t)sk->solver_drag_anchor_owner_entity == arc_entity &&
                                    sk->solver_drag_anchor_role == arc_role) {
                             drag_anchor_is_arc_endpoint = true;
@@ -4039,6 +4043,46 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                 break;
                             }
                             if (normal_residual > pass_max_residual) pass_max_residual = normal_residual;
+                            updated = true;
+                        }
+                    } else if (drag_anchor_is_line_adjacent_endpoint) {
+                        // User dragged the non-shared line endpoint: keep that endpoint authoritative
+                        // when feasible and reconcile tangency by steering arc orientation first.
+                        if (!arc_normal->fixed) {
+                            vec3_t radial_normalized = vec3_scale(radial, 1.0f / radial_len);
+                            vec3_t target_normal = vec3_cross(radial_normalized, line_dir);
+                            float target_normal_len = vec3_length(target_normal);
+                            if (target_normal_len <= 1e-6f || !isfinite(target_normal_len)) {
+                                solve_failed = true;
+                                failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                                implicated_constraints[implicated_constraint_count++] = child;
+                                break;
+                            }
+                            target_normal = vec3_scale(target_normal, 1.0f / target_normal_len);
+                            if (vec3_dot(target_normal, arc_normal->normal) < 0.0f) {
+                                target_normal = vec3_scale(target_normal, -1.0f);
+                            }
+                            float normal_dot = vec3_dot(arc_normal->normal, target_normal);
+                            if (normal_dot > 1.0f) normal_dot = 1.0f;
+                            if (normal_dot < -1.0f) normal_dot = -1.0f;
+                            float normal_residual = acosf(fabsf(normal_dot));
+                            if (normal_residual > pass_max_angle_delta) pass_max_angle_delta = normal_residual;
+                            if (normal_residual > pass_max_residual) pass_max_residual = normal_residual;
+                            arc_normal->normal = target_normal;
+                            updated = true;
+                        } else if (!candidates[arc_center_index].fixed) {
+                            vec3_t radial_projection = vec3_sub(radial, vec3_scale(line_dir, vec3_dot(radial, line_dir)));
+                            float radial_projection_len = vec3_length(radial_projection);
+                            if (radial_projection_len <= 1e-6f || !isfinite(radial_projection_len)) {
+                                solve_failed = true;
+                                failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                                implicated_constraints[implicated_constraint_count++] = child;
+                                break;
+                            }
+                            vec3_t before_center = candidates[arc_center_index].point;
+                            candidates[arc_center_index].point = vec3_sub(shared_point, radial_projection);
+                            float delta_center = vec3_length(vec3_sub(candidates[arc_center_index].point, before_center));
+                            if (delta_center > pass_max_position_delta) pass_max_position_delta = delta_center;
                             updated = true;
                         }
                     } else if (drag_anchor_is_arc_endpoint) {
