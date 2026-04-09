@@ -3040,20 +3040,83 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     int locked_axis_a = (free_axis == 0) ? 1 : 0;
                     int locked_axis_b = (free_axis == 2) ? 1 : 2;
 
-                    if (participant_count < 2) {
-                        solve_failed = true;
-                        failure_reason = along_unsat_reason;
-                        implicated_constraints[implicated_constraint_count++] = child;
-                        break;
+                    int along_indices[ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS] = {0};
+                    int along_count = 0;
+                    constraint_participant_descriptor_t normalized_desc[CONSTRAINT_MAX_PARTICIPANTS * 2] = {0};
+                    uint32_t normalized_count = 0;
+                    for (uint32_t p = 0; p < participant_count; p++) {
+                        const constraint_participant_descriptor_t *desc =
+                            &constraint->participant_descriptors[p];
+                        ecs_entity_t participant_entity = (ecs_entity_t)desc->entity;
+                        constraint_participant_role_t participant_role =
+                            (constraint_participant_role_t)desc->role;
+                        GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+                        if (!participant_geom) {
+                            solve_failed = true;
+                            failure_reason = along_unsat_reason;
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+
+                        if (participant_geom->type == GEOM_LINE &&
+                            participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY) {
+                            if (normalized_count + 2 > (uint32_t)(CONSTRAINT_MAX_PARTICIPANTS * 2)) {
+                                solve_failed = true;
+                                failure_reason = along_unsat_reason;
+                                implicated_constraints[implicated_constraint_count++] = child;
+                                break;
+                            }
+                            normalized_desc[normalized_count++] =
+                                constraint_participant_descriptor_make((uint64_t)participant_entity,
+                                                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
+                                                                       0);
+                            normalized_desc[normalized_count++] =
+                                constraint_participant_descriptor_make((uint64_t)participant_entity,
+                                                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_B,
+                                                                       1);
+                            continue;
+                        }
+
+                        if (normalized_count >= (uint32_t)(CONSTRAINT_MAX_PARTICIPANTS * 2)) {
+                            solve_failed = true;
+                            failure_reason = along_unsat_reason;
+                            implicated_constraints[implicated_constraint_count++] = child;
+                            break;
+                        }
+                        normalized_desc[normalized_count++] = *desc;
+                    }
+                    if (solve_failed) break;
+
+                    for (uint32_t i = 1; i < normalized_count; i++) {
+                        uint32_t j = i;
+                        while (j > 0 &&
+                               scene_constraint_descriptor_compare(&normalized_desc[j - 1],
+                                                                  &normalized_desc[j]) > 0) {
+                            constraint_participant_descriptor_t tmp = normalized_desc[j - 1];
+                            normalized_desc[j - 1] = normalized_desc[j];
+                            normalized_desc[j] = tmp;
+                            j--;
+                        }
                     }
 
-                    int along_indices[CONSTRAINT_MAX_PARTICIPANTS] = {0};
-                    int along_count = 0;
-                    for (uint32_t p = 0; p < participant_count; p++) {
-                        ecs_entity_t participant_entity =
-                            (ecs_entity_t)constraint->participant_descriptors[p].entity;
+                    uint32_t normalized_write = 0;
+                    for (uint32_t read = 0; read < normalized_count; read++) {
+                        bool duplicate =
+                            (normalized_write > 0 &&
+                             scene_constraint_descriptor_compare(&normalized_desc[normalized_write - 1],
+                                                                &normalized_desc[read]) == 0);
+                        if (duplicate) continue;
+                        if (normalized_write != read) {
+                            normalized_desc[normalized_write] = normalized_desc[read];
+                        }
+                        normalized_write++;
+                    }
+                    normalized_count = normalized_write;
+
+                    for (uint32_t p = 0; p < normalized_count; p++) {
+                        ecs_entity_t participant_entity = (ecs_entity_t)normalized_desc[p].entity;
                         constraint_participant_role_t participant_role =
-                            (constraint_participant_role_t)constraint->participant_descriptors[p].role;
+                            (constraint_participant_role_t)normalized_desc[p].role;
                         int idx = scene_solver_ensure_point_candidate(scene, candidates,
                                                                       ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
                                                                       &candidate_count,
@@ -3072,7 +3135,7 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                                 break;
                             }
                         }
-                        if (!seen && along_count < (int)CONSTRAINT_MAX_PARTICIPANTS) {
+                        if (!seen && along_count < (int)ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS) {
                             along_indices[along_count++] = idx;
                         }
                     }
