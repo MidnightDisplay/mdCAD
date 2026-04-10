@@ -1,49 +1,69 @@
 # Project Research Summary
 
 **Project:** mdCAD  
-**Domain:** v1.4 Solver Robustness + Sketch Gizmo Corrections  
-**Researched:** 2026-04-08  
-**Confidence:** High
+**Domain:** v1.5 Solver Workflow Robustness + Script Re-apply Integrity  
+**Researched:** 2026-04-10  
+**Confidence:** HIGH
 
 ## Executive Summary
 
-v1.4 should be delivered as a robustness-first milestone: fix known solver correctness gaps, preserve deterministic transactional behavior, and correct active-sketch line gizmo semantics. No new external stack is required; success depends on legality/runtime parity, focused test coverage, and strict regression gates on Windows Vulkan.
+v1.5 should stay focused on solver reliability under real user workflows and script re-apply integrity. No external stack expansion is required: the highest leverage comes from descriptor-fidelity in script roundtrip, explicit coincidence authoring semantics, bounded deterministic large-jump robustness tuning, and tighter regression coverage.
 
 ## Key Findings
 
-### Stack
+### Stack additions
 
-- Reuse current C-first stack and test infrastructure.
-- Add internal focused tests and one human-facing solver architecture document.
-- Avoid external solver and build-system churn for this milestone.
+- No new external libraries are required for milestone success.
+- Required internal upgrades:
+  - descriptor-preserving script schema/apply flow,
+  - explicit coincidence insertion in composite authoring paths,
+  - deterministic adaptive solve policy for large jumps,
+  - targeted regression expansion for script + interactive workflows.
 
-### Feature Scope
+### Feature table stakes
 
-- Add line-line `PARALLEL` and `PERPENDICULAR` for pairs and groups.
-- Fix line `ALONG X/Y/Z` semantics and failures.
-- Harden arc-line tangency + mixed drag determinism.
-- Fix active-sketch line gizmo midpoint and endpoint authority behavior.
-- Document solver architecture with literature/code references and TL;DR implementation primer.
+- Deterministic solve/replay outcomes for identical operations.
+- Large-jump robustness for mixed arc/line closed-loop edits.
+- Explicit coincidence semantics for ArcAxisLine and endpoint tangency workflows.
+- PARALLEL-vs-ALONG behavior parity in equivalent setups.
+- Script re-apply fidelity: preserved constraint intent + preserved colors.
+- Typed, actionable diagnostics for failure classes.
 
-### Architecture
+### Watch out for
 
-- Main code touchpoints: `ecs_scene.h`, `constraint_types.h`, `app.c`, `gizmo.h`.
-- Keep transactional solve semantics and deterministic failure implication lifecycle.
-- Implement in dependency order: legality/runtime parity -> solver fixes -> gizmo fix -> docs.
+1. Max-pass inflation masking root-cause convergence issues.
+2. Implicit coincidence coupling in composite constraints.
+3. Participant descriptor loss (role/sub-index) in script re-apply.
+4. Metadata fidelity regressions (e.g., color resets).
+5. Stale reference/caches after ECS remap on re-apply.
 
-### Top Risks
+## Implications for Roadmap
 
-1. Legality/runtime drift for new line constraints.
-2. ALONG line semantics causing immediate unsatisfied-driving failures.
-3. Tangency drag instability with branch/anchor issues.
-4. Transform-vs-geometry authority conflicts in gizmo handling.
+### Phase 31: Script Re-apply Fidelity Contract
+**Rationale:** Removes false solver errors caused by remap/descriptor loss before convergence tuning.  
+**Delivers:** Role-preserving emit/parse/apply + color preservation + integrity tests.
 
-## Roadmap Implications
+### Phase 32: Explicit Composite Authoring Semantics
+**Rationale:** Stabilizes constraint graph semantics before pass-policy tuning.  
+**Delivers:** Explicit coincidence-first ArcAxisLine/tangency authoring and verification.
 
-- Start with correctness and deterministic contracts.
-- Follow with robustness in mixed-constraint solve paths.
-- Close with active-sketch line gizmo UX correction and documentation.
+### Phase 33: Large-Jump Robustness + Parity Hardening
+**Rationale:** Core user workflow pain; depends on solid graph semantics and script fidelity foundation.  
+**Delivers:** Deterministic bounded adaptive solve behavior + PARALLEL/ALONG parity regression closure.
+
+### Phase 34: Deterministic Closure Gate for v1.5
+**Rationale:** Final sign-off requires reproducible confidence.  
+**Delivers:** Build + targeted baseline + rerun evidence for all new requirements.
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack | HIGH | Existing stack is already sufficient and validated |
+| Features | HIGH | Based on concrete user-provided failure scenarios |
+| Architecture | HIGH | Touchpoints are clear and already centralized |
+| Pitfalls | HIGH | Reproduced patterns map directly to current code paths |
 
 ---
-*Research completed: 2026-04-08*  
+*Research completed: 2026-04-10*  
 *Ready for requirements: yes*

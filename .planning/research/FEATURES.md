@@ -1,70 +1,57 @@
-# Feature Research: v1.4 Solver Robustness + Sketch Gizmo Corrections
+# Feature Research
 
-**Domain:** Sketch constraint correctness, solver reliability, and sketch-line gizmo semantics  
-**Researched:** 2026-04-08  
-**Confidence:** High
+**Domain:** CAD solver workflow robustness + script re-apply integrity (v1.5)  
+**Researched:** 2026-04-10  
+**Confidence:** HIGH
 
-## Category 1 - Line-Line Parallel / Perpendicular
+## Feature Landscape
 
-### Table Stakes
+### Table Stakes (Users Expect These)
 
-- Pair selection can create valid `PARALLEL` / `PERPENDICULAR` constraints.
-- Group selections resolve deterministically and remain stable under drag.
-- Invalid selections are rejected with actionable diagnostics.
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Deterministic solve outcomes for identical operations | Mature CAD expectation | MEDIUM | Same input -> same outcome class + diagnostics |
+| Large-jump edit robustness in mixed arc/line loops | Users expect no "wiggle to latch" | HIGH | Must converge or fail transactionally |
+| Explicit coincidence authoring for ArcAxisLine/tangency workflows | Hidden implicit links are fragile | MEDIUM | Coincidence should be first-class constraints |
+| PARALLEL behavior parity vs equivalent ALONG setups | Equivalent intent should behave equivalently | HIGH | Especially rectangular/lattice workflows |
+| Script re-apply integrity (constraint remap + color preservation) | Reapply should be lossless | HIGH | Preserve semantics despite ECS ID churn |
+| Typed actionable diagnostics | Users need clear recovery guidance | MEDIUM | Avoid ambiguous unsupported-participant failures |
 
-### Anti-Features
+### Differentiators (Competitive Advantage)
 
-- Selection-order dependent outcomes.
-- Hidden over-constraint expansion without clear diagnostics.
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Determinism contract surfaced in workflow/logs | Improves trust in scripting workflows | MEDIUM | Useful for support/debug loops |
+| Re-apply semantic diff visibility | Makes remap behavior auditable | MEDIUM | Great for script-heavy users |
 
-## Category 2 - Line ALONG X/Y/Z
+### Anti-Features (Commonly Requested, Often Problematic)
 
-### Table Stakes
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Unlimited hidden retry/tolerance inflation | Seems to improve solve success quickly | Degrades determinism/perf and hides root cause | Bounded deterministic adaptive strategy |
+| Silent auto-rewriting of user constraints | "Just make it solve" convenience | Breaks intent traceability | Transactional fail + explicit diagnostics |
+| Scope creep to new constraint families in this milestone | Feature pressure | Delays robustness closure | Keep v1.5 focused on robustness/replay integrity |
 
-- Applying ALONG to lines must not trigger immediate unsatisfied-driving failures.
-- Principal-axis intent must be preserved in mixed-constraint sketches.
-- Equivalent drags from mirrored vertices should behave consistently.
+## MVP Definition
 
-### Anti-Features
+### Launch With (v1.5)
 
-- Immediate `[ERROR] solve Unsatisfied driving ALONG *` on valid authoring.
-- Side-dependent behavior where one valid drag works and equivalent drag fails.
+- [ ] Deterministic large-jump solve behavior for target user workflows
+- [ ] Explicit coincidence semantics for ArcAxisLine + endpoint tangency authoring
+- [ ] PARALLEL vs ALONG parity for equivalent arrangements
+- [ ] Script re-apply descriptor fidelity and color preservation
+- [ ] Typed diagnostics for solve/replay failure classes
 
-## Category 3 - Arc-Line Tangency Robustness
+### Add After Validation (v1.5.x)
 
-### Table Stakes
+- [ ] Recovery-hint UX layer on top of typed diagnostics
+- [ ] Re-apply diff report for advanced debugging
 
-- Tangency authoring in typical fillet-like setups remains solvable.
-- Dragging endpoints keeps tangency stable when feasible.
-- Infeasible edits fail transactionally without global solver stall.
+### Future Consideration (v2+)
 
-### Anti-Features
+- [ ] Broader automatic constraint repair systems
+- [ ] Runtime-selectable advanced solver strategy plugins
 
-- Solver stalls after one failed tangency interaction.
-- Branch flip/jitter behavior during drag.
-
-## Category 4 - Active-Sketch Line Gizmo
-
-### Table Stakes
-
-- Gizmo anchored at line midpoint for selected line in active sketch.
-- Drag updates geometry endpoints `A/B` in sync (not transform-only drift).
-- Undo remains gesture-coherent.
-
-### Anti-Features
-
-- Transform updates without matching geometry updates.
-- Midpoint mismatch between visual line and gizmo origin.
-
-## Category 5 - Solver Architecture Documentation
-
-### Table Stakes
-
-- Easy-read architecture overview for human consumers.
-- Literature references plus direct code-structure mapping.
-- TL;DR primer for key constraint implementation patterns.
-
-### Anti-Features
-
-- Theory-only docs disconnected from code.
-- Missing failure taxonomy for practical debugging.
+---
+*Feature research for: v1.5 Solver Workflow Robustness + Script Re-apply Integrity*  
+*Researched: 2026-04-10*

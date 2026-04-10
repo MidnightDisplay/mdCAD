@@ -1,23 +1,77 @@
-# Pitfalls Research: v1.4 Solver Robustness + Sketch Gizmo Corrections
+# Pitfalls Research
 
-**Domain:** Failure modes for v1.4 solver and gizmo work  
-**Researched:** 2026-04-08  
-**Confidence:** High
+**Domain:** v1.5 solver robustness + script re-apply integrity  
+**Researched:** 2026-04-10  
+**Confidence:** HIGH
 
-| Pitfall | Why It Happens | Detection | Prevention | Suggested Phase |
-|---|---|---|---|---|
-| Selection-order dependent line-line results | Participant normalization is inconsistent | Same constraints give different outcomes by selection order | Canonical participant ordering and direction rules | 26 |
-| Group constraint over-constraint loops | Naive pairwise expansion adds redundant equations | Pass-count spikes and intermittent unsatisfied errors | Minimal relation model + redundancy checks | 26 |
-| ALONG line frame mismatch | Axis interpreted in wrong frame or overly strict endpoint lock | Immediate ALONG unsatisfied errors in valid setups | Directional line equations + frame-correct axis handling | 27 |
-| Tangency drag branch instability | Multiple tangent branches without stable interaction anchor | Jitter, flips, or drag freeze near corner cases | Anchor persistence + step clamping + warm-start | 27 |
-| Partial commit on failed solve | Candidate state isolation is incomplete | Sketch mutates after failed recalc | Strict commit-on-success transactional boundary | 27 |
-| Gizmo authority split (transform vs geometry) | Legacy transform path overlaps endpoint semantics | Line moves inconsistently or snaps back | Active-sketch line path updates geometry endpoints only | 28 |
-| Midpoint anchor drift | Gizmo origin sourced from stale transform values | Gizmo appears off-line or jumps on drag | Midpoint recomputed from current `A/B` each update | 28 |
-| Opaque blocked drags | Diagnostics do not clearly map to blocking constraints | User sees no movement with no actionable reason | Deterministic implication payload + participant highlighting | 28 |
+## Critical Pitfalls
 
-## Immediate Warning Signals
+### Pitfall 1: Over-relying on max-pass inflation
 
-- Any deterministic replay mismatch under identical inputs.
-- Any valid ALONG line authoring producing immediate unsatisfied-driving errors.
-- Any tangency failure that leaves solver non-responsive for subsequent edits.
-- Any active-sketch line gizmo drag that changes transform but not geometry endpoints.
+**What goes wrong:** Large-jump edits still stall while solve cost grows and behavior stays fragile.
+
+**Why it happens:** Pass count tuning is used as a substitute for fixing conditioning/ordering/anchor issues.
+
+**How to avoid:** Use bounded deterministic adaptive solve strategy with residual trend checks, not unbounded pass inflation.
+
+**Phase to address:** Early robustness phase.
+
+---
+
+### Pitfall 2: Implicit coincidence coupling
+
+**What goes wrong:** ArcAxisLine/tangency appear valid but break after subsequent larger edits.
+
+**Why it happens:** Hidden topology assumptions are encoded implicitly instead of explicit coincidence constraints.
+
+**How to avoid:** Author explicit coincidence constraints first, then apply orientation/tangency relations.
+
+**Phase to address:** Authoring semantics phase.
+
+---
+
+### Pitfall 3: Descriptor loss in script re-apply
+
+**What goes wrong:** Re-applied constraints become semantically wrong and trigger misleading solver errors.
+
+**Why it happens:** Participant roles/sub-index are lost when script pipeline reconstructs entity-only descriptors.
+
+**How to avoid:** Roundtrip full participant descriptors (`id`, `role`, `sub_index`) in emit/parse/apply.
+
+**Phase to address:** Script fidelity phase.
+
+---
+
+### Pitfall 4: Metadata fidelity regressions
+
+**What goes wrong:** Re-apply resets colors or other visible sketch metadata.
+
+**Why it happens:** Script/apply pathway recreates defaults and omits metadata restore.
+
+**How to avoid:** Preserve/restore color metadata explicitly during script roundtrip apply transactions.
+
+**Phase to address:** Script fidelity phase.
+
+---
+
+### Pitfall 5: Stale ID/cache references after reapply remap
+
+**What goes wrong:** UI/solver interactions use dead or mismapped entities after script re-apply.
+
+**Why it happens:** ECS IDs are recreated, but all dependent caches/highlights/selections are not fully refreshed.
+
+**How to avoid:** Enforce post-reapply remap propagation and stale-reference invalidation.
+
+**Phase to address:** Integration hardening phase.
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] Large-jump edits converge/fail cleanly without manual wiggle.
+- [ ] ArcAxisLine/tangency authoring emits explicit coincidence relations.
+- [ ] Script roundtrip preserves descriptor roles/sub-index.
+- [ ] Script re-apply preserves visual metadata (including colors).
+- [ ] No stale ECS IDs remain in selection/highlight/interaction caches after reapply.
+
+---
+*Pitfalls research for: v1.5 Solver Workflow Robustness + Script Re-apply Integrity*  
+*Researched: 2026-04-10*

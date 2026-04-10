@@ -1,46 +1,52 @@
-# Architecture Research: v1.4 Solver Robustness + Sketch Gizmo Corrections
+# Architecture Research
 
-**Domain:** Integration strategy for v1.4 solver/gizmo/doc scope  
-**Researched:** 2026-04-08  
-**Confidence:** High
+**Domain:** mdCAD v1.5 solver workflow robustness + script re-apply integrity  
+**Researched:** 2026-04-10  
+**Confidence:** HIGH
 
-## Integration Points
+## Standard Architecture
 
-- Keep authoring flow: selection -> legality check -> scene constraint add -> solver recalc -> diagnostics.
-- Keep drag flow mediated through solver feasibility (`scene_solver_can_apply_drag(...)`) with transactional commit semantics.
-- Keep failure implication lifecycle as authoritative UX feedback contract.
+### System Overview
 
-## Module Touchpoints
+```text
+Authoring/UI (app.c, script editor, gizmo)
+    -> Scene orchestration (src/ecs/ecs_scene.h)
+        -> Constraint graph + solver pass loop + diagnostics
+        -> Script parse/emit/apply pipeline
+            -> ECS entities/components + remap
+```
 
-### Primary
+## Major Integration Points
 
-- `src/ecs/ecs_scene.h` (solver runtime branches + transactional hardening)
-- `src/constraints/constraint_types.h` (legality/runtime parity)
-- `src/app.c` (active-sketch line gizmo routing to geometry endpoints)
-- `src/gizmo/gizmo.h` (midpoint anchor behavior)
+- `src/ecs/ecs_scene.h`: primary solve/recalc, diagnostics, failure implication, script apply transaction.
+- `src/scripting/sketch_script_emit.h`: must evolve to preserve participant descriptor semantics.
+- `src/scripting/sketch_script_parse.h`: must parse descriptor-rich participant forms.
+- `src/scripting/sketch_script_apply.h`: must reconstruct descriptor-accurate constraints and preserve colors.
+- `src/constraints/constraint_types.h`: legality/runtime parity helpers for descriptor-aware constraints.
+- `src/app.c`: route composite authoring through explicit-coincidence workflows.
 
-### Tests
+## Recommended Implementation Order
 
-- `src/tests/scene_solver_contract_test.c`
-- `src/tests/scene_solver_pass_policy_test.c`
-- `src/tests/scene_solver_drag_test.c`
-- `src/tests/scene_solver_diagnostics_test.c`
-- `src/tests/endpoint_pick_test.c`
+1. **Script fidelity foundation:** descriptor-preserving emit/parse/apply + color preservation.
+2. **Explicit authoring semantics:** ArcAxisLine/tangency with explicit coincidence insertion.
+3. **Large-jump robustness policy:** deterministic bounded adaptive solve behavior.
+4. **PARALLEL/ALONG parity hardening:** equivalent-intent behavior and responsiveness parity.
+5. **Closure verification gates:** deterministic rerun evidence for interactive + script flows.
 
-### Documentation
+## Anti-Patterns to Avoid
 
-- Add `docs/SOLVER_ARCHITECTURE.md`.
+- Entity-only participant reconstruction for role-sensitive constraints.
+- Hidden implicit coincidence behavior in composite constraints.
+- Non-deterministic retries/jitter as convergence workaround.
+- Partial state commits when solve/apply fails.
 
-## Build Order (recommended)
+## Validation Hooks
 
-1. Legality/runtime parity for new line-line constraints.
-2. Runtime solver implementation for parallel/perpendicular.
-3. ALONG line semantics fix + mixed-constraint determinism.
-4. Tangency drag hardening + transactional rollback guarantees.
-5. Active-sketch line gizmo midpoint/endpoints behavior fix.
-6. Solver architecture docs + TL;DR primer.
+- Script roundtrip descriptor equality (type + participant role/sub-index intent).
+- Re-apply visual fidelity checks (entity color preservation).
+- Large-jump quarter-arc and multi-tangency workflow convergence/rollback tests.
+- PARALLEL vs ALONG metamorphic parity tests on equivalent arrangements.
 
-## Verification Hooks
-
-- Use targeted strict CTest gates and mandatory fresh reruns for determinism.
-- Include manual checkpoint for active-sketch line midpoint/endpoints UX behavior.
+---
+*Architecture research for: mdCAD v1.5 solver workflow robustness + script re-apply integrity*  
+*Researched: 2026-04-10*
