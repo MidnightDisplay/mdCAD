@@ -130,14 +130,14 @@ static inline bool sketch_script_apply_create_entities(ecs_scene_t *scene,
         const sketch_script_entity_model_t *src = &model->entities[i];
         ecs_entity_t entity = 0;
         if (src->kind == SKETCH_SCRIPT_ENTITY_POINT) {
-            entity = scene_add_point_to_sketch(scene, sketch, src->point, vec4_make(1, 1, 1, 1), 0.01f);
+            entity = scene_add_point_to_sketch(scene, sketch, src->point, src->color, 0.01f);
         } else if (src->kind == SKETCH_SCRIPT_ENTITY_LINE) {
-            entity = scene_add_line_to_sketch(scene, sketch, src->a, src->b, vec4_make(1, 1, 1, 1), 1.0f);
+            entity = scene_add_line_to_sketch(scene, sketch, src->a, src->b, src->color, 1.0f);
         } else {
             entity = scene_add_arc_to_sketch(scene, sketch,
                                              src->center, src->radius,
                                              src->start_angle, src->end_angle,
-                                             src->normal, vec4_make(1, 1, 1, 1), 1.0f);
+                                             src->normal, src->color, 1.0f);
         }
         if (entity == 0) {
             sketch_script_apply_set_error(out_error, "Failed creating script entity.");
@@ -164,23 +164,26 @@ static inline bool sketch_script_apply_create_constraints(ecs_scene_t *scene,
                                                           sketch_script_error_t *out_error) {
     for (uint32_t i = 0; i < model->constraint_count; i++) {
         const sketch_script_constraint_model_t *src = &model->constraints[i];
-        if (src->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY ||
-            src->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
-            sketch_script_apply_set_error(
-                out_error,
-                "Script apply does not support endpoint-role ARCI constraints without descriptor roles.");
-            return false;
-        }
         constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
         for (uint32_t p = 0; p < src->participant_count; p++) {
-            ecs_entity_t participant_entity = sketch_script_apply_link_find(links, src->participants[p]);
+            const sketch_script_participant_model_t *participant = &src->participants[p];
+            ecs_entity_t participant_entity = sketch_script_apply_link_find(links, participant->id);
             if (participant_entity == 0) {
                 sketch_script_apply_set_error(out_error, "Unresolved participant reference.");
                 return false;
             }
+            GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+            if (!participant_geom) {
+                sketch_script_apply_set_error(out_error, "Participant has no geometry.");
+                return false;
+            }
+            if (!sketch_script_capability_role_allowed_for_geometry(participant_geom->type, participant->role)) {
+                sketch_script_apply_set_error(out_error, "Participant descriptor role is not supported for geometry.");
+                return false;
+            }
             participants[p] = constraint_participant_descriptor_make((uint64_t)participant_entity,
-                                                                     CONSTRAINT_PARTICIPANT_ROLE_ENTITY,
-                                                                     0);
+                                                                     (uint8_t)participant->role,
+                                                                     participant->sub_index);
         }
 
         ecs_entity_t constraint = scene_add_constraint_to_sketch_with_descriptors(scene, sketch, src->type,
@@ -220,6 +223,25 @@ static inline int sketch_script_snapshot_sketch_children(ecs_scene_t *scene,
     return count;
 }
 
+static inline int sketch_script_snapshot_script_children(ecs_scene_t *scene,
+                                                         ecs_entity_t sketch,
+                                                         ecs_entity_t *out_children,
+                                                         int max_children) {
+    if (!scene || sketch == 0 || !out_children || max_children <= 0) return 0;
+    int count = 0;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count && count < max_children; i++) {
+            ecs_entity_t child = it.entities[i];
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, child);
+            if (!sid || sid->script_local_id[0] == '\0') continue;
+            out_children[count++] = child;
+        }
+        if (count >= max_children) break;
+    }
+    return count;
+}
+
 static inline void sketch_script_remove_children(ecs_scene_t *scene,
                                                  ecs_entity_t *children,
                                                  int child_count) {
@@ -253,36 +275,25 @@ static inline bool sketch_script_apply_validate_model_links(const sketch_script_
     if (!model) return false;
     for (uint32_t i = 0; i < model->constraint_count; i++) {
         const sketch_script_constraint_model_t *constraint = &model->constraints[i];
-        if (constraint->participant_count < constraint_type_min_participants(constraint->type)) {
-            sketch_script_apply_set_error(out_error, "Constraint participant count below minimum.");
-            return false;
-        }
-        if (constraint->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY ||
-            constraint->type == CONSTRAINT_ARC_ENDPOINT_ANGLE) {
-            sketch_script_apply_set_error(
-                out_error,
-                "Script validation does not support endpoint-role ARCI constraints without descriptor roles.");
-            return false;
-        }
         constraint_selection_signature_t sig = {0};
         sig.count = constraint->participant_count;
         for (uint32_t p = 0; p < constraint->participant_count; p++) {
             bool found = false;
             for (uint32_t e = 0; e < model->entity_count; e++) {
-                if (strcmp(model->entities[e].id, constraint->participants[p]) != 0) continue;
+                if (strcmp(model->entities[e].id, constraint->participants[p].id) != 0) continue;
                 found = true;
+                sig.entities[p] = (uint64_t)(e + 1u);
                 if (model->entities[e].kind == SKETCH_SCRIPT_ENTITY_POINT) {
-                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_POINT;
-                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 } else if (model->entities[e].kind == SKETCH_SCRIPT_ENTITY_LINE) {
-                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_LINE;
-                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
                 } else {
-                    sig.entities[p] = (uint64_t)(e + 1u);
                     sig.geometry_types[p] = GEOM_ARC;
-                    sig.roles[p] = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+                }
+                sig.roles[p] = constraint->participants[p].role;
+                if (!sketch_script_capability_role_allowed_for_geometry(sig.geometry_types[p], sig.roles[p])) {
+                    sketch_script_apply_set_error(out_error, "Participant descriptor role is not supported for geometry.");
+                    return false;
                 }
                 break;
             }
@@ -291,8 +302,10 @@ static inline bool sketch_script_apply_validate_model_links(const sketch_script_
                 return false;
             }
         }
-        if (!constraint_type_is_selection_legal(&sig, constraint->type)) {
-            sketch_script_apply_set_error(out_error, "Constraint participants are not legal for type.");
+        char capability_error[192] = {0};
+        if (!sketch_script_capability_validate_signature(&sig, constraint->type,
+                                                         capability_error, sizeof(capability_error))) {
+            sketch_script_apply_set_error(out_error, capability_error);
             return false;
         }
     }
@@ -328,16 +341,12 @@ static inline bool sketch_script_apply_commit_model(ecs_scene_t *scene,
     sketch_script_apply_snapshot_labels(scene, sketch, &previous_labels);
 
     ecs_entity_t previous_children[1024] = {0};
-    int previous_count = sketch_script_snapshot_sketch_children(scene, sketch, previous_children, 1024);
+    int previous_count = sketch_script_snapshot_script_children(scene, sketch, previous_children, 1024);
     sketch_script_remove_children(scene, previous_children, previous_count);
-
-    ecs_entity_t created_children[1024] = {0};
-    int created_before = sketch_script_snapshot_sketch_children(scene, sketch, created_children, 1024);
-    (void)created_before;
 
     if (!sketch_script_apply_model_on_sketch(scene, sketch, &model, &previous_labels, out_error)) {
         ecs_entity_t created_after[1024] = {0};
-        int created_count = sketch_script_snapshot_sketch_children(scene, sketch, created_after, 1024);
+        int created_count = sketch_script_snapshot_script_children(scene, sketch, created_after, 1024);
         sketch_script_remove_children(scene, created_after, created_count);
         return false;
     }

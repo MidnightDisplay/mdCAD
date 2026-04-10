@@ -31,9 +31,9 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 
 ### Script Re-apply Integrity
 
-- [ ] **SCRI-01**: User re-applying scripts preserves constraint participant semantics (including role/sub-index intent) and does not regress into unsupported-participant solver failures for valid authored cases.
-- [ ] **SCRI-02**: User re-applying scripts preserves entity color metadata instead of resetting geometry to default white.
-- [ ] **SCRI-03**: User can re-apply the same script repeatedly and observe stable, deterministic geometry/constraint outcomes.
+- [x] **SCRI-01**: User re-applying scripts preserves constraint participant semantics (including role/sub-index intent) and does not regress into unsupported-participant solver failures for valid authored cases. — Validated in Phase 31: script-reapply-fidelity-foundation
+- [x] **SCRI-02**: User re-applying scripts preserves entity color metadata instead of resetting geometry to default white. — Validated in Phase 31: script-reapply-fidelity-foundation
+- [x] **SCRI-03**: User can re-apply the same script repeatedly and observe stable, deterministic geometry/constraint outcomes. — Validated in Phase 31: script-reapply-fidelity-foundation
 
 ## v1.6+ Requirements (Deferred)
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | COIN-02 | Phase 32 | Pending |
 | PARI-01 | Phase 33 | Pending |
 | PARI-02 | Phase 33 | Pending |
-| SCRI-01 | Phase 31 | Pending |
-| SCRI-02 | Phase 31 | Pending |
-| SCRI-03 | Phase 31 | Pending |
+| SCRI-01 | Phase 31 | Complete |
+| SCRI-02 | Phase 31 | Complete |
+| SCRI-03 | Phase 31 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 13 total

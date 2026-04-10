@@ -3,6 +3,7 @@
 #include "../scene_serializer.h"
 #include "../scripting/sketch_script_runtime.h"
 #include "../scripting/sketch_script_contract.h"
+#include "../scripting/sketch_script_capability_registry.h"
 #include "../scripting/sketch_script_parse.h"
 #include "../scripting/sketch_script_apply.h"
 #include "../scripting/sketch_script_emit.h"
@@ -2303,6 +2304,22 @@ static int test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12(
     return ok ? 0 : 1;
 }
 
+static int test_registry_parity_valid_signature_accepts_script_and_solver(void) {
+    constraint_selection_signature_t sig = {0};
+    sig.count = 2;
+    sig.entities[0] = 1;
+    sig.entities[1] = 2;
+    sig.geometry_types[0] = GEOM_LINE;
+    sig.geometry_types[1] = GEOM_ARC;
+    sig.roles[0] = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    sig.roles[1] = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    char err[192] = {0};
+    bool registry_ok = sketch_script_capability_validate_signature(
+        &sig, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, err, sizeof(err));
+    bool solver_ok = constraint_type_is_selection_legal(&sig, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY);
+    return (registry_ok && solver_ok) ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -2397,6 +2414,8 @@ int main(void) {
           test_arci_arc_endpoint_angle_anchors_first_and_moves_second_D10_D11 },
         { "test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12",
           test_arci_arc_endpoint_angle_unsat_fixed_target_is_transactional_D12 },
+        { "test_registry_parity_valid_signature_accepts_script_and_solver",
+          test_registry_parity_valid_signature_accepts_script_and_solver },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

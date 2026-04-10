@@ -7,6 +7,7 @@
 #include "../components/geometry_comp.h"
 #include "../components/constraint_comp.h"
 #include "../constraints/constraint_types.h"
+#include "sketch_script_capability_registry.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,21 +33,11 @@ typedef struct {
 } sketch_script_constraint_decl_t;
 
 static inline bool sketch_script_contract_geometry_type_allowed(const char *type) {
-    if (!type) return false;
-    return strcmp(type, "point") == 0 ||
-           strcmp(type, "line") == 0 ||
-           strcmp(type, "arc") == 0 ||
-           strcmp(type, "circle") == 0;
+    return sketch_script_capability_entity_type_allowed(type);
 }
 
 static inline bool sketch_script_contract_constraint_type_allowed(const char *type) {
-    if (!type) return false;
-    for (int i = 0; i < CONSTRAINT_TYPE_COUNT; i++) {
-        if (strcmp(type, constraint_type_display_name((constraint_type_t)i)) == 0) {
-            return true;
-        }
-    }
-    return false;
+    return sketch_script_capability_constraint_type_allowed(type);
 }
 
 static inline bool sketch_script_contract_validate_entity_decl(const sketch_script_entity_decl_t *decl,
@@ -63,7 +54,7 @@ static inline bool sketch_script_contract_validate_entity_decl(const sketch_scri
     if (!sketch_script_contract_geometry_type_allowed(decl->type)) {
         if (error_text && error_text_size > 0) {
             snprintf(error_text, error_text_size,
-                     "Unsupported entity type '%s'. Phase 13 supports point/line/arc/circle.",
+                     "Unsupported entity type '%s' in capability registry.",
                      decl->type ? decl->type : "(null)");
             error_text[error_text_size - 1] = '\0';
         }
@@ -86,7 +77,7 @@ static inline bool sketch_script_contract_validate_constraint_decl(const sketch_
     if (!sketch_script_contract_constraint_type_allowed(decl->type)) {
         if (error_text && error_text_size > 0) {
             snprintf(error_text, error_text_size,
-                     "Unsupported constraint type '%s' for Phase 13 contract.",
+                     "Unsupported constraint type '%s' in capability registry.",
                      decl->type ? decl->type : "(null)");
             error_text[error_text_size - 1] = '\0';
         }

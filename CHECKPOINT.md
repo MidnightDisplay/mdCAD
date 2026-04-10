@@ -207,6 +207,38 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
+## Most Recent Changes (2026-04-10)
+
+### Phase 31 Script Reapply Fidelity Foundation (IMPLEMENTED, 2026-04-10)
+
+- Completed Phase 31 execution and promoted plans `31-01` and `31-02` to complete (2/2 plans).
+- Delivered shared script+solver capability parity:
+  - Added `src/scripting/sketch_script_capability_registry.h` as single-source capability authority.
+  - Script contract and solver legality paths now use the same registry validation and deterministic error taxonomy.
+- Delivered descriptor fidelity across script parse/apply/emit/reapply:
+  - Participant descriptors now preserve `id`, `role`, `sub_index`.
+  - Legacy participant string-array fixtures in roundtrip tests were migrated to descriptor-object schema.
+- Delivered color fidelity for script-managed entities:
+  - Script apply now uses parsed entity colors for point/line/arc creation.
+  - Emitter now serializes canonical `color = {r,g,b,a}` for script-managed entities.
+- Preserved non-script geometry during reapply:
+  - Script apply commit now replaces only script-managed children instead of deleting all sketch children.
+- Deterministic closure evidence captured:
+  - Targeted gate baseline+rerun passed:
+    - `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests|scene_solver_contract|scene_solver_diagnostics" --output-on-failure`
+  - Full 7-suite baseline+rerun passed:
+    - `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag|endpoint_pick|script_roundtrip_tests" --output-on-failure`
+- Added/updated Phase 31 artifacts:
+  - `.planning/phases/31-script-reapply-fidelity-foundation/31-01-SUMMARY.md`
+  - `.planning/phases/31-script-reapply-fidelity-foundation/31-02-SUMMARY.md`
+  - `.planning/phases/31-script-reapply-fidelity-foundation/31-VERIFICATION.md`
+  - `.planning/phases/31-script-reapply-fidelity-foundation/31-VALIDATION.md` (`status: complete`)
+- Lifecycle continuity advanced:
+  - `.planning/ROADMAP.md` marks Phase 31 complete.
+  - `.planning/REQUIREMENTS.md` marks `SCRI-01..03` complete.
+  - `.planning/STATE.md` advances current focus to Phase 32 planning.
+  - `.planning/PROJECT.md` updates current focus and validated requirements for script reapply integrity.
+
 ## Most Recent Changes (2026-04-09)
 
 ### Phase 29 Active-Sketch Line Gizmo Endpoint Authority (IMPLEMENTED)

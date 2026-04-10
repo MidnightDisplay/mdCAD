@@ -512,6 +512,45 @@ static int test_tangency_post_failure_diagnostic_remains_family_specific_and_sol
     return ok ? 0 : 1;
 }
 
+static int test_diagnostic_parity_reapply(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (!sketch) return 1;
+
+    const char *bad_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0}, color = {1, 1, 1, 1} },\n"
+        "    { id = \"geometry_2\", type = \"arc\", center = {1, 0, 0}, radius = 1, start_angle = 0, end_angle = 1, normal = {0, 0, 1}, color = {1, 1, 1, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Line-End Arc-End Tangency\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t err_first = {0};
+    if (scene_script_apply_commit(&scene, sketch, bad_script, &err_first)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    sketch_script_error_t err_second = {0};
+    if (scene_script_apply_commit(&scene, sketch, bad_script, &err_second)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    int diag_count = scene_solver_diagnostic_count(&scene, sketch);
+    int ok = (diag_count == 0 &&
+              strcmp(err_first.message, err_second.message) == 0 &&
+              strstr(err_first.message, "descriptor objects") != NULL);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -537,6 +576,7 @@ int main(void) {
           test_along_z_unsat_reports_family_specific_diagnostic_alin04 },
         { "test_tangency_post_failure_diagnostic_remains_family_specific_and_solver_recovers",
           test_tangency_post_failure_diagnostic_remains_family_specific_and_solver_recovers },
+        { "test_diagnostic_parity_reapply", test_diagnostic_parity_reapply },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

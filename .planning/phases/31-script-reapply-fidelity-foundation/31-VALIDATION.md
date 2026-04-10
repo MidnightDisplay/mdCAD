@@ -1,9 +1,9 @@
 ---
 phase: 31
 slug: script-reapply-fidelity-foundation
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-10
 ---
 
@@ -41,9 +41,9 @@ created: 2026-04-10
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 31-01-01 | 01 | 1 | SCRI-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ⬜ pending |
-| 31-01-02 | 01 | 1 | SCRI-02 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ⬜ pending |
-| 31-02-01 | 02 | 2 | SCRI-03 | integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ⬜ pending |
+| 31-01-01 | 01 | 1 | SCRI-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ✅ green |
+| 31-01-02 | 01 | 1 | SCRI-02 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ✅ green |
+| 31-02-01 | 02 | 2 | SCRI-03 | integration | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,9 +51,9 @@ created: 2026-04-10
 
 ## Wave 0 Requirements
 
-- [ ] `src/tests/script_roundtrip_tests.c` — add descriptor-role/sub-index roundtrip coverage and color roundtrip coverage.
-- [ ] `src/tests/scene_solver_diagnostics_test.c` — add deterministic diagnostics parity assertions under repeated script reapply.
-- [ ] Existing infrastructure covers framework/tooling; no test framework installation required.
+- [x] `src/tests/script_roundtrip_tests.c` — descriptor-role/sub-index roundtrip + color roundtrip coverage added.
+- [x] `src/tests/scene_solver_diagnostics_test.c` — deterministic diagnostics parity assertions under repeated script reapply added.
+- [x] Existing infrastructure covers framework/tooling; no test framework installation required.
 
 ---
 
@@ -72,4 +72,4 @@ All phase behaviors have automated verification.
 - [x] Per-task fast smoke feedback latency target < 30s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete

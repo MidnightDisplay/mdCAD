@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
 
-**Current focus:** Defining v1.5 requirements and roadmap.
+**Current focus:** Phase 32 preparation after Phase 31 closure.
 
 ## Requirements
 
@@ -45,13 +45,13 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Active-sketch line gizmo behavior now satisfies midpoint anchoring, endpoint-authority drag semantics, mixed-selection guardrails, and grouped undo/redo interaction coherence (`GZM-01..04`) — Validated in Phase 29: active-sketch-line-gizmo-endpoint-authority
 - ✓ Human-facing solver architecture docs now provide practical code anchors, literature-backed context, and a TL;DR debug primer (`SDOC-01..03`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
 - ✓ Deterministic Windows Vulkan closure gate now enforces build + canonical 7-test baseline + immediate rerun sign-off (`V14-01..02`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
+- ✓ Script re-apply now preserves descriptor participant semantics (role/sub-index), script-managed color metadata, and deterministic repeated outcomes (`SCRI-01..03`) — Validated in Phase 31: script-reapply-fidelity-foundation
 
 ### Active
 
 - [ ] Improve solver convergence reliability for large-jump edits in mixed arc/line closed-loop sketches.
 - [ ] Make ArcAxisLine and line-end/arc-end tangency authoring explicit with required coincidence constraints and stable solve behavior.
 - [ ] Close behavior parity gaps where `PARALLEL`-based arrangements should match equivalent `ALONG`-based workflows.
-- [ ] Fix script re-apply integrity so constraint remap remains valid and entity colors are preserved.
 
 ### Out of Scope
 
@@ -131,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after v1.5 milestone initialization*
+*Last updated: 2026-04-10 after Phase 31 execution closure*

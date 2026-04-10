@@ -15,7 +15,7 @@
 - Integer phases (31, 32, 33, 34): Planned milestone work
 - Decimal phases (31.1, 31.2): Urgent insertions (if needed later)
 
-- [ ] **Phase 31: Script Reapply Fidelity Foundation** - Preserve script remap semantics and metadata so replayed scenes stay valid and deterministic.
+- [x] **Phase 31: Script Reapply Fidelity Foundation** - Preserve script remap semantics and metadata so replayed scenes stay valid and deterministic. (completed 2026-04-10)
 - [ ] **Phase 32: Explicit Coincidence Authoring Semantics** - Make ArcAxisLine and endpoint tangency authoring explicit and stable via required coincidence intent.
 - [ ] **Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity** - Stabilize mixed arc/line large edits and parity behavior across equivalent constraint setups.
 - [ ] **Phase 34: Deterministic v1.5 Closure Gate** - Lock reproducible deterministic sign-off for targeted v1.5 regression coverage.
@@ -33,8 +33,8 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 31-01-PLAN.md — Establish shared script+solver capability registry and deterministic contract failure taxonomy.
-- [ ] 31-02-PLAN.md — Implement descriptor/color fidelity pipeline with repeat-apply determinism parity gates.
+- [x] 31-01-PLAN.md — Establish shared script+solver capability registry and deterministic contract failure taxonomy.
+- [x] 31-02-PLAN.md — Implement descriptor/color fidelity pipeline with repeat-apply determinism parity gates.
 
 ### Phase 32: Explicit Coincidence Authoring Semantics
 **Goal**: Users get explicit, durable coincidence semantics when authoring composite ArcAxisLine and line-end/arc-end tangency relations.
@@ -72,7 +72,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 31. Script Reapply Fidelity Foundation | 0/TBD | Not started | - |
+| 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 0/TBD | Not started | - |
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 0/TBD | Not started | - |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |

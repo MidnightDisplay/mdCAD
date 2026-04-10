@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,8 +163,8 @@ static int test_script_apply_reconstructs_supported_scope(void) {
         "    { id = \"geometry_4\", type = \"circle\", center = {3, 2, 0}, radius = 2.0, normal = {0, 0, 1} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} },\n"
-        "    { id = \"constraint_2\", type = \"Length\", participants = {\"geometry_2\"}, value = 5.0, driven = false }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 } } },\n"
+        "    { id = \"constraint_2\", type = \"Length\", participants = { { id = \"geometry_2\", role = \"entity\", sub_index = 0 } }, value = 5.0, driven = false }\n"
         "  }\n"
         "}";
 
@@ -195,7 +196,7 @@ static int test_script_apply_resolves_forward_references_two_pass(void) {
         "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
 
@@ -247,7 +248,7 @@ static int test_script_apply_commit_is_atomic_on_unresolved_reference(void) {
         "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"missing_geometry\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
 
@@ -279,7 +280,7 @@ static int test_script_preview_parse_preserves_committed_scene_on_failure(void) 
         "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     sketch_script_error_t error = {0};
@@ -296,7 +297,7 @@ static int test_script_preview_parse_preserves_committed_scene_on_failure(void) 
         "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"missing\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     if (scene_script_preview_parse(&scene, sketch, invalid_script, &error)) {
@@ -327,7 +328,7 @@ static int test_script_preview_parse_rejects_illegal_constraint_participants(voi
         "    { id = \"geometry_3\", type = \"arc\", center = {0, 0, 0}, radius = 1, start_angle = 0, end_angle = 3.14, normal = {0, 0, 1} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Perpendicular\", participants = {\"geometry_1\", \"geometry_3\"} }\n"
+        "    { id = \"constraint_1\", type = \"Perpendicular\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_3\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     sketch_script_error_t error = {0};
@@ -360,8 +361,8 @@ static int test_script_roundtrip_parallel_perpendicular_group_constraints_lcon04
         "    { id = \"geometry_5\", type = \"line\", a = {1.0, -1.0, 0}, b = {2.0, -3.0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Parallel\", participants = {\"geometry_1\", \"geometry_2\", \"geometry_3\"} },\n"
-        "    { id = \"constraint_2\", type = \"Perpendicular\", participants = {\"geometry_1\", \"geometry_4\", \"geometry_5\"} }\n"
+        "    { id = \"constraint_1\", type = \"Parallel\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 }, { id = \"geometry_3\", role = \"entity\", sub_index = 0 } } },\n"
+        "    { id = \"constraint_2\", type = \"Perpendicular\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_4\", role = \"entity\", sub_index = 0 }, { id = \"geometry_5\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     sketch_script_error_t err = {0};
@@ -432,7 +433,7 @@ static int test_script_parse_rejects_unexpected_tokens_between_blocks(void) {
         "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Fixed\", participants = {\"geometry_1\"} } xyz\n"
+        "    { id = \"constraint_1\", type = \"Fixed\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 } } } xyz\n"
         "  }\n"
         "}";
     sketch_script_error_t error = {0};
@@ -476,7 +477,7 @@ static int test_script_apply_commit_keeps_last_valid_scene_on_failure(void) {
         "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"missing_geometry\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     if (scene_script_apply_commit(&scene, sketch, invalid_script, &error)) {
@@ -537,7 +538,7 @@ static int test_script_apply_undo_redo_single_step(void) {
         "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     sketch_script_error_t error = {0};
@@ -625,7 +626,7 @@ static int test_script_apply_failure_preserves_last_valid_state(void) {
         "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"geometry_2\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     const char *invalid_script =
@@ -635,7 +636,7 @@ static int test_script_apply_failure_preserves_last_valid_state(void) {
         "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_1\", type = \"Coincident\", participants = {\"geometry_1\", \"missing_geometry\"} }\n"
+        "    { id = \"constraint_1\", type = \"Coincident\", participants = { { id = \"geometry_1\", role = \"entity\", sub_index = 0 }, { id = \"missing_geometry\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
 
@@ -1240,7 +1241,7 @@ static int test_script_apply_preserves_labels_by_script_identity(void) {
         "    { id = \"geometry_102\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
         "  },\n"
         "  constraints = {\n"
-        "    { id = \"constraint_201\", type = \"Coincident\", participants = {\"geometry_101\", \"geometry_102\"} }\n"
+        "    { id = \"constraint_201\", type = \"Coincident\", participants = { { id = \"geometry_101\", role = \"entity\", sub_index = 0 }, { id = \"geometry_102\", role = \"entity\", sub_index = 0 } } }\n"
         "  }\n"
         "}";
     sketch_script_error_t err = {0};
@@ -1515,6 +1516,234 @@ static int test_script_reemit_revision_changes_on_mutation(void) {
     return rev1 > rev0 ? 0 : 1;
 }
 
+static int test_registry_parity_deterministic_contract_error(void) {
+    sketch_script_entity_decl_t bad_entity = {
+        .type = "mesh",
+        .has_id = true,
+        .id = "geometry_bad"
+    };
+    char err[192] = {0};
+    if (sketch_script_contract_validate_entity_decl(&bad_entity, err, sizeof(err))) return 1;
+    return strstr(err, "capability registry") != NULL ? 0 : 1;
+}
+
+static int test_descriptor_roundtrip_preserves_role_and_sub_index(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+
+    const char *script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {2, 0, 0}, color = {0.2, 0.3, 0.4, 1} },\n"
+        "    { id = \"geometry_2\", type = \"arc\", center = {2, 0, 0}, radius = 1, start_angle = 0, end_angle = 2, normal = {0, 0, 1}, color = {0.5, 0.4, 0.3, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Line-End Arc-End Tangency\", participants = {"
+        "{ id = \"geometry_1\", role = \"point_b\", sub_index = 0 }, "
+        "{ id = \"geometry_2\", role = \"point_a\", sub_index = 3 } } }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char emitted[8192] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    bool has_roles = strstr(emitted, "role = \"point_a\"") != NULL &&
+                     strstr(emitted, "role = \"point_b\"") != NULL &&
+                     strstr(emitted, "sub_index = 3") != NULL;
+    if (!has_roles) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_script_apply_commit(&scene, sketch, emitted, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    bool role_preserved = false;
+    ecs_iter_t it = ecs_children(scene.world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ConstraintComp *constraint = ecs_world_get_constraint(scene.world, it.entities[i]);
+            if (!constraint || constraint->type != CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY) continue;
+            if (constraint->participant_count != 2) continue;
+            constraint_participant_role_t r0 = (constraint_participant_role_t)constraint->participant_descriptors[0].role;
+            constraint_participant_role_t r1 = (constraint_participant_role_t)constraint->participant_descriptors[1].role;
+            uint8_t s0 = constraint->participant_descriptors[0].sub_index;
+            uint8_t s1 = constraint->participant_descriptors[1].sub_index;
+            role_preserved = ((r0 == CONSTRAINT_PARTICIPANT_ROLE_POINT_A && r1 == CONSTRAINT_PARTICIPANT_ROLE_POINT_B &&
+                               s0 == 3 && s1 == 0) ||
+                              (r0 == CONSTRAINT_PARTICIPANT_ROLE_POINT_B && r1 == CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                               s0 == 0 && s1 == 3));
+        }
+    }
+    ecs_world_shutdown(&world);
+    return role_preserved ? 0 : 1;
+}
+
+static int test_deterministic_contract_error_atomic_reject(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    ecs_entity_t baseline = scene_add_point_to_sketch(&scene, sketch, vec3_make(0, 0, 0), vec4_make(1, 0, 0, 1), 0.01f);
+    if (baseline == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    int geometry_before = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_before = scene_count_sketch_constraints(&scene, sketch);
+
+    const char *bad_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0}, color = {1, 1, 1, 1} },\n"
+        "    { id = \"geometry_2\", type = \"arc\", center = {1, 0, 0}, radius = 1, start_angle = 0, end_angle = 1, normal = {0, 0, 1}, color = {1, 1, 1, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Line-End Arc-End Tangency\", participants = {\"geometry_1\", \"geometry_2\"} }\n"
+        "  }\n"
+        "}";
+
+    sketch_script_error_t err = {0};
+    bool ok = scene_script_apply_commit(&scene, sketch, bad_script, &err);
+    int geometry_after = scene_count_sketch_geometry(&scene, sketch);
+    int constraints_after = scene_count_sketch_constraints(&scene, sketch);
+    bool taxonomy = strstr(err.message, "descriptor objects") != NULL;
+    ecs_world_shutdown(&world);
+    return (!ok && taxonomy &&
+            geometry_before == geometry_after &&
+            constraints_before == constraints_after) ? 0 : 1;
+}
+
+static int test_color_roundtrip_and_non_script_color_untouched(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    ecs_entity_t non_script = scene_add_point_to_sketch(&scene, sketch, vec3_make(10, 10, 0), vec4_make(0.9f, 0.1f, 0.2f, 1.0f), 0.01f);
+    if (non_script == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const char *script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0}, color = {0.2, 0.3, 0.4, 0.9} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0}, color = {0.1, 0.8, 0.2, 1} },\n"
+        "    { id = \"geometry_3\", type = \"arc\", center = {1, 1, 0}, radius = 1, start_angle = 0, end_angle = 1.5, normal = {0, 0, 1}, color = {0.7, 0.2, 0.6, 1} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, script, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    char emitted[8192] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_script_apply_commit(&scene, sketch, emitted, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    bool colors_ok = false;
+    bool non_script_ok = false;
+    ecs_iter_t it = ecs_children(scene.world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t child = it.entities[i];
+            GeometryComp *g = ecs_world_get_geometry(scene.world, child);
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene.world, child);
+            if (!g) continue;
+            if (sid && strcmp(sid->script_local_id, "geometry_1") == 0 && g->type == GEOM_POINT) {
+                colors_ok = (fabsf(g->color.x - 0.2f) < 1e-5f &&
+                             fabsf(g->color.y - 0.3f) < 1e-5f &&
+                             fabsf(g->color.z - 0.4f) < 1e-5f &&
+                             fabsf(g->color.w - 0.9f) < 1e-5f);
+            }
+            if (child == non_script && g->type == GEOM_POINT) {
+                non_script_ok = (fabsf(g->color.x - 0.9f) < 1e-5f &&
+                                 fabsf(g->color.y - 0.1f) < 1e-5f &&
+                                 fabsf(g->color.z - 0.2f) < 1e-5f &&
+                                 fabsf(g->color.w - 1.0f) < 1e-5f);
+            }
+        }
+    }
+    ecs_world_shutdown(&world);
+    return (colors_ok && non_script_ok) ? 0 : 1;
+}
+
+static int test_repeat_apply_deterministic(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+    const char *seed =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"point\", point = {0, 0, 0}, color = {0.1, 0.1, 0.1, 1} },\n"
+        "    { id = \"geometry_2\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0}, color = {0.2, 0.2, 0.2, 1} }\n"
+        "  },\n"
+        "  constraints = {\n"
+        "    { id = \"constraint_1\", type = \"Length\", participants = { { id = \"geometry_2\", role = \"entity\", sub_index = 0 } }, value = 1, driven = false }\n"
+        "  }\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, seed, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    char canonical[8192] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, canonical, sizeof(canonical), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    for (int i = 0; i < 5; i++) {
+        if (!scene_script_apply_commit(&scene, sketch, canonical, &err)) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        char emitted[8192] = {0};
+        if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        if (strcmp(canonical, emitted) != 0) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 
 typedef int (*script_test_fn_t)(void);
 
@@ -1554,7 +1783,12 @@ int main(void) {
         { "test_script_emit_orders_by_type_and_script_id", test_script_emit_orders_by_type_and_script_id },
         { "test_script_emit_formats_numbers_without_scientific_notation", test_script_emit_formats_numbers_without_scientific_notation },
         { "test_script_emit_noop_stability", test_script_emit_noop_stability },
-        { "test_script_reemit_revision_changes_on_mutation", test_script_reemit_revision_changes_on_mutation }
+        { "test_script_reemit_revision_changes_on_mutation", test_script_reemit_revision_changes_on_mutation },
+        { "test_registry_parity_deterministic_contract_error", test_registry_parity_deterministic_contract_error },
+        { "test_descriptor_roundtrip_preserves_role_and_sub_index", test_descriptor_roundtrip_preserves_role_and_sub_index },
+        { "test_deterministic_contract_error_atomic_reject", test_deterministic_contract_error_atomic_reject },
+        { "test_color_roundtrip_and_non_script_color_untouched", test_color_roundtrip_and_non_script_color_untouched },
+        { "test_repeat_apply_deterministic", test_repeat_apply_deterministic }
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

@@ -36,7 +36,14 @@ typedef struct {
     float start_angle;
     float end_angle;
     vec3_t normal;
+    vec4_t color;
 } sketch_script_entity_model_t;
+
+typedef struct {
+    char id[SCRIPT_LOCAL_ID_MAX];
+    constraint_participant_role_t role;
+    uint8_t sub_index;
+} sketch_script_participant_model_t;
 
 typedef struct {
     char id[SCRIPT_LOCAL_ID_MAX];
@@ -45,7 +52,7 @@ typedef struct {
     float value;
     bool driven;
     uint32_t participant_count;
-    char participants[CONSTRAINT_MAX_PARTICIPANTS][SCRIPT_LOCAL_ID_MAX];
+    sketch_script_participant_model_t participants[CONSTRAINT_MAX_PARTICIPANTS];
 } sketch_script_constraint_model_t;
 
 typedef struct {
@@ -107,7 +114,9 @@ static inline bool sketch_script_parse_id_field(const char *block,
     if (!block || !out_id || out_id_size == 0) return false;
     const char *id_key = strstr(block, "id");
     if (!id_key) return false;
-    const char *q1 = strchr(id_key, '"');
+    const char *eq = strchr(id_key, '=');
+    if (!eq) return false;
+    const char *q1 = strchr(eq, '"');
     if (!q1) return false;
     const char *q2 = strchr(q1 + 1, '"');
     if (!q2) return false;
@@ -118,20 +127,63 @@ static inline bool sketch_script_parse_id_field(const char *block,
     return true;
 }
 
-static inline bool sketch_script_parse_type_field(const char *block,
-                                                  char *out_type,
-                                                  size_t out_type_size) {
-    if (!block || !out_type || out_type_size == 0) return false;
-    const char *type_key = strstr(block, "type");
-    if (!type_key) return false;
-    const char *q1 = strchr(type_key, '"');
+static inline bool sketch_script_parse_string_named(const char *block,
+                                                    const char *key,
+                                                    char *out_text,
+                                                    size_t out_text_size) {
+    if (!block || !key || !out_text || out_text_size == 0) return false;
+    const char *p = strstr(block, key);
+    if (!p) return false;
+    const char *eq = strchr(p, '=');
+    if (!eq) return false;
+    const char *q1 = strchr(eq, '"');
     if (!q1) return false;
     const char *q2 = strchr(q1 + 1, '"');
     if (!q2) return false;
     size_t len = (size_t)(q2 - (q1 + 1));
-    if (len == 0 || len >= out_type_size) return false;
-    memcpy(out_type, q1 + 1, len);
-    out_type[len] = '\0';
+    if (len == 0 || len >= out_text_size) return false;
+    memcpy(out_text, q1 + 1, len);
+    out_text[len] = '\0';
+    return true;
+}
+
+static inline bool sketch_script_parse_type_field(const char *block,
+                                                  char *out_type,
+                                                  size_t out_type_size) {
+    return sketch_script_parse_string_named(block, "type", out_type, out_type_size);
+}
+
+static inline bool sketch_script_parse_uint8_named(const char *block,
+                                                   const char *key,
+                                                   uint8_t *out_value) {
+    if (!block || !key || !out_value) return false;
+    const char *p = strstr(block, key);
+    if (!p) return false;
+    p = strchr(p, '=');
+    if (!p) return false;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    char *end = NULL;
+    unsigned long v = strtoul(p, &end, 10);
+    if (end == p || v > 255UL) return false;
+    *out_value = (uint8_t)v;
+    return true;
+}
+
+static inline bool sketch_script_parse_vec4_named(const char *block,
+                                                  const char *key,
+                                                  vec4_t *out) {
+    if (!block || !key || !out) return false;
+    const char *p = strstr(block, key);
+    if (!p) return false;
+    const char *brace = strchr(p, '{');
+    if (!brace) return false;
+    float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
+    if (sscanf(brace, "{%f , %f , %f , %f}", &r, &g, &b, &a) != 4 &&
+        sscanf(brace, "{%f,%f,%f,%f}", &r, &g, &b, &a) != 4) {
+        return false;
+    }
+    *out = vec4_make(r, g, b, a);
     return true;
 }
 
@@ -191,39 +243,101 @@ static inline bool sketch_script_parse_bool_named(const char *block,
 }
 
 static inline constraint_type_t sketch_script_constraint_type_from_name(const char *name) {
-    if (!name) return CONSTRAINT_TYPE_COUNT;
-    for (int i = 0; i < CONSTRAINT_TYPE_COUNT; i++) {
-        if (strcmp(name, constraint_type_display_name((constraint_type_t)i)) == 0) {
-            return (constraint_type_t)i;
-        }
+    constraint_type_t type = CONSTRAINT_TYPE_COUNT;
+    if (!sketch_script_capability_constraint_type_from_name(name, &type)) {
+        return CONSTRAINT_TYPE_COUNT;
     }
-    return CONSTRAINT_TYPE_COUNT;
+    return type;
 }
 
+static inline bool sketch_script_parse_delimiter_segment_ok(const char *start, const char *end);
+
 static inline bool sketch_script_parse_participants(const char *block,
-                                                    sketch_script_constraint_model_t *out_constraint) {
-    if (!block || !out_constraint) return false;
+                                                    sketch_script_constraint_model_t *out_constraint,
+                                                    sketch_script_error_t *out_error) {
+    if (!block || !out_constraint) {
+        sketch_script_parse_error(out_error, "Constraint participants are missing.");
+        return false;
+    }
     const char *p = strstr(block, "participants");
-    if (!p) return false;
+    if (!p) {
+        sketch_script_parse_error(out_error, "Constraint requires participants block.");
+        return false;
+    }
     const char *start = strchr(p, '{');
-    if (!start) return false;
-    const char *end = strchr(start, '}');
-    if (!end) return false;
+    if (!start) {
+        sketch_script_parse_error(out_error, "Constraint participants block missing '{'.");
+        return false;
+    }
+    const char *end = NULL;
+    if (!sketch_script_find_matching_brace(start, &end)) {
+        sketch_script_parse_error(out_error, "Constraint participants block missing matching '}'.");
+        return false;
+    }
 
     out_constraint->participant_count = 0;
-    const char *cur = start;
+    const char *cur = start + 1;
+    const char *cursor = cur;
     while (cur < end) {
-        const char *q1 = strchr(cur, '"');
-        if (!q1 || q1 >= end) break;
-        const char *q2 = strchr(q1 + 1, '"');
-        if (!q2 || q2 > end) return false;
-        if (out_constraint->participant_count >= CONSTRAINT_MAX_PARTICIPANTS) return false;
-        size_t len = (size_t)(q2 - (q1 + 1));
-        if (len == 0 || len >= SCRIPT_LOCAL_ID_MAX) return false;
-        char *dst = out_constraint->participants[out_constraint->participant_count++];
-        memcpy(dst, q1 + 1, len);
-        dst[len] = '\0';
-        cur = q2 + 1;
+        while (cur < end && *cur != '{' && *cur != '"') cur++;
+        if (cur >= end) break;
+        if (!sketch_script_parse_delimiter_segment_ok(cursor, cur)) {
+            sketch_script_parse_error(out_error, "Unexpected token in participants block.");
+            return false;
+        }
+        if (*cur == '"') {
+            sketch_script_parse_error(
+                out_error,
+                "Constraint participants must be descriptor objects: { id = \"...\", role = \"...\", sub_index = N }.");
+            return false;
+        }
+        const char *entry_end = NULL;
+        if (!sketch_script_find_matching_brace(cur, &entry_end) || entry_end > end) {
+            sketch_script_parse_error(out_error, "Participant descriptor missing matching '}'.");
+            return false;
+        }
+        if (out_constraint->participant_count >= CONSTRAINT_MAX_PARTICIPANTS) {
+            sketch_script_parse_error(out_error, "Too many participant descriptors.");
+            return false;
+        }
+
+        size_t entry_len = (size_t)(entry_end - cur + 1);
+        char entry[512] = {0};
+        if (entry_len >= sizeof(entry)) {
+            sketch_script_parse_error(out_error, "Participant descriptor too large.");
+            return false;
+        }
+        memcpy(entry, cur, entry_len);
+        entry[entry_len] = '\0';
+
+        sketch_script_participant_model_t *dst =
+            &out_constraint->participants[out_constraint->participant_count];
+        memset(dst, 0, sizeof(*dst));
+        if (!sketch_script_parse_id_field(entry, dst->id, sizeof(dst->id))) {
+            sketch_script_parse_error(out_error, "Participant descriptor requires non-empty id.");
+            return false;
+        }
+        char role_text[32] = {0};
+        if (!sketch_script_parse_string_named(entry, "role", role_text, sizeof(role_text))) {
+            sketch_script_parse_error(out_error, "Participant descriptor requires role.");
+            return false;
+        }
+        if (!sketch_script_capability_parse_role(role_text, &dst->role)) {
+            sketch_script_parse_error(out_error, "Participant descriptor role is not supported.");
+            return false;
+        }
+        if (!sketch_script_parse_uint8_named(entry, "sub_index", &dst->sub_index)) {
+            sketch_script_parse_error(out_error, "Participant descriptor requires numeric sub_index.");
+            return false;
+        }
+
+        out_constraint->participant_count++;
+        cur = entry_end + 1;
+        cursor = cur;
+    }
+    if (!sketch_script_parse_delimiter_segment_ok(cursor, end)) {
+        sketch_script_parse_error(out_error, "Unexpected token in participants block.");
+        return false;
     }
     return out_constraint->participant_count > 0;
 }
@@ -433,6 +547,13 @@ static inline bool sketch_script_parse_entities_block(const char *script_text,
                 }
             }
         }
+        dst->color = vec4_make(1.0f, 1.0f, 1.0f, 1.0f);
+        if (strstr(entry, "color")) {
+            if (!sketch_script_parse_vec4_named(entry, "color", &dst->color)) {
+                sketch_script_parse_error(out_error, "entity color must be color = {r,g,b,a}.");
+                return false;
+            }
+        }
 
         out_model->entity_count++;
         p = entry_end + 1;
@@ -494,9 +615,11 @@ static inline bool sketch_script_parse_constraints_block(const char *script_text
 
         char type[64];
         if (!sketch_script_parse_id_field(entry, dst->id, sizeof(dst->id)) ||
-            !sketch_script_parse_type_field(entry, type, sizeof(type)) ||
-            !sketch_script_parse_participants(entry, dst)) {
-            sketch_script_parse_error(out_error, "constraint requires id, type, and participants.");
+            !sketch_script_parse_type_field(entry, type, sizeof(type))) {
+            sketch_script_parse_error(out_error, "constraint requires id and type.");
+            return false;
+        }
+        if (!sketch_script_parse_participants(entry, dst, out_error)) {
             return false;
         }
 

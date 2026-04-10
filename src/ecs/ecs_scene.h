@@ -2568,23 +2568,8 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
         if (!g) return 0;
         if (ecs_world_get_parent(scene->world, p) != sketch) return 0;
         if (role == CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED) role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
-        if (g->type == GEOM_LINE || g->type == GEOM_ARC) {
-            if (g->type == GEOM_LINE) {
-                if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
-                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
-                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
-                    return 0;
-                }
-            } else {
-                if (role != CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
-                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
-                    role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B &&
-                    role != CONSTRAINT_PARTICIPANT_ROLE_CENTER) {
-                    return 0;
-                }
-            }
-        } else {
-            role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+        if (!sketch_script_capability_role_allowed_for_geometry(g->type, role)) {
+            return 0;
         }
         participant_ids[i] = (uint64_t)p;
         signature.entities[i] = (uint64_t)p;
@@ -2642,8 +2627,11 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
         signature.count = participant_count;
     }
 
-    if (participant_count < constraint_type_min_participants(type)) return 0;
-    if (!constraint_type_is_selection_legal(&signature, type)) return 0;
+    char capability_error[192] = {0};
+    if (!sketch_script_capability_validate_signature(&signature, type,
+                                                     capability_error, sizeof(capability_error))) {
+        return 0;
+    }
 
     ecs_entity_t constraint_e = scene_add_anchor(scene, "", "");
     if (constraint_e == 0) return 0;

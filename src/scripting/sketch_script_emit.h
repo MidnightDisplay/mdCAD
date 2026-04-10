@@ -6,6 +6,7 @@
 
 #include "../ecs/ecs_scene.h"
 #include "../components/script_identity_comp.h"
+#include "sketch_script_capability_registry.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,6 +28,18 @@ static inline int sketch_script_emit_compare_id(const char *a, const char *b) {
     if (!a) return -1;
     if (!b) return 1;
     return strcmp(a, b);
+}
+
+static inline int sketch_script_emit_compare_descriptor(const constraint_participant_descriptor_t *a,
+                                                        const constraint_participant_descriptor_t *b) {
+    if (!a || !b) return 0;
+    if (a->entity < b->entity) return -1;
+    if (a->entity > b->entity) return 1;
+    if (a->role < b->role) return -1;
+    if (a->role > b->role) return 1;
+    if (a->sub_index < b->sub_index) return -1;
+    if (a->sub_index > b->sub_index) return 1;
+    return 0;
 }
 
 static inline void sketch_script_emit_format_number(double value,
@@ -95,7 +108,6 @@ static inline bool sketch_script_emit_collect(ecs_scene_t *scene,
     }
     *geom_count = 0;
     *constraint_count = 0;
-    scene_normalize_sketch_script_local_ids(scene, sketch);
 
     ecs_iter_t it = ecs_children(scene->world->world, sketch);
     while (ecs_children_next(&it)) {
@@ -259,9 +271,14 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
             sketch_script_emit_format_number(g->data.point.point.x, a, sizeof(a));
             sketch_script_emit_format_number(g->data.point.point.y, b, sizeof(b));
             sketch_script_emit_format_number(g->data.point.point.z, c, sizeof(c));
+            char cr[32], cg[32], cb[32], ca[32];
+            sketch_script_emit_format_number(g->color.x, cr, sizeof(cr));
+            sketch_script_emit_format_number(g->color.y, cg, sizeof(cg));
+            sketch_script_emit_format_number(g->color.z, cb, sizeof(cb));
+            sketch_script_emit_format_number(g->color.w, ca, sizeof(ca));
             sketch_script_emit_appendf(out_script, out_script_size, &off,
-                "    { id = \"%s\", type = \"point\", point = {%s, %s, %s} }%s\n",
-                geoms[i].id, a, b, c, (i + 1 < geom_count) ? "," : "");
+                "    { id = \"%s\", type = \"point\", point = {%s, %s, %s}, color = {%s, %s, %s, %s} }%s\n",
+                geoms[i].id, a, b, c, cr, cg, cb, ca, (i + 1 < geom_count) ? "," : "");
         } else if (g->type == GEOM_LINE) {
             sketch_script_emit_format_number(g->data.line.a.x, a, sizeof(a));
             sketch_script_emit_format_number(g->data.line.a.y, b, sizeof(b));
@@ -270,26 +287,36 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
             char e[32], f[32];
             sketch_script_emit_format_number(g->data.line.b.y, e, sizeof(e));
             sketch_script_emit_format_number(g->data.line.b.z, f, sizeof(f));
+            char cr[32], cg[32], cb[32], ca[32];
+            sketch_script_emit_format_number(g->color.x, cr, sizeof(cr));
+            sketch_script_emit_format_number(g->color.y, cg, sizeof(cg));
+            sketch_script_emit_format_number(g->color.z, cb, sizeof(cb));
+            sketch_script_emit_format_number(g->color.w, ca, sizeof(ca));
             sketch_script_emit_appendf(out_script, out_script_size, &off,
-                "    { id = \"%s\", type = \"line\", a = {%s, %s, %s}, b = {%s, %s, %s} }%s\n",
-                geoms[i].id, a, b, c, d, e, f, (i + 1 < geom_count) ? "," : "");
+                "    { id = \"%s\", type = \"line\", a = {%s, %s, %s}, b = {%s, %s, %s}, color = {%s, %s, %s, %s} }%s\n",
+                geoms[i].id, a, b, c, d, e, f, cr, cg, cb, ca, (i + 1 < geom_count) ? "," : "");
         } else if (g->type == GEOM_ARC) {
             const bool is_circle = fabsf(g->data.arc.end_angle - g->data.arc.start_angle) >= 6.2830f;
             sketch_script_emit_format_number(g->data.arc.center.x, a, sizeof(a));
             sketch_script_emit_format_number(g->data.arc.center.y, b, sizeof(b));
             sketch_script_emit_format_number(g->data.arc.center.z, c, sizeof(c));
             sketch_script_emit_format_number(g->data.arc.radius, d, sizeof(d));
+            char cr[32], cg[32], cb[32], ca[32];
+            sketch_script_emit_format_number(g->color.x, cr, sizeof(cr));
+            sketch_script_emit_format_number(g->color.y, cg, sizeof(cg));
+            sketch_script_emit_format_number(g->color.z, cb, sizeof(cb));
+            sketch_script_emit_format_number(g->color.w, ca, sizeof(ca));
             if (is_circle) {
                 sketch_script_emit_appendf(out_script, out_script_size, &off,
-                    "    { id = \"%s\", type = \"circle\", center = {%s, %s, %s}, radius = %s, normal = {0, 0, 1} }%s\n",
-                    geoms[i].id, a, b, c, d, (i + 1 < geom_count) ? "," : "");
+                    "    { id = \"%s\", type = \"circle\", center = {%s, %s, %s}, radius = %s, normal = {0, 0, 1}, color = {%s, %s, %s, %s} }%s\n",
+                    geoms[i].id, a, b, c, d, cr, cg, cb, ca, (i + 1 < geom_count) ? "," : "");
             } else {
                 char sa[32], ea[32];
                 sketch_script_emit_format_number(g->data.arc.start_angle, sa, sizeof(sa));
                 sketch_script_emit_format_number(g->data.arc.end_angle, ea, sizeof(ea));
                 sketch_script_emit_appendf(out_script, out_script_size, &off,
-                    "    { id = \"%s\", type = \"arc\", center = {%s, %s, %s}, radius = %s, start_angle = %s, end_angle = %s, normal = {0, 0, 1} }%s\n",
-                    geoms[i].id, a, b, c, d, sa, ea, (i + 1 < geom_count) ? "," : "");
+                    "    { id = \"%s\", type = \"arc\", center = {%s, %s, %s}, radius = %s, start_angle = %s, end_angle = %s, normal = {0, 0, 1}, color = {%s, %s, %s, %s} }%s\n",
+                    geoms[i].id, a, b, c, d, sa, ea, cr, cg, cb, ca, (i + 1 < geom_count) ? "," : "");
             }
         }
     }
@@ -300,12 +327,32 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
         sketch_script_emit_appendf(out_script, out_script_size, &off,
             "    { id = \"%s\", type = \"%s\", participants = {",
             constraints[i].id, constraint_type_display_name(c->type));
-        for (uint32_t p = 0; p < c->participant_count; p++) {
-            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, (ecs_entity_t)c->participants[p]);
+        constraint_participant_descriptor_t sorted[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+        uint32_t emit_count = c->participant_count;
+        for (uint32_t p = 0; p < emit_count; p++) {
+            sorted[p] = c->participant_descriptors[p];
+            if (sorted[p].entity == 0) {
+                sorted[p] = constraint_participant_descriptor_make(
+                    c->participants[p], CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0);
+            }
+        }
+        for (uint32_t p = 1; p < emit_count; p++) {
+            uint32_t j = p;
+            while (j > 0 && sketch_script_emit_compare_descriptor(&sorted[j - 1], &sorted[j]) > 0) {
+                constraint_participant_descriptor_t tmp = sorted[j - 1];
+                sorted[j - 1] = sorted[j];
+                sorted[j] = tmp;
+                j--;
+            }
+        }
+        for (uint32_t p = 0; p < emit_count; p++) {
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, (ecs_entity_t)sorted[p].entity);
             sketch_script_emit_appendf(out_script, out_script_size, &off,
-                "\"%s\"%s",
+                "{ id = \"%s\", role = \"%s\", sub_index = %u }%s",
                 (sid && sid->script_local_id[0]) ? sid->script_local_id : "",
-                (p + 1 < c->participant_count) ? ", " : "");
+                sketch_script_capability_role_name((constraint_participant_role_t)sorted[p].role),
+                (unsigned int)sorted[p].sub_index,
+                (p + 1 < emit_count) ? ", " : "");
         }
         if (constraint_type_is_dimensional(c->type)) {
             char value_text[32];
