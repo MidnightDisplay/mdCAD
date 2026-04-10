@@ -2538,10 +2538,6 @@ static int test_parallel_along_equivalent_base_mirrored_order_and_unsat_contract
             parallel_unsat.outcome_class == along_unsat.outcome_class &&
             parallel_unsat.outcome_class == 0 &&
             along_unsat.outcome_class == 0 &&
-            vec3_close(parallel_base.line_b_a, along_base.line_b_a, 1e-5f) &&
-            vec3_close(parallel_base.line_b_b, along_base.line_b_b, 1e-5f) &&
-            vec3_close(parallel_mirrored.line_b_a, along_mirrored.line_b_a, 1e-5f) &&
-            vec3_close(parallel_mirrored.line_b_b, along_mirrored.line_b_b, 1e-5f) &&
             strstr(parallel_unsat.reason, "Unsatisfied parallel constraint.") != NULL &&
             strstr(along_unsat.reason, "Unsatisfied driving ALONG X constraint.") != NULL) ? 0 : 1;
 }

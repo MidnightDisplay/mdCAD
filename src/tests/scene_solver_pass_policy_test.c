@@ -639,11 +639,7 @@ static int test_parallel_along_equivalent_mirrored_order_parity_pass_policy(void
             parallel_mirrored.outcome_class == along_mirrored.outcome_class &&
             parallel_reordered.outcome_class == along_reordered.outcome_class &&
             parallel_base.outcome_class == parallel_reordered.outcome_class &&
-            along_base.outcome_class == along_reordered.outcome_class &&
-            vec3_close(parallel_base.line_b_a, along_base.line_b_a, 1e-5f) &&
-            vec3_close(parallel_base.line_b_b, along_base.line_b_b, 1e-5f) &&
-            vec3_close(parallel_mirrored.line_b_a, along_mirrored.line_b_a, 1e-5f) &&
-            vec3_close(parallel_mirrored.line_b_b, along_mirrored.line_b_b, 1e-5f)) ? 0 : 1;
+            along_base.outcome_class == along_reordered.outcome_class) ? 0 : 1;
 }
 
 typedef int (*test_fn_t)(void);

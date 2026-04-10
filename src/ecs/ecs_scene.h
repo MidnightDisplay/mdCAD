@@ -3759,6 +3759,11 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                             : "Unsatisfied perpendicular constraint.";
                     ecs_entity_t line_a_entity = (ecs_entity_t)constraint->participant_descriptors[0].entity;
                     ecs_entity_t line_b_entity = (ecs_entity_t)constraint->participant_descriptors[1].entity;
+                    if (line_b_entity < line_a_entity) {
+                        ecs_entity_t tmp = line_a_entity;
+                        line_a_entity = line_b_entity;
+                        line_b_entity = tmp;
+                    }
                     int ia0 = scene_solver_ensure_point_candidate(scene, candidates,
                                                                   ECS_SCENE_SOLVER_MAX_IMPLICATED_PARTICIPANTS,
                                                                   &candidate_count, line_a_entity,
