@@ -30,7 +30,11 @@
   1. User can re-apply a valid script and constraint participants keep role/sub-index intent instead of degrading into unsupported-participant failures.
   2. User can re-apply a script and entity color metadata is preserved rather than resetting to default white.
   3. User can re-apply the same script repeatedly and get stable deterministic geometry and constraint outcomes each run.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — Establish shared script+solver capability registry and deterministic contract failure taxonomy.
+- [ ] 31-02-PLAN.md — Implement descriptor/color fidelity pipeline with repeat-apply determinism parity gates.
 
 ### Phase 32: Explicit Coincidence Authoring Semantics
 **Goal**: Users get explicit, durable coincidence semantics when authoring composite ArcAxisLine and line-end/arc-end tangency relations.
