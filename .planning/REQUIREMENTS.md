@@ -9,13 +9,13 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 
 ### Solver Convergence Robustness
 
-- [ ] **SROB-01**: User can perform large-jump edits in quarter-arc closed-loop line/arc arrangements without requiring manual "wiggle to latch" behavior.
-- [ ] **SROB-02**: User can apply large length changes in coupled line/arc loops and either get a solved update for all dependent participants or a transactional rollback with no partial corruption.
-- [ ] **SROB-03**: User can continue editing immediately after an infeasible large-jump attempt without solver deadlock or stale failure lock.
+- [x] **SROB-01**: User can perform large-jump edits in quarter-arc closed-loop line/arc arrangements without requiring manual "wiggle to latch" behavior.
+- [x] **SROB-02**: User can apply large length changes in coupled line/arc loops and either get a solved update for all dependent participants or a transactional rollback with no partial corruption.
+- [x] **SROB-03**: User can continue editing immediately after an infeasible large-jump attempt without solver deadlock or stale failure lock.
 
 ### Deterministic Diagnostics and Solve Policy
 
-- [ ] **DIAG-01**: User gets deterministic solve outcomes and deterministic failure-class diagnostics for identical operation sequences.
+- [x] **DIAG-01**: User gets deterministic solve outcomes and deterministic failure-class diagnostics for identical operation sequences.
 - [ ] **DIAG-02**: User gets actionable diagnostics for large-jump and mixed-constraint failures without misleading participant-type errors.
 - [ ] **DIAG-03**: Developer can verify deterministic baseline + immediate rerun parity on the v1.5 targeted regression gate.
 
@@ -64,10 +64,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SROB-01 | Phase 33 | Pending |
-| SROB-02 | Phase 33 | Pending |
-| SROB-03 | Phase 33 | Pending |
-| DIAG-01 | Phase 33 | Pending |
+| SROB-01 | Phase 33 | Complete |
+| SROB-02 | Phase 33 | Complete |
+| SROB-03 | Phase 33 | Complete |
+| DIAG-01 | Phase 33 | Complete |
 | DIAG-02 | Phase 33 | Pending |
 | DIAG-03 | Phase 34 | Pending |
 | COIN-01 | Phase 32 | Complete |
