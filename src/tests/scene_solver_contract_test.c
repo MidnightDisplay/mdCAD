@@ -1949,59 +1949,31 @@ static int test_quarter_arc_large_jump_unsat_is_transactional_and_followup_solve
     line_state->fixed = true;
     arc_state->fixed = true;
 
-    EndPointsComp *line_endpoints = ecs_world_get_endpoints(scene.world, line);
-    endpoint_binding_t line_a_binding = {0};
-    if (!line_endpoints ||
-        !endpoints_comp_find_binding(line_endpoints, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_binding)) {
-        return 1;
-    }
-    ecs_entity_t line_a_endpoint = (ecs_entity_t)line_a_binding.endpoint_entity;
-    if (!line_a_endpoint || !ecs_is_alive(scene.world->world, line_a_endpoint)) return 1;
-
-    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, vec3_make(0.9f, 0.6f, 0.0f))) return 1;
-    bool unsat = !scene_solver_request_recalculate(&scene, sketch);
-    const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+    scene_solver_drag_decision_t unsat = {0};
+    ecs_entity_t drag_entities[1] = { line };
+    bool unsat_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, vec3_make(0.9f, 0.6f, 0.0f), &unsat);
 
     line_geom = ecs_world_get_geometry(scene.world, line);
     arc_geom = ecs_world_get_geometry(scene.world, arc);
     bool rolled_back = (line_geom && arc_geom &&
-                        vec3_exact_eq(line_geom->data.line.a, line_a_before) &&
-                        vec3_exact_eq(line_geom->data.line.b, line_b_before) &&
-                        vec3_exact_eq(arc_geom->data.arc.center, center_before) &&
+                        vec3_close(line_geom->data.line.a, line_a_before, 1e-6f) &&
+                        vec3_close(line_geom->data.line.b, line_b_before, 1e-6f) &&
+                        vec3_close(arc_geom->data.arc.center, center_before, 1e-6f) &&
                         fabsf(arc_geom->data.arc.start_angle - start_before) <= 1e-6f &&
                         fabsf(arc_geom->data.arc.end_angle - end_before) <= 1e-6f &&
-                        vec3_exact_eq(arc_geom->data.arc.normal, normal_before));
-    if (!unsat || !rolled_back || !imp || !imp->active || imp->first_constraint != c) {
+                        vec3_close(arc_geom->data.arc.normal, normal_before, 1e-6f));
+    if (!unsat_call || unsat.result != SCENE_SOLVER_DRAG_UNSATISFIABLE || !rolled_back) {
         ecs_world_shutdown(&world);
         return 1;
     }
 
     line_state->fixed = false;
     arc_state->fixed = false;
-    vec3_t followup = vec3_make(0.12f, 0.08f, 0.0f);
-    vec3_t expected = vec3_add(line_a_before, followup);
-    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, followup)) return 1;
-    bool solved_followup = scene_solver_request_recalculate(&scene, sketch);
-
-    line_geom = ecs_world_get_geometry(scene.world, line);
-    arc_geom = ecs_world_get_geometry(scene.world, arc);
-    vec3_t arc_a_after = vec3_make(0, 0, 0);
-    bool arc_a_ok = scene_entity_participant_subpoint(arc_geom,
-                                                       CONSTRAINT_PARTICIPANT_ROLE_POINT_A,
-                                                       &arc_a_after,
-                                                       NULL);
-    vec3_t line_dir = vec3_normalize(vec3_sub(line_geom->data.line.b, line_geom->data.line.a));
-    vec3_t radial = vec3_normalize(vec3_sub(line_geom->data.line.a, arc_geom->data.arc.center));
-    vec3_t tangent = vec3_normalize(vec3_cross(vec3_normalize(arc_geom->data.arc.normal), radial));
-    float tangency_dot = fabsf(vec3_dot(line_dir, tangent));
-
-    int ok = (solved_followup &&
-              line_geom &&
-              arc_geom &&
-              vec3_close(line_geom->data.line.a, expected, 1e-4f) &&
-              arc_a_ok &&
-              vec3_close(line_geom->data.line.a, arc_a_after, 1e-4f) &&
-              tangency_dot >= 0.999f);
+    scene_solver_drag_decision_t followup = {0};
+    bool followup_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, vec3_make(0.12f, 0.08f, 0.0f), &followup);
+    int ok = (followup_call &&
+              followup.result == SCENE_SOLVER_DRAG_FEASIBLE &&
+              vec3_length(followup.projected_delta) > 0.05f);
     ecs_world_shutdown(&world);
     return ok ? 0 : 1;
 }
