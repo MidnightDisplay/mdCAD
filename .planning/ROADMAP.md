@@ -17,7 +17,7 @@
 
 - [x] **Phase 31: Script Reapply Fidelity Foundation** - Preserve script remap semantics and metadata so replayed scenes stay valid and deterministic. (completed 2026-04-10)
 - [x] **Phase 32: Explicit Coincidence Authoring Semantics** - Make ArcAxisLine and endpoint tangency authoring explicit and stable via required coincidence intent. (completed 2026-04-10)
-- [ ] **Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity** - Stabilize mixed arc/line large edits and parity behavior across equivalent constraint setups.
+- [x] **Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity** - Stabilize mixed arc/line large edits and parity behavior across equivalent constraint setups. (completed 2026-04-10)
 - [ ] **Phase 34: Deterministic v1.5 Closure Gate** - Lock reproducible deterministic sign-off for targeted v1.5 regression coverage.
 
 ## Phase Details
@@ -64,7 +64,7 @@ Plans:
 
 Plans:
 - [x] 33-01-PLAN.md — Implement two-stage large-jump staging with transactional rollback/recovery and deterministic failure ordering.
-- [ ] 33-02-PLAN.md — Enforce PARALLEL/ALONG equivalence parity matrix and actionable deterministic diagnostics for mixed-constraint failures.
+- [x] 33-02-PLAN.md — Enforce PARALLEL/ALONG equivalence parity matrix and actionable deterministic diagnostics for mixed-constraint failures.
 
 ### Phase 34: Deterministic v1.5 Closure Gate
 **Goal**: Developers and users can trust v1.5 reliability claims through reproducible deterministic baseline and immediate rerun evidence.
@@ -82,6 +82,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
-| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 1/2 | In Progress|  |
+| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 2/2 | Complete   | 2026-04-10 |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 

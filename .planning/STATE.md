@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Solver Workflow Robustness + Script Reapply Integrity
-status: executing
-stopped_at: Completed 33-large-jump-robustness-and-parallel-along-parity-01-PLAN.md
-last_updated: "2026-04-10T18:23:50.617Z"
+status: verifying
+stopped_at: Completed 33-large-jump-robustness-and-parallel-along-parity-02-PLAN.md
+last_updated: "2026-04-10T18:37:02.895Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 
 Phase: 33 (large-jump-robustness-and-parallel-along-parity) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-10
 
 Progress: [█████░░░░░] 50%
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - [Roadmap v1.5]: Requirements mapped 100% across phases 31-34 with deterministic closure gate isolated in final phase.
 - [Phase 33]: Use staged large-jump drag projection with anchor-scoped diagnostic taxonomy remap for unsatisfied tangency failures.
 - [Phase 33]: Deterministic large-jump diagnostics evidence uses stable taxonomy class + sorted implication ordering across reruns.
+- [Phase 33-large-jump-robustness-and-parallel-along-parity]: Canonicalize PARALLEL pair participant ordering by entity ID in recalc to match ALONG equivalent-class determinism.
+- [Phase 33-large-jump-robustness-and-parallel-along-parity]: Assert PARALLEL↔ALONG parity by outcome class and mirrored/reordered invariants across static and drag workflows.
+- [Phase 33-large-jump-robustness-and-parallel-along-parity]: Lock parity diagnostics to family+reason classes and reject participant-type fallback wording for targeted failures.
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-10T18:23:50.613Z
-Stopped at: Completed 33-large-jump-robustness-and-parallel-along-parity-01-PLAN.md
+Last session: 2026-04-10T18:37:02.892Z
+Stopped at: Completed 33-large-jump-robustness-and-parallel-along-parity-02-PLAN.md
 Resume file: None

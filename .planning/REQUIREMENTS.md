@@ -16,7 +16,7 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 ### Deterministic Diagnostics and Solve Policy
 
 - [x] **DIAG-01**: User gets deterministic solve outcomes and deterministic failure-class diagnostics for identical operation sequences.
-- [ ] **DIAG-02**: User gets actionable diagnostics for large-jump and mixed-constraint failures without misleading participant-type errors.
+- [x] **DIAG-02**: User gets actionable diagnostics for large-jump and mixed-constraint failures without misleading participant-type errors.
 - [ ] **DIAG-03**: Developer can verify deterministic baseline + immediate rerun parity on the v1.5 targeted regression gate.
 
 ### Explicit Coincidence Authoring Semantics
@@ -26,8 +26,8 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 
 ### PARALLEL / ALONG Parity
 
-- [ ] **PARI-01**: User gets equivalent interaction behavior for geometrically equivalent setups authored with PARALLEL constraints versus ALONG-axis constraints.
-- [ ] **PARI-02**: User can drag equivalent vertices in mirrored/linked PARALLEL and ALONG arrangements with consistent feasibility outcomes.
+- [x] **PARI-01**: User gets equivalent interaction behavior for geometrically equivalent setups authored with PARALLEL constraints versus ALONG-axis constraints.
+- [x] **PARI-02**: User can drag equivalent vertices in mirrored/linked PARALLEL and ALONG arrangements with consistent feasibility outcomes.
 
 ### Script Re-apply Integrity
 
@@ -68,12 +68,12 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SROB-02 | Phase 33 | Complete |
 | SROB-03 | Phase 33 | Complete |
 | DIAG-01 | Phase 33 | Complete |
-| DIAG-02 | Phase 33 | Pending |
+| DIAG-02 | Phase 33 | Complete |
 | DIAG-03 | Phase 34 | Pending |
 | COIN-01 | Phase 32 | Complete |
 | COIN-02 | Phase 32 | Complete |
-| PARI-01 | Phase 33 | Pending |
-| PARI-02 | Phase 33 | Pending |
+| PARI-01 | Phase 33 | Complete |
+| PARI-02 | Phase 33 | Complete |
 | SCRI-01 | Phase 31 | Complete |
 | SCRI-02 | Phase 31 | Complete |
 | SCRI-03 | Phase 31 | Complete |
