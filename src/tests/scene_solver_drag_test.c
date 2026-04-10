@@ -468,6 +468,108 @@ static int test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_e
     return ok ? 0 : 1;
 }
 
+static bool setup_parallel_along_equivalent_drag_case(bool use_parallel,
+                                                      bool mirrored,
+                                                      bool reorder,
+                                                      ecs_world_state_t *world,
+                                                      ecs_scene_t *scene,
+                                                      ecs_entity_t *out_sketch,
+                                                      ecs_entity_t *out_line_a,
+                                                      ecs_entity_t *out_line_b) {
+    if (!world || !scene || !out_sketch || !out_line_a || !out_line_b) return false;
+    memset(world, 0, sizeof(*world));
+    memset(scene, 0, sizeof(*scene));
+    ecs_world_init(world);
+    ecs_scene_init(scene, world);
+
+    float mirror = mirrored ? -1.0f : 1.0f;
+    ecs_entity_t sketch = scene_add_sketch(scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(scene, sketch,
+                                                   vec3_make(mirror * 0.0f, 0.0f, 0.0f),
+                                                   vec3_make(mirror * 3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(scene, sketch,
+                                                   vec3_make(mirror * 0.0f, 1.0f, 0.0f),
+                                                   vec3_make(mirror * 2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) return false;
+
+    SketchGeometryStateComp *state_a = ecs_world_get_sketch_geometry_state(scene->world, line_a);
+    if (!state_a) return false;
+    state_a->fixed = true;
+
+    if (use_parallel) {
+        ecs_entity_t participants[2] = { line_a, line_b };
+        if (reorder) {
+            participants[0] = line_b;
+            participants[1] = line_a;
+        }
+        if (!scene_add_constraint_to_sketch(scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false)) {
+            return false;
+        }
+    } else {
+        constraint_participant_descriptor_t along_desc[2] = {
+            constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+            constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1),
+        };
+        if (reorder) {
+            constraint_participant_descriptor_t tmp = along_desc[0];
+            along_desc[0] = along_desc[1];
+            along_desc[1] = tmp;
+        }
+        if (!scene_add_constraint_to_sketch_with_descriptors(scene, sketch, CONSTRAINT_ALONG_X, along_desc, 2, 0.0f, false)) {
+            return false;
+        }
+    }
+
+    if (!scene_solver_request_recalculate(scene, sketch)) return false;
+    *out_sketch = sketch;
+    *out_line_a = line_a;
+    *out_line_b = line_b;
+    return true;
+}
+
+static int test_drag_parallel_along_mirrored_reordered_linked_vertex_parity(void) {
+    const vec3_t requested = {0.30f, 0.15f, 0.0f};
+    const bool use_parallel[6] = { true, false, true, false, true, false };
+    const bool mirrored[6] =    { false, false, true, true, false, false };
+    const bool reordered[6] =   { false, false, false, false, true, true };
+    int outcomes[6] = {0};
+    vec3_t projected[6] = {0};
+
+    for (int i = 0; i < 6; i++) {
+        ecs_world_state_t world = {0};
+        ecs_scene_t scene = {0};
+        ecs_entity_t sketch = 0, line_a = 0, line_b = 0;
+        if (!setup_parallel_along_equivalent_drag_case(use_parallel[i], mirrored[i], reordered[i],
+                                                       &world, &scene, &sketch, &line_a, &line_b)) {
+            return 1;
+        }
+
+        ecs_entity_t line_b_endpoint = 0;
+        if (!test_get_endpoint_entity(&scene, line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_b_endpoint)) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+
+        scene_solver_drag_decision_t decision = {0};
+        ecs_entity_t drag_entities[1] = { line_b_endpoint };
+        bool ok_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, requested, &decision);
+        outcomes[i] = (ok_call && decision.result == SCENE_SOLVER_DRAG_FEASIBLE) ? 1 : 0;
+        projected[i] = decision.projected_delta;
+        ecs_world_shutdown(&world);
+    }
+
+    return (outcomes[0] == outcomes[1] &&
+            outcomes[2] == outcomes[3] &&
+            outcomes[4] == outcomes[5] &&
+            outcomes[0] == outcomes[4] &&
+            outcomes[1] == outcomes[5] &&
+            vec3_close(projected[0], projected[1], 1e-5f) &&
+            vec3_close(projected[2], projected[3], 1e-5f) &&
+            vec3_close(projected[4], projected[5], 1e-5f)) ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -491,6 +593,8 @@ int main(void) {
           test_quarter_arc_large_jump_single_sequence_followup_is_responsive },
         { "test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints",
           test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints },
+        { "test_drag_parallel_along_mirrored_reordered_linked_vertex_parity",
+          test_drag_parallel_along_mirrored_reordered_linked_vertex_parity },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
