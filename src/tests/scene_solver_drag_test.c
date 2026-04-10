@@ -146,6 +146,27 @@ static int test_drag_feasible_large_delta_is_bounded_projection(void) {
             decision.projected_delta.z == 0.0f) ? 0 : 1;
 }
 
+static int test_drag_large_jump_constrained_tangency_uses_staged_projection(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    scene_solver_drag_decision_t decision = {0};
+    ecs_entity_t drag_entities[1] = { line };
+    vec3_t requested = vec3_make(1.2f, 0.0f, 0.0f);
+    bool ok_call = scene_solver_can_apply_drag(&scene, sketch, drag_entities, 1, requested, &decision);
+
+    int ok = (ok_call &&
+              decision.result == SCENE_SOLVER_DRAG_FEASIBLE &&
+              decision.projected_delta.x > 0.25f &&
+              decision.projected_delta.x <= requested.x &&
+              fabsf(decision.projected_delta.y) <= 1e-6f &&
+              fabsf(decision.projected_delta.z) <= 1e-6f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_drag_unsat_preserves_last_valid_geometry_state(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -378,6 +399,8 @@ int main(void) {
     static const test_case_t tests[] = {
         { "test_drag_fixed_geometry_is_unsat_with_zero_projection", test_drag_fixed_geometry_is_unsat_with_zero_projection },
         { "test_drag_feasible_large_delta_is_bounded_projection", test_drag_feasible_large_delta_is_bounded_projection },
+        { "test_drag_large_jump_constrained_tangency_uses_staged_projection",
+          test_drag_large_jump_constrained_tangency_uses_staged_projection },
         { "test_drag_unsat_preserves_last_valid_geometry_state", test_drag_unsat_preserves_last_valid_geometry_state },
         { "test_drag_rejected_diagnostic_payload_baseline", test_drag_rejected_diagnostic_payload_baseline },
         { "test_drag_tangency_shared_endpoint_drag_feasible_preserves_shared_authority",
