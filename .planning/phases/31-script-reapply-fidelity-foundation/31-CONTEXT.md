@@ -35,10 +35,16 @@ This phase is limited to script re-apply integrity (`SCRI-01`, `SCRI-02`, `SCRI-
 - **D-11:** Determinism parity checks must include emitted script stability and key solver diagnostics stability for identical inputs.
 - **D-12:** Weak "no crash/no error only" verification is not sufficient for this phase.
 
+### Shared capability registry (script + solver parity)
+- **D-13:** Script contract validation and solver legality checks must consume a shared capability registry as a single source of truth for supported entity types, constraint types, participant roles, and legal signatures.
+- **D-14:** Manual dual-maintenance of separate script/solver allowlists is not acceptable in this phase.
+- **D-15:** When script input references unsupported or out-of-contract combinations, errors must be explicit, deterministic, and derived from the shared registry contract.
+
 ### the agent's Discretion
 - Exact internal representation for descriptor persistence in script parse/apply/emit pipeline, as long as D-01..D-03 behavior is enforced.
 - Exact deterministic failure code/message structuring, provided family-level diagnostics remain explicit and stable.
-- Exact test fixture composition and helper wiring, provided D-10..D-12 parity guarantees are covered.
+- Exact registry factoring shape (header ownership/module boundaries), as long as D-13..D-15 single-source behavior is enforced.
+- Exact test fixture composition and helper wiring, provided D-10..D-15 parity guarantees are covered.
 
 </decisions>
 
@@ -62,9 +68,11 @@ This phase is limited to script re-apply integrity (`SCRI-01`, `SCRI-02`, `SCRI-
 
 ### Code anchors for implementation
 - `src/scripting/sketch_script_apply.h` — parse/validate/apply transaction flow, participant construction, rollback behavior, label restoration.
+- `src/scripting/sketch_script_contract.h` — script-side allowed entity/constraint declaration validation boundary.
 - `src/scripting/sketch_script_parse.h` — current script constraint participant schema and parse boundaries.
 - `src/scripting/sketch_script_emit.h` — deterministic emitter behavior and current participant/color emission contract.
 - `src/ecs/ecs_scene.h` — scene-level script apply/preview/reemit facade and undo transaction integration.
+- `src/constraints/constraint_types.h` — canonical runtime legality/signature rules and participant-role semantics.
 - `src/components/script_identity_comp.h` — script-local identity persistence boundary.
 - `src/tests/script_roundtrip_tests.c` — existing roundtrip regression surface to extend for SCRI coverage.
 - `src/tests/scene_solver_diagnostics_test.c` — diagnostic determinism assertions relevant to repeated re-apply parity.

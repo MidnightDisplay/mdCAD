@@ -5,7 +5,7 @@
 
 **Date:** 2026-04-10
 **Phase:** 31-script-reapply-fidelity-foundation
-**Areas discussed:** Participant descriptor contract (roles/sub-index), Color preservation semantics, Reapply/remap transaction behavior, Determinism verification contract
+**Areas discussed:** Participant descriptor contract (roles/sub-index), Color preservation semantics, Reapply/remap transaction behavior, Determinism verification contract, Shared capability registry (script + solver parity)
 
 ---
 
@@ -58,6 +58,19 @@
 
 **User's choice:** Yes - lock deterministic repeated-apply + rerun parity gate.
 **Notes:** User rejected weak non-parity validation for phase closure quality.
+
+---
+
+## Shared capability registry (script + solver parity)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Yes - shared registry as single source of truth | Script contract + solver legality checks use one shared definition of allowed entity/constraint/participant signatures | ✓ |
+| No - keep separate registries but sync manually | Script and solver maintain independent allowlists/contracts | |
+| Partial - shared constraint types only, entity/role signatures remain separate | Unify only type names while leaving legality/signature rules split | |
+
+**User's choice:** Yes - shared registry as single source of truth.
+**Notes:** User reported valid participants sometimes failing due to script/solver contract drift since recent solver development passes.
 
 ---
 
