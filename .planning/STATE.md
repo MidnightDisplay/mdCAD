@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Solver Robustness + Sketch Gizmo Corrections
-status: v1.4 milestone complete
-stopped_at: Milestone archived
-last_updated: "2026-04-09T16:30:00.000Z"
-last_activity: 2026-04-09 -- v1.4 milestone archived
+milestone: v1.5
+milestone_name: Solver Workflow Robustness + Script Reapply Integrity
+status: defining requirements
+stopped_at: Milestone started
+last_updated: "2026-04-09T17:10:00.000Z"
+last_activity: 2026-04-09 -- v1.5 milestone started
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Preparing next milestone definition (`/gsd-new-milestone`)
+**Current focus:** Defining milestone requirements (`/gsd-new-milestone`)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 30 (Deterministic Closure Gate + Solver Docs) — COMPLETE
-Plan: 2 of 2
-Status: v1.4 milestone archived and tagged-ready
-Last activity: 2026-04-09 -- v1.4 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-09 -- Milestone v1.5 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
@@ -41,7 +41,7 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Next command: `/gsd-new-milestone`
+Next command: `/gsd-plan-phase 31`
 
 ## Accumulated Context
 
@@ -71,10 +71,11 @@ Recent decisions affecting current work:
 - [Phase 30]: Required Windows Vulkan closure sequence to run build plus baseline and immediate rerun using identical command.
 - [Phase 30]: Kept closure sign-off scope Windows Vulkan only and deferred cross-platform expansion.
 - [Milestone v1.4]: Archival completed with roadmap/requirements snapshots and milestone index entry.
+- [Milestone v1.5]: Scope includes solver large-jump robustness hardening plus script re-apply integrity regression fixes.
 
 ### Pending Todos
 
-- Start next milestone discovery and requirements workflow.
+- Define v1.5 requirements and phase roadmap.
 
 ### Blockers/Concerns
 
@@ -83,5 +84,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-04-09T14:21:53.316Z
-Stopped at: Milestone archived
-Resume file: None
+Stopped at: Milestone started
+Resume file: docs/improvements/solver-user-workflow-robustness.md

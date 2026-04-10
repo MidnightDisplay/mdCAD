@@ -12,7 +12,9 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Shipped:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections (2026-04-09)
 
-**Current focus:** Preparing `v1.5` milestone definition (`/gsd-new-milestone`).
+**Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
+
+**Current focus:** Defining v1.5 requirements and roadmap.
 
 ## Requirements
 
@@ -46,7 +48,10 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- None — next milestone requirements are pending definition via `/gsd-new-milestone`.
+- [ ] Improve solver convergence reliability for large-jump edits in mixed arc/line closed-loop sketches.
+- [ ] Make ArcAxisLine and line-end/arc-end tangency authoring explicit with required coincidence constraints and stable solve behavior.
+- [ ] Close behavior parity gaps where `PARALLEL`-based arrangements should match equivalent `ALONG`-based workflows.
+- [ ] Fix script re-apply integrity so constraint remap remains valid and entity colors are preserved.
 
 ### Out of Scope
 
@@ -74,12 +79,13 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - v1.4 delivered line-line `PARALLEL`/`PERPENDICULAR` coverage, principal-axis ALONG reliability, tangency drag robustness, and active-sketch line gizmo endpoint-authority behavior.
 - v1.4 closure is deterministic on Windows Vulkan with build + canonical seven-test baseline + immediate rerun pass evidence captured in phase verification artifacts.
 - Solver architecture documentation is now published with practical code anchors, literature references, and a targeted debugging primer.
+- Milestone `v1.5` is initialized to continue solver robustness hardening from real user workflows, including script re-apply fidelity regressions.
 ## Next Milestone Goals
 
-1. Define the next solver/constraint milestone scope from fresh user priorities and archived observations.
-2. Decide which deferred capability items (`CAP-01..03`) are promoted into active requirements for v1.5.
-3. Decide whether to promote platform-expansion validation (`PLAT-01`, `PLAT-02`) into near-term scope.
-4. Preserve deterministic Windows Vulkan closure policy as baseline for any new solver work.
+1. Stabilize solver outcomes for large-jump edits in quarter-arc loop and multi-constraint tangency workflows.
+2. Promote explicit coincidence authoring semantics around ArcAxisLine and tangency relations to remove implicit-flaky behavior.
+3. Improve parity and responsiveness in larger linked sketches where `PARALLEL` should behave like equivalent axis-aligned setups.
+4. Fix script re-apply so geometry/constraint intent and visual metadata survive roundtrip reload.
 
 ## Constraints
 
@@ -105,6 +111,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
 | Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Completed in v1.4 |
 | Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Completed in v1.4 |
+| Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Active for v1.5 |
 
 ## Evolution
 
@@ -124,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after v1.4 milestone completion*
+*Last updated: 2026-04-09 after v1.5 milestone initialization*
