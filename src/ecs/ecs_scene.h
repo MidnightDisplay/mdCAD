@@ -4755,13 +4755,22 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
     sk->solver_backend_id = scene_solver_backend_id(scene);
 
     if (solve_failed) {
+        const char *final_failure_reason = failure_reason;
+        if (sk->solver_drag_anchor_valid &&
+            sk->solver_drag_anchor_sub_index == 1) {
+            if (strcmp(failure_reason, "Unsatisfied line-arc endpoint tangency constraint.") == 0) {
+                final_failure_reason = "Large-jump unsatisfied line-arc endpoint tangency constraint.";
+            } else if (strcmp(failure_reason, "Unsatisfied coincident constraint.") == 0) {
+                final_failure_reason = "Large-jump unsatisfied coincident constraint.";
+            }
+        }
         scene_solver_sort_entities_unique(implicated_constraints, &implicated_constraint_count);
         scene_solver_set_failure_implication(scene, sketch,
                                              implicated_constraints,
                                              implicated_constraint_count,
-                                             failure_reason);
+                                             final_failure_reason);
         scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
-                                    "solve", failure_reason,
+                                    "solve", final_failure_reason,
                                     implicated_constraint_count > 0 ? implicated_constraints[0] : 0);
         sk->solve_completed_serial = sk->solve_request_serial;
         scene_solver_apply_status(scene, sketch, SKETCH_STATUS_ERROR);
