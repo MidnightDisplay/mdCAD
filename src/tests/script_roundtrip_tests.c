@@ -1516,6 +1516,71 @@ static int test_script_reemit_revision_changes_on_mutation(void) {
     return rev1 > rev0 ? 0 : 1;
 }
 
+static int test_script_emit_includes_incremental_manual_additions_after_script_activation(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) return 1;
+
+    const char *seed_script =
+        "return {\n"
+        "  entities = {\n"
+        "    { id = \"geometry_1\", type = \"line\", a = {0, 0, 0}, b = {1, 0, 0} }\n"
+        "  },\n"
+        "  constraints = {}\n"
+        "}";
+    sketch_script_error_t err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, seed_script, &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0, 1, 0),
+                                                    vec3_make(1, 1, 0),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    if (line_b == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ScriptIdentityComp *line_b_sid = ecs_world_get_script_identity(scene.world, line_b);
+    if (!line_b_sid || line_b_sid->script_local_id[0] == '\0') {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    constraint_participant_descriptor_t participants[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0)
+    };
+    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+        &scene, sketch, CONSTRAINT_FIXED, participants, 1, 0.0f, false);
+    if (c == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ScriptIdentityComp *c_sid = ecs_world_get_script_identity(scene.world, c);
+    if (!c_sid || c_sid->script_local_id[0] == '\0') {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char emitted[8192] = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    bool has_seed = strstr(emitted, "id = \"geometry_1\"") != NULL;
+    bool has_new_geom = strstr(emitted, line_b_sid->script_local_id) != NULL;
+    bool has_new_constraint = strstr(emitted, c_sid->script_local_id) != NULL;
+    ecs_world_shutdown(&world);
+    return (has_seed && has_new_geom && has_new_constraint) ? 0 : 1;
+}
+
 static int test_registry_parity_deterministic_contract_error(void) {
     sketch_script_entity_decl_t bad_entity = {
         .type = "mesh",
@@ -1784,6 +1849,8 @@ int main(void) {
         { "test_script_emit_formats_numbers_without_scientific_notation", test_script_emit_formats_numbers_without_scientific_notation },
         { "test_script_emit_noop_stability", test_script_emit_noop_stability },
         { "test_script_reemit_revision_changes_on_mutation", test_script_reemit_revision_changes_on_mutation },
+        { "test_script_emit_includes_incremental_manual_additions_after_script_activation",
+          test_script_emit_includes_incremental_manual_additions_after_script_activation },
         { "test_registry_parity_deterministic_contract_error", test_registry_parity_deterministic_contract_error },
         { "test_descriptor_roundtrip_preserves_role_and_sub_index", test_descriptor_roundtrip_preserves_role_and_sub_index },
         { "test_deterministic_contract_error_atomic_reject", test_deterministic_contract_error_atomic_reject },

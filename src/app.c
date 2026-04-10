@@ -236,6 +236,18 @@ static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool ov
         state.script_editor_last_error = emit_err;
         return false;
     }
+    if (scene_is_sketch(&state.ecs_scene, sketch)) {
+        const int geometry_count = scene_count_sketch_geometry(&state.ecs_scene, sketch);
+        const int constraint_count = scene_count_sketch_constraints(&state.ecs_scene, sketch);
+        const bool has_script_shape_entries = strstr(emitted, "type = \"") != NULL;
+        if ((geometry_count > 0 || constraint_count > 0) && !has_script_shape_entries) {
+            scene_normalize_sketch_script_local_ids(&state.ecs_scene, sketch);
+            if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+                state.script_editor_last_error = emit_err;
+                return false;
+            }
+        }
+    }
     snprintf(state.script_editor_committed_text, sizeof(state.script_editor_committed_text), "%s", emitted);
     state.script_editor_committed_text[sizeof(state.script_editor_committed_text) - 1] = '\0';
     if (overwrite_text) {
@@ -695,6 +707,11 @@ static bool mdcad_collect_constraint_context(ecs_scene_t *scene,
 }
 
 static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
+    if (!scene_is_sketch(&state.ecs_scene, sketch)) {
+        return false;
+    }
+    scene_normalize_sketch_script_local_ids(&state.ecs_scene, sketch);
+
     char emitted[16384] = {0};
     sketch_script_error_t error = {0};
     if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &error)) {
@@ -738,122 +755,113 @@ static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
     state.ecs_scene.script_apply_undo_suppressed = prev_undo_suppressed;
     return applied;
 }
+
+static void mdcad_seed_add_coincident_line_endpoints(ecs_entity_t sketch,
+                                                     ecs_entity_t line_a,
+                                                     constraint_participant_role_t role_a,
+                                                     ecs_entity_t line_b,
+                                                     constraint_participant_role_t role_b) {
+    if (line_a == 0 || line_b == 0) return;
+    constraint_participant_descriptor_t pair[2] = {
+        constraint_participant_descriptor_make((uint64_t)line_a, (uint8_t)role_a, 0),
+        constraint_participant_descriptor_make((uint64_t)line_b, (uint8_t)role_b, 0)
+    };
+    (void)scene_add_constraint_to_sketch_with_descriptors(&state.ecs_scene, sketch,
+                                                           CONSTRAINT_COINCIDENT, pair, 2, 0.0f, false);
+}
+
+static void mdcad_seed_add_line_axis_constraint(ecs_entity_t sketch,
+                                                ecs_entity_t line,
+                                                constraint_type_t axis_type) {
+    if (line == 0) return;
+    (void)scene_add_constraint_to_sketch(&state.ecs_scene, sketch, axis_type, &line, 1, 0.0f, false);
+}
+
 static void mdcad_seed_default_sketch_scene(void) {
     const vec4_t sketch_color = vec4_make(0.90f, 0.90f, 0.95f, 1.0f);
     ecs_entity_t sketch = scene_add_sketch(&state.ecs_scene,
                                            "StartupSketch",
-                                           "Default startup sketch: rounded cube wireframe with through-hole.",
+                                           "Default startup sketch: stretchable box lattice constrained to X/Y/Z axes.",
                                            sketch_color);
     if (sketch == 0) return;
 
-    const float z_front = 0.5f;
-    const float z_back = -0.5f;
-    const float half_extent = 1.0f;
-    const float fillet = 0.25f;
-    const float top_y = half_extent;
-    const float bottom_y = -half_extent;
-    const float left_x = -half_extent;
-    const float right_x = half_extent;
-    const float inner_x = half_extent - fillet;
-    const float inner_y = half_extent - fillet;
+    const float x_half = 1.0f;
+    const float y_half = 0.7f;
+    const float z_half = 0.6f;
+    const float width = 0.03f;
 
-    ecs_entity_t f_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, top_y, z_front), vec3_make(inner_x, top_y, z_front), sketch_color, 0.03f);
-    ecs_entity_t f_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, bottom_y, z_front), vec3_make(inner_x, bottom_y, z_front), sketch_color, 0.03f);
-    ecs_entity_t f_left = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(left_x, -inner_y, z_front), vec3_make(left_x, inner_y, z_front), sketch_color, 0.03f);
-    ecs_entity_t f_right = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(right_x, -inner_y, z_front), vec3_make(right_x, inner_y, z_front), sketch_color, 0.03f);
+    ecs_entity_t x_bottom_back = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, -y_half, -z_half), vec3_make(x_half, -y_half, -z_half), sketch_color, width);
+    ecs_entity_t x_top_back = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, y_half, -z_half), vec3_make(x_half, y_half, -z_half), sketch_color, width);
+    ecs_entity_t x_bottom_front = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, -y_half, z_half), vec3_make(x_half, -y_half, z_half), sketch_color, width);
+    ecs_entity_t x_top_front = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, y_half, z_half), vec3_make(x_half, y_half, z_half), sketch_color, width);
 
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, inner_y, z_front), fillet, 3.14159265f, 1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(inner_x, inner_y, z_front), fillet, 1.57079633f, 0.0f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(inner_x, -inner_y, z_front), fillet, 0.0f, -1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, -inner_y, z_front), fillet, -1.57079633f, -3.14159265f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
+    ecs_entity_t y_left_back = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, -y_half, -z_half), vec3_make(-x_half, y_half, -z_half), sketch_color, width);
+    ecs_entity_t y_right_back = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(x_half, -y_half, -z_half), vec3_make(x_half, y_half, -z_half), sketch_color, width);
+    ecs_entity_t y_left_front = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, -y_half, z_half), vec3_make(-x_half, y_half, z_half), sketch_color, width);
+    ecs_entity_t y_right_front = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(x_half, -y_half, z_half), vec3_make(x_half, y_half, z_half), sketch_color, width);
 
-    ecs_entity_t b_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, top_y, z_back), vec3_make(inner_x, top_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t b_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, bottom_y, z_back), vec3_make(inner_x, bottom_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t b_left = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(left_x, -inner_y, z_back), vec3_make(left_x, inner_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t b_right = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(right_x, -inner_y, z_back), vec3_make(right_x, inner_y, z_back), sketch_color, 0.03f);
+    ecs_entity_t z_left_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, -y_half, -z_half), vec3_make(-x_half, -y_half, z_half), sketch_color, width);
+    ecs_entity_t z_right_bottom = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(x_half, -y_half, -z_half), vec3_make(x_half, -y_half, z_half), sketch_color, width);
+    ecs_entity_t z_left_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(-x_half, y_half, -z_half), vec3_make(-x_half, y_half, z_half), sketch_color, width);
+    ecs_entity_t z_right_top = scene_add_line_to_sketch(&state.ecs_scene, sketch,
+        vec3_make(x_half, y_half, -z_half), vec3_make(x_half, y_half, z_half), sketch_color, width);
 
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, inner_y, z_back), fillet, 3.14159265f, 1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(inner_x, inner_y, z_back), fillet, 1.57079633f, 0.0f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(inner_x, -inner_y, z_back), fillet, 0.0f, -1.57079633f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-inner_x, -inner_y, z_back), fillet, -1.57079633f, -3.14159265f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-
-    ecs_entity_t cube_conn_1 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(left_x, inner_y, z_front), vec3_make(left_x, inner_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t cube_conn_2 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(right_x, inner_y, z_front), vec3_make(right_x, inner_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t cube_conn_3 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(right_x, -inner_y, z_front), vec3_make(right_x, -inner_y, z_back), sketch_color, 0.03f);
-    ecs_entity_t cube_conn_4 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(left_x, -inner_y, z_front), vec3_make(left_x, -inner_y, z_back), sketch_color, 0.03f);
-
-    const float hole_r = 0.35f;
-    ecs_entity_t hole_front = scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(0.0f, 0.0f, z_front), hole_r, 0.0f, 6.28318531f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-    ecs_entity_t hole_back = scene_add_arc_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(0.0f, 0.0f, z_back), hole_r, 0.0f, 6.28318531f, vec3_make(0.0f, 0.0f, 1.0f),
-        sketch_color, 0.03f);
-
-    ecs_entity_t hole_conn_1 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(hole_r, 0.0f, z_front), vec3_make(hole_r, 0.0f, z_back), sketch_color, 0.03f);
-    ecs_entity_t hole_conn_2 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(-hole_r, 0.0f, z_front), vec3_make(-hole_r, 0.0f, z_back), sketch_color, 0.03f);
-    ecs_entity_t hole_conn_3 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(0.0f, hole_r, z_front), vec3_make(0.0f, hole_r, z_back), sketch_color, 0.03f);
-    ecs_entity_t hole_conn_4 = scene_add_line_to_sketch(&state.ecs_scene, sketch,
-        vec3_make(0.0f, -hole_r, z_front), vec3_make(0.0f, -hole_r, z_back), sketch_color, 0.03f);
-
-    ecs_entity_t parallel_set_1[] = { cube_conn_1, cube_conn_2, cube_conn_3, cube_conn_4 };
-    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
-                                   parallel_set_1, 4, 0.0f, false);
-
-    ecs_entity_t parallel_set_2[] = { hole_conn_1, hole_conn_2, hole_conn_3, hole_conn_4 };
-    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
-                                   parallel_set_2, 4, 0.0f, false);
-
-    ecs_entity_t side_lines[] = { f_left, f_right, b_left, b_right };
-    scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_PARALLEL,
-                                   side_lines, 4, 0.0f, false);
-
-    if (f_top != 0) {
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_LENGTH, &f_top, 1, 1.5f, false);
+    if (!x_bottom_back || !x_top_back || !x_bottom_front || !x_top_front ||
+        !y_left_back || !y_right_back || !y_left_front || !y_right_front ||
+        !z_left_bottom || !z_right_bottom || !z_left_top || !z_right_top) {
+        return;
     }
-    if (hole_conn_1 != 0) {
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_LENGTH, &hole_conn_1, 1, 1.0f, false);
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_ALONG_Z, &hole_conn_1, 1, 0.0f, false);
-    }
-    if (hole_front != 0 && hole_back != 0) {
-        ecs_entity_t hole_pair[] = { hole_front, hole_back };
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_CORADIAL, hole_pair, 2, 0.0f, false);
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_CONCENTRIC, hole_pair, 2, 0.0f, false);
-    }
-    if (f_bottom != 0) {
-        scene_add_constraint_to_sketch(&state.ecs_scene, sketch, CONSTRAINT_FIXED, &f_bottom, 1, 0.0f, false);
-    }
+
+    // Back-bottom-left corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, y_left_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, z_left_bottom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    // Back-bottom-right corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, y_right_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, z_right_bottom, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    // Back-top-right corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, y_right_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, z_right_top, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    // Back-top-left corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, y_left_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_back, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, z_left_top, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    // Front-bottom-left corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, y_left_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, z_left_bottom, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    // Front-bottom-right corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, y_right_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_bottom_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, z_right_bottom, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    // Front-top-right corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, y_right_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, z_right_top, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    // Front-top-left corner
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, y_left_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    mdcad_seed_add_coincident_line_endpoints(sketch, x_top_front, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, z_left_top, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+
+    mdcad_seed_add_line_axis_constraint(sketch, x_bottom_back, CONSTRAINT_ALONG_X);
+    mdcad_seed_add_line_axis_constraint(sketch, x_top_back, CONSTRAINT_ALONG_X);
+    mdcad_seed_add_line_axis_constraint(sketch, x_bottom_front, CONSTRAINT_ALONG_X);
+    mdcad_seed_add_line_axis_constraint(sketch, x_top_front, CONSTRAINT_ALONG_X);
+
+    mdcad_seed_add_line_axis_constraint(sketch, y_left_back, CONSTRAINT_ALONG_Y);
+    mdcad_seed_add_line_axis_constraint(sketch, y_right_back, CONSTRAINT_ALONG_Y);
+    mdcad_seed_add_line_axis_constraint(sketch, y_left_front, CONSTRAINT_ALONG_Y);
+    mdcad_seed_add_line_axis_constraint(sketch, y_right_front, CONSTRAINT_ALONG_Y);
+
+    mdcad_seed_add_line_axis_constraint(sketch, z_left_bottom, CONSTRAINT_ALONG_Z);
+    mdcad_seed_add_line_axis_constraint(sketch, z_right_bottom, CONSTRAINT_ALONG_Z);
+    mdcad_seed_add_line_axis_constraint(sketch, z_left_top, CONSTRAINT_ALONG_Z);
+    mdcad_seed_add_line_axis_constraint(sketch, z_right_top, CONSTRAINT_ALONG_Z);
 
     scene_refresh_sketch_metadata(&state.ecs_scene, sketch);
     (void)mdcad_seed_default_sketch_script_io(sketch);

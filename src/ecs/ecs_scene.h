@@ -288,6 +288,9 @@ static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
                                                      const char *id,
                                                      double value,
                                                      sketch_script_error_t *out_error);
+static inline void scene_assign_script_local_id_if_needed(ecs_scene_t *scene,
+                                                           ecs_entity_t sketch,
+                                                           ecs_entity_t entity);
 static inline ecs_entity_t ecs_scene_find_entity_by_pick_id(ecs_scene_t *scene, uint32_t pick_id);
 static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
     ecs_scene_t *scene,
@@ -2263,6 +2266,7 @@ static inline bool scene_attach_geometry_to_sketch(ecs_scene_t *scene,
     if (g) {
         scene_set_geometry_default_label(scene, sketch, geometry_entity, g->type);
     }
+    scene_assign_script_local_id_if_needed(scene, sketch, geometry_entity);
 
     scene_sync_endpoint_entities_for_owner(scene, geometry_entity);
 
@@ -2453,9 +2457,30 @@ static inline bool scene_script_local_id_duplicate(ecs_scene_t *scene, ecs_entit
     return false;
 }
 
+static inline int scene_count_sketch_script_managed_children(ecs_scene_t *scene, ecs_entity_t sketch) {
+    if (!scene_is_sketch(scene, sketch)) return 0;
+    int count = 0;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t child = it.entities[i];
+            if (!scene_script_entity_needs_id(scene, child, sketch)) continue;
+            ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, child);
+            if (sid && sid->script_local_id[0] != '\0') {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static inline bool scene_sketch_script_scope_enabled(ecs_scene_t *scene, ecs_entity_t sketch) {
+    return scene_count_sketch_script_managed_children(scene, sketch) > 0;
+}
+
 static inline void scene_script_local_id_assign_unique(ecs_scene_t *scene, ecs_entity_t sketch,
-                                                       ecs_entity_t entity, const char *prefix,
-                                                       uint32_t *next_index) {
+                                                        ecs_entity_t entity, const char *prefix,
+                                                        uint32_t *next_index) {
     if (!scene || !prefix || !next_index || entity == 0) return;
     ScriptIdentityComp *id = ecs_world_get_script_identity(scene->world, entity);
     if (!id) {
@@ -2476,6 +2501,49 @@ static inline void scene_script_local_id_assign_unique(ecs_scene_t *scene, ecs_e
             return;
         }
     }
+}
+
+static inline void scene_assign_script_local_id_if_needed(ecs_scene_t *scene,
+                                                           ecs_entity_t sketch,
+                                                           ecs_entity_t entity) {
+    if (!scene || entity == 0) return;
+    if (!scene_script_entity_needs_id(scene, entity, sketch)) return;
+    if (!scene_sketch_script_scope_enabled(scene, sketch)) return;
+
+    const bool is_constraint = ecs_world_get_constraint(scene->world, entity) != NULL;
+    const char *prefix = is_constraint ? "constraint" : "geometry";
+
+    ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, entity);
+    if (!sid) {
+        ScriptIdentityComp init = script_identity_comp_default();
+        ecs_world_set_script_identity(scene->world, entity, &init);
+        sid = ecs_world_get_script_identity(scene->world, entity);
+    }
+    if (!sid) return;
+
+    bool valid = false;
+    if (sid->script_local_id[0] != '\0') {
+        valid = scene_script_local_id_sequence(sid, prefix) > 0 &&
+                !scene_script_local_id_duplicate(scene, sketch, entity, sid->script_local_id);
+    }
+    if (valid) return;
+
+    uint32_t next_index = 1;
+    ecs_iter_t it = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&it)) {
+        for (int i = 0; i < it.count; i++) {
+            ecs_entity_t child = it.entities[i];
+            if (child == entity) continue;
+            if (!scene_script_entity_needs_id(scene, child, sketch)) continue;
+            const bool child_is_constraint = ecs_world_get_constraint(scene->world, child) != NULL;
+            if (child_is_constraint != is_constraint) continue;
+            ScriptIdentityComp *other = ecs_world_get_script_identity(scene->world, child);
+            if (!other || other->script_local_id[0] == '\0') continue;
+            uint32_t seq = scene_script_local_id_sequence(other, prefix);
+            if (seq >= next_index) next_index = seq + 1;
+        }
+    }
+    scene_script_local_id_assign_unique(scene, sketch, entity, prefix, &next_index);
 }
 
 static inline void scene_normalize_sketch_script_local_ids(ecs_scene_t *scene, ecs_entity_t sketch) {
@@ -2647,6 +2715,7 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
     ecs_world_set_constraint(scene->world, constraint_e, &constraint);
     scene_set_parent(scene, constraint_e, sketch);
     scene_set_constraint_default_label(scene, sketch, constraint_e, type);
+    scene_assign_script_local_id_if_needed(scene, sketch, constraint_e);
 
     for (uint32_t i = 0; i < participant_count; i++) {
         ecs_entity_t p = (ecs_entity_t)participant_descriptors[i].entity;
