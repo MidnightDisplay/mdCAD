@@ -1106,6 +1106,27 @@ static inline vec3_t scene_solver_project_drag_delta_with_budget(vec3_t requeste
     return vec3_scale(requested_delta, scale);
 }
 
+static inline vec3_t scene_solver_project_drag_delta_with_large_jump_staging(vec3_t requested_delta) {
+    float len = vec3_length(requested_delta);
+    if (len <= 1e-7f) {
+        return vec3_make(0.0f, 0.0f, 0.0f);
+    }
+
+    vec3_t stage1 = scene_solver_project_drag_delta_with_budget(requested_delta);
+    float stage1_len = vec3_length(stage1);
+    if (stage1_len <= 1e-7f) {
+        return stage1;
+    }
+
+    const float staged_cap = ECS_SCENE_SOLVER_DRAG_MAX_DELTA_PER_FRAME * 5.0f;
+    float stage2_len = fminf(len, staged_cap);
+    if (stage2_len <= stage1_len) {
+        return stage1;
+    }
+
+    return vec3_scale(requested_delta, stage2_len / len);
+}
+
 //------------------------------------------------------------------------------
 // Scene Initialization
 //------------------------------------------------------------------------------
@@ -4998,14 +5019,14 @@ static inline const scene_solver_failure_implication_t* scene_solver_failure_imp
 }
 
 static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
-                                              ecs_entity_t sketch,
-                                              const ecs_entity_t *drag_entities,
-                                              int drag_entity_count,
-                                              vec3_t requested_delta,
-                                              scene_solver_drag_decision_t *out_decision) {
+                                               ecs_entity_t sketch,
+                                               const ecs_entity_t *drag_entities,
+                                               int drag_entity_count,
+                                               vec3_t requested_delta,
+                                               scene_solver_drag_decision_t *out_decision) {
     if (!out_decision) return false;
     memset(out_decision, 0, sizeof(*out_decision));
-    out_decision->projected_delta = scene_solver_project_drag_delta_with_budget(requested_delta);
+    out_decision->projected_delta = scene_solver_project_drag_delta_with_large_jump_staging(requested_delta);
     out_decision->result = SCENE_SOLVER_DRAG_INVALID;
 
     if (!scene || !scene_is_sketch(scene, sketch)) {
@@ -5065,7 +5086,7 @@ static inline bool scene_solver_can_apply_drag(ecs_scene_t *scene,
     }
 
     out_decision->result = SCENE_SOLVER_DRAG_FEASIBLE;
-    out_decision->projected_delta = scene_solver_project_drag_delta_with_budget(requested_delta);
+    out_decision->projected_delta = scene_solver_project_drag_delta_with_large_jump_staging(requested_delta);
     out_decision->first_implicated_constraint = 0;
     out_decision->implicated_constraint_count = 0;
     out_decision->block_reason[0] = '\0';
