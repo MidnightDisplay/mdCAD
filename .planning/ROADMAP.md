@@ -60,7 +60,11 @@ Plans:
   3. User can immediately continue editing after an infeasible large-jump attempt without deadlock or stale-failure lock behavior.
   4. User gets deterministic outcomes and actionable failure diagnostics for identical operation sequences, including large-jump and mixed-constraint cases.
   5. User interacting with geometrically equivalent PARALLEL and ALONG arrangements gets consistent drag feasibility and parity behavior.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 33-01-PLAN.md — Implement two-stage large-jump staging with transactional rollback/recovery and deterministic failure ordering.
+- [ ] 33-02-PLAN.md — Enforce PARALLEL/ALONG equivalence parity matrix and actionable deterministic diagnostics for mixed-constraint failures.
 
 ### Phase 34: Deterministic v1.5 Closure Gate
 **Goal**: Developers and users can trust v1.5 reliability claims through reproducible deterministic baseline and immediate rerun evidence.
@@ -78,6 +82,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
-| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 0/TBD | Not started | - |
+| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 0/2 | Not started | - |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 
