@@ -44,7 +44,11 @@ Plans:
   1. User authoring ArcAxisLine sees required center/axis coincidence represented explicitly rather than relying on implicit coupling.
   2. User authoring line-end/arc-end tangency gets explicit endpoint coincidence semantics that remain intact after subsequent edits.
   3. User can continue editing sketches containing these composite relations without hidden coupling drift or surprise relation breakage.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 32-01-PLAN.md — Implement explicit composite authoring semantics and pair-link metadata plumbing for ArcAxisLine/tangency.
+- [ ] 32-02-PLAN.md — Enforce lifecycle durability, diagnostics, and deterministic script pair-link persistence with rerun evidence.
 
 ### Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity
 **Goal**: Users can perform large-jump and mirrored linked edits in mixed constrained sketches with deterministic, parity-consistent outcomes.
@@ -73,7 +77,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
-| 32. Explicit Coincidence Authoring Semantics | 0/TBD | Not started | - |
+| 32. Explicit Coincidence Authoring Semantics | 0/2 | Planned | - |
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 0/TBD | Not started | - |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 
