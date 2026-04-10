@@ -516,6 +516,82 @@ static int test_tangency_post_failure_diagnostic_remains_family_specific_and_sol
     return ok ? 0 : 1;
 }
 
+static int test_large_jump_unsatisfied_sequences_keep_deterministic_implication_and_diagnostic_order(void) {
+    ecs_entity_t implication_order_a[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS] = {0};
+    ecs_entity_t implication_order_b[ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS] = {0};
+    int implication_count_a = 0;
+    int implication_count_b = 0;
+    char diag_a[SKETCH_SOLVER_DIAGNOSTIC_MESSAGE_MAX] = {0};
+    char diag_b[SKETCH_SOLVER_DIAGNOSTIC_MESSAGE_MAX] = {0};
+
+    for (int run = 0; run < 2; run++) {
+        ecs_world_state_t world = {0};
+        ecs_scene_t scene = {0};
+        ecs_world_init(&world);
+        ecs_scene_init(&scene, &world);
+
+        ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+        ecs_entity_t line = scene_add_line_to_sketch(&scene, sketch,
+                                                     vec3_make(2.0f, -2.0f, 0.0f),
+                                                     vec3_make(2.0f, 2.0f, 0.0f),
+                                                     vec4_make(1, 1, 1, 1), 1.0f);
+        ecs_entity_t arc = scene_add_arc_to_sketch(&scene, sketch,
+                                                   vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                                   0.0f, 1.57079632679f, vec3_make(0.0f, 0.0f, 1.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+        if (!sketch || !line || !arc) return 1;
+
+        SketchGeometryStateComp *line_state = ecs_world_get_sketch_geometry_state(scene.world, line);
+        SketchGeometryStateComp *arc_state = ecs_world_get_sketch_geometry_state(scene.world, arc);
+        if (!line_state || !arc_state) return 1;
+        line_state->fixed = true;
+        arc_state->fixed = true;
+
+        constraint_participant_descriptor_t desc[2] = {
+            constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+            constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        };
+        ecs_entity_t c = scene_add_constraint_with_paired_coincident(
+            &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+        if (!c) return 1;
+
+        bool solved = scene_solver_request_recalculate(&scene, sketch);
+        const scene_solver_failure_implication_t *imp = scene_solver_failure_implication(&scene);
+        int diag_count = scene_solver_diagnostic_count(&scene, sketch);
+        const sketch_solver_diagnostic_t *last =
+            scene_solver_diagnostic_at(&scene, sketch, diag_count > 0 ? diag_count - 1 : -1);
+        if (solved || !imp || !imp->active || !last) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        if (strcmp(last->message, "Large-jump unsatisfied line-arc endpoint tangency constraint.") != 0) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+
+        if (run == 0) {
+            implication_count_a = imp->implicated_constraint_count;
+            if (implication_count_a > ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) implication_count_a = ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS;
+            for (int i = 0; i < implication_count_a; i++) implication_order_a[i] = imp->implicated_constraints[i];
+            snprintf(diag_a, sizeof(diag_a), "%s", last->message);
+        } else {
+            implication_count_b = imp->implicated_constraint_count;
+            if (implication_count_b > ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS) implication_count_b = ECS_SCENE_SOLVER_MAX_IMPLICATED_CONSTRAINTS;
+            for (int i = 0; i < implication_count_b; i++) implication_order_b[i] = imp->implicated_constraints[i];
+            snprintf(diag_b, sizeof(diag_b), "%s", last->message);
+        }
+
+        ecs_world_shutdown(&world);
+    }
+
+    if (implication_count_a != implication_count_b) return 1;
+    for (int i = 0; i < implication_count_a; i++) {
+        if (implication_order_a[i] != implication_order_b[i]) return 1;
+    }
+    if (strcmp(diag_a, diag_b) != 0) return 1;
+    return 0;
+}
+
 static int test_diagnostic_parity_reapply(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -580,6 +656,8 @@ int main(void) {
           test_along_z_unsat_reports_family_specific_diagnostic_alin04 },
         { "test_tangency_post_failure_diagnostic_remains_family_specific_and_solver_recovers",
           test_tangency_post_failure_diagnostic_remains_family_specific_and_solver_recovers },
+        { "test_large_jump_unsatisfied_sequences_keep_deterministic_implication_and_diagnostic_order",
+          test_large_jump_unsatisfied_sequences_keep_deterministic_implication_and_diagnostic_order },
         { "test_diagnostic_parity_reapply", test_diagnostic_parity_reapply },
     };
 
