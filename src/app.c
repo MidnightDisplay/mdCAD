@@ -905,19 +905,39 @@ static void mdcad_draw_constraint_context_menu(void) {
 
         if (igMenuItem_Bool(constraint_type_display_name(type), NULL, false, true)) {
             float initial_value = mdcad_constraint_type_uses_degree_ui(type) ? mdcad_deg_to_rad(90.0f) : 1.0f;
-            ecs_entity_t created = scene_add_constraint_to_sketch_with_descriptors(
-                &state.ecs_scene,
-                state.constraint_menu_sketch,
-                type,
-                state.constraint_menu_participants,
-                state.constraint_menu_participant_count,
-                initial_value,
-                false);
+            ecs_entity_t created = 0;
+            if (type == CONSTRAINT_ARC_AXIS_LINE ||
+                type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY) {
+                created = scene_add_constraint_with_paired_coincident(
+                    &state.ecs_scene,
+                    state.constraint_menu_sketch,
+                    type,
+                    state.constraint_menu_participants,
+                    state.constraint_menu_participant_count,
+                    initial_value,
+                    false);
+            } else {
+                created = scene_add_constraint_to_sketch_with_descriptors(
+                    &state.ecs_scene,
+                    state.constraint_menu_sketch,
+                    type,
+                    state.constraint_menu_participants,
+                    state.constraint_menu_participant_count,
+                    initial_value,
+                    false);
+            }
             if (created != 0) {
                 undo_cmd_create_entity(&state.undo_redo, created);
+                ConstraintComp *created_constraint = ecs_world_get_constraint(&state.ecs_world, created);
+                if (created_constraint && created_constraint->pair_is_owner &&
+                    created_constraint->paired_constraint_entity != 0) {
+                    ecs_entity_t paired = (ecs_entity_t)created_constraint->paired_constraint_entity;
+                    if (paired != 0 && ecs_is_alive(state.ecs_world.world, paired)) {
+                        undo_cmd_create_entity(&state.undo_redo, paired);
+                    }
+                }
                 state.selected_constraint_entity = created;
                 if (constraint_type_is_dimensional(type)) {
-                    ConstraintComp *created_constraint = ecs_world_get_constraint(&state.ecs_world, created);
                     const constraint_glyph_entry_t *glyph = constraint_glyphs_find_by_constraint(&state.constraint_glyphs, created);
                     if (glyph && glyph->has_screen_anchor) {
                         state.constraint_menu_anchor = (ImVec2){ glyph->anchor_screen_x, glyph->anchor_screen_y };

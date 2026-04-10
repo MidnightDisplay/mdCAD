@@ -21,8 +21,8 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 
 ### Explicit Coincidence Authoring Semantics
 
-- [ ] **COIN-01**: User authoring ArcAxisLine relations receives explicit coincidence constraints for required center/axis anchoring instead of relying on implicit coupling.
-- [ ] **COIN-02**: User authoring line-end/arc-end tangency receives explicit endpoint coincidence semantics that remain stable under subsequent edits.
+- [x] **COIN-01**: User authoring ArcAxisLine relations receives explicit coincidence constraints for required center/axis anchoring instead of relying on implicit coupling. — Validated in Phase 32: explicit-coincidence-authoring-semantics
+- [x] **COIN-02**: User authoring line-end/arc-end tangency receives explicit endpoint coincidence semantics that remain stable under subsequent edits. — Validated in Phase 32: explicit-coincidence-authoring-semantics
 
 ### PARALLEL / ALONG Parity
 
@@ -70,8 +70,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DIAG-01 | Phase 33 | Pending |
 | DIAG-02 | Phase 33 | Pending |
 | DIAG-03 | Phase 34 | Pending |
-| COIN-01 | Phase 32 | Pending |
-| COIN-02 | Phase 32 | Pending |
+| COIN-01 | Phase 32 | Complete |
+| COIN-02 | Phase 32 | Complete |
 | PARI-01 | Phase 33 | Pending |
 | PARI-02 | Phase 33 | Pending |
 | SCRI-01 | Phase 31 | Complete |

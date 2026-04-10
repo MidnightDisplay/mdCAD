@@ -178,7 +178,7 @@ static int test_arci02_repeated_recalc_is_deterministic(void) {
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
 
@@ -240,7 +240,7 @@ static int test_arci02_repeated_recalc_is_deterministic_after_anchor_drag(void) 
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
     if (!scene_solver_request_recalculate(&scene, sketch)) return 1;
@@ -341,7 +341,7 @@ static bool build_arci02_mirrored_pass_policy_case_D07_D08(bool mirrored,
         desc[0] = desc[1];
         desc[1] = tmp;
     }
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c || !scene_solver_request_recalculate(&scene, sketch)) {
         ecs_world_shutdown(&world);

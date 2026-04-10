@@ -357,12 +357,36 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
         if (constraint_type_is_dimensional(c->type)) {
             char value_text[32];
             sketch_script_emit_format_number(c->value, value_text, sizeof(value_text));
+            sketch_script_emit_appendf(out_script, out_script_size, &off, "}");
+            if (c->pair_owner_constraint_entity != 0 && c->paired_constraint_entity != 0) {
+                ScriptIdentityComp *owner_sid = ecs_world_get_script_identity(
+                    scene->world, (ecs_entity_t)c->pair_owner_constraint_entity);
+                ScriptIdentityComp *paired_sid = ecs_world_get_script_identity(
+                    scene->world, (ecs_entity_t)c->paired_constraint_entity);
+                sketch_script_emit_appendf(out_script, out_script_size, &off,
+                    ", pair = { is_owner = %s, owner = \"%s\", paired = \"%s\" }",
+                    c->pair_is_owner ? "true" : "false",
+                    (owner_sid && owner_sid->script_local_id[0]) ? owner_sid->script_local_id : "",
+                    (paired_sid && paired_sid->script_local_id[0]) ? paired_sid->script_local_id : "");
+            }
             sketch_script_emit_appendf(out_script, out_script_size, &off,
-                "}, value = %s, driven = %s }%s\n",
+                ", value = %s, driven = %s }%s\n",
                 value_text, c->driven ? "true" : "false", (i + 1 < constraint_count) ? "," : "");
         } else {
+            sketch_script_emit_appendf(out_script, out_script_size, &off, "}");
+            if (c->pair_owner_constraint_entity != 0 && c->paired_constraint_entity != 0) {
+                ScriptIdentityComp *owner_sid = ecs_world_get_script_identity(
+                    scene->world, (ecs_entity_t)c->pair_owner_constraint_entity);
+                ScriptIdentityComp *paired_sid = ecs_world_get_script_identity(
+                    scene->world, (ecs_entity_t)c->paired_constraint_entity);
+                sketch_script_emit_appendf(out_script, out_script_size, &off,
+                    ", pair = { is_owner = %s, owner = \"%s\", paired = \"%s\" }",
+                    c->pair_is_owner ? "true" : "false",
+                    (owner_sid && owner_sid->script_local_id[0]) ? owner_sid->script_local_id : "",
+                    (paired_sid && paired_sid->script_local_id[0]) ? paired_sid->script_local_id : "");
+            }
             sketch_script_emit_appendf(out_script, out_script_size, &off,
-                "} }%s\n", (i + 1 < constraint_count) ? "," : "");
+                " }%s\n", (i + 1 < constraint_count) ? "," : "");
         }
     }
     sketch_script_emit_append(out_script, out_script_size, &off, "  }\n}\n");
@@ -383,9 +407,13 @@ static inline bool scene_script_emit_for_sketch(ecs_scene_t *scene,
 }
 
 static inline bool scene_script_reemit_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch) {
-    char sink[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
+    char *sink = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+    if (!sink) {
+        return false;
+    }
     sketch_script_error_t err = {0};
-    bool ok = scene_script_emit_for_sketch(scene, sketch, sink, sizeof(sink), &err);
+    bool ok = scene_script_emit_for_sketch(scene, sketch, sink, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, &err);
+    free(sink);
     if (ok && scene) {
         scene->script_emit_revision++;
     }

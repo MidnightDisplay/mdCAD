@@ -513,6 +513,14 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         json_write_indent(b, depth + 3);
         json_builder_appendf(b, "\"display_decimals\": %u,\n", (unsigned int)constraint->display_decimals);
         json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"pair_is_owner\": %s,\n", constraint->pair_is_owner ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"paired_constraint_entity\": %llu,\n",
+                             (unsigned long long)constraint->paired_constraint_entity);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"pair_owner_constraint_entity\": %llu,\n",
+                             (unsigned long long)constraint->pair_owner_constraint_entity);
+        json_write_indent(b, depth + 3);
         json_builder_append(b, "\"participants\": [");
         for (uint32_t i = 0; i < constraint->participant_count; i++) {
             if (i > 0) json_builder_append(b, ", ");
@@ -1708,6 +1716,18 @@ static inline bool json_parse_constraint(json_parser_t *p, loaded_entity_t *ent)
             ent->constraint.display_decimals = (uint8_t)decimals;
             has_display_decimals = true;
             if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "pair_is_owner") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->constraint.pair_is_owner = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "paired_constraint_entity") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->constraint.paired_constraint_entity = (uint64_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "pair_owner_constraint_entity") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->constraint.pair_owner_constraint_entity = (uint64_t)p->num_value;
+            if (!json_next_token(p)) return false;
         } else if (strcmp(key, "participants") == 0) {
             if (p->token != JSON_TOK_LBRACKET) return false;
             ent->constraint.participant_count = 0;
@@ -2377,6 +2397,20 @@ static inline int scene_load_from_string(ecs_scene_t *scene, const char *json,
         if (!entities[i].has_constraint || entities[i].new_entity == 0) continue;
         ConstraintComp *constraint = ecs_world_get_constraint(scene->world, entities[i].new_entity);
         if (!constraint) continue;
+        if (constraint->paired_constraint_entity != 0) {
+            ecs_entity_t mapped_pair = scene_find_new_entity(
+                entities, entity_count, constraint->paired_constraint_entity);
+            if (mapped_pair != 0) {
+                constraint->paired_constraint_entity = (uint64_t)mapped_pair;
+            }
+        }
+        if (constraint->pair_owner_constraint_entity != 0) {
+            ecs_entity_t mapped_owner = scene_find_new_entity(
+                entities, entity_count, constraint->pair_owner_constraint_entity);
+            if (mapped_owner != 0) {
+                constraint->pair_owner_constraint_entity = (uint64_t)mapped_owner;
+            }
+        }
         for (uint32_t p_idx = 0; p_idx < constraint->participant_count; p_idx++) {
             uint64_t descriptor_old_entity = constraint->participant_descriptors[p_idx].entity;
             if (descriptor_old_entity == 0) {

@@ -51,6 +51,10 @@ typedef struct {
     bool has_value;
     float value;
     bool driven;
+    bool has_pair;
+    bool pair_is_owner;
+    char pair_owner_id[SCRIPT_LOCAL_ID_MAX];
+    char pair_paired_id[SCRIPT_LOCAL_ID_MAX];
     uint32_t participant_count;
     sketch_script_participant_model_t participants[CONSTRAINT_MAX_PARTICIPANTS];
 } sketch_script_constraint_model_t;
@@ -240,6 +244,62 @@ static inline bool sketch_script_parse_bool_named(const char *block,
         return true;
     }
     return false;
+}
+
+static inline bool sketch_script_parse_pair_block(const char *block,
+                                                  sketch_script_constraint_model_t *out_constraint,
+                                                  sketch_script_error_t *out_error) {
+    if (!block || !out_constraint) return false;
+    const char *pair_key = NULL;
+    const char *scan = block;
+    while ((scan = strstr(scan, "pair")) != NULL) {
+        const char *after = scan + 4;
+        while (*after == ' ' || *after == '\t') after++;
+        if (*after == '=') {
+            pair_key = scan;
+            break;
+        }
+        scan++;
+    }
+    if (!pair_key) {
+        out_constraint->has_pair = false;
+        return true;
+    }
+    const char *start = strchr(pair_key, '{');
+    if (!start) {
+        sketch_script_parse_error(out_error, "Constraint pair block missing '{'.");
+        return false;
+    }
+    const char *end = NULL;
+    if (!sketch_script_find_matching_brace(start, &end)) {
+        sketch_script_parse_error(out_error, "Constraint pair block missing matching '}'.");
+        return false;
+    }
+    size_t pair_len = (size_t)(end - start + 1);
+    char pair_block[512] = {0};
+    if (pair_len >= sizeof(pair_block)) {
+        sketch_script_parse_error(out_error, "Constraint pair block too large.");
+        return false;
+    }
+    memcpy(pair_block, start, pair_len);
+    pair_block[pair_len] = '\0';
+
+    if (!sketch_script_parse_bool_named(pair_block, "is_owner", &out_constraint->pair_is_owner)) {
+        sketch_script_parse_error(out_error, "Constraint pair block requires is_owner.");
+        return false;
+    }
+    if (!sketch_script_parse_string_named(pair_block, "owner", out_constraint->pair_owner_id,
+                                          sizeof(out_constraint->pair_owner_id))) {
+        sketch_script_parse_error(out_error, "Constraint pair block requires owner.");
+        return false;
+    }
+    if (!sketch_script_parse_string_named(pair_block, "paired", out_constraint->pair_paired_id,
+                                          sizeof(out_constraint->pair_paired_id))) {
+        sketch_script_parse_error(out_error, "Constraint pair block requires paired.");
+        return false;
+    }
+    out_constraint->has_pair = true;
+    return true;
 }
 
 static inline constraint_type_t sketch_script_constraint_type_from_name(const char *name) {
@@ -620,6 +680,9 @@ static inline bool sketch_script_parse_constraints_block(const char *script_text
             return false;
         }
         if (!sketch_script_parse_participants(entry, dst, out_error)) {
+            return false;
+        }
+        if (!sketch_script_parse_pair_block(entry, dst, out_error)) {
             return false;
         }
 

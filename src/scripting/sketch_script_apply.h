@@ -19,6 +19,23 @@ typedef struct {
 } sketch_script_apply_link_table_t;
 
 typedef struct {
+    bool has_pair;
+    bool pair_is_owner;
+    char owner_id[SCRIPT_LOCAL_ID_MAX];
+    char paired_id[SCRIPT_LOCAL_ID_MAX];
+} sketch_script_apply_pair_meta_t;
+
+typedef struct {
+    char id[SCRIPT_LOCAL_ID_MAX];
+    sketch_script_apply_pair_meta_t meta;
+} sketch_script_apply_pair_entry_t;
+
+typedef struct {
+    uint32_t count;
+    sketch_script_apply_pair_entry_t items[SKETCH_SCRIPT_MODEL_MAX_CONSTRAINTS];
+} sketch_script_apply_pair_table_t;
+
+typedef struct {
     char id[SCRIPT_LOCAL_ID_MAX];
     LabelComp label;
 } sketch_script_apply_label_entry_t;
@@ -83,6 +100,32 @@ static inline bool sketch_script_apply_label_find(const sketch_script_apply_labe
     for (uint32_t i = 0; i < table->count; i++) {
         if (strcmp(table->items[i].id, id) == 0) {
             *out_label = table->items[i].label;
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline bool sketch_script_apply_pair_add(sketch_script_apply_pair_table_t *table,
+                                                const char *id,
+                                                const sketch_script_apply_pair_meta_t *meta) {
+    if (!table || !id || id[0] == '\0' || !meta) return false;
+    if (!meta->has_pair) return true;
+    if (table->count >= (uint32_t)(sizeof(table->items) / sizeof(table->items[0]))) return false;
+    strncpy(table->items[table->count].id, id, SCRIPT_LOCAL_ID_MAX - 1);
+    table->items[table->count].id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+    table->items[table->count].meta = *meta;
+    table->count++;
+    return true;
+}
+
+static inline bool sketch_script_apply_pair_find(const sketch_script_apply_pair_table_t *table,
+                                                 const char *id,
+                                                 sketch_script_apply_pair_meta_t *out_meta) {
+    if (!table || !id || id[0] == '\0' || !out_meta) return false;
+    for (uint32_t i = 0; i < table->count; i++) {
+        if (strcmp(table->items[i].id, id) == 0) {
+            *out_meta = table->items[i].meta;
             return true;
         }
     }
@@ -160,6 +203,7 @@ static inline bool sketch_script_apply_create_constraints(ecs_scene_t *scene,
                                                           ecs_entity_t sketch,
                                                           const sketch_script_model_t *model,
                                                           sketch_script_apply_link_table_t *links,
+                                                          sketch_script_apply_pair_table_t *pairs,
                                                           const sketch_script_apply_label_table_t *labels,
                                                           sketch_script_error_t *out_error) {
     for (uint32_t i = 0; i < model->constraint_count; i++) {
@@ -203,6 +247,50 @@ static inline bool sketch_script_apply_create_constraints(ecs_scene_t *scene,
             sketch_script_apply_set_error(out_error, "Failed linking script constraint ID.");
             return false;
         }
+        sketch_script_apply_pair_meta_t pair_meta = {0};
+        pair_meta.has_pair = src->has_pair;
+        pair_meta.pair_is_owner = src->pair_is_owner;
+        if (src->has_pair) {
+            strncpy(pair_meta.owner_id, src->pair_owner_id, SCRIPT_LOCAL_ID_MAX - 1);
+            pair_meta.owner_id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+            strncpy(pair_meta.paired_id, src->pair_paired_id, SCRIPT_LOCAL_ID_MAX - 1);
+            pair_meta.paired_id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+        if (!sketch_script_apply_pair_add(pairs, src->id, &pair_meta)) {
+            sketch_script_apply_set_error(out_error, "Failed storing script constraint pair metadata.");
+            return false;
+        }
+        }
+    }
+    return true;
+}
+
+static inline bool sketch_script_apply_restore_pairs(ecs_scene_t *scene,
+                                                     const sketch_script_apply_pair_table_t *pairs,
+                                                     const sketch_script_apply_link_table_t *links,
+                                                     sketch_script_error_t *out_error) {
+    if (!scene || !pairs || !links) {
+        sketch_script_apply_set_error(out_error, "Invalid pair metadata apply state.");
+        return false;
+    }
+    for (uint32_t i = 0; i < pairs->count; i++) {
+        const sketch_script_apply_pair_entry_t *entry = &pairs->items[i];
+        ecs_entity_t self = sketch_script_apply_link_find(links, entry->id);
+        ecs_entity_t owner = sketch_script_apply_link_find(links, entry->meta.owner_id);
+        ecs_entity_t paired = sketch_script_apply_link_find(links, entry->meta.paired_id);
+        if (self == 0 || owner == 0 || paired == 0) {
+            sketch_script_apply_set_error(out_error, "Unresolved pair metadata constraint reference.");
+            return false;
+        }
+        ConstraintComp *self_constraint = ecs_world_get_constraint(scene->world, self);
+        ConstraintComp *owner_constraint = ecs_world_get_constraint(scene->world, owner);
+        ConstraintComp *paired_constraint = ecs_world_get_constraint(scene->world, paired);
+        if (!self_constraint || !owner_constraint || !paired_constraint) {
+            sketch_script_apply_set_error(out_error, "Pair metadata references non-constraint entities.");
+            return false;
+        }
+        self_constraint->pair_is_owner = entry->meta.pair_is_owner;
+        self_constraint->pair_owner_constraint_entity = (uint64_t)owner;
+        self_constraint->paired_constraint_entity = (uint64_t)paired;
     }
     return true;
 }
@@ -264,8 +352,10 @@ static inline bool sketch_script_apply_model_on_sketch(ecs_scene_t *scene,
     }
 
     sketch_script_apply_link_table_t links = {0};
+    sketch_script_apply_pair_table_t pairs = {0};
     if (!sketch_script_apply_create_entities(scene, sketch, model, &links, labels, out_error)) return false;
-    if (!sketch_script_apply_create_constraints(scene, sketch, model, &links, labels, out_error)) return false;
+    if (!sketch_script_apply_create_constraints(scene, sketch, model, &links, &pairs, labels, out_error)) return false;
+    if (!sketch_script_apply_restore_pairs(scene, &pairs, &links, out_error)) return false;
     scene_refresh_sketch_metadata(scene, sketch);
     return true;
 }

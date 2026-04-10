@@ -300,6 +300,14 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
     uint32_t participant_count,
     float value,
     bool driven);
+static inline ecs_entity_t scene_add_constraint_with_paired_coincident(
+    ecs_scene_t *scene,
+    ecs_entity_t sketch,
+    constraint_type_t type,
+    const constraint_participant_descriptor_t *participants,
+    uint32_t participant_count,
+    float value,
+    bool driven);
 static inline const char* scene_solver_backend_name(const ecs_scene_t *scene);
 static inline uint32_t scene_solver_backend_id(const ecs_scene_t *scene);
 static inline uint64_t scene_solver_now_ms(void);
@@ -2614,13 +2622,13 @@ static inline ecs_entity_t scene_add_constraint_to_sketch(ecs_scene_t *scene,
 }
 
 static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
-                                                          ecs_scene_t *scene,
-                                                          ecs_entity_t sketch,
-                                                          constraint_type_t type,
-                                                          const constraint_participant_descriptor_t *participants,
-                                                          uint32_t participant_count,
-                                                          float value,
-                                                          bool driven) {
+                                                           ecs_scene_t *scene,
+                                                           ecs_entity_t sketch,
+                                                           constraint_type_t type,
+                                                           const constraint_participant_descriptor_t *participants,
+                                                           uint32_t participant_count,
+                                                           float value,
+                                                           bool driven) {
     if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
     if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) return 0;
 
@@ -2735,6 +2743,270 @@ static inline ecs_entity_t scene_add_constraint_to_sketch_with_descriptors(
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return constraint_e;
+}
+
+static inline bool scene_find_line_endpoints_by_nearest_point(ecs_scene_t *scene,
+                                                              ecs_entity_t line_entity,
+                                                              vec3_t target_point,
+                                                              constraint_participant_role_t *out_nearest_role,
+                                                              constraint_participant_role_t *out_other_role) {
+    if (!scene || line_entity == 0 || !out_nearest_role || !out_other_role) return false;
+    GeometryComp *line_geom = ecs_world_get_geometry(scene->world, line_entity);
+    if (!line_geom || line_geom->type != GEOM_LINE) return false;
+    float dist_a = vec3_length(vec3_sub(line_geom->data.line.a, target_point));
+    float dist_b = vec3_length(vec3_sub(line_geom->data.line.b, target_point));
+    if (dist_a <= dist_b) {
+        *out_nearest_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+        *out_other_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+    } else {
+        *out_nearest_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+        *out_other_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+    }
+    return true;
+}
+
+static inline bool scene_constraint_find_line_arc_indices(const ConstraintComp *constraint,
+                                                          ecs_scene_t *scene,
+                                                          bool require_endpoint_roles,
+                                                          int *out_line_index,
+                                                          int *out_arc_index) {
+    if (!constraint || !scene || !out_line_index || !out_arc_index) return false;
+    *out_line_index = -1;
+    *out_arc_index = -1;
+    for (uint32_t p = 0; p < constraint->participant_count; p++) {
+        ecs_entity_t participant_entity = (ecs_entity_t)constraint->participant_descriptors[p].entity;
+        constraint_participant_role_t participant_role =
+            (constraint_participant_role_t)constraint->participant_descriptors[p].role;
+        GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+        if (!participant_geom) continue;
+        if (participant_geom->type == GEOM_LINE && *out_line_index < 0) {
+            if (require_endpoint_roles &&
+                participant_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                participant_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                continue;
+            }
+            *out_line_index = (int)p;
+            continue;
+        }
+        if (participant_geom->type == GEOM_ARC && *out_arc_index < 0) {
+            if (require_endpoint_roles &&
+                participant_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+                participant_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                continue;
+            }
+            *out_arc_index = (int)p;
+            continue;
+        }
+    }
+    return *out_line_index >= 0 && *out_arc_index >= 0;
+}
+
+static inline bool scene_constraint_has_pair_metadata(const ConstraintComp *constraint) {
+    if (!constraint) return false;
+    return constraint->paired_constraint_entity != 0 ||
+           constraint->pair_owner_constraint_entity != 0 ||
+           constraint->pair_is_owner;
+}
+
+static inline bool scene_constraint_pair_exists_and_valid(ecs_scene_t *scene,
+                                                          ecs_entity_t owner_entity,
+                                                          const ConstraintComp *owner_constraint) {
+    if (!scene || owner_entity == 0 || !owner_constraint) return false;
+    if (!scene_constraint_has_pair_metadata(owner_constraint)) return false;
+    if (owner_constraint->paired_constraint_entity == 0) return false;
+    ecs_entity_t pair_entity = (ecs_entity_t)owner_constraint->paired_constraint_entity;
+    if (!ecs_is_alive(scene->world->world, pair_entity)) return false;
+    ConstraintComp *pair = ecs_world_get_constraint(scene->world, pair_entity);
+    if (!pair || pair->type != CONSTRAINT_COINCIDENT) return false;
+    if (pair->pair_owner_constraint_entity != (uint64_t)owner_entity) return false;
+    return true;
+}
+
+static inline bool scene_constraint_type_requires_paired_coincident(const ConstraintComp *constraint) {
+    if (!constraint) return false;
+    return constraint->type == CONSTRAINT_ARC_AXIS_LINE ||
+           constraint->type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY;
+}
+
+static inline bool scene_constraint_pair_has_participant(const ConstraintComp *pair,
+                                                         ecs_entity_t entity,
+                                                         constraint_participant_role_t role) {
+    if (!pair || entity == 0) return false;
+    for (uint32_t i = 0; i < pair->participant_count; i++) {
+        const constraint_participant_descriptor_t *descriptor = &pair->participant_descriptors[i];
+        if ((ecs_entity_t)descriptor->entity == entity &&
+            (constraint_participant_role_t)descriptor->role == role) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline bool scene_constraint_pair_matches_owner(ecs_scene_t *scene,
+                                                       const ConstraintComp *owner_constraint,
+                                                       constraint_type_t owner_type) {
+    if (!scene || !owner_constraint) return false;
+    if (!scene_constraint_type_requires_paired_coincident(owner_constraint)) return false;
+    ecs_entity_t pair_entity = (ecs_entity_t)owner_constraint->paired_constraint_entity;
+    ConstraintComp *pair = ecs_world_get_constraint(scene->world, pair_entity);
+    if (!pair || pair->type != CONSTRAINT_COINCIDENT) return false;
+
+    int line_index = -1;
+    int arc_index = -1;
+    bool require_endpoints = (owner_type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY);
+    if (!scene_constraint_find_line_arc_indices(owner_constraint, scene, require_endpoints,
+                                                &line_index, &arc_index)) {
+        return false;
+    }
+
+    ecs_entity_t line_entity = (ecs_entity_t)owner_constraint->participant_descriptors[line_index].entity;
+    ecs_entity_t arc_entity = (ecs_entity_t)owner_constraint->participant_descriptors[arc_index].entity;
+    constraint_participant_role_t line_role =
+        (constraint_participant_role_t)owner_constraint->participant_descriptors[line_index].role;
+    constraint_participant_role_t arc_role =
+        (constraint_participant_role_t)owner_constraint->participant_descriptors[arc_index].role;
+
+    if (owner_type == CONSTRAINT_ARC_AXIS_LINE) {
+        bool has_line_endpoint =
+            scene_constraint_pair_has_participant(pair, line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ||
+            scene_constraint_pair_has_participant(pair, line_entity, CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+        bool has_arc_center =
+            scene_constraint_pair_has_participant(pair, arc_entity, CONSTRAINT_PARTICIPANT_ROLE_CENTER);
+        return has_line_endpoint && has_arc_center;
+    }
+    if (!scene_constraint_pair_has_participant(pair, line_entity, line_role)) return false;
+    return scene_constraint_pair_has_participant(pair, arc_entity, arc_role);
+}
+
+static inline ecs_entity_t scene_add_constraint_with_paired_coincident(
+    ecs_scene_t *scene,
+    ecs_entity_t sketch,
+    constraint_type_t type,
+    const constraint_participant_descriptor_t *participants,
+    uint32_t participant_count,
+    float value,
+    bool driven) {
+    if (!scene_is_sketch(scene, sketch) || !participants || participant_count == 0) return 0;
+    if (type != CONSTRAINT_ARC_AXIS_LINE && type != CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY) {
+        return scene_add_constraint_to_sketch_with_descriptors(
+            scene, sketch, type, participants, participant_count, value, driven);
+    }
+
+    int line_index = -1;
+    int arc_index = -1;
+    bool require_endpoint_roles = (type == CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY);
+
+    constraint_participant_descriptor_t owner_participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+    memcpy(owner_participants,
+           participants,
+           sizeof(constraint_participant_descriptor_t) * participant_count);
+
+    for (uint32_t p = 0; p < participant_count; p++) {
+        ecs_entity_t participant_entity = (ecs_entity_t)owner_participants[p].entity;
+        GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
+        if (!participant_geom) return 0;
+        constraint_participant_role_t role = (constraint_participant_role_t)owner_participants[p].role;
+        if (owner_participants[p].role == (uint8_t)CONSTRAINT_PARTICIPANT_ROLE_UNSPECIFIED) {
+            role = CONSTRAINT_PARTICIPANT_ROLE_ENTITY;
+            owner_participants[p].role = (uint8_t)role;
+        }
+        if (participant_geom->type == GEOM_LINE && line_index < 0) {
+            if (!require_endpoint_roles ||
+                role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                line_index = (int)p;
+            }
+        }
+        if (participant_geom->type == GEOM_ARC && arc_index < 0) {
+            if (!require_endpoint_roles ||
+                role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+                arc_index = (int)p;
+            }
+        }
+    }
+    if (line_index < 0 || arc_index < 0) return 0;
+
+    ecs_entity_t line_entity = (ecs_entity_t)owner_participants[line_index].entity;
+    ecs_entity_t arc_entity = (ecs_entity_t)owner_participants[arc_index].entity;
+    constraint_participant_role_t line_role = (constraint_participant_role_t)owner_participants[line_index].role;
+    constraint_participant_role_t arc_role = (constraint_participant_role_t)owner_participants[arc_index].role;
+
+    constraint_participant_descriptor_t pair_desc[2] = {0};
+    if (type == CONSTRAINT_ARC_AXIS_LINE) {
+        GeometryComp *arc_geom = ecs_world_get_geometry(scene->world, arc_entity);
+        if (!arc_geom || arc_geom->type != GEOM_ARC) return 0;
+        constraint_participant_role_t nearest_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_A;
+        constraint_participant_role_t other_role = CONSTRAINT_PARTICIPANT_ROLE_POINT_B;
+        if (!scene_find_line_endpoints_by_nearest_point(scene, line_entity, arc_geom->data.arc.center,
+                                                        &nearest_role, &other_role)) {
+            return 0;
+        }
+        uint8_t line_sub_index = (nearest_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0u : 1u;
+        pair_desc[0] = constraint_participant_descriptor_make((uint64_t)arc_entity,
+                                                               CONSTRAINT_PARTICIPANT_ROLE_CENTER,
+                                                               2);
+        pair_desc[1] = constraint_participant_descriptor_make((uint64_t)line_entity,
+                                                               nearest_role,
+                                                               line_sub_index);
+    } else {
+        if (line_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+            line_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+            return 0;
+        }
+        if (arc_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+            arc_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+            return 0;
+        }
+        owner_participants[line_index].sub_index = (line_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0u : 1u;
+        owner_participants[arc_index].sub_index = (arc_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A) ? 0u : 1u;
+        pair_desc[0] = constraint_participant_descriptor_make((uint64_t)line_entity,
+                                                               line_role,
+                                                               owner_participants[line_index].sub_index);
+        pair_desc[1] = constraint_participant_descriptor_make((uint64_t)arc_entity,
+                                                               arc_role,
+                                                               owner_participants[arc_index].sub_index);
+    }
+
+    ecs_entity_t paired = scene_add_constraint_to_sketch_with_descriptors(
+        scene, sketch, CONSTRAINT_COINCIDENT, pair_desc, 2, 0.0f, false);
+    if (paired == 0) {
+        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                    "author", "ArcAxisLine/tangency explicit coincidence creation failed.", 0);
+        return 0;
+    }
+
+    ecs_entity_t owner = scene_add_constraint_to_sketch_with_descriptors(
+        scene, sketch, type, owner_participants, participant_count, value, driven);
+    if (owner == 0) {
+        scene_remove_entity(scene, paired);
+        scene_refresh_sketch_metadata(scene, sketch);
+        scene_solver_request_auto(scene, sketch);
+        scene_script_reemit_for_sketch(scene, sketch);
+        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                    "author", "ArcAxisLine/tangency owner creation failed after paired coincidence.", 0);
+        return 0;
+    }
+
+    ConstraintComp *owner_comp = ecs_world_get_constraint(scene->world, owner);
+    ConstraintComp *paired_comp = ecs_world_get_constraint(scene->world, paired);
+    if (!owner_comp || !paired_comp) {
+        scene_remove_entity(scene, owner);
+        scene_remove_entity(scene, paired);
+        scene_refresh_sketch_metadata(scene, sketch);
+        scene_solver_request_auto(scene, sketch);
+        scene_script_reemit_for_sketch(scene, sketch);
+        return 0;
+    }
+
+    owner_comp->pair_is_owner = true;
+    owner_comp->paired_constraint_entity = (uint64_t)paired;
+    owner_comp->pair_owner_constraint_entity = (uint64_t)owner;
+
+    paired_comp->pair_is_owner = false;
+    paired_comp->paired_constraint_entity = (uint64_t)owner;
+    paired_comp->pair_owner_constraint_entity = (uint64_t)owner;
+    return owner;
 }
 
 static inline bool scene_constraint_set_dimensional_value(ecs_scene_t *scene,
@@ -3007,6 +3279,14 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                 }
 
                 if (constraint->type == CONSTRAINT_COINCIDENT && participant_count == 2) {
+                    if (!constraint->pair_is_owner && constraint->pair_owner_constraint_entity != 0) {
+                        ecs_entity_t owner_entity = (ecs_entity_t)constraint->pair_owner_constraint_entity;
+                        ConstraintComp *owner_constraint = ecs_world_get_constraint(scene->world, owner_entity);
+                        if (owner_constraint && scene_constraint_type_requires_paired_coincident(owner_constraint)) {
+                            continue;
+                        }
+                    }
+
                     ecs_entity_t pa = (ecs_entity_t)constraint->participant_descriptors[0].entity;
                     ecs_entity_t pb = (ecs_entity_t)constraint->participant_descriptors[1].entity;
                     constraint_participant_role_t role_a =
@@ -3042,9 +3322,29 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
 
                     vec3_t before_a = candidates[ia].point;
                     vec3_t before_b = candidates[ib].point;
+                    bool anchor_a = false;
+                    bool anchor_b = false;
+                    if (constraint->pair_owner_constraint_entity != 0 &&
+                        sk->solver_drag_anchor_valid &&
+                        (sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                         sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B)) {
+                        ecs_entity_t anchor_owner = (ecs_entity_t)sk->solver_drag_anchor_owner_entity;
+                        constraint_participant_role_t anchor_role =
+                            (constraint_participant_role_t)sk->solver_drag_anchor_role;
+                        if (anchor_owner == pa && anchor_role == role_a) {
+                            anchor_a = true;
+                        } else if (anchor_owner == pb && anchor_role == role_b) {
+                            anchor_b = true;
+                        }
+                    }
+
                     if (candidates[ia].fixed && !candidates[ib].fixed) {
                         candidates[ib].point = candidates[ia].point;
                     } else if (!candidates[ia].fixed && candidates[ib].fixed) {
+                        candidates[ia].point = candidates[ib].point;
+                    } else if (anchor_a && !candidates[ia].fixed) {
+                        candidates[ib].point = candidates[ia].point;
+                    } else if (anchor_b && !candidates[ib].fixed) {
                         candidates[ia].point = candidates[ib].point;
                     } else {
                         vec3_t midpoint = vec3_scale(vec3_add(candidates[ia].point, candidates[ib].point), 0.5f);
@@ -3788,6 +4088,15 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         implicated_constraints[implicated_constraint_count++] = child;
                         break;
                     }
+                    if (!scene_constraint_pair_exists_and_valid(scene, child, constraint) ||
+                        !scene_constraint_pair_matches_owner(scene, constraint, CONSTRAINT_ARC_AXIS_LINE)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied arc-axis-vs-line constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                                    "pair", "ArcAxisLine paired coincidence missing or invalid.", child);
+                        break;
+                    }
 
                     int line_participant = -1;
                     int arc_participant = -1;
@@ -3799,11 +4108,14 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         GeometryComp *participant_geom = ecs_world_get_geometry(scene->world, participant_entity);
                         if (!participant_geom) continue;
                         if (participant_geom->type == GEOM_LINE &&
-                            participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                            (participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY ||
+                             participant_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                             participant_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B) &&
                             line_participant < 0) {
                             line_participant = (int)p;
                         } else if (participant_geom->type == GEOM_ARC &&
-                                   participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY &&
+                                   (participant_role == CONSTRAINT_PARTICIPANT_ROLE_ENTITY ||
+                                    participant_role == CONSTRAINT_PARTICIPANT_ROLE_CENTER) &&
                                    arc_participant < 0) {
                             arc_participant = (int)p;
                         }
@@ -3946,6 +4258,16 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         solve_failed = true;
                         failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
                         implicated_constraints[implicated_constraint_count++] = child;
+                        break;
+                    }
+                    if (!scene_constraint_pair_exists_and_valid(scene, child, constraint) ||
+                        !scene_constraint_pair_matches_owner(scene, constraint,
+                                                             CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY)) {
+                        solve_failed = true;
+                        failure_reason = "Unsatisfied line-arc endpoint tangency constraint.";
+                        implicated_constraints[implicated_constraint_count++] = child;
+                        scene_solver_add_diagnostic(scene, sketch, SKETCH_SOLVER_DIAG_ERROR,
+                                                    "pair", "Line-arc endpoint tangency paired coincidence missing or invalid.", child);
                         break;
                     }
 
@@ -6065,11 +6387,23 @@ static inline bool scene_script_io_apply_input_value(ecs_scene_t *scene,
         return false;
     }
 
-    char script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
-    if (!scene_script_emit_for_sketch(scene, sketch, script, sizeof(script), out_error)) {
+    char *script = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+    if (!script) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script buffer.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
         return false;
     }
-    return scene_script_apply_commit(scene, sketch, script, out_error);
+    if (!scene_script_emit_for_sketch(scene, sketch, script, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, out_error)) {
+        free(script);
+        return false;
+    }
+    bool ok = scene_script_apply_commit(scene, sketch, script, out_error);
+    free(script);
+    return ok;
 }
 
 static inline bool scene_script_preview_parse(ecs_scene_t *scene,
@@ -6088,17 +6422,33 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
     if (io_state) {
         io_state_before = *io_state;
     }
-    char before_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
-    bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, sizeof(before_script), out_error);
-    if (!capture_before) return false;
+    char *before_script = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+    if (!before_script) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script snapshot buffer.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+    bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, out_error);
+    if (!capture_before) {
+        free(before_script);
+        return false;
+    }
 
-    if (!sketch_script_apply_commit_model(scene, sketch, script_text, out_error)) return false;
+    if (!sketch_script_apply_commit_model(scene, sketch, script_text, out_error)) {
+        free(before_script);
+        return false;
+    }
 
     sketch_script_model_t model = {0};
     if (!sketch_script_parse_model(script_text, &model, out_error)) {
         sketch_script_error_t rollback_error = {0};
         (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
         if (io_state) *io_state = io_state_before;
+        free(before_script);
         return false;
     }
     if (io_state) {
@@ -6106,13 +6456,30 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
     }
 
     if (!scene->script_apply_undo_suppressed && scene->script_undo_redo) {
-        char after_script[ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE] = {0};
-        if (!scene_script_emit_for_sketch(scene, sketch, after_script, sizeof(after_script), out_error)) {
+        char *after_script = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+        if (!after_script) {
             sketch_script_error_t rollback_error = {0};
             scene->script_apply_undo_suppressed = true;
             (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
             scene->script_apply_undo_suppressed = false;
             if (io_state) *io_state = io_state_before;
+            if (out_error && out_error->message[0] == '\0') {
+                out_error->line = 0;
+                out_error->column = 0;
+                snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script snapshot buffer.");
+                out_error->message[sizeof(out_error->message) - 1] = '\0';
+            }
+            free(before_script);
+            return false;
+        }
+        if (!scene_script_emit_for_sketch(scene, sketch, after_script, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, out_error)) {
+            sketch_script_error_t rollback_error = {0};
+            scene->script_apply_undo_suppressed = true;
+            (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
+            scene->script_apply_undo_suppressed = false;
+            if (io_state) *io_state = io_state_before;
+            free(after_script);
+            free(before_script);
             return false;
         }
 
@@ -6136,11 +6503,15 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
                 snprintf(out_error->message, sizeof(out_error->message), "Failed recording undo transaction for script apply.");
                 out_error->message[sizeof(out_error->message) - 1] = '\0';
             }
+            free(after_script);
+            free(before_script);
             return false;
         }
         undo_redo_push(scene->script_undo_redo, &cmd);
+        free(after_script);
     }
 
+    free(before_script);
     return true;
 }
 

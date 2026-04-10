@@ -1706,9 +1706,18 @@ static int test_arci_arc_axis_line_reorients_arc_normal_and_keeps_line_reference
                                                vec4_make(1, 1, 1, 1), 1.0f);
     if (!sketch || !line || !arc) return 1;
 
-    ecs_entity_t participants[2] = { line, arc };
-    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ARC_AXIS_LINE, participants, 2, 0.0f, false);
+    constraint_participant_descriptor_t owner_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
+        &scene, sketch, CONSTRAINT_ARC_AXIS_LINE, owner_desc, 2, 0.0f, false);
     if (!c) return 1;
+    ConstraintComp *owner = ecs_world_get_constraint(scene.world, c);
+    if (!owner || !owner->pair_is_owner || owner->paired_constraint_entity == 0) return 1;
+    ConstraintComp *paired = ecs_world_get_constraint(scene.world, (ecs_entity_t)owner->paired_constraint_entity);
+    if (!paired || paired->type != CONSTRAINT_COINCIDENT) return 1;
+    if (paired->pair_owner_constraint_entity != (uint64_t)c) return 1;
 
     GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
     if (!line_geom || line_geom->type != GEOM_LINE) return 1;
@@ -1756,8 +1765,12 @@ static int test_arci_arc_axis_line_fixed_fixed_unsat_is_transactional_D04(void) 
     line_state->fixed = true;
     arc_state->fixed = true;
 
-    ecs_entity_t participants[2] = { line, arc };
-    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ARC_AXIS_LINE, participants, 2, 0.0f, false);
+    constraint_participant_descriptor_t owner_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
+        &scene, sketch, CONSTRAINT_ARC_AXIS_LINE, owner_desc, 2, 0.0f, false);
     if (!c) return 1;
 
     GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
@@ -1804,9 +1817,11 @@ static int test_arci_line_arc_endpoint_tangency_satisfies_coincidence_then_tange
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
+    ConstraintComp *owner = ecs_world_get_constraint(scene.world, c);
+    if (!owner || !owner->pair_is_owner || owner->paired_constraint_entity == 0) return 1;
 
     bool solved = scene_solver_request_recalculate(&scene, sketch);
     GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
@@ -1859,7 +1874,7 @@ static int test_arci_line_arc_endpoint_tangency_unsat_fixed_is_transactional_D08
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
 
@@ -1913,7 +1928,7 @@ static int test_arci_line_arc_endpoint_tangency_respects_line_endpoint_drag_anch
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
     if (!scene_solver_request_recalculate(&scene, sketch)) return 1;
@@ -1993,7 +2008,7 @@ static int test_arci_line_arc_endpoint_tangency_adjacent_arc_center_drag_anchor(
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
     if (!scene_solver_request_recalculate(&scene, sketch)) return 1;
@@ -2089,7 +2104,7 @@ static int build_mirrored_tangency_parity_case_D07_D08(bool mirrored,
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c_tangent = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c_tangent = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c_tangent || !scene_solver_request_recalculate(&scene, sketch)) {
         ecs_world_shutdown(&world);

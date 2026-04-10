@@ -51,9 +51,12 @@ typedef struct {
     constraint_type_t type;
     bool has_value;                             // true for dimensional constraints
     bool driven;                                // CONS-05 for LENGTH/ANGLE
+    bool pair_is_owner;                         // true when this constraint owns an explicit paired coincident
     float value;                                // LENGTH/ANGLE value
     uint8_t display_decimals;                   // UI display precision for dimensional values
     uint32_t participant_count;
+    uint64_t paired_constraint_entity;          // counterpart constraint entity (owner <-> paired coincident)
+    uint64_t pair_owner_constraint_entity;      // owner constraint entity for pair linkage
     uint64_t participants[CONSTRAINT_MAX_PARTICIPANTS];
     constraint_participant_descriptor_t participant_descriptors[CONSTRAINT_MAX_PARTICIPANTS];
 } ConstraintComp;

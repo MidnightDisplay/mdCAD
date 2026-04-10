@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
 
-**Current focus:** Phase 32 preparation after Phase 31 closure.
+**Current focus:** Phase 33 preparation after Phase 32 closure.
 
 ## Requirements
 
@@ -46,6 +46,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Human-facing solver architecture docs now provide practical code anchors, literature-backed context, and a TL;DR debug primer (`SDOC-01..03`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
 - ✓ Deterministic Windows Vulkan closure gate now enforces build + canonical 7-test baseline + immediate rerun sign-off (`V14-01..02`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
 - ✓ Script re-apply now preserves descriptor participant semantics (role/sub-index), script-managed color metadata, and deterministic repeated outcomes (`SCRI-01..03`) — Validated in Phase 31: script-reapply-fidelity-foundation
+- ✓ Explicit coincidence authoring semantics now preserve deterministic ArcAxisLine/tangency pair intent with durable lifecycle + script roundtrip behavior (`COIN-01..02`) — Validated in Phase 32: explicit-coincidence-authoring-semantics
 
 ### Active
 

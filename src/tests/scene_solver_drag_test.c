@@ -52,7 +52,7 @@ static bool test_setup_tangency_scene(ecs_world_state_t *world,
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return false;
     if (!scene_solver_request_recalculate(scene, sketch)) return false;

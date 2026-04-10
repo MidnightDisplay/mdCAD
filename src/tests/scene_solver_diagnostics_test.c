@@ -115,8 +115,12 @@ static int test_arci01_unsat_reports_family_specific_diagnostic(void) {
     line_state->fixed = true;
     arc_state->fixed = true;
 
-    ecs_entity_t participants[2] = { line, arc };
-    ecs_entity_t c = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ARC_AXIS_LINE, participants, 2, 0.0f, false);
+    constraint_participant_descriptor_t arci_desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_ENTITY, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
+        &scene, sketch, CONSTRAINT_ARC_AXIS_LINE, arci_desc, 2, 0.0f, false);
     if (!c) return 1;
 
     bool solved = scene_solver_request_recalculate(&scene, sketch);
@@ -158,7 +162,7 @@ static int test_arci02_unsat_reports_family_specific_diagnostic(void) {
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
 
@@ -454,7 +458,7 @@ static int test_tangency_post_failure_diagnostic_remains_family_specific_and_sol
         constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
         constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
     };
-    ecs_entity_t c = scene_add_constraint_to_sketch_with_descriptors(
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
         &scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
     if (!c) return 1;
     if (!scene_solver_request_recalculate(&scene, sketch)) return 1;

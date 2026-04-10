@@ -1,7 +1,7 @@
 ---
 phase: 32
 slug: explicit-coincidence-authoring-semantics
-status: draft
+status: complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-10
@@ -41,10 +41,10 @@ created: 2026-04-10
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 32-01-01 | 01 | 1 | COIN-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract" --output-on-failure` | ✅ | ⬜ pending |
-| 32-01-02 | 01 | 1 | COIN-01 | diagnostics | `ctest --test-dir build-vulkan -C Release -R "scene_solver_diagnostics" --output-on-failure` | ✅ | ⬜ pending |
-| 32-02-01 | 02 | 2 | COIN-02 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_drag" --output-on-failure` | ✅ | ⬜ pending |
-| 32-02-02 | 02 | 2 | COIN-01, COIN-02 | script roundtrip | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ⬜ pending |
+| 32-01-01 | 01 | 1 | COIN-01 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract" --output-on-failure` | ✅ | ✅ green |
+| 32-01-02 | 01 | 1 | COIN-01 | diagnostics | `ctest --test-dir build-vulkan -C Release -R "scene_solver_diagnostics" --output-on-failure` | ✅ | ✅ green |
+| 32-02-01 | 02 | 2 | COIN-02 | unit/integration | `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_drag" --output-on-failure` | ✅ | ✅ green |
+| 32-02-02 | 02 | 2 | COIN-01, COIN-02 | script roundtrip | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests" --output-on-failure` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -75,4 +75,4 @@ created: 2026-04-10
 - [x] Per-task fast smoke feedback latency target < 30s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete

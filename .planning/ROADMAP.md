@@ -16,7 +16,7 @@
 - Decimal phases (31.1, 31.2): Urgent insertions (if needed later)
 
 - [x] **Phase 31: Script Reapply Fidelity Foundation** - Preserve script remap semantics and metadata so replayed scenes stay valid and deterministic. (completed 2026-04-10)
-- [ ] **Phase 32: Explicit Coincidence Authoring Semantics** - Make ArcAxisLine and endpoint tangency authoring explicit and stable via required coincidence intent.
+- [x] **Phase 32: Explicit Coincidence Authoring Semantics** - Make ArcAxisLine and endpoint tangency authoring explicit and stable via required coincidence intent. (completed 2026-04-10)
 - [ ] **Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity** - Stabilize mixed arc/line large edits and parity behavior across equivalent constraint setups.
 - [ ] **Phase 34: Deterministic v1.5 Closure Gate** - Lock reproducible deterministic sign-off for targeted v1.5 regression coverage.
 
@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — Implement explicit composite authoring semantics and pair-link metadata plumbing for ArcAxisLine/tangency.
-- [ ] 32-02-PLAN.md — Enforce lifecycle durability, diagnostics, and deterministic script pair-link persistence with rerun evidence.
+- [x] 32-01-PLAN.md — Implement explicit composite authoring semantics and pair-link metadata plumbing for ArcAxisLine/tangency.
+- [x] 32-02-PLAN.md — Enforce lifecycle durability, diagnostics, and deterministic script pair-link persistence with rerun evidence.
 
 ### Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity
 **Goal**: Users can perform large-jump and mirrored linked edits in mixed constrained sketches with deterministic, parity-consistent outcomes.
@@ -77,7 +77,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
-| 32. Explicit Coincidence Authoring Semantics | 0/2 | Planned | - |
+| 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 0/TBD | Not started | - |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 
