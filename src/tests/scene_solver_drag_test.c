@@ -63,6 +63,43 @@ static bool test_setup_tangency_scene(ecs_world_state_t *world,
     return true;
 }
 
+static bool test_setup_quarter_arc_tangency_scene(ecs_world_state_t *world,
+                                                  ecs_scene_t *scene,
+                                                  ecs_entity_t *out_sketch,
+                                                  ecs_entity_t *out_line,
+                                                  ecs_entity_t *out_arc) {
+    if (!world || !scene || !out_sketch || !out_line || !out_arc) return false;
+    memset(world, 0, sizeof(*world));
+    memset(scene, 0, sizeof(*scene));
+    ecs_world_init(world);
+    ecs_scene_init(scene, world);
+
+    ecs_entity_t sketch = scene_add_sketch(scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line = scene_add_line_to_sketch(scene, sketch,
+                                                 vec3_make(2.0f, -2.0f, 0.0f),
+                                                 vec3_make(2.0f, 2.0f, 0.0f),
+                                                 vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t arc = scene_add_arc_to_sketch(scene, sketch,
+                                               vec3_make(0.0f, 0.0f, 0.0f), 2.0f,
+                                               0.0f, 1.57079632679f, vec3_make(0.0f, 0.0f, 1.0f),
+                                               vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line || !arc) return false;
+
+    constraint_participant_descriptor_t desc[2] = {
+        constraint_participant_descriptor_make((uint64_t)line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+        constraint_participant_descriptor_make((uint64_t)arc, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+    };
+    ecs_entity_t c = scene_add_constraint_with_paired_coincident(
+        scene, sketch, CONSTRAINT_LINE_ARC_ENDPOINT_TANGENCY, desc, 2, 0.0f, false);
+    if (!c) return false;
+    if (!scene_solver_request_recalculate(scene, sketch)) return false;
+
+    *out_sketch = sketch;
+    *out_line = line;
+    *out_arc = arc;
+    return true;
+}
+
 static bool test_get_endpoint_entity(ecs_scene_t *scene,
                                      ecs_entity_t owner,
                                      constraint_participant_role_t role,
@@ -349,6 +386,45 @@ static int test_drag_tangency_post_failure_followup_feasible_is_responsive(void)
     return ok ? 0 : 1;
 }
 
+static int test_quarter_arc_large_jump_single_sequence_followup_is_responsive(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t sketch = 0, line = 0, arc = 0;
+    if (!test_setup_quarter_arc_tangency_scene(&world, &scene, &sketch, &line, &arc)) return 1;
+
+    ecs_entity_t line_a_endpoint = 0;
+    if (!test_get_endpoint_entity(&scene, line, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, &line_a_endpoint)) return 1;
+
+    GeometryComp *line_geom = ecs_world_get_geometry(scene.world, line);
+    if (!line_geom || line_geom->type != GEOM_LINE) return 1;
+    vec3_t line_a_before = line_geom->data.line.a;
+
+    vec3_t large_jump = vec3_make(0.9f, 0.6f, 0.0f);
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, large_jump)) return 1;
+    bool solved_large_jump = scene_solver_request_recalculate(&scene, sketch);
+
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    vec3_t line_a_after_large_jump = line_geom ? line_geom->data.line.a : vec3_make(0, 0, 0);
+    vec3_t expected_large_jump = vec3_add(line_a_before, large_jump);
+    if (!solved_large_jump || !line_geom || !vec3_close(line_a_after_large_jump, expected_large_jump, 1e-4f)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t followup = vec3_make(0.1f, 0.05f, 0.0f);
+    if (!scene_apply_endpoint_point_world_delta(&scene, line_a_endpoint, followup)) return 1;
+    bool solved_followup = scene_solver_request_recalculate(&scene, sketch);
+    line_geom = ecs_world_get_geometry(scene.world, line);
+    vec3_t expected_followup = vec3_add(expected_large_jump, followup);
+
+    int ok = (solved_followup &&
+              line_geom &&
+              vec3_close(line_geom->data.line.a, expected_followup, 1e-4f) &&
+              test_assert_tangency_still_satisfied(&scene, line, arc));
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 static int test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints(void) {
     ecs_world_state_t world = {0};
     ecs_scene_t scene = {0};
@@ -411,6 +487,8 @@ int main(void) {
           test_drag_tangency_shared_endpoint_infeasible_rolls_back_transactionally },
         { "test_drag_tangency_post_failure_followup_feasible_is_responsive",
           test_drag_tangency_post_failure_followup_feasible_is_responsive },
+        { "test_quarter_arc_large_jump_single_sequence_followup_is_responsive",
+          test_quarter_arc_large_jump_single_sequence_followup_is_responsive },
         { "test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints",
           test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints },
     };
