@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Solver Workflow Robustness + Script Reapply Integrity
-status: defining requirements
-stopped_at: Milestone started
-last_updated: "2026-04-09T17:10:00.000Z"
-last_activity: 2026-04-09 -- v1.5 milestone started
+status: roadmap created
+stopped_at: Roadmap created for phases 31-34
+last_updated: "2026-04-10T00:00:00.000Z"
+last_activity: 2026-04-10 -- v1.5 roadmap created and traceability mapped
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,27 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Defining milestone requirements (`/gsd-new-milestone`)
+**Current focus:** Phase 31 planning (`/gsd-plan-phase 31`)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 31 of 34 (Script Reapply Fidelity Foundation)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-09 -- Milestone v1.5 started
+Status: Ready to plan
+Last activity: 2026-04-10 -- v1.5 roadmap created with full requirement coverage
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
-- In scope: solver robustness fixes plus active-sketch line gizmo correction and solver architecture documentation.
-- Deterministic reliability remained mandatory and closed with explicit Windows Vulkan baseline + immediate rerun sign-off.
-
-## Session Continuity
-
-Next command: `/gsd-plan-phase 31`
+- In scope: solver large-jump robustness, deterministic diagnostics, explicit coincidence authoring semantics, PARALLEL/ALONG parity, and script re-apply integrity.
+- Deterministic closure remains mandatory via baseline + immediate rerun parity evidence.
 
 ## Accumulated Context
 
@@ -72,10 +68,11 @@ Recent decisions affecting current work:
 - [Phase 30]: Kept closure sign-off scope Windows Vulkan only and deferred cross-platform expansion.
 - [Milestone v1.4]: Archival completed with roadmap/requirements snapshots and milestone index entry.
 - [Milestone v1.5]: Scope includes solver large-jump robustness hardening plus script re-apply integrity regression fixes.
+- [Roadmap v1.5]: Requirements mapped 100% across phases 31-34 with deterministic closure gate isolated in final phase.
 
 ### Pending Todos
 
-- Define v1.5 requirements and phase roadmap.
+- Plan and execute Phase 31 (Script Reapply Fidelity Foundation).
 
 ### Blockers/Concerns
 
@@ -83,6 +80,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-09T14:21:53.316Z
-Stopped at: Milestone started
+Last session: 2026-04-10T00:00:00.000Z
+Stopped at: Roadmap created for v1.5
 Resume file: docs/improvements/solver-user-workflow-robustness.md

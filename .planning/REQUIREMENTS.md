@@ -64,11 +64,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SROB-01 | Phase 31 | Pending |
-| SROB-02 | Phase 31 | Pending |
-| SROB-03 | Phase 31 | Pending |
-| DIAG-01 | Phase 31 | Pending |
-| DIAG-02 | Phase 31 | Pending |
+| SROB-01 | Phase 33 | Pending |
+| SROB-02 | Phase 33 | Pending |
+| SROB-03 | Phase 33 | Pending |
+| DIAG-01 | Phase 33 | Pending |
+| DIAG-02 | Phase 33 | Pending |
 | DIAG-03 | Phase 34 | Pending |
 | COIN-01 | Phase 32 | Pending |
 | COIN-02 | Phase 32 | Pending |
@@ -85,4 +85,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-10 after v1.5 milestone initialization*
+*Last updated: 2026-04-10 after v1.5 roadmap creation*
