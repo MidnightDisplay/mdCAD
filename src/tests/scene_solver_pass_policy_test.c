@@ -542,6 +542,110 @@ static int test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun
     return ok ? 0 : 1;
 }
 
+typedef struct {
+    int outcome_class;
+    vec3_t line_b_a;
+    vec3_t line_b_b;
+} parallel_along_equivalent_result_t;
+
+static bool build_parallel_along_equivalent_pass_policy_case(bool use_parallel,
+                                                             bool mirrored,
+                                                             bool reordered,
+                                                             parallel_along_equivalent_result_t *out_result) {
+    if (!out_result) return false;
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    float mirror = mirrored ? -1.0f : 1.0f;
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(mirror * 0.0f, 0.0f, 0.0f),
+                                                   vec3_make(mirror * 3.0f, 0.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                   vec3_make(mirror * 0.0f, 1.0f, 0.0f),
+                                                   vec3_make(mirror * 2.0f, 2.0f, 0.0f),
+                                                   vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_a || !line_b) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+
+    SketchGeometryStateComp *state_a = ecs_world_get_sketch_geometry_state(scene.world, line_a);
+    if (!state_a) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+    state_a->fixed = true;
+
+    if (use_parallel) {
+        ecs_entity_t participants[2] = { line_a, line_b };
+        if (reordered) {
+            participants[0] = line_b;
+            participants[1] = line_a;
+        }
+        if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+    } else {
+        constraint_participant_descriptor_t along_desc[2] = {
+            constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+            constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1),
+        };
+        if (reordered) {
+            constraint_participant_descriptor_t tmp = along_desc[0];
+            along_desc[0] = along_desc[1];
+            along_desc[1] = tmp;
+        }
+        if (!scene_add_constraint_to_sketch_with_descriptors(&scene, sketch, CONSTRAINT_ALONG_X, along_desc, 2, 0.0f, false)) {
+            ecs_world_shutdown(&world);
+            return false;
+        }
+    }
+
+    bool solved_first = scene_solver_request_recalculate(&scene, sketch);
+    bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *line_b_geom = ecs_world_get_geometry(scene.world, line_b);
+    if (!line_b_geom || line_b_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return false;
+    }
+    out_result->outcome_class = (solved_first && solved_second) ? 1 : 0;
+    out_result->line_b_a = line_b_geom->data.line.a;
+    out_result->line_b_b = line_b_geom->data.line.b;
+    ecs_world_shutdown(&world);
+    return true;
+}
+
+static int test_parallel_along_equivalent_mirrored_order_parity_pass_policy(void) {
+    parallel_along_equivalent_result_t parallel_base = {0};
+    parallel_along_equivalent_result_t along_base = {0};
+    parallel_along_equivalent_result_t parallel_mirrored = {0};
+    parallel_along_equivalent_result_t along_mirrored = {0};
+    parallel_along_equivalent_result_t parallel_reordered = {0};
+    parallel_along_equivalent_result_t along_reordered = {0};
+
+    if (!build_parallel_along_equivalent_pass_policy_case(true, false, false, &parallel_base)) return 1;
+    if (!build_parallel_along_equivalent_pass_policy_case(false, false, false, &along_base)) return 1;
+    if (!build_parallel_along_equivalent_pass_policy_case(true, true, false, &parallel_mirrored)) return 1;
+    if (!build_parallel_along_equivalent_pass_policy_case(false, true, false, &along_mirrored)) return 1;
+    if (!build_parallel_along_equivalent_pass_policy_case(true, false, true, &parallel_reordered)) return 1;
+    if (!build_parallel_along_equivalent_pass_policy_case(false, false, true, &along_reordered)) return 1;
+
+    return (parallel_base.outcome_class == along_base.outcome_class &&
+            parallel_mirrored.outcome_class == along_mirrored.outcome_class &&
+            parallel_reordered.outcome_class == along_reordered.outcome_class &&
+            parallel_base.outcome_class == parallel_reordered.outcome_class &&
+            along_base.outcome_class == along_reordered.outcome_class &&
+            vec3_close(parallel_base.line_b_a, along_base.line_b_a, 1e-5f) &&
+            vec3_close(parallel_base.line_b_b, along_base.line_b_b, 1e-5f) &&
+            vec3_close(parallel_mirrored.line_b_a, along_mirrored.line_b_a, 1e-5f) &&
+            vec3_close(parallel_mirrored.line_b_b, along_mirrored.line_b_b, 1e-5f)) ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -562,6 +666,8 @@ int main(void) {
           test_arci02_mirrored_parity_rerun_and_ordering_adjacent_unsat_D07_D08 },
         { "test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic",
           test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic },
+        { "test_parallel_along_equivalent_mirrored_order_parity_pass_policy",
+          test_parallel_along_equivalent_mirrored_order_parity_pass_policy },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
