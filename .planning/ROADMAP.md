@@ -30,7 +30,7 @@
   1. User can re-apply a valid script and constraint participants keep role/sub-index intent instead of degrading into unsupported-participant failures.
   2. User can re-apply a script and entity color metadata is preserved rather than resetting to default white.
   3. User can re-apply the same script repeatedly and get stable deterministic geometry and constraint outcomes each run.
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 - [x] 31-01-PLAN.md — Establish shared script+solver capability registry and deterministic contract failure taxonomy.
@@ -65,6 +65,7 @@ Plans:
 Plans:
 - [x] 33-01-PLAN.md — Implement two-stage large-jump staging with transactional rollback/recovery and deterministic failure ordering.
 - [x] 33-02-PLAN.md — Enforce PARALLEL/ALONG equivalence parity matrix and actionable deterministic diagnostics for mixed-constraint failures.
+- [ ] 33-03-PLAN.md — Close UAT PARALLEL drag-authority gap with equal-priority bidirectional motion policy and deterministic regressions.
 
 ### Phase 34: Deterministic v1.5 Closure Gate
 **Goal**: Developers and users can trust v1.5 reliability claims through reproducible deterministic baseline and immediate rerun evidence.
