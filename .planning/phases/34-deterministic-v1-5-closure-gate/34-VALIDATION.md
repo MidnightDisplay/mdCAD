@@ -20,7 +20,7 @@ created: 2026-04-11
 | **Framework** | CTest + native C test executables |
 | **Config file** | `src/CMakeLists.txt` |
 | **Quick run command** | `ctest --test-dir build-vulkan -C Release -R "scene_solver_trigger|scene_solver_pass_policy|scene_solver_diagnostics" --output-on-failure` |
-| **Full suite command** | `ctest --test-dir build-vulkan -C Release -R "scene_solver_contract|scene_solver_pass_policy|scene_solver_diagnostics|scene_solver_trigger|scene_solver_drag|endpoint_pick|script_roundtrip_tests" --output-on-failure` |
+| **Full suite command** | Canonical 7-test gate command (see locked command definition below) |
 | **Estimated runtime** | Build-dependent; execute in Windows Developer PowerShell with MSVC toolchain loaded |
 
 ---
