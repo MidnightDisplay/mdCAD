@@ -83,6 +83,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
-| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete   | 2026-04-11 |
+| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete    | 2026-04-11 |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 
