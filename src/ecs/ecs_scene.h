@@ -3210,6 +3210,50 @@ static inline uint64_t scene_solver_now_ms(void) {
     return (uint64_t)time(NULL) * 1000ULL;
 }
 
+static inline bool scene_solver_constraint_mentions_entity(const ConstraintComp *constraint,
+                                                           ecs_entity_t entity) {
+    if (!constraint || entity == 0) return false;
+    uint32_t participant_count = constraint->participant_count;
+    if (participant_count > CONSTRAINT_MAX_PARTICIPANTS) {
+        participant_count = CONSTRAINT_MAX_PARTICIPANTS;
+    }
+    for (uint32_t i = 0; i < participant_count; i++) {
+        if ((ecs_entity_t)constraint->participant_descriptors[i].entity == entity) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline int scene_solver_external_constraint_score_for_entity(ecs_scene_t *scene,
+                                                                    ecs_entity_t sketch,
+                                                                    ecs_entity_t skip_constraint,
+                                                                    ecs_entity_t entity) {
+    if (!scene || !scene_is_sketch(scene, sketch) || entity == 0) return 0;
+    int score = 0;
+    ecs_iter_t children = ecs_children(scene->world->world, sketch);
+    while (ecs_children_next(&children)) {
+        for (int i = 0; i < children.count; i++) {
+            ecs_entity_t child = children.entities[i];
+            if (child == skip_constraint) continue;
+            ConstraintComp *constraint = ecs_world_get_constraint(scene->world, child);
+            if (!constraint) continue;
+            if (!scene_solver_constraint_mentions_entity(constraint, entity)) continue;
+            switch (constraint->type) {
+                case CONSTRAINT_ALONG_X:
+                case CONSTRAINT_ALONG_Y:
+                case CONSTRAINT_ALONG_Z:
+                    score += 2;
+                    break;
+                default:
+                    score += 1;
+                    break;
+            }
+        }
+    }
+    return score;
+}
+
 static inline void scene_solver_process_auto_queue(ecs_scene_t *scene) {
     if (!scene || !scene->world) return;
     ecs_world_state_t *w = scene->world;
@@ -3829,7 +3873,32 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     vec3_t before_ib0 = candidates[ib0].point;
                     vec3_t before_ib1 = candidates[ib1].point;
                     bool updated = false;
-                    if (!line_b_fixed) {
+                    bool line_a_has_drag_authority = false;
+                    bool line_b_has_drag_authority = false;
+                    if (sk->solver_drag_anchor_valid &&
+                        (sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
+                         sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B)) {
+                        ecs_entity_t anchor_owner = (ecs_entity_t)sk->solver_drag_anchor_owner_entity;
+                        if (anchor_owner == line_a_entity) {
+                            line_a_has_drag_authority = true;
+                        } else if (anchor_owner == line_b_entity) {
+                            line_b_has_drag_authority = true;
+                        }
+                    }
+
+                    if (!line_a_has_drag_authority && !line_b_has_drag_authority) {
+                        int line_a_external_score =
+                            scene_solver_external_constraint_score_for_entity(scene, sketch, child, line_a_entity);
+                        int line_b_external_score =
+                            scene_solver_external_constraint_score_for_entity(scene, sketch, child, line_b_entity);
+                        if (line_a_external_score > line_b_external_score) {
+                            line_a_has_drag_authority = true;
+                        } else if (line_b_external_score > line_a_external_score) {
+                            line_b_has_drag_authority = true;
+                        }
+                    }
+
+                    if (line_a_has_drag_authority && !line_b_fixed) {
                         vec3_t target_dir = na;
                         if (constraint->type == CONSTRAINT_PARALLEL) {
                             vec3_t target_opposite = vec3_scale(target_dir, -1.0f);
@@ -3866,7 +3935,8 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                             candidates[ib0].point = vec3_sub(candidates[ib1].point, vec3_scale(target_dir, len_b));
                             updated = true;
                         }
-                    } else if (!line_a_fixed) {
+                    }
+                    if (!updated && line_b_has_drag_authority && !line_a_fixed) {
                         vec3_t target_dir = nb;
                         if (constraint->type == CONSTRAINT_PARALLEL) {
                             vec3_t target_opposite = vec3_scale(target_dir, -1.0f);
@@ -3895,6 +3965,74 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                             target_dir = (vec3_dot(perp_dir, na) >= vec3_dot(perp_dir_opposite, na))
                                              ? perp_dir
                                              : perp_dir_opposite;
+                        }
+                        if (!candidates[ia1].fixed) {
+                            candidates[ia1].point = vec3_add(candidates[ia0].point, vec3_scale(target_dir, len_a));
+                            updated = true;
+                        } else if (!candidates[ia0].fixed) {
+                            candidates[ia0].point = vec3_sub(candidates[ia1].point, vec3_scale(target_dir, len_a));
+                            updated = true;
+                        }
+                    }
+                    if (!updated && !line_b_fixed) {
+                        vec3_t target_dir = na;
+                        if (constraint->type == CONSTRAINT_PARALLEL) {
+                            vec3_t target_opposite = vec3_scale(target_dir, -1.0f);
+                            target_dir = (vec3_dot(target_dir, nb) >= vec3_dot(target_opposite, nb))
+                                             ? target_dir
+                                             : target_opposite;
+                        } else {
+                            vec3_t perp_axis = vec3_cross(na, nb);
+                            float perp_len = vec3_length(perp_axis);
+                            if (perp_len <= 1e-6f || !isfinite(perp_len)) {
+                                vec3_t fallback = (fabsf(na.z) < 0.9f)
+                                                      ? vec3_make(0.0f, 0.0f, 1.0f)
+                                                      : vec3_make(0.0f, 1.0f, 0.0f);
+                                perp_axis = vec3_cross(na, fallback);
+                                perp_len = vec3_length(perp_axis);
+                            }
+                            if (perp_len > 1e-6f && isfinite(perp_len)) {
+                                perp_axis = vec3_scale(perp_axis, 1.0f / perp_len);
+                                vec3_t perp_dir = vec3_normalize(vec3_cross(perp_axis, na));
+                                vec3_t perp_dir_opposite = vec3_scale(perp_dir, -1.0f);
+                                target_dir = (vec3_dot(perp_dir, nb) >= vec3_dot(perp_dir_opposite, nb))
+                                                 ? perp_dir
+                                                 : perp_dir_opposite;
+                            }
+                        }
+                        if (!candidates[ib1].fixed) {
+                            candidates[ib1].point = vec3_add(candidates[ib0].point, vec3_scale(target_dir, len_b));
+                            updated = true;
+                        } else if (!candidates[ib0].fixed) {
+                            candidates[ib0].point = vec3_sub(candidates[ib1].point, vec3_scale(target_dir, len_b));
+                            updated = true;
+                        }
+                    }
+                    if (!updated && !line_a_fixed) {
+                        vec3_t target_dir = nb;
+                        if (constraint->type == CONSTRAINT_PARALLEL) {
+                            vec3_t target_opposite = vec3_scale(target_dir, -1.0f);
+                            target_dir = (vec3_dot(target_dir, na) >= vec3_dot(target_opposite, na))
+                                             ? target_dir
+                                             : target_opposite;
+                        } else {
+                            vec3_t perp_axis = vec3_cross(nb, na);
+                            float perp_len = vec3_length(perp_axis);
+                            if (perp_len <= 1e-6f || !isfinite(perp_len)) {
+                                vec3_t fallback = (fabsf(nb.z) < 0.9f)
+                                                      ? vec3_make(0.0f, 0.0f, 1.0f)
+                                                      : vec3_make(0.0f, 1.0f, 0.0f);
+                                perp_axis = vec3_cross(nb, fallback);
+                                perp_len = vec3_length(perp_axis);
+                            }
+                            if (perp_len > 1e-6f && isfinite(perp_len)) {
+                                perp_axis = vec3_scale(perp_axis, 1.0f / perp_len);
+                                vec3_t perp_dir = vec3_normalize(vec3_cross(perp_axis, nb));
+                                vec3_t perp_dir_opposite = vec3_scale(perp_dir, -1.0f);
+                                target_dir = (vec3_dot(perp_dir, na) >= vec3_dot(perp_dir_opposite, na))
+                                                 ? perp_dir
+                                                 : perp_dir_opposite;
+                            }
                         }
                         if (!candidates[ia1].fixed) {
                             candidates[ia1].point = vec3_add(candidates[ia0].point, vec3_scale(target_dir, len_a));
