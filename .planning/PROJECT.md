@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
 
-**Current focus:** Phase 33 preparation after Phase 32 closure.
+**Current focus:** Phase 34 deterministic closure gate preparation after Phase 33 completion.
 
 ## Requirements
 
@@ -47,12 +47,13 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Deterministic Windows Vulkan closure gate now enforces build + canonical 7-test baseline + immediate rerun sign-off (`V14-01..02`) — Validated in Phase 30: deterministic-closure-gate-windows-vulkan-solver-docs
 - ✓ Script re-apply now preserves descriptor participant semantics (role/sub-index), script-managed color metadata, and deterministic repeated outcomes (`SCRI-01..03`) — Validated in Phase 31: script-reapply-fidelity-foundation
 - ✓ Explicit coincidence authoring semantics now preserve deterministic ArcAxisLine/tangency pair intent with durable lifecycle + script roundtrip behavior (`COIN-01..02`) — Validated in Phase 32: explicit-coincidence-authoring-semantics
+- ✓ Large-jump mixed arc/line workflows now use staged robustness semantics with transactional rollback/recovery and deterministic diagnostics/parity behavior for equivalent PARALLEL/ALONG setups (`SROB-01..03`, `DIAG-01..02`, `PARI-01..02`) — Validated in Phase 33: large-jump-robustness-and-parallel-along-parity
 
 ### Active
 
-- [ ] Improve solver convergence reliability for large-jump edits in mixed arc/line closed-loop sketches.
+- [ ] Improve solver convergence reliability for remaining edge-case large-jump edits in mixed arc/line closed-loop sketches.
 - [ ] Make ArcAxisLine and line-end/arc-end tangency authoring explicit with required coincidence constraints and stable solve behavior.
-- [ ] Close behavior parity gaps where `PARALLEL`-based arrangements should match equivalent `ALONG`-based workflows.
+- [ ] Continue refining behavior parity edge cases where `PARALLEL`-based arrangements should match equivalent `ALONG`-based workflows.
 
 ### Out of Scope
 
@@ -80,7 +81,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - v1.4 delivered line-line `PARALLEL`/`PERPENDICULAR` coverage, principal-axis ALONG reliability, tangency drag robustness, and active-sketch line gizmo endpoint-authority behavior.
 - v1.4 closure is deterministic on Windows Vulkan with build + canonical seven-test baseline + immediate rerun pass evidence captured in phase verification artifacts.
 - Solver architecture documentation is now published with practical code anchors, literature references, and a targeted debugging primer.
-- Milestone `v1.5` is initialized to continue solver robustness hardening from real user workflows, including script re-apply fidelity regressions.
+- Milestone `v1.5` is in closure stage after Phase 33 completion; remaining work is deterministic sign-off and final edge-case parity hardening acceptance.
 ## Next Milestone Goals
 
 1. Stabilize solver outcomes for large-jump edits in quarter-arc loop and multi-constraint tangency workflows.
@@ -132,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after Phase 31 execution closure*
+*Last updated: 2026-04-11 after Phase 33 execution and gap-closure completion*
