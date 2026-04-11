@@ -65,7 +65,7 @@ Plans:
 Plans:
 - [x] 33-01-PLAN.md — Implement two-stage large-jump staging with transactional rollback/recovery and deterministic failure ordering.
 - [x] 33-02-PLAN.md — Enforce PARALLEL/ALONG equivalence parity matrix and actionable deterministic diagnostics for mixed-constraint failures.
-- [ ] 33-03-PLAN.md — Close UAT PARALLEL drag-authority gap with equal-priority bidirectional motion policy and deterministic regressions.
+- [x] 33-03-PLAN.md — Close UAT PARALLEL drag-authority gap with equal-priority bidirectional motion policy and deterministic regressions.
 
 ### Phase 34: Deterministic v1.5 Closure Gate
 **Goal**: Developers and users can trust v1.5 reliability claims through reproducible deterministic baseline and immediate rerun evidence.
@@ -83,6 +83,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
-| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 2/2 | Complete   | 2026-04-10 |
+| 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete   | 2026-04-11 |
 | 34. Deterministic v1.5 Closure Gate | 0/TBD | Not started | - |
 
