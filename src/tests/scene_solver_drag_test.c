@@ -570,6 +570,170 @@ static int test_drag_parallel_along_mirrored_reordered_linked_vertex_parity(void
             vec3_close(projected[4], projected[5], 1e-5f)) ? 0 : 1;
 }
 
+static int test_drag_parallel_pair_ab_moves_cd_follows(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_ab = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 0.0f, 0.0f),
+                                                    vec3_make(3.0f, 0.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_cd = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 1.0f, 0.0f),
+                                                    vec3_make(2.0f, 2.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_ab || !line_cd) return 1;
+
+    ecs_entity_t participants[2] = { line_ab, line_cd };
+    if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *ab_before_geom = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_before_geom = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_before_geom || !cd_before_geom ||
+        ab_before_geom->type != GEOM_LINE || cd_before_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t ab_before_a = ab_before_geom->data.line.a;
+    vec3_t ab_before_b = ab_before_geom->data.line.b;
+    vec3_t cd_before_a = cd_before_geom->data.line.a;
+    vec3_t cd_before_b = cd_before_geom->data.line.b;
+
+    if (!scene_solver_set_drag_anchor(&scene, sketch, line_ab, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t ab_delta = vec3_make(0.0f, 0.6f, 0.0f);
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line_ab, ab_delta)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *ab_after_geom = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_after_geom = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_after_geom || !cd_after_geom ||
+        ab_after_geom->type != GEOM_LINE || cd_after_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t ab_after_a = ab_after_geom->data.line.a;
+    vec3_t ab_after_b = ab_after_geom->data.line.b;
+    vec3_t cd_after_a = cd_after_geom->data.line.a;
+    vec3_t cd_after_b = cd_after_geom->data.line.b;
+    vec3_t ab_dir = vec3_normalize(vec3_sub(ab_after_b, ab_after_a));
+    vec3_t cd_dir = vec3_normalize(vec3_sub(cd_after_b, cd_after_a));
+    float dot_dirs = vec3_dot(ab_dir, cd_dir);
+    if (dot_dirs > 1.0f) dot_dirs = 1.0f;
+    if (dot_dirs < -1.0f) dot_dirs = -1.0f;
+
+    int ok = (!vec3_close(ab_before_a, ab_after_a, 1e-4f) &&
+              !vec3_close(ab_before_b, ab_after_b, 1e-4f) &&
+              !vec3_close(cd_before_a, cd_after_a, 1e-4f) &&
+              !vec3_close(cd_before_b, cd_after_b, 1e-4f) &&
+              fabsf(fabsf(dot_dirs) - 1.0f) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
+static int test_drag_parallel_pair_cd_moves_ab_follows(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_ab = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 0.0f, 0.0f),
+                                                    vec3_make(3.0f, 0.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_cd = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 1.0f, 0.0f),
+                                                    vec3_make(2.0f, 2.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_ab || !line_cd) return 1;
+
+    ecs_entity_t participants[2] = { line_ab, line_cd };
+    if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, participants, 2, 0.0f, false)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *ab_before_geom = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_before_geom = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_before_geom || !cd_before_geom ||
+        ab_before_geom->type != GEOM_LINE || cd_before_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t ab_before_a = ab_before_geom->data.line.a;
+    vec3_t ab_before_b = ab_before_geom->data.line.b;
+    vec3_t cd_before_a = cd_before_geom->data.line.a;
+    vec3_t cd_before_b = cd_before_geom->data.line.b;
+
+    if (!scene_solver_set_drag_anchor(&scene, sketch, line_cd, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t cd_delta = vec3_make(0.0f, -0.5f, 0.0f);
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line_cd, cd_delta)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    GeometryComp *ab_after_geom = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_after_geom = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_after_geom || !cd_after_geom ||
+        ab_after_geom->type != GEOM_LINE || cd_after_geom->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t ab_after_a = ab_after_geom->data.line.a;
+    vec3_t ab_after_b = ab_after_geom->data.line.b;
+    vec3_t cd_after_a = cd_after_geom->data.line.a;
+    vec3_t cd_after_b = cd_after_geom->data.line.b;
+    vec3_t ab_dir = vec3_normalize(vec3_sub(ab_after_b, ab_after_a));
+    vec3_t cd_dir = vec3_normalize(vec3_sub(cd_after_b, cd_after_a));
+    float dot_dirs = vec3_dot(ab_dir, cd_dir);
+    if (dot_dirs > 1.0f) dot_dirs = 1.0f;
+    if (dot_dirs < -1.0f) dot_dirs = -1.0f;
+
+    int ok = (!vec3_close(ab_before_a, ab_after_a, 1e-4f) &&
+              !vec3_close(ab_before_b, ab_after_b, 1e-4f) &&
+              !vec3_close(cd_before_a, cd_after_a, 1e-4f) &&
+              !vec3_close(cd_before_b, cd_after_b, 1e-4f) &&
+              fabsf(fabsf(dot_dirs) - 1.0f) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -595,6 +759,10 @@ int main(void) {
           test_active_sketch_line_rigid_delta_applies_projected_delta_to_both_endpoints },
         { "test_drag_parallel_along_mirrored_reordered_linked_vertex_parity",
           test_drag_parallel_along_mirrored_reordered_linked_vertex_parity },
+        { "test_drag_parallel_pair_ab_moves_cd_follows",
+          test_drag_parallel_pair_ab_moves_cd_follows },
+        { "test_drag_parallel_pair_cd_moves_ab_follows",
+          test_drag_parallel_pair_cd_moves_ab_follows },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

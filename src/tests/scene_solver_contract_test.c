@@ -2542,6 +2542,91 @@ static int test_parallel_along_equivalent_base_mirrored_order_and_unsat_contract
             strstr(along_unsat.reason, "Unsatisfied driving ALONG X constraint.") != NULL) ? 0 : 1;
 }
 
+static int test_parallel_pair_along_interaction_switches_authority_without_lock_in(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+    ecs_entity_t line_ab = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 0.0f, 0.0f),
+                                                    vec3_make(3.0f, 0.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    ecs_entity_t line_cd = scene_add_line_to_sketch(&scene, sketch,
+                                                    vec3_make(0.0f, 1.0f, 0.0f),
+                                                    vec3_make(2.0f, 2.0f, 0.0f),
+                                                    vec4_make(1, 1, 1, 1), 1.0f);
+    if (!sketch || !line_ab || !line_cd) return 1;
+
+    ecs_entity_t parallel_pair[2] = { line_ab, line_cd };
+    if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, parallel_pair, 2, 0.0f, false)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    ecs_entity_t along_cd[1] = { line_cd };
+    if (!scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_ALONG_X, along_cd, 1, 0.0f, false)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_solver_request_recalculate(&scene, sketch)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    if (!scene_solver_set_drag_anchor(&scene, sketch, line_cd, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line_cd, vec3_make(0.0f, 0.4f, 0.0f))) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    bool solved_cd_drives = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ab_after_cd = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_after_cd = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_after_cd || !cd_after_cd ||
+        ab_after_cd->type != GEOM_LINE || cd_after_cd->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    vec3_t ab_after_cd_a = ab_after_cd->data.line.a;
+    vec3_t cd_after_cd_a = cd_after_cd->data.line.a;
+
+    if (!scene_solver_set_drag_anchor(&scene, sketch, line_ab, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (!scene_apply_active_sketch_line_world_delta(&scene, line_ab, vec3_make(0.0f, -0.35f, 0.0f))) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    bool solved_ab_drives = scene_solver_request_recalculate(&scene, sketch);
+    GeometryComp *ab_after_ab = ecs_world_get_geometry(scene.world, line_ab);
+    GeometryComp *cd_after_ab = ecs_world_get_geometry(scene.world, line_cd);
+    if (!ab_after_ab || !cd_after_ab ||
+        ab_after_ab->type != GEOM_LINE || cd_after_ab->type != GEOM_LINE) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    vec3_t ab_after_ab_a = ab_after_ab->data.line.a;
+    vec3_t cd_after_ab_a = cd_after_ab->data.line.a;
+    vec3_t ab_dir = vec3_normalize(vec3_sub(ab_after_ab->data.line.b, ab_after_ab->data.line.a));
+    vec3_t cd_dir = vec3_normalize(vec3_sub(cd_after_ab->data.line.b, cd_after_ab->data.line.a));
+    float dot_dirs = vec3_dot(ab_dir, cd_dir);
+    if (dot_dirs > 1.0f) dot_dirs = 1.0f;
+    if (dot_dirs < -1.0f) dot_dirs = -1.0f;
+
+    int ok = (solved_cd_drives &&
+              solved_ab_drives &&
+              !vec3_close(ab_after_cd_a, ab_after_ab_a, 1e-4f) &&
+              !vec3_close(cd_after_cd_a, cd_after_ab_a, 1e-4f) &&
+              fabsf(fabsf(dot_dirs) - 1.0f) <= 1e-4f);
+    ecs_world_shutdown(&world);
+    return ok ? 0 : 1;
+}
+
 
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
@@ -2642,6 +2727,8 @@ int main(void) {
           test_registry_parity_valid_signature_accepts_script_and_solver },
         { "test_parallel_along_equivalent_base_mirrored_order_and_unsat_contract",
           test_parallel_along_equivalent_base_mirrored_order_and_unsat_contract },
+        { "test_parallel_pair_along_interaction_switches_authority_without_lock_in",
+          test_parallel_pair_along_interaction_switches_authority_without_lock_in },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

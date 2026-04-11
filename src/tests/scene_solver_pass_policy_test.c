@@ -642,6 +642,82 @@ static int test_parallel_along_equivalent_mirrored_order_parity_pass_policy(void
             along_base.outcome_class == along_reordered.outcome_class) ? 0 : 1;
 }
 
+static int test_parallel_along_mirrored_reordered_authority_switch_is_deterministic(void) {
+    const bool use_parallel[6] = { true, false, true, false, true, false };
+    const bool mirrored[6] =    { false, false, true, true, false, false };
+    const bool reordered[6] =   { false, false, false, false, true, true };
+    int outcomes[6] = {0};
+
+    for (int i = 0; i < 6; i++) {
+        ecs_world_state_t world = {0};
+        ecs_scene_t scene = {0};
+        ecs_world_init(&world);
+        ecs_scene_init(&scene, &world);
+
+        float mirror = mirrored[i] ? -1.0f : 1.0f;
+        ecs_entity_t sketch = scene_add_sketch(&scene, "Sketch", "", vec4_make(1, 1, 1, 1));
+        ecs_entity_t line_a = scene_add_line_to_sketch(&scene, sketch,
+                                                       vec3_make(mirror * 0.0f, 0.0f, 0.0f),
+                                                       vec3_make(mirror * 3.0f, 0.0f, 0.0f),
+                                                       vec4_make(1, 1, 1, 1), 1.0f);
+        ecs_entity_t line_b = scene_add_line_to_sketch(&scene, sketch,
+                                                       vec3_make(mirror * 0.0f, 1.0f, 0.0f),
+                                                       vec3_make(mirror * 2.0f, 2.0f, 0.0f),
+                                                       vec4_make(1, 1, 1, 1), 1.0f);
+        if (!sketch || !line_a || !line_b) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+
+        bool added = false;
+        if (use_parallel[i]) {
+            ecs_entity_t pair[2] = { line_a, line_b };
+            if (reordered[i]) {
+                pair[0] = line_b;
+                pair[1] = line_a;
+            }
+            added = scene_add_constraint_to_sketch(&scene, sketch, CONSTRAINT_PARALLEL, pair, 2, 0.0f, false) != 0;
+        } else {
+            constraint_participant_descriptor_t along_desc[2] = {
+                constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0),
+                constraint_participant_descriptor_make((uint64_t)line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_B, 1),
+            };
+            if (reordered[i]) {
+                constraint_participant_descriptor_t tmp = along_desc[0];
+                along_desc[0] = along_desc[1];
+                along_desc[1] = tmp;
+            }
+            added = scene_add_constraint_to_sketch_with_descriptors(
+                &scene, sketch, CONSTRAINT_ALONG_X, along_desc, 2, 0.0f, false) != 0;
+        }
+        if (!added || !scene_solver_request_recalculate(&scene, sketch)) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+
+        if (!scene_solver_set_drag_anchor(&scene, sketch, line_b, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0) ||
+            !scene_apply_active_sketch_line_world_delta(&scene, line_b, vec3_make(0.0f, 0.3f, 0.0f))) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        bool solved_first = scene_solver_request_recalculate(&scene, sketch);
+        if (!scene_solver_set_drag_anchor(&scene, sketch, line_a, CONSTRAINT_PARTICIPANT_ROLE_POINT_A, 0) ||
+            !scene_apply_active_sketch_line_world_delta(&scene, line_a, vec3_make(0.0f, -0.25f, 0.0f))) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        bool solved_second = scene_solver_request_recalculate(&scene, sketch);
+        outcomes[i] = (solved_first && solved_second) ? 1 : 0;
+        ecs_world_shutdown(&world);
+    }
+
+    return (outcomes[0] == outcomes[1] &&
+            outcomes[2] == outcomes[3] &&
+            outcomes[4] == outcomes[5] &&
+            outcomes[0] == outcomes[2] &&
+            outcomes[0] == outcomes[4]) ? 0 : 1;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct { const char *name; test_fn_t fn; } test_case_t;
 
@@ -664,6 +740,8 @@ int main(void) {
           test_alin04_pass_policy_mixed_along_x_length_angle_connectivity_rerun_deterministic },
         { "test_parallel_along_equivalent_mirrored_order_parity_pass_policy",
           test_parallel_along_equivalent_mirrored_order_parity_pass_policy },
+        { "test_parallel_along_mirrored_reordered_authority_switch_is_deterministic",
+          test_parallel_along_mirrored_reordered_authority_switch_is_deterministic },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
