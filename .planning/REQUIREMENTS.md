@@ -17,7 +17,7 @@ Requirements for the solver workflow robustness and script re-apply integrity mi
 
 - [x] **DIAG-01**: User gets deterministic solve outcomes and deterministic failure-class diagnostics for identical operation sequences.
 - [x] **DIAG-02**: User gets actionable diagnostics for large-jump and mixed-constraint failures without misleading participant-type errors.
-- [ ] **DIAG-03**: Developer can verify deterministic baseline + immediate rerun parity on the v1.5 targeted regression gate.
+- [x] **DIAG-03**: Developer can verify deterministic baseline + immediate rerun parity on the v1.5 targeted regression gate.
 
 ### Explicit Coincidence Authoring Semantics
 
@@ -69,7 +69,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SROB-03 | Phase 33 | Complete |
 | DIAG-01 | Phase 33 | Complete |
 | DIAG-02 | Phase 33 | Complete |
-| DIAG-03 | Phase 34 | Pending |
+| DIAG-03 | Phase 34 | Complete |
 | COIN-01 | Phase 32 | Complete |
 | COIN-02 | Phase 32 | Complete |
 | PARI-01 | Phase 33 | Complete |

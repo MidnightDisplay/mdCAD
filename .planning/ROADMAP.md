@@ -79,7 +79,7 @@ Plans:
 
 Plans:
 - [x] 34-01-PLAN.md — Lock canonical deterministic closure contract and capture baseline + immediate rerun DIAG-03 evidence.
-- [ ] 34-02-PLAN.md — Stabilize failing canonical gate tests and re-capture 7/7 baseline + immediate rerun parity evidence for DIAG-03 closure.
+- [x] 34-02-PLAN.md — Stabilize failing canonical gate tests and re-capture 7/7 baseline + immediate rerun parity evidence for DIAG-03 closure.
 
 ## Progress
 
@@ -88,5 +88,5 @@ Plans:
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete    | 2026-04-11 |
-| 34. Deterministic v1.5 Closure Gate | 1/2 | In Progress | - |
+| 34. Deterministic v1.5 Closure Gate | 2/2 | Complete | 2026-04-11 |
 

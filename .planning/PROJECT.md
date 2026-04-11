@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
 
-**Current focus:** Phase 34 deterministic closure gate preparation after Phase 33 completion.
+**Current focus:** Phase 34 deterministic closure gate complete; milestone v1.5 ready for closure flow.
 
 ## Requirements
 
@@ -48,6 +48,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Script re-apply now preserves descriptor participant semantics (role/sub-index), script-managed color metadata, and deterministic repeated outcomes (`SCRI-01..03`) — Validated in Phase 31: script-reapply-fidelity-foundation
 - ✓ Explicit coincidence authoring semantics now preserve deterministic ArcAxisLine/tangency pair intent with durable lifecycle + script roundtrip behavior (`COIN-01..02`) — Validated in Phase 32: explicit-coincidence-authoring-semantics
 - ✓ Large-jump mixed arc/line workflows now use staged robustness semantics with transactional rollback/recovery and deterministic diagnostics/parity behavior for equivalent PARALLEL/ALONG setups (`SROB-01..03`, `DIAG-01..02`, `PARI-01..02`) — Validated in Phase 33: large-jump-robustness-and-parallel-along-parity
+- ✓ Deterministic v1.5 closure gate now proves canonical Windows Vulkan baseline + immediate rerun parity for targeted 7-test suite (`DIAG-03`) — Validated in Phase 34: deterministic-v1-5-closure-gate
 
 ### Active
 
@@ -81,7 +82,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - v1.4 delivered line-line `PARALLEL`/`PERPENDICULAR` coverage, principal-axis ALONG reliability, tangency drag robustness, and active-sketch line gizmo endpoint-authority behavior.
 - v1.4 closure is deterministic on Windows Vulkan with build + canonical seven-test baseline + immediate rerun pass evidence captured in phase verification artifacts.
 - Solver architecture documentation is now published with practical code anchors, literature references, and a targeted debugging primer.
-- Milestone `v1.5` is in closure stage after Phase 33 completion; remaining work is deterministic sign-off and final edge-case parity hardening acceptance.
+- Milestone `v1.5` is phase-complete through Phase 34, including deterministic closure sign-off evidence (canonical 7/7 baseline + immediate rerun 7/7).
 ## Next Milestone Goals
 
 1. Stabilize solver outcomes for large-jump edits in quarter-arc loop and multi-constraint tangency workflows.
