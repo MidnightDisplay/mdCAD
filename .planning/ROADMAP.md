@@ -18,7 +18,7 @@
 - [x] **Phase 31: Script Reapply Fidelity Foundation** - Preserve script remap semantics and metadata so replayed scenes stay valid and deterministic. (completed 2026-04-10)
 - [x] **Phase 32: Explicit Coincidence Authoring Semantics** - Make ArcAxisLine and endpoint tangency authoring explicit and stable via required coincidence intent. (completed 2026-04-10)
 - [x] **Phase 33: Large-Jump Robustness and PARALLEL/ALONG Parity** - Stabilize mixed arc/line large edits and parity behavior across equivalent constraint setups. (completed 2026-04-10)
-- [ ] **Phase 34: Deterministic v1.5 Closure Gate** - Lock reproducible deterministic sign-off for targeted v1.5 regression coverage.
+- [x] **Phase 34: Deterministic v1.5 Closure Gate** - Lock reproducible deterministic sign-off for targeted v1.5 regression coverage. (completed 2026-04-11)
 
 ## Phase Details
 
@@ -88,5 +88,5 @@ Plans:
 | 31. Script Reapply Fidelity Foundation | 2/2 | Complete | 2026-04-10 |
 | 32. Explicit Coincidence Authoring Semantics | 2/2 | Complete | 2026-04-10 |
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete    | 2026-04-11 |
-| 34. Deterministic v1.5 Closure Gate | 2/2 | Complete | 2026-04-11 |
+| 34. Deterministic v1.5 Closure Gate | 2/2 | Complete    | 2026-04-11 |
 
