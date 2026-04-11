@@ -961,7 +961,14 @@ static inline bool scene_apply_active_sketch_line_world_delta(ecs_scene_t *scene
     if (line_renderable) line_renderable->instance_dirty = true;
 
     scene_sync_endpoint_entities_for_owner(scene, line_entity);
-    (void)scene_solver_clear_drag_anchor(scene, sketch);
+    SketchComp *sk = ecs_world_get_sketch(scene->world, sketch);
+    if (sk &&
+        sk->solver_drag_anchor_valid &&
+        (ecs_entity_t)sk->solver_drag_anchor_owner_entity == line_entity) {
+        /* Preserve explicit drag-anchor intent for active line drags. */
+    } else {
+        (void)scene_solver_clear_drag_anchor(scene, sketch);
+    }
     scene_solver_request_auto(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
     return true;
@@ -3226,9 +3233,9 @@ static inline bool scene_solver_constraint_mentions_entity(const ConstraintComp 
 }
 
 static inline int scene_solver_external_constraint_score_for_entity(ecs_scene_t *scene,
-                                                                    ecs_entity_t sketch,
-                                                                    ecs_entity_t skip_constraint,
-                                                                    ecs_entity_t entity) {
+                                                                     ecs_entity_t sketch,
+                                                                     ecs_entity_t skip_constraint,
+                                                                     ecs_entity_t entity) {
     if (!scene || !scene_is_sketch(scene, sketch) || entity == 0) return 0;
     int score = 0;
     ecs_iter_t children = ecs_children(scene->world->world, sketch);
@@ -3252,6 +3259,46 @@ static inline int scene_solver_external_constraint_score_for_entity(ecs_scene_t 
         }
     }
     return score;
+}
+
+static inline bool scene_solver_apply_parallel_drag_authority_translation(
+    const SketchComp *sk,
+    scene_solver_point_candidate_t *candidates,
+    int ia0,
+    int ia1,
+    int ib0,
+    int ib1,
+    ecs_entity_t line_a_entity,
+    ecs_entity_t line_b_entity) {
+    if (!sk || !candidates || !sk->solver_drag_anchor_valid) return false;
+    if (sk->solver_drag_anchor_owner_entity == 0) return false;
+    if (sk->solver_drag_anchor_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_A &&
+        sk->solver_drag_anchor_role != CONSTRAINT_PARTICIPANT_ROLE_POINT_B) {
+        return false;
+    }
+
+    ecs_entity_t anchor_owner = (ecs_entity_t)sk->solver_drag_anchor_owner_entity;
+    bool anchor_on_point_b = (sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B);
+    int authority_index = anchor_on_point_b ? ia1 : ia0;
+    int follower_index = anchor_on_point_b ? ib1 : ib0;
+
+    if (anchor_owner == line_a_entity) {
+        if (candidates[ib0].fixed || candidates[ib1].fixed) return false;
+        vec3_t delta = vec3_sub(candidates[authority_index].point, candidates[follower_index].point);
+        if (!isfinite(delta.x) || !isfinite(delta.y) || !isfinite(delta.z)) return false;
+        candidates[ib0].point = vec3_add(candidates[ib0].point, delta);
+        candidates[ib1].point = vec3_add(candidates[ib1].point, delta);
+        return true;
+    }
+    if (anchor_owner == line_b_entity) {
+        if (candidates[ia0].fixed || candidates[ia1].fixed) return false;
+        vec3_t delta = vec3_sub(candidates[follower_index].point, candidates[authority_index].point);
+        if (!isfinite(delta.x) || !isfinite(delta.y) || !isfinite(delta.z)) return false;
+        candidates[ia0].point = vec3_add(candidates[ia0].point, delta);
+        candidates[ia1].point = vec3_add(candidates[ia1].point, delta);
+        return true;
+    }
+    return false;
 }
 
 static inline void scene_solver_process_auto_queue(ecs_scene_t *scene) {
@@ -3855,6 +3902,25 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     }
                     if (residual > pass_max_residual) pass_max_residual = residual;
                     if (residual > pass_max_angle_delta) pass_max_angle_delta = residual;
+                    if (constraint->type == CONSTRAINT_PARALLEL && residual <= angle_tolerance) {
+                        vec3_t before_ia0 = candidates[ia0].point;
+                        vec3_t before_ia1 = candidates[ia1].point;
+                        vec3_t before_ib0 = candidates[ib0].point;
+                        vec3_t before_ib1 = candidates[ib1].point;
+                        bool translated = scene_solver_apply_parallel_drag_authority_translation(
+                            sk, candidates, ia0, ia1, ib0, ib1, line_a_entity, line_b_entity);
+                        if (translated) {
+                            float delta_ia0 = vec3_length(vec3_sub(candidates[ia0].point, before_ia0));
+                            float delta_ia1 = vec3_length(vec3_sub(candidates[ia1].point, before_ia1));
+                            float delta_ib0 = vec3_length(vec3_sub(candidates[ib0].point, before_ib0));
+                            float delta_ib1 = vec3_length(vec3_sub(candidates[ib1].point, before_ib1));
+                            if (delta_ia0 > pass_max_position_delta) pass_max_position_delta = delta_ia0;
+                            if (delta_ia1 > pass_max_position_delta) pass_max_position_delta = delta_ia1;
+                            if (delta_ib0 > pass_max_position_delta) pass_max_position_delta = delta_ib0;
+                            if (delta_ib1 > pass_max_position_delta) pass_max_position_delta = delta_ib1;
+                        }
+                        continue;
+                    }
                     if (residual <= angle_tolerance) {
                         continue;
                     }
@@ -3875,6 +3941,11 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                     bool updated = false;
                     bool line_a_has_drag_authority = false;
                     bool line_b_has_drag_authority = false;
+                    bool translation_applied = false;
+                    if (constraint->type == CONSTRAINT_PARALLEL) {
+                        translation_applied = scene_solver_apply_parallel_drag_authority_translation(
+                            sk, candidates, ia0, ia1, ib0, ib1, line_a_entity, line_b_entity);
+                    }
                     if (sk->solver_drag_anchor_valid &&
                         (sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_A ||
                          sk->solver_drag_anchor_role == CONSTRAINT_PARTICIPANT_ROLE_POINT_B)) {
@@ -3898,7 +3969,10 @@ static inline bool scene_solver_request_recalculate(ecs_scene_t *scene, ecs_enti
                         }
                     }
 
-                    if (line_a_has_drag_authority && !line_b_fixed) {
+                    if (translation_applied) {
+                        updated = true;
+                    }
+                    if (!updated && line_a_has_drag_authority && !line_b_fixed) {
                         vec3_t target_dir = na;
                         if (constraint->type == CONSTRAINT_PARALLEL) {
                             vec3_t target_opposite = vec3_scale(target_dir, -1.0f);
