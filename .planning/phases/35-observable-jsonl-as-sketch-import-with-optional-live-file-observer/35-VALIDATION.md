@@ -19,18 +19,18 @@ created: 2026-04-12
 |----------|-------|
 | **Framework** | CTest + native C test executables |
 | **Config file** | `CMakeLists.txt`, `src/CMakeLists.txt` |
-| **Quick run command** | `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests|scene_solver_contract" --output-on-failure` |
+| **Quick run command** | `ctest --test-dir build-vulkan -C Release -R "jsonl_sketch_import_test|jsonl_sketch_mapping_test|jsonl_observer_state_test|jsonl_reparse_transaction_test|jsonl_label_contract_test|script_roundtrip_tests|scene_solver_contract" --output-on-failure` |
 | **Full suite command** | `ctest --test-dir build-vulkan -C Release --output-on-failure` |
-| **Estimated runtime** | ~120 seconds |
+| **Estimated runtime** | ~20-30 seconds (quick loop), ~120 seconds (full suite) |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `ctest --test-dir build-vulkan -C Release -R "script_roundtrip_tests|scene_solver_contract" --output-on-failure`
+- **After every task commit:** Run `ctest --test-dir build-vulkan -C Release -R "jsonl_sketch_import_test|jsonl_sketch_mapping_test|jsonl_observer_state_test|jsonl_reparse_transaction_test|jsonl_label_contract_test|script_roundtrip_tests|scene_solver_contract" --output-on-failure`
 - **After every plan wave:** Run `ctest --test-dir build-vulkan -C Release --output-on-failure`
 - **Before `/gsd-verify-work`:** Full suite must be green
-- **Max feedback latency:** 120 seconds
+- **Max feedback latency:** 30 seconds (inner loop), 120 seconds (wave/full gates)
 
 ---
 
@@ -76,7 +76,7 @@ created: 2026-04-12
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
+- [ ] Feedback latency <= 30s for quick-loop command (wave/full gates may run longer)
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
