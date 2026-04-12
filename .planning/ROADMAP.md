@@ -99,6 +99,6 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 35-01-PLAN.md — Create Wave 0 tests and interface contracts for JSONL sketch import + observer subsystems.
-- [ ] 35-02-PLAN.md — Implement persisted observer state and transactional authoritative re-parse/relink behavior.
-- [ ] 35-03-PLAN.md — Ship user-facing JSONL-as-sketch import mapping plus observer UI relocation and overwrite warnings.
+- [ ] 35-01-PLAN.md (Wave 1) — Create Wave 0 tests and interface contracts for JSONL sketch import + observer subsystems.
+- [ ] 35-02-PLAN.md (Wave 2, depends on 35-01) — Implement persisted observer state and transactional authoritative re-parse/relink behavior.
+- [ ] 35-03-PLAN.md (Wave 3, depends on 35-01 and 35-02) — Ship user-facing JSONL-as-sketch import mapping plus observer UI relocation and overwrite warnings.
