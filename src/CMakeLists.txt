@@ -178,6 +178,66 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     target_link_libraries(scene_solver_pass_policy PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME scene_solver_pass_policy COMMAND scene_solver_pass_policy)
+
+    add_executable(jsonl_sketch_import_test tests/jsonl_sketch_import_test.c)
+    target_compile_features(jsonl_sketch_import_test PRIVATE c_std_11)
+    target_include_directories(jsonl_sketch_import_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_sketch_import_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_sketch_import_test COMMAND jsonl_sketch_import_test)
+
+    add_executable(jsonl_sketch_mapping_test tests/jsonl_sketch_mapping_test.c)
+    target_compile_features(jsonl_sketch_mapping_test PRIVATE c_std_11)
+    target_include_directories(jsonl_sketch_mapping_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_sketch_mapping_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_sketch_mapping_test COMMAND jsonl_sketch_mapping_test)
+
+    add_executable(jsonl_observer_state_test tests/jsonl_observer_state_test.c)
+    target_compile_features(jsonl_observer_state_test PRIVATE c_std_11)
+    target_include_directories(jsonl_observer_state_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_observer_state_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_observer_state_test COMMAND jsonl_observer_state_test)
+
+    add_executable(jsonl_reparse_transaction_test tests/jsonl_reparse_transaction_test.c)
+    target_compile_features(jsonl_reparse_transaction_test PRIVATE c_std_11)
+    target_include_directories(jsonl_reparse_transaction_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_reparse_transaction_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_reparse_transaction_test COMMAND jsonl_reparse_transaction_test)
+
+    add_executable(jsonl_label_contract_test tests/jsonl_label_contract_test.c)
+    target_compile_features(jsonl_label_contract_test PRIVATE c_std_11)
+    target_include_directories(jsonl_label_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_label_contract_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_label_contract_test COMMAND jsonl_label_contract_test)
 endif()
 
 # Emscripten-specific linker options
