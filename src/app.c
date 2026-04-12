@@ -138,8 +138,9 @@ static struct {
     bool script_editor_preview_ok;
     bool script_editor_last_apply_failed;
     uint64_t script_editor_last_seen_emit_revision;
-    char script_editor_text[16384];
-    char script_editor_committed_text[16384];
+    char *script_editor_text;
+    char *script_editor_committed_text;
+    size_t script_editor_capacity;
     sketch_script_error_t script_editor_last_error;
     ecs_entity_t script_io_sketch;
     bool script_io_open;
@@ -148,8 +149,195 @@ static struct {
     bool script_io_slider_drag_active;
     ecs_entity_t script_io_slider_drag_sketch;
     char script_io_slider_drag_input_id[SCRIPT_LOCAL_ID_MAX];
-    char script_io_slider_drag_before_script[16384];
+    char *script_io_slider_drag_before_script;
+    size_t script_io_slider_drag_before_capacity;
 } state;
+
+#define MDCAD_SCRIPT_EDITOR_MIN_CAPACITY 16384u
+#define MDCAD_SCRIPT_EDITOR_MAX_CAPACITY (4u * 1024u * 1024u)
+
+static size_t mdcad_script_editor_estimate_capacity(ecs_entity_t sketch) {
+    int geom_count = 0;
+    int constraint_count = 0;
+    int io_count = 0;
+    if (scene_is_sketch(&state.ecs_scene, sketch)) {
+        geom_count = scene_count_sketch_geometry(&state.ecs_scene, sketch);
+        constraint_count = scene_count_sketch_constraints(&state.ecs_scene, sketch);
+        io_count = scene_script_io_descriptor_count(&state.ecs_scene, sketch);
+    }
+    if (geom_count < 0) geom_count = 0;
+    if (constraint_count < 0) constraint_count = 0;
+    if (io_count < 0) io_count = 0;
+
+    size_t predicted_extra_constraints = (size_t)(geom_count / 2 + 16);
+    size_t estimate = 2048u +
+                      (size_t)io_count * 192u +
+                      (size_t)geom_count * 256u +
+                      ((size_t)constraint_count + predicted_extra_constraints) * 320u;
+    if (estimate < MDCAD_SCRIPT_EDITOR_MIN_CAPACITY) estimate = MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+    if (estimate > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) estimate = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+    return estimate;
+}
+
+static bool mdcad_script_editor_reserve(size_t required_capacity, bool preserve_text) {
+    if (required_capacity < MDCAD_SCRIPT_EDITOR_MIN_CAPACITY) {
+        required_capacity = MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+    }
+    if (required_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+        required_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+    }
+    if (state.script_editor_text &&
+        state.script_editor_committed_text &&
+        state.script_editor_capacity >= required_capacity) {
+        return true;
+    }
+
+    size_t new_capacity = state.script_editor_capacity > 0
+        ? state.script_editor_capacity
+        : MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+    while (new_capacity < required_capacity && new_capacity < MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+        new_capacity *= 2u;
+        if (new_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+            new_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+            break;
+        }
+    }
+    if (new_capacity < required_capacity) return false;
+
+    char *new_text = (char*)calloc(new_capacity, sizeof(char));
+    char *new_committed = (char*)calloc(new_capacity, sizeof(char));
+    if (!new_text || !new_committed) {
+        if (new_text) free(new_text);
+        if (new_committed) free(new_committed);
+        return false;
+    }
+
+    if (preserve_text && state.script_editor_text && state.script_editor_committed_text) {
+        snprintf(new_text, new_capacity, "%s", state.script_editor_text);
+        new_text[new_capacity - 1] = '\0';
+        snprintf(new_committed, new_capacity, "%s", state.script_editor_committed_text);
+        new_committed[new_capacity - 1] = '\0';
+    }
+
+    if (state.script_editor_text) free(state.script_editor_text);
+    if (state.script_editor_committed_text) free(state.script_editor_committed_text);
+    state.script_editor_text = new_text;
+    state.script_editor_committed_text = new_committed;
+    state.script_editor_capacity = new_capacity;
+    return true;
+}
+
+static bool mdcad_script_editor_emit_complete(ecs_entity_t sketch,
+                                              char **out_script,
+                                              sketch_script_error_t *out_error) {
+    if (!out_script) return false;
+    *out_script = NULL;
+
+    size_t target_capacity = mdcad_script_editor_estimate_capacity(sketch);
+    if (!mdcad_script_editor_reserve(target_capacity, true)) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message),
+                     "Out of memory allocating script editor buffer.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+
+    size_t emit_capacity = state.script_editor_capacity;
+    while (emit_capacity <= MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+        char *emitted = (char*)calloc(emit_capacity, sizeof(char));
+        if (!emitted) {
+            if (out_error) {
+                out_error->line = 0;
+                out_error->column = 0;
+                snprintf(out_error->message, sizeof(out_error->message),
+                         "Out of memory allocating script emit buffer.");
+                out_error->message[sizeof(out_error->message) - 1] = '\0';
+            }
+            return false;
+        }
+
+        if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, emit_capacity, out_error)) {
+            free(emitted);
+            return false;
+        }
+
+        sketch_script_error_t preview_err = {0};
+        if (scene_script_preview_parse(&state.ecs_scene, sketch, emitted, &preview_err)) {
+            *out_script = emitted;
+            return true;
+        }
+
+        free(emitted);
+        if (emit_capacity >= MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+            if (out_error) {
+                *out_error = preview_err;
+                if (out_error->message[0] == '\0') {
+                    snprintf(out_error->message, sizeof(out_error->message),
+                             "Script exceeds maximum editor buffer capacity.");
+                    out_error->message[sizeof(out_error->message) - 1] = '\0';
+                }
+            }
+            return false;
+        }
+
+        size_t next_capacity = emit_capacity * 2u;
+        if (next_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+            next_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+        }
+        if (!mdcad_script_editor_reserve(next_capacity, true)) {
+            if (out_error) {
+                out_error->line = 0;
+                out_error->column = 0;
+                snprintf(out_error->message, sizeof(out_error->message),
+                         "Out of memory growing script editor buffer.");
+                out_error->message[sizeof(out_error->message) - 1] = '\0';
+            }
+            return false;
+        }
+        emit_capacity = state.script_editor_capacity;
+    }
+
+    return false;
+}
+
+static bool mdcad_script_io_slider_before_reserve(size_t required_capacity) {
+    if (required_capacity < MDCAD_SCRIPT_EDITOR_MIN_CAPACITY) {
+        required_capacity = MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+    }
+    if (required_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+        required_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+    }
+    if (state.script_io_slider_drag_before_script &&
+        state.script_io_slider_drag_before_capacity >= required_capacity) {
+        return true;
+    }
+
+    size_t new_capacity = state.script_io_slider_drag_before_capacity > 0
+        ? state.script_io_slider_drag_before_capacity
+        : MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+    while (new_capacity < required_capacity && new_capacity < MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+        new_capacity *= 2u;
+        if (new_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+            new_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+            break;
+        }
+    }
+    if (new_capacity < required_capacity) return false;
+
+    char *new_buffer = (char*)calloc(new_capacity, sizeof(char));
+    if (!new_buffer) return false;
+    if (state.script_io_slider_drag_before_script) {
+        snprintf(new_buffer, new_capacity, "%s", state.script_io_slider_drag_before_script);
+        new_buffer[new_capacity - 1] = '\0';
+        free(state.script_io_slider_drag_before_script);
+    }
+    state.script_io_slider_drag_before_script = new_buffer;
+    state.script_io_slider_drag_before_capacity = new_capacity;
+    return true;
+}
 
 static inline float mdcad_deg_to_rad(float degrees) {
     return degrees * (3.14159265359f / 180.0f);
@@ -232,9 +420,9 @@ static void mdcad_script_io_clear_error(void) {
 
 static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool overwrite_text) {
     if (sketch == 0) return false;
-    char emitted[sizeof(state.script_editor_committed_text)] = {0};
     sketch_script_error_t emit_err = {0};
-    if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+    char *emitted = NULL;
+    if (!mdcad_script_editor_emit_complete(sketch, &emitted, &emit_err)) {
         state.script_editor_last_error = emit_err;
         return false;
     }
@@ -244,24 +432,45 @@ static bool mdcad_script_editor_load_emitted_script(ecs_entity_t sketch, bool ov
         const bool has_script_shape_entries = strstr(emitted, "type = \"") != NULL;
         if ((geometry_count > 0 || constraint_count > 0) && !has_script_shape_entries) {
             scene_normalize_sketch_script_local_ids(&state.ecs_scene, sketch);
-            if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+            free(emitted);
+            emitted = NULL;
+            if (!mdcad_script_editor_emit_complete(sketch, &emitted, &emit_err)) {
                 state.script_editor_last_error = emit_err;
                 return false;
             }
         }
     }
-    snprintf(state.script_editor_committed_text, sizeof(state.script_editor_committed_text), "%s", emitted);
-    state.script_editor_committed_text[sizeof(state.script_editor_committed_text) - 1] = '\0';
+    size_t needed_capacity = strlen(emitted) + 1u;
+    if (!mdcad_script_editor_reserve(needed_capacity, true)) {
+        free(emitted);
+        state.script_editor_last_error.line = 0;
+        state.script_editor_last_error.column = 0;
+        snprintf(state.script_editor_last_error.message, sizeof(state.script_editor_last_error.message),
+                 "Out of memory growing script editor buffer.");
+        state.script_editor_last_error.message[sizeof(state.script_editor_last_error.message) - 1] = '\0';
+        return false;
+    }
+    snprintf(state.script_editor_committed_text, state.script_editor_capacity, "%s", emitted);
+    state.script_editor_committed_text[state.script_editor_capacity - 1] = '\0';
     if (overwrite_text) {
-        snprintf(state.script_editor_text, sizeof(state.script_editor_text), "%s", emitted);
-        state.script_editor_text[sizeof(state.script_editor_text) - 1] = '\0';
+        snprintf(state.script_editor_text, state.script_editor_capacity, "%s", emitted);
+        state.script_editor_text[state.script_editor_capacity - 1] = '\0';
         state.script_editor_has_unsaved_edits = false;
     }
+    free(emitted);
     return true;
 }
 
 static void mdcad_script_editor_open_for_sketch(ecs_entity_t sketch) {
     if (sketch == 0) return;
+    if (!mdcad_script_editor_reserve(mdcad_script_editor_estimate_capacity(sketch), true)) {
+        state.script_editor_last_error.line = 0;
+        state.script_editor_last_error.column = 0;
+        snprintf(state.script_editor_last_error.message, sizeof(state.script_editor_last_error.message),
+                 "Out of memory preparing script editor buffer.");
+        state.script_editor_last_error.message[sizeof(state.script_editor_last_error.message) - 1] = '\0';
+        return;
+    }
     state.script_editor_sketch = sketch;
     state.script_editor_open = true;
     state.script_editor_initialized = true;
@@ -278,13 +487,18 @@ static void mdcad_script_editor_open_for_sketch(ecs_entity_t sketch) {
 
 static void mdcad_script_io_open_for_sketch(ecs_entity_t sketch) {
     if (sketch == 0) return;
+    if (!mdcad_script_io_slider_before_reserve(mdcad_script_editor_estimate_capacity(sketch))) {
+        return;
+    }
     state.script_io_sketch = sketch;
     state.script_io_open = true;
     state.script_io_last_seen_emit_revision = scene_script_emit_revision(&state.ecs_scene);
     state.script_io_slider_drag_active = false;
     state.script_io_slider_drag_sketch = 0;
     state.script_io_slider_drag_input_id[0] = '\0';
-    state.script_io_slider_drag_before_script[0] = '\0';
+    if (state.script_io_slider_drag_before_script) {
+        state.script_io_slider_drag_before_script[0] = '\0';
+    }
     mdcad_script_io_clear_error();
 }
 
@@ -322,7 +536,7 @@ static void mdcad_draw_script_editor_window(void) {
 
         bool edited = igInputTextMultiline("##script_editor_text",
                                            state.script_editor_text,
-                                           sizeof(state.script_editor_text),
+                                           state.script_editor_capacity,
                                            (ImVec2){-1.0f, 420.0f},
                                            ImGuiInputTextFlags_AllowTabInput,
                                            NULL,
@@ -508,11 +722,30 @@ static void mdcad_draw_script_io_window(void) {
                                                strcmp(state.script_io_slider_drag_input_id, desc.id) == 0;
                 if (interaction_active && !session_active_for_item) {
                     sketch_script_error_t emit_error = {0};
-                    char before_script[16384] = {0};
+                    size_t before_capacity = mdcad_script_editor_estimate_capacity(state.script_io_sketch);
+                    if (!mdcad_script_io_slider_before_reserve(before_capacity)) {
+                        state.script_io_last_error.line = 0;
+                        state.script_io_last_error.column = 0;
+                        snprintf(state.script_io_last_error.message, sizeof(state.script_io_last_error.message),
+                                 "Out of memory preparing script IO snapshot buffer.");
+                        state.script_io_last_error.message[sizeof(state.script_io_last_error.message) - 1] = '\0';
+                        igPopID();
+                        continue;
+                    }
+                    char *before_script = (char*)calloc(state.script_io_slider_drag_before_capacity, sizeof(char));
+                    if (!before_script) {
+                        state.script_io_last_error.line = 0;
+                        state.script_io_last_error.column = 0;
+                        snprintf(state.script_io_last_error.message, sizeof(state.script_io_last_error.message),
+                                 "Out of memory allocating script IO snapshot buffer.");
+                        state.script_io_last_error.message[sizeof(state.script_io_last_error.message) - 1] = '\0';
+                        igPopID();
+                        continue;
+                    }
                     if (scene_script_emit_for_sketch(&state.ecs_scene,
                                                      state.script_io_sketch,
                                                      before_script,
-                                                     sizeof(before_script),
+                                                     state.script_io_slider_drag_before_capacity,
                                                      &emit_error)) {
                         state.script_io_slider_drag_active = true;
                         state.script_io_slider_drag_sketch = state.script_io_sketch;
@@ -522,12 +755,13 @@ static void mdcad_draw_script_io_window(void) {
                                  desc.id);
                         state.script_io_slider_drag_input_id[sizeof(state.script_io_slider_drag_input_id) - 1] = '\0';
                         snprintf(state.script_io_slider_drag_before_script,
-                                 sizeof(state.script_io_slider_drag_before_script),
+                                 state.script_io_slider_drag_before_capacity,
                                  "%s",
                                  before_script);
-                        state.script_io_slider_drag_before_script[sizeof(state.script_io_slider_drag_before_script) - 1] = '\0';
+                        state.script_io_slider_drag_before_script[state.script_io_slider_drag_before_capacity - 1] = '\0';
                         session_active_for_item = true;
                     }
+                    free(before_script);
                 }
                 if (session_active_for_item && interaction_active) {
                     slider_drag_active_this_frame = true;
@@ -551,7 +785,9 @@ static void mdcad_draw_script_io_window(void) {
                         state.script_io_slider_drag_active = false;
                         state.script_io_slider_drag_sketch = 0;
                         state.script_io_slider_drag_input_id[0] = '\0';
-                        state.script_io_slider_drag_before_script[0] = '\0';
+                        if (state.script_io_slider_drag_before_script) {
+                            state.script_io_slider_drag_before_script[0] = '\0';
+                        }
                     }
                     if (session_active_for_item) {
                         state.ecs_scene.script_apply_undo_suppressed = prev_undo_suppressed;
@@ -597,12 +833,31 @@ static void mdcad_draw_script_io_window(void) {
     if (state.script_io_slider_drag_active) {
         if (!slider_drag_active_this_frame ||
             state.script_io_slider_drag_sketch != state.script_io_sketch) {
-            char after_script[16384] = {0};
+            size_t after_capacity = mdcad_script_editor_estimate_capacity(state.script_io_slider_drag_sketch);
+            if (after_capacity < state.script_io_slider_drag_before_capacity) {
+                after_capacity = state.script_io_slider_drag_before_capacity;
+            }
+            if (after_capacity < MDCAD_SCRIPT_EDITOR_MIN_CAPACITY) {
+                after_capacity = MDCAD_SCRIPT_EDITOR_MIN_CAPACITY;
+            }
+            if (after_capacity > MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
+                after_capacity = MDCAD_SCRIPT_EDITOR_MAX_CAPACITY;
+            }
+            char *after_script = (char*)calloc(after_capacity, sizeof(char));
+            if (!after_script) {
+                state.script_io_slider_drag_active = false;
+                state.script_io_slider_drag_sketch = 0;
+                state.script_io_slider_drag_input_id[0] = '\0';
+                if (state.script_io_slider_drag_before_script) {
+                    state.script_io_slider_drag_before_script[0] = '\0';
+                }
+                return;
+            }
             sketch_script_error_t emit_error = {0};
             if (scene_script_emit_for_sketch(&state.ecs_scene,
                                              state.script_io_slider_drag_sketch,
                                              after_script,
-                                             sizeof(after_script),
+                                             after_capacity,
                                              &emit_error)) {
                 if (strcmp(state.script_io_slider_drag_before_script, after_script) != 0) {
                     undo_cmd_script_apply_transaction(&state.undo_redo,
@@ -611,10 +866,13 @@ static void mdcad_draw_script_io_window(void) {
                                                       after_script);
                 }
             }
+            free(after_script);
             state.script_io_slider_drag_active = false;
             state.script_io_slider_drag_sketch = 0;
             state.script_io_slider_drag_input_id[0] = '\0';
-            state.script_io_slider_drag_before_script[0] = '\0';
+            if (state.script_io_slider_drag_before_script) {
+                state.script_io_slider_drag_before_script[0] = '\0';
+            }
         }
     }
 
@@ -624,7 +882,9 @@ static void mdcad_draw_script_io_window(void) {
         state.script_io_slider_drag_active = false;
         state.script_io_slider_drag_sketch = 0;
         state.script_io_slider_drag_input_id[0] = '\0';
-        state.script_io_slider_drag_before_script[0] = '\0';
+        if (state.script_io_slider_drag_before_script) {
+            state.script_io_slider_drag_before_script[0] = '\0';
+        }
     }
 }
 
@@ -719,15 +979,21 @@ static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
     }
     scene_normalize_sketch_script_local_ids(&state.ecs_scene, sketch);
 
-    char emitted[16384] = {0};
+    if (!mdcad_script_editor_reserve(MDCAD_SCRIPT_EDITOR_MIN_CAPACITY, true)) {
+        return false;
+    }
+    char *emitted = (char*)calloc(state.script_editor_capacity, sizeof(char));
+    if (!emitted) return false;
     sketch_script_error_t error = {0};
-    if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, sizeof(emitted), &error)) {
+    if (!scene_script_emit_for_sketch(&state.ecs_scene, sketch, emitted, state.script_editor_capacity, &error)) {
+        free(emitted);
         return false;
     }
 
     const char *entities_marker = "  entities = {\n";
     char *entities_pos = strstr(emitted, entities_marker);
     if (!entities_pos) {
+        free(emitted);
         return false;
     }
 
@@ -743,16 +1009,22 @@ static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
         "    { id = \"hole_diameter\", value = 0.7 }\n"
         "  },\n";
 
-    char seeded_script[16384] = {0};
+    char *seeded_script = (char*)calloc(state.script_editor_capacity, sizeof(char));
+    if (!seeded_script) {
+        free(emitted);
+        return false;
+    }
     size_t prefix_len = (size_t)(entities_pos - emitted);
     int written = snprintf(seeded_script,
-                           sizeof(seeded_script),
+                           state.script_editor_capacity,
                            "%.*s%s%s",
                            (int)prefix_len,
                            emitted,
                            io_block,
                            entities_pos);
-    if (written <= 0 || (size_t)written >= sizeof(seeded_script)) {
+    if (written <= 0 || (size_t)written >= state.script_editor_capacity) {
+        free(seeded_script);
+        free(emitted);
         return false;
     }
 
@@ -760,6 +1032,8 @@ static bool mdcad_seed_default_sketch_script_io(ecs_entity_t sketch) {
     state.ecs_scene.script_apply_undo_suppressed = true;
     bool applied = scene_script_apply_commit(&state.ecs_scene, sketch, seeded_script, &error);
     state.ecs_scene.script_apply_undo_suppressed = prev_undo_suppressed;
+    free(seeded_script);
+    free(emitted);
     return applied;
 }
 
@@ -1288,8 +1562,13 @@ static void init(void) {
     state.script_editor_preview_ok = false;
     state.script_editor_last_apply_failed = false;
     state.script_editor_last_seen_emit_revision = 0;
-    state.script_editor_text[0] = '\0';
-    state.script_editor_committed_text[0] = '\0';
+    state.script_editor_text = NULL;
+    state.script_editor_committed_text = NULL;
+    state.script_editor_capacity = 0;
+    if (mdcad_script_editor_reserve(MDCAD_SCRIPT_EDITOR_MIN_CAPACITY, false)) {
+        state.script_editor_text[0] = '\0';
+        state.script_editor_committed_text[0] = '\0';
+    }
     mdcad_script_editor_clear_error();
     state.script_io_sketch = 0;
     state.script_io_open = false;
@@ -1297,7 +1576,11 @@ static void init(void) {
     state.script_io_slider_drag_active = false;
     state.script_io_slider_drag_sketch = 0;
     state.script_io_slider_drag_input_id[0] = '\0';
-    state.script_io_slider_drag_before_script[0] = '\0';
+    state.script_io_slider_drag_before_script = NULL;
+    state.script_io_slider_drag_before_capacity = 0;
+    if (mdcad_script_io_slider_before_reserve(MDCAD_SCRIPT_EDITOR_MIN_CAPACITY)) {
+        state.script_io_slider_drag_before_script[0] = '\0';
+    }
     mdcad_script_io_clear_error();
 
     // Create test ECS entities using the scene API
@@ -1399,8 +1682,9 @@ static void init(void) {
         // Edit the parent's position in Entity Inspector to see children move together!
     }
 
-    // Seed a default sketch scene for startup UX and quick constraint validation.
-    mdcad_seed_default_sketch_scene();
+    // Commented out for now as we are testing the JSONL import
+    //// Seed a default sketch scene for startup UX and quick constraint validation.
+    //mdcad_seed_default_sketch_scene();
     ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
 
     // Create default 3-point studio lighting
@@ -2140,6 +2424,20 @@ static void cleanup(void) {
 
     // Shutdown scene hierarchy (frees cache)
     ui_scene_hierarchy_shutdown(&state.scene_hierarchy);
+    if (state.script_editor_text) {
+        free(state.script_editor_text);
+        state.script_editor_text = NULL;
+    }
+    if (state.script_editor_committed_text) {
+        free(state.script_editor_committed_text);
+        state.script_editor_committed_text = NULL;
+    }
+    state.script_editor_capacity = 0;
+    if (state.script_io_slider_drag_before_script) {
+        free(state.script_io_slider_drag_before_script);
+        state.script_io_slider_drag_before_script = NULL;
+    }
+    state.script_io_slider_drag_before_capacity = 0;
 
     // Shutdown ECS scene and world
     ecs_scene_shutdown(&state.ecs_scene);
