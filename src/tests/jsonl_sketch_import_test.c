@@ -52,7 +52,7 @@ static int test_jsonl_sketch_import_creates_sketch_entity(void) {
     if (!scene_is_sketch(&scene, sketch)) return 1;
 
     JsonlObserverComp *obs = ecs_world_get_jsonl_observer(&world, sketch);
-    if (!obs || !obs->linked || !obs->observe_enabled) return 1; // D-01
+    if (!obs || !obs->linked || obs->observe_enabled) return 1; // default Observe OFF
     if (obs->scale != 1.0f || obs->rotation_x != 0.0f || obs->rotation_y != 0.0f || obs->rotation_z != 0.0f) return 1;
     if (obs->shift_to_center) return 1;
     if (strcmp(obs->source_path, fixture) != 0) return 1;

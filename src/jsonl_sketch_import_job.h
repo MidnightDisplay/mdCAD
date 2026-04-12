@@ -303,7 +303,7 @@ static inline bool jsonl_sketch_import_job_start(ecs_scene_t *scene,
 
     JsonlObserverComp observer = jsonl_observer_comp_default();
     jsonl_observer_comp_set_path(&observer, filepath);
-    observer.observe_enabled = true; // D-01: ON by default.
+    observer.observe_enabled = false; // Import default: OFF until user opts in.
     observer.scale = (scale > 0.0f) ? scale : 1.0f;
     observer.rotation_x = rotation_x;
     observer.rotation_y = rotation_y;

@@ -2267,7 +2267,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igPopItemWidth();
         igSeparator();
 
-        igTextWrapped("Observer link is created with Observe file ON by default. Mesh entries are ignored in sketch import.");
+        igTextWrapped("Observer link is created with Observe file OFF by default. Mesh entries are ignored in sketch import.");
         igSeparator();
 
         if (igButton("Import##jsonl_as_sketch", (ImVec2){120, 0})) {
