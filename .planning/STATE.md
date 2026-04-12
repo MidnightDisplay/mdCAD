@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 34 — deterministic-v1-5-closure-gate
+**Current focus:** Phase 35 — observable-jsonl-as-sketch-import-with-optional-live-file-observer
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
@@ -78,9 +78,13 @@ Recent decisions affecting current work:
 - [Phase 33]: ALONG X/Y/Z constraints are weighted higher in external-constraint scoring to avoid deadlock-prone permanent anchor behavior.
 - [Phase 33]: Regression assertions validate participant motion deltas (not only feasibility) for AB→CD and CD→AB authority switching.
 
+### Roadmap Evolution
+
+- Phase 35 added: Observable JSONL as sketch import with optional live file observer.
+
 ### Pending Todos
 
-- Discuss and plan Phase 33 (Large-Jump Robustness and PARALLEL/ALONG Parity).
+- Discuss, plan, and execute Phase 35 (Observable JSONL as sketch import with optional live file observer).
 
 ### Blockers/Concerns
 

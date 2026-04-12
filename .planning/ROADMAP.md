@@ -90,3 +90,13 @@ Plans:
 | 33. Large-Jump Robustness and PARALLEL/ALONG Parity | 3/3 | Complete    | 2026-04-11 |
 | 34. Deterministic v1.5 Closure Gate | 2/2 | Complete    | 2026-04-11 |
 
+
+### Phase 35: Observable JSONL as sketch import with optional live file observer
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 34
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 35 to break down)
