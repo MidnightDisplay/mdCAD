@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Solver Workflow Robustness + Script Reapply Integrity
 status: executing
-stopped_at: Phase 35 context gathered
-last_updated: "2026-04-12T12:38:35.834Z"
-last_activity: 2026-04-12 -- Phase 35 execution started
+stopped_at: Completed 35-02-PLAN.md
+last_updated: "2026-04-12T13:01:38.313Z"
+last_activity: 2026-04-12
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 50
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 ## Current Position
 
 Phase: 35 (observable-jsonl-as-sketch-import-with-optional-live-file-observer) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 35
-Last activity: 2026-04-12 -- Phase 35 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-12
 
 Progress: [█████░░░░░] 50%
 
@@ -77,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 33]: PARALLEL pair resolution now chooses authority from active drag context first, then external-constraint strength when no drag anchor is present.
 - [Phase 33]: ALONG X/Y/Z constraints are weighted higher in external-constraint scoring to avoid deadlock-prone permanent anchor behavior.
 - [Phase 33]: Regression assertions validate participant motion deltas (not only feasibility) for AB→CD and CD→AB authority switching.
+- [Phase 35-observable-jsonl-as-sketch-import-with-optional-live-file-observer]: Persist observer settings on sketch entities via JsonlObserverComp serialized as jsonl_observer.
+- [Phase 35-observable-jsonl-as-sketch-import-with-optional-live-file-observer]: Use staged child creation and commit-on-success reparse semantics to preserve last-good sketch state on failure.
 
 ### Roadmap Evolution
 
@@ -92,6 +94,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-12T12:07:13.249Z
-Stopped at: Phase 35 context gathered
-Resume file: .planning/phases/35-observable-jsonl-as-sketch-import-with-optional-live-file-observer/35-CONTEXT.md
+Last session: 2026-04-12T13:01:38.309Z
+Stopped at: Completed 35-02-PLAN.md
+Resume file: None
