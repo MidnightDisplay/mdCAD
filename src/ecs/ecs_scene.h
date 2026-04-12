@@ -6660,6 +6660,62 @@ static inline bool scene_script_preview_parse(ecs_scene_t *scene,
     return sketch_script_apply_preview_model(scene, sketch, script_text, out_error);
 }
 
+static inline bool scene_script_emit_has_footer(const char *script_text) {
+    if (!script_text) return false;
+    static const char *footer = "  }\n}\n";
+    size_t len = strlen(script_text);
+    size_t footer_len = strlen(footer);
+    if (len < footer_len) return false;
+    return strcmp(script_text + (len - footer_len), footer) == 0;
+}
+
+static inline char *scene_script_emit_snapshot_alloc(ecs_scene_t *scene,
+                                                     ecs_entity_t sketch,
+                                                     sketch_script_error_t *out_error) {
+    const size_t min_capacity = (size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE;
+    const size_t max_capacity = (size_t)(4u * 1024u * 1024u);
+    size_t capacity = min_capacity;
+    while (capacity <= max_capacity) {
+        char *script = (char*)calloc(capacity, sizeof(char));
+        if (!script) break;
+        sketch_script_error_t emit_error = {0};
+        if (scene_script_emit_for_sketch(scene, sketch, script, capacity, &emit_error) &&
+            scene_script_emit_has_footer(script)) {
+            if (out_error) {
+                out_error->line = 0;
+                out_error->column = 0;
+                out_error->message[0] = '\0';
+            }
+            return script;
+        }
+        free(script);
+        if (capacity >= max_capacity) {
+            if (out_error) {
+                if (emit_error.message[0] != '\0') {
+                    *out_error = emit_error;
+                } else {
+                    out_error->line = 0;
+                    out_error->column = 0;
+                    snprintf(out_error->message, sizeof(out_error->message),
+                             "Script exceeds maximum snapshot buffer capacity.");
+                    out_error->message[sizeof(out_error->message) - 1] = '\0';
+                }
+            }
+            return NULL;
+        }
+        capacity *= 2u;
+        if (capacity > max_capacity) capacity = max_capacity;
+    }
+    if (out_error) {
+        out_error->line = 0;
+        out_error->column = 0;
+        snprintf(out_error->message, sizeof(out_error->message),
+                 "Out of memory allocating script snapshot buffer.");
+        out_error->message[sizeof(out_error->message) - 1] = '\0';
+    }
+    return NULL;
+}
+
 static inline bool scene_script_apply_commit(ecs_scene_t *scene,
                                              ecs_entity_t sketch,
                                              const char *script_text,
@@ -6669,18 +6725,8 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
     if (io_state) {
         io_state_before = *io_state;
     }
-    char *before_script = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+    char *before_script = scene_script_emit_snapshot_alloc(scene, sketch, out_error);
     if (!before_script) {
-        if (out_error) {
-            out_error->line = 0;
-            out_error->column = 0;
-            snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script snapshot buffer.");
-            out_error->message[sizeof(out_error->message) - 1] = '\0';
-        }
-        return false;
-    }
-    bool capture_before = scene_script_emit_for_sketch(scene, sketch, before_script, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, out_error);
-    if (!capture_before) {
         free(before_script);
         return false;
     }
@@ -6690,42 +6736,41 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
         return false;
     }
 
-    sketch_script_model_t model = {0};
-    if (!sketch_script_parse_model(script_text, &model, out_error)) {
+    sketch_script_model_t *model = (sketch_script_model_t*)calloc(1u, sizeof(sketch_script_model_t));
+    if (!model) {
         sketch_script_error_t rollback_error = {0};
         (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
         if (io_state) *io_state = io_state_before;
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script model.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        free(before_script);
+        return false;
+    }
+    if (!sketch_script_parse_model(script_text, model, out_error)) {
+        sketch_script_error_t rollback_error = {0};
+        (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
+        if (io_state) *io_state = io_state_before;
+        free(model);
         free(before_script);
         return false;
     }
     if (io_state) {
-        scene_script_io_state_copy_from_model(io_state, &model);
+        scene_script_io_state_copy_from_model(io_state, model);
     }
 
     if (!scene->script_apply_undo_suppressed && scene->script_undo_redo) {
-        char *after_script = (char*)calloc((size_t)ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, sizeof(char));
+        char *after_script = scene_script_emit_snapshot_alloc(scene, sketch, out_error);
         if (!after_script) {
             sketch_script_error_t rollback_error = {0};
             scene->script_apply_undo_suppressed = true;
             (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
             scene->script_apply_undo_suppressed = false;
             if (io_state) *io_state = io_state_before;
-            if (out_error && out_error->message[0] == '\0') {
-                out_error->line = 0;
-                out_error->column = 0;
-                snprintf(out_error->message, sizeof(out_error->message), "Out of memory allocating script snapshot buffer.");
-                out_error->message[sizeof(out_error->message) - 1] = '\0';
-            }
-            free(before_script);
-            return false;
-        }
-        if (!scene_script_emit_for_sketch(scene, sketch, after_script, ECS_SCENE_SCRIPT_TEXT_BUFFER_SIZE, out_error)) {
-            sketch_script_error_t rollback_error = {0};
-            scene->script_apply_undo_suppressed = true;
-            (void)sketch_script_apply_commit_model(scene, sketch, before_script, &rollback_error);
-            scene->script_apply_undo_suppressed = false;
-            if (io_state) *io_state = io_state_before;
-            free(after_script);
+            free(model);
             free(before_script);
             return false;
         }
@@ -6751,6 +6796,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
                 out_error->message[sizeof(out_error->message) - 1] = '\0';
             }
             free(after_script);
+            free(model);
             free(before_script);
             return false;
         }
@@ -6758,6 +6804,7 @@ static inline bool scene_script_apply_commit(ecs_scene_t *scene,
         free(after_script);
     }
 
+    free(model);
     free(before_script);
     return true;
 }

@@ -351,11 +351,31 @@ static inline bool sketch_script_apply_model_on_sketch(ecs_scene_t *scene,
         return false;
     }
 
-    sketch_script_apply_link_table_t links = {0};
-    sketch_script_apply_pair_table_t pairs = {0};
-    if (!sketch_script_apply_create_entities(scene, sketch, model, &links, labels, out_error)) return false;
-    if (!sketch_script_apply_create_constraints(scene, sketch, model, &links, &pairs, labels, out_error)) return false;
-    if (!sketch_script_apply_restore_pairs(scene, &pairs, &links, out_error)) return false;
+    sketch_script_apply_link_table_t *links = (sketch_script_apply_link_table_t*)calloc(1u, sizeof(sketch_script_apply_link_table_t));
+    sketch_script_apply_pair_table_t *pairs = (sketch_script_apply_pair_table_t*)calloc(1u, sizeof(sketch_script_apply_pair_table_t));
+    if (!links || !pairs) {
+        if (links) free(links);
+        if (pairs) free(pairs);
+        sketch_script_apply_set_error(out_error, "Out of memory allocating apply workspace.");
+        return false;
+    }
+    if (!sketch_script_apply_create_entities(scene, sketch, model, links, labels, out_error)) {
+        free(links);
+        free(pairs);
+        return false;
+    }
+    if (!sketch_script_apply_create_constraints(scene, sketch, model, links, pairs, labels, out_error)) {
+        free(links);
+        free(pairs);
+        return false;
+    }
+    if (!sketch_script_apply_restore_pairs(scene, pairs, links, out_error)) {
+        free(links);
+        free(pairs);
+        return false;
+    }
+    free(links);
+    free(pairs);
     scene_refresh_sketch_metadata(scene, sketch);
     return true;
 }
@@ -406,13 +426,23 @@ static inline bool sketch_script_apply_preview_model(ecs_scene_t *scene,
                                                      ecs_entity_t sketch,
                                                      const char *script_text,
                                                      sketch_script_error_t *out_error) {
-    sketch_script_model_t model = {0};
-    if (!sketch_script_parse_model(script_text, &model, out_error)) return false;
+    sketch_script_model_t *model = (sketch_script_model_t*)calloc(1u, sizeof(sketch_script_model_t));
+    if (!model) {
+        sketch_script_apply_set_error(out_error, "Out of memory allocating preview model.");
+        return false;
+    }
+    if (!sketch_script_parse_model(script_text, model, out_error)) {
+        free(model);
+        return false;
+    }
     if (!scene_is_sketch(scene, sketch)) {
+        free(model);
         sketch_script_apply_set_error(out_error, "Invalid scene/sketch/script.");
         return false;
     }
-    return sketch_script_apply_validate_model_links(&model, out_error);
+    bool ok = sketch_script_apply_validate_model_links(model, out_error);
+    free(model);
+    return ok;
 }
 
 static inline bool sketch_script_apply_commit_model(ecs_scene_t *scene,
@@ -423,23 +453,41 @@ static inline bool sketch_script_apply_commit_model(ecs_scene_t *scene,
         sketch_script_apply_set_error(out_error, "Invalid scene/sketch/script.");
         return false;
     }
-    sketch_script_model_t model = {0};
-    if (!sketch_script_parse_model(script_text, &model, out_error)) return false;
-    if (!sketch_script_apply_validate_model_links(&model, out_error)) return false;
+    sketch_script_model_t *model = (sketch_script_model_t*)calloc(1u, sizeof(sketch_script_model_t));
+    sketch_script_apply_label_table_t *previous_labels = (sketch_script_apply_label_table_t*)calloc(1u, sizeof(sketch_script_apply_label_table_t));
+    if (!model || !previous_labels) {
+        if (model) free(model);
+        if (previous_labels) free(previous_labels);
+        sketch_script_apply_set_error(out_error, "Out of memory allocating apply model.");
+        return false;
+    }
+    if (!sketch_script_parse_model(script_text, model, out_error)) {
+        free(model);
+        free(previous_labels);
+        return false;
+    }
+    if (!sketch_script_apply_validate_model_links(model, out_error)) {
+        free(model);
+        free(previous_labels);
+        return false;
+    }
 
-    sketch_script_apply_label_table_t previous_labels = {0};
-    sketch_script_apply_snapshot_labels(scene, sketch, &previous_labels);
+    sketch_script_apply_snapshot_labels(scene, sketch, previous_labels);
 
     ecs_entity_t previous_children[1024] = {0};
     int previous_count = sketch_script_snapshot_script_children(scene, sketch, previous_children, 1024);
     sketch_script_remove_children(scene, previous_children, previous_count);
 
-    if (!sketch_script_apply_model_on_sketch(scene, sketch, &model, &previous_labels, out_error)) {
+    if (!sketch_script_apply_model_on_sketch(scene, sketch, model, previous_labels, out_error)) {
         ecs_entity_t created_after[1024] = {0};
         int created_count = sketch_script_snapshot_script_children(scene, sketch, created_after, 1024);
         sketch_script_remove_children(scene, created_after, created_count);
+        free(model);
+        free(previous_labels);
         return false;
     }
+    free(model);
+    free(previous_labels);
     return true;
 }
 

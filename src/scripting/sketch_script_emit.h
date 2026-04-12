@@ -7,6 +7,7 @@
 #include "../ecs/ecs_scene.h"
 #include "../components/script_identity_comp.h"
 #include "sketch_script_capability_registry.h"
+#include "sketch_script_parse.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -102,12 +103,16 @@ static inline bool sketch_script_emit_collect(ecs_scene_t *scene,
                                               sketch_script_emit_geom_entry_t *geoms,
                                               int *geom_count,
                                               sketch_script_emit_constraint_entry_t *constraints,
-                                              int *constraint_count) {
+                                              int *constraint_count,
+                                              bool *geom_overflow,
+                                              bool *constraint_overflow) {
     if (!scene || !scene_is_sketch(scene, sketch) || !geoms || !geom_count || !constraints || !constraint_count) {
         return false;
     }
     *geom_count = 0;
     *constraint_count = 0;
+    if (geom_overflow) *geom_overflow = false;
+    if (constraint_overflow) *constraint_overflow = false;
 
     ecs_iter_t it = ecs_children(scene->world->world, sketch);
     while (ecs_children_next(&it)) {
@@ -116,20 +121,28 @@ static inline bool sketch_script_emit_collect(ecs_scene_t *scene,
             ScriptIdentityComp *sid = ecs_world_get_script_identity(scene->world, child);
             if (!sid || sid->script_local_id[0] == '\0') continue;
             GeometryComp *g = ecs_world_get_geometry(scene->world, child);
-            if (g && *geom_count < 256) {
-                geoms[*geom_count].entity = child;
-                geoms[*geom_count].type = g->type;
-                strncpy(geoms[*geom_count].id, sid->script_local_id, SCRIPT_LOCAL_ID_MAX - 1);
-                geoms[*geom_count].id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
-                (*geom_count)++;
+            if (g) {
+                if (*geom_count < SKETCH_SCRIPT_MODEL_MAX_ENTITIES) {
+                    geoms[*geom_count].entity = child;
+                    geoms[*geom_count].type = g->type;
+                    strncpy(geoms[*geom_count].id, sid->script_local_id, SCRIPT_LOCAL_ID_MAX - 1);
+                    geoms[*geom_count].id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+                    (*geom_count)++;
+                } else if (geom_overflow) {
+                    *geom_overflow = true;
+                }
             }
             ConstraintComp *c = ecs_world_get_constraint(scene->world, child);
-            if (c && *constraint_count < 256) {
-                constraints[*constraint_count].entity = child;
-                constraints[*constraint_count].type = c->type;
-                strncpy(constraints[*constraint_count].id, sid->script_local_id, SCRIPT_LOCAL_ID_MAX - 1);
-                constraints[*constraint_count].id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
-                (*constraint_count)++;
+            if (c) {
+                if (*constraint_count < SKETCH_SCRIPT_MODEL_MAX_CONSTRAINTS) {
+                    constraints[*constraint_count].entity = child;
+                    constraints[*constraint_count].type = c->type;
+                    strncpy(constraints[*constraint_count].id, sid->script_local_id, SCRIPT_LOCAL_ID_MAX - 1);
+                    constraints[*constraint_count].id[SCRIPT_LOCAL_ID_MAX - 1] = '\0';
+                    (*constraint_count)++;
+                } else if (constraint_overflow) {
+                    *constraint_overflow = true;
+                }
             }
         }
     }
@@ -187,15 +200,36 @@ static inline bool sketch_script_emit_for_sketch(ecs_scene_t *scene,
         return false;
     }
 
-    sketch_script_emit_geom_entry_t geoms[256] = {0};
-    sketch_script_emit_constraint_entry_t constraints[256] = {0};
+    sketch_script_emit_geom_entry_t geoms[SKETCH_SCRIPT_MODEL_MAX_ENTITIES] = {0};
+    sketch_script_emit_constraint_entry_t constraints[SKETCH_SCRIPT_MODEL_MAX_CONSTRAINTS] = {0};
     int geom_count = 0;
     int constraint_count = 0;
-    if (!sketch_script_emit_collect(scene, sketch, geoms, &geom_count, constraints, &constraint_count)) {
+    bool geom_overflow = false;
+    bool constraint_overflow = false;
+    if (!sketch_script_emit_collect(scene, sketch, geoms, &geom_count, constraints, &constraint_count,
+                                    &geom_overflow, &constraint_overflow)) {
         if (out_error) {
             out_error->line = 0;
             out_error->column = 0;
             snprintf(out_error->message, sizeof(out_error->message), "Failed to collect sketch for emit.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+    if (geom_overflow) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "too many entities in script model.");
+            out_error->message[sizeof(out_error->message) - 1] = '\0';
+        }
+        return false;
+    }
+    if (constraint_overflow) {
+        if (out_error) {
+            out_error->line = 0;
+            out_error->column = 0;
+            snprintf(out_error->message, sizeof(out_error->message), "too many constraints in script model.");
             out_error->message[sizeof(out_error->message) - 1] = '\0';
         }
         return false;

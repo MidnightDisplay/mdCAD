@@ -227,6 +227,15 @@ static bool mdcad_script_editor_reserve(size_t required_capacity, bool preserve_
     return true;
 }
 
+static bool mdcad_script_emit_has_footer(const char *script_text) {
+    if (!script_text) return false;
+    static const char *footer = "  }\n}\n";
+    size_t len = strlen(script_text);
+    size_t footer_len = strlen(footer);
+    if (len < footer_len) return false;
+    return strcmp(script_text + (len - footer_len), footer) == 0;
+}
+
 static bool mdcad_script_editor_emit_complete(ecs_entity_t sketch,
                                               char **out_script,
                                               sketch_script_error_t *out_error) {
@@ -264,8 +273,7 @@ static bool mdcad_script_editor_emit_complete(ecs_entity_t sketch,
             return false;
         }
 
-        sketch_script_error_t preview_err = {0};
-        if (scene_script_preview_parse(&state.ecs_scene, sketch, emitted, &preview_err)) {
+        if (mdcad_script_emit_has_footer(emitted)) {
             *out_script = emitted;
             return true;
         }
@@ -273,12 +281,11 @@ static bool mdcad_script_editor_emit_complete(ecs_entity_t sketch,
         free(emitted);
         if (emit_capacity >= MDCAD_SCRIPT_EDITOR_MAX_CAPACITY) {
             if (out_error) {
-                *out_error = preview_err;
-                if (out_error->message[0] == '\0') {
-                    snprintf(out_error->message, sizeof(out_error->message),
-                             "Script exceeds maximum editor buffer capacity.");
-                    out_error->message[sizeof(out_error->message) - 1] = '\0';
-                }
+                out_error->line = 0;
+                out_error->column = 0;
+                snprintf(out_error->message, sizeof(out_error->message),
+                         "Script exceeds maximum editor buffer capacity.");
+                out_error->message[sizeof(out_error->message) - 1] = '\0';
             }
             return false;
         }

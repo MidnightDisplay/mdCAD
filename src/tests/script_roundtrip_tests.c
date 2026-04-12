@@ -1809,6 +1809,193 @@ static int test_repeat_apply_deterministic(void) {
     return 0;
 }
 
+static int test_script_apply_large_sketch_within_model_limit(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "LargeSketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const int point_count = 140;
+    for (int i = 0; i < point_count; i++) {
+        float x = (float)i * 0.01f;
+        ecs_entity_t p = scene_add_point_to_sketch(&scene,
+                                                   sketch,
+                                                   vec3_make(x, 0.0f, 0.0f),
+                                                   vec4_make(1.0f, 1.0f, 1.0f, 1.0f),
+                                                   0.02f);
+        if (p == 0) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+    scene_normalize_sketch_script_local_ids(&scene, sketch);
+
+    char emitted[65536] = {0};
+    sketch_script_error_t emit_err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (strstr(emitted, "return {\n") == NULL || strstr(emitted, "  entities = {\n") == NULL) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    size_t emitted_len = strlen(emitted);
+    if (emitted_len < 6 || strcmp(emitted + emitted_len - 6, "  }\n}\n") != 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sketch_script_error_t preview_err = {0};
+    if (!scene_script_preview_parse(&scene, sketch, emitted, &preview_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sketch_script_error_t apply_err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, emitted, &apply_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_count_sketch_geometry(&scene, sketch) != point_count) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    char re_emitted[65536] = {0};
+    sketch_script_error_t re_emit_err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, re_emitted, sizeof(re_emitted), &re_emit_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (strcmp(emitted, re_emitted) != 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_script_preview_rejects_over_model_limit_without_truncation(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "OverLimitSketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const int point_count = SKETCH_SCRIPT_MODEL_MAX_ENTITIES + 8;
+    for (int i = 0; i < point_count; i++) {
+        float x = (float)i * 0.01f;
+        ecs_entity_t p = scene_add_point_to_sketch(&scene,
+                                                   sketch,
+                                                   vec3_make(x, 0.0f, 0.0f),
+                                                   vec4_make(1.0f, 1.0f, 1.0f, 1.0f),
+                                                   0.02f);
+        if (p == 0) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+    scene_normalize_sketch_script_local_ids(&scene, sketch);
+
+    char emitted[262144] = {0};
+    size_t off = 0;
+    int wrote = snprintf(emitted + off, sizeof(emitted) - off, "return {\n  entities = {\n");
+    if (wrote <= 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    off += (size_t)wrote;
+    for (int i = 0; i < point_count; i++) {
+        wrote = snprintf(emitted + off, sizeof(emitted) - off,
+                         "    { id = \"geometry_%d\", type = \"point\", point = {%d, 0, 0} }%s\n",
+                         i + 1, i, (i + 1 < point_count) ? "," : "");
+        if (wrote <= 0 || off + (size_t)wrote >= sizeof(emitted)) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+        off += (size_t)wrote;
+    }
+    wrote = snprintf(emitted + off, sizeof(emitted) - off, "  },\n  constraints = {\n  }\n}");
+    if (wrote <= 0 || off + (size_t)wrote >= sizeof(emitted)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sketch_script_error_t preview_err = {0};
+    if (scene_script_preview_parse(&scene, sketch, emitted, &preview_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (strstr(preview_err.message, "too many entities in script model.") == NULL) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
+static int test_script_apply_handles_max_entity_model_without_crash(void) {
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    ecs_entity_t sketch = scene_add_sketch(&scene, "MaxEntitySketch", "", vec4_make(1, 1, 1, 1));
+    if (sketch == 0) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    const int point_count = SKETCH_SCRIPT_MODEL_MAX_ENTITIES;
+    for (int i = 0; i < point_count; i++) {
+        float x = (float)i * 0.01f;
+        ecs_entity_t p = scene_add_point_to_sketch(&scene,
+                                                   sketch,
+                                                   vec3_make(x, 0.0f, 0.0f),
+                                                   vec4_make(1.0f, 1.0f, 1.0f, 1.0f),
+                                                   0.02f);
+        if (p == 0) {
+            ecs_world_shutdown(&world);
+            return 1;
+        }
+    }
+    scene_normalize_sketch_script_local_ids(&scene, sketch);
+
+    char emitted[262144] = {0};
+    sketch_script_error_t emit_err = {0};
+    if (!scene_script_emit_for_sketch(&scene, sketch, emitted, sizeof(emitted), &emit_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    sketch_script_error_t apply_err = {0};
+    if (!scene_script_apply_commit(&scene, sketch, emitted, &apply_err)) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+    if (scene_count_sketch_geometry(&scene, sketch) != point_count) {
+        ecs_world_shutdown(&world);
+        return 1;
+    }
+
+    ecs_world_shutdown(&world);
+    return 0;
+}
+
 
 typedef int (*script_test_fn_t)(void);
 
@@ -1855,7 +2042,13 @@ int main(void) {
         { "test_descriptor_roundtrip_preserves_role_and_sub_index", test_descriptor_roundtrip_preserves_role_and_sub_index },
         { "test_deterministic_contract_error_atomic_reject", test_deterministic_contract_error_atomic_reject },
         { "test_color_roundtrip_and_non_script_color_untouched", test_color_roundtrip_and_non_script_color_untouched },
-        { "test_repeat_apply_deterministic", test_repeat_apply_deterministic }
+        { "test_repeat_apply_deterministic", test_repeat_apply_deterministic },
+        { "test_script_apply_large_sketch_within_model_limit",
+          test_script_apply_large_sketch_within_model_limit },
+        { "test_script_apply_handles_max_entity_model_without_crash",
+          test_script_apply_handles_max_entity_model_without_crash },
+        { "test_script_preview_rejects_over_model_limit_without_truncation",
+          test_script_preview_rejects_over_model_limit_without_truncation }
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
