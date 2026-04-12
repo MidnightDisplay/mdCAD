@@ -12,6 +12,7 @@
 #include "components/geometry_comp.h"
 #include "components/transform_comp.h"
 #include "components/renderable_comp.h"
+#include "components/jsonl_observer_comp.h"
 #include "math/cglm_entry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -182,6 +183,7 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     SketchGeometryStateComp *sketch_state = ecs_world_get_sketch_geometry_state(w, e);
     ConstraintComp *constraint = ecs_world_get_constraint(w, e);
     ScriptIdentityComp *script_identity = ecs_world_get_script_identity(w, e);
+    JsonlObserverComp *jsonl_observer = ecs_world_get_jsonl_observer(w, e);
 
     // Only serialize entities that contribute to persisted scene state.
     // This keeps transient anchor entities out of save files.
@@ -559,6 +561,56 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         wrote_component = true;
     }
 
+    if (jsonl_observer && jsonl_observer->linked) {
+        if (wrote_component) json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "\"jsonl_observer\": {\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"linked\": %s,\n", jsonl_observer->linked ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"observe_enabled\": %s,\n", jsonl_observer->observe_enabled ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"interval_ms\": %u,\n", (unsigned)jsonl_observer->interval_ms);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"max_retries\": %u,\n", (unsigned)jsonl_observer->max_retries);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"retry_count\": %u,\n", (unsigned)jsonl_observer->retry_count);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"next_retry_at_ms\": %llu,\n",
+                             (unsigned long long)jsonl_observer->next_retry_at_ms);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"scale\": %.6g,\n", jsonl_observer->scale);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"rotation_x\": %.6g,\n", jsonl_observer->rotation_x);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"rotation_y\": %.6g,\n", jsonl_observer->rotation_y);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"rotation_z\": %.6g,\n", jsonl_observer->rotation_z);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"shift_to_center\": %s,\n", jsonl_observer->shift_to_center ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"source_path\": ");
+        json_write_string_escaped(b, jsonl_observer->source_path);
+        json_builder_append(b, ",\n");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"message_count\": %u,\n", (unsigned)jsonl_observer->message_count);
+        json_write_indent(b, depth + 3);
+        json_builder_append(b, "\"messages\": [");
+        uint32_t msg_count = jsonl_observer->message_count;
+        if (msg_count > JSONL_OBSERVER_MESSAGE_HISTORY) msg_count = JSONL_OBSERVER_MESSAGE_HISTORY;
+        for (uint32_t i = 0; i < msg_count; i++) {
+            if (i > 0) json_builder_append(b, ", ");
+            json_builder_appendf(b, "{\"severity\": %u, \"text\": ",
+                                 (unsigned)jsonl_observer->message_severity[i]);
+            json_write_string_escaped(b, jsonl_observer->messages[i]);
+            json_builder_append(b, "}");
+        }
+        json_builder_append(b, "]\n");
+        json_write_indent(b, depth + 2);
+        json_builder_append(b, "}");
+        wrote_component = true;
+    }
+
     json_builder_append(b, "\n");
 
     json_write_indent(b, depth + 1);
@@ -661,11 +713,12 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     ecs_entity_t *entities = NULL;
     int entity_count = 0;
     int entity_capacity = 0;
-    ecs_entity_t persisted_component_ids[4] = {
+    ecs_entity_t persisted_component_ids[5] = {
         w->GeometryComp_id,
         w->SketchComp_id,
         w->ConstraintComp_id,
-        w->ScriptIdentityComp_id
+        w->ScriptIdentityComp_id,
+        w->JsonlObserverComp_id
     };
 
     // Normalize script-local IDs for each sketch before emitting.
@@ -682,7 +735,7 @@ static inline char* scene_save_to_string(ecs_scene_t *scene) {
     }
     ecs_query_fini(sq);
 
-    for (int c = 0; c < 4; c++) {
+    for (int c = 0; c < 5; c++) {
         ecs_query_t *q = ecs_query(w->world, {
             .terms = {
                 { .id = persisted_component_ids[c] }
@@ -1269,6 +1322,8 @@ typedef struct {
     ConstraintComp constraint;
     ScriptIdentityComp script_identity;
     bool has_script_identity;
+    JsonlObserverComp jsonl_observer;
+    bool has_jsonl_observer;
 
     // Light (when is_light is true, geometry fields are unused)
     bool is_light;
@@ -1866,6 +1921,137 @@ static inline bool json_parse_script_identity(json_parser_t *p, loaded_entity_t 
     return json_next_token(p);  // Skip }
 }
 
+static inline bool json_parse_jsonl_observer(json_parser_t *p, loaded_entity_t *ent) {
+    if (p->token != JSON_TOK_LBRACE) return false;
+
+    ent->jsonl_observer = jsonl_observer_comp_default();
+    ent->has_jsonl_observer = true;
+
+    if (!json_next_token(p)) return false;
+
+    while (p->token != JSON_TOK_RBRACE) {
+        if (p->token != JSON_TOK_STRING) return false;
+        char key[64];
+        strncpy(key, p->str_value, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+
+        if (!json_next_token(p)) return false;  // :
+        if (p->token != JSON_TOK_COLON) return false;
+        if (!json_next_token(p)) return false;  // value
+
+        if (strcmp(key, "linked") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->jsonl_observer.linked = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "observe_enabled") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->jsonl_observer.observe_enabled = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "interval_ms") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.interval_ms = (uint32_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "max_retries") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.max_retries = (uint32_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "retry_count") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.retry_count = (uint32_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "next_retry_at_ms") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.next_retry_at_ms = (uint64_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "scale") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.scale = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "rotation_x") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.rotation_x = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "rotation_y") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.rotation_y = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "rotation_z") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.rotation_z = (float)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "shift_to_center") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->jsonl_observer.shift_to_center = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "source_path") == 0) {
+            if (p->token != JSON_TOK_STRING) return false;
+            jsonl_observer_comp_set_path(&ent->jsonl_observer, p->str_value);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "message_count") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.message_count = (uint32_t)p->num_value;
+            if (ent->jsonl_observer.message_count > JSONL_OBSERVER_MESSAGE_HISTORY) {
+                ent->jsonl_observer.message_count = JSONL_OBSERVER_MESSAGE_HISTORY;
+            }
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "messages") == 0) {
+            if (p->token != JSON_TOK_LBRACKET) return false;
+            if (!json_next_token(p)) return false;
+            uint32_t idx = 0;
+            while (p->token != JSON_TOK_RBRACKET) {
+                if (p->token != JSON_TOK_LBRACE) return false;
+                if (!json_next_token(p)) return false;
+                uint8_t sev = 0;
+                char txt[JSONL_OBSERVER_MESSAGE_MAX] = {0};
+                while (p->token != JSON_TOK_RBRACE) {
+                    if (p->token != JSON_TOK_STRING) return false;
+                    char mk[64];
+                    strncpy(mk, p->str_value, sizeof(mk) - 1);
+                    mk[sizeof(mk) - 1] = '\0';
+                    if (!json_next_token(p)) return false;
+                    if (p->token != JSON_TOK_COLON) return false;
+                    if (!json_next_token(p)) return false;
+                    if (strcmp(mk, "severity") == 0) {
+                        if (p->token != JSON_TOK_NUMBER) return false;
+                        sev = (uint8_t)p->num_value;
+                        if (!json_next_token(p)) return false;
+                    } else if (strcmp(mk, "text") == 0) {
+                        if (p->token != JSON_TOK_STRING) return false;
+                        strncpy(txt, p->str_value, sizeof(txt) - 1);
+                        txt[sizeof(txt) - 1] = '\0';
+                        if (!json_next_token(p)) return false;
+                    } else {
+                        if (!json_skip_value(p)) return false;
+                    }
+                    if (p->token == JSON_TOK_COMMA) {
+                        if (!json_next_token(p)) return false;
+                    }
+                }
+                if (!json_next_token(p)) return false;
+                if (idx < JSONL_OBSERVER_MESSAGE_HISTORY) {
+                    ent->jsonl_observer.message_severity[idx] = sev;
+                    strncpy(ent->jsonl_observer.messages[idx], txt, JSONL_OBSERVER_MESSAGE_MAX - 1);
+                    ent->jsonl_observer.messages[idx][JSONL_OBSERVER_MESSAGE_MAX - 1] = '\0';
+                    idx++;
+                }
+                if (p->token == JSON_TOK_COMMA) {
+                    if (!json_next_token(p)) return false;
+                }
+            }
+            ent->jsonl_observer.message_count = idx;
+            if (!json_next_token(p)) return false;
+        } else {
+            if (!json_skip_value(p)) return false;
+        }
+
+        if (p->token == JSON_TOK_COMMA) {
+            if (!json_next_token(p)) return false;
+        }
+    }
+
+    return json_next_token(p);  // Skip }
+}
+
 //------------------------------------------------------------------------------
 // Parse Light Component
 //------------------------------------------------------------------------------
@@ -1980,6 +2166,8 @@ static inline bool json_parse_entity(json_parser_t *p, loaded_entity_t *ent) {
                     if (!json_parse_constraint(p, ent)) return false;
                 } else if (strcmp(comp_key, "script_identity") == 0) {
                     if (!json_parse_script_identity(p, ent)) return false;
+                } else if (strcmp(comp_key, "jsonl_observer") == 0) {
+                    if (!json_parse_jsonl_observer(p, ent)) return false;
                 } else if (strcmp(comp_key, "light") == 0) {
                     if (!json_parse_light(p, ent)) return false;
                 } else {
@@ -2041,6 +2229,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
         if (ent->has_script_identity) {
             ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
         }
+        if (ent->has_jsonl_observer) {
+            ecs_world_set_jsonl_observer(scene->world, e, &ent->jsonl_observer);
+        }
         return e;
     }
 
@@ -2062,6 +2253,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
         }
         if (ent->has_script_identity) {
             ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
+        }
+        if (ent->has_jsonl_observer) {
+            ecs_world_set_jsonl_observer(scene->world, e, &ent->jsonl_observer);
         }
         return e;
     }
@@ -2181,6 +2375,9 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
         }
         if (ent->has_script_identity) {
             ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
+        }
+        if (ent->has_jsonl_observer) {
+            ecs_world_set_jsonl_observer(scene->world, e, &ent->jsonl_observer);
         }
     }
 

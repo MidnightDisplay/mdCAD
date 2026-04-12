@@ -17,6 +17,7 @@
 #include "../components/constraint_participant_comp.h"
 #include "../components/script_identity_comp.h"
 #include "../components/endpoints_comp.h"
+#include "../components/jsonl_observer_comp.h"
 
 //------------------------------------------------------------------------------
 // Types
@@ -39,6 +40,7 @@ typedef struct {
     ecs_entity_t ConstraintParticipantComp_id;
     ecs_entity_t ScriptIdentityComp_id;
     ecs_entity_t EndPointsComp_id;
+    ecs_entity_t JsonlObserverComp_id;
 
     // Tag component IDs (no data, just markers)
     ecs_entity_t Selected_tag;      // Entity is currently selected
@@ -158,6 +160,12 @@ static inline void ecs_world_init(ecs_world_state_t *s) {
         .entity = ecs_entity(s->world, { .name = "EndPointsComp" }),
         .type.size = sizeof(EndPointsComp),
         .type.alignment = ECS_ALIGNOF(EndPointsComp)
+    });
+
+    s->JsonlObserverComp_id = ecs_component_init(s->world, &(ecs_component_desc_t){
+        .entity = ecs_entity(s->world, { .name = "JsonlObserverComp" }),
+        .type.size = sizeof(JsonlObserverComp),
+        .type.alignment = ECS_ALIGNOF(JsonlObserverComp)
     });
 
     // Register tag components (zero-size)
@@ -358,8 +366,17 @@ static inline EndPointsComp* ecs_world_get_endpoints(ecs_world_state_t *s, ecs_e
 }
 
 static inline void ecs_world_set_endpoints(ecs_world_state_t *s, ecs_entity_t e,
-                                           const EndPointsComp *endpoints) {
+                                            const EndPointsComp *endpoints) {
     ecs_set_id(s->world, e, s->EndPointsComp_id, sizeof(EndPointsComp), endpoints);
+}
+
+static inline JsonlObserverComp* ecs_world_get_jsonl_observer(ecs_world_state_t *s, ecs_entity_t e) {
+    return (JsonlObserverComp*)ecs_get_id(s->world, e, s->JsonlObserverComp_id);
+}
+
+static inline void ecs_world_set_jsonl_observer(ecs_world_state_t *s, ecs_entity_t e,
+                                                const JsonlObserverComp *observer) {
+    ecs_set_id(s->world, e, s->JsonlObserverComp_id, sizeof(JsonlObserverComp), observer);
 }
 
 //------------------------------------------------------------------------------
