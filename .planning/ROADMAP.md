@@ -93,10 +93,12 @@ Plans:
 
 ### Phase 35: Observable JSONL as sketch import with optional live file observer
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Users can import JSONL into a real sketch with optional persistent live-file observation, authoritative re-parse semantics, and explicit operator-visible overwrite/retry behavior.
+**Requirements**: P35-01, P35-02, P35-03, P35-04, P35-05, P35-06
 **Depends on:** Phase 34
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 35 to break down)
+- [ ] 35-01-PLAN.md — Create Wave 0 tests and interface contracts for JSONL sketch import + observer subsystems.
+- [ ] 35-02-PLAN.md — Implement persisted observer state and transactional authoritative re-parse/relink behavior.
+- [ ] 35-03-PLAN.md — Ship user-facing JSONL-as-sketch import mapping plus observer UI relocation and overwrite warnings.
