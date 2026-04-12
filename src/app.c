@@ -41,6 +41,8 @@
 #include "constraints/constraint_glyphs.h"
 #include "constraints/constraint_selection.h"
 #include "scripting/sketch_script_emit.h"
+#include "components/jsonl_observer_comp.h"
+#include "jsonl_observer_system.h"
 
 // Gizmo system
 #include "gizmo/gizmo.h"
@@ -311,6 +313,11 @@ static void mdcad_draw_script_editor_window(void) {
         LabelComp *label = ecs_world_get_label(&state.ecs_world, state.script_editor_sketch);
         const char *sketch_name = (label && label->name[0]) ? label->name : "Sketch";
         igText("Sketch: %s (#%llu)", sketch_name, (unsigned long long)state.script_editor_sketch);
+        JsonlObserverComp *observer = ecs_world_get_jsonl_observer(&state.ecs_world, state.script_editor_sketch);
+        if (observer && observer->linked) {
+            igTextWrapped("Script edits can be overwritten by next successful JSONL re-parse while JSONL link is active.");
+            igDummy((ImVec2){0.0f, 6.0f});
+        }
         igDummy((ImVec2){0.0f, 8.0f});
 
         bool edited = igInputTextMultiline("##script_editor_text",
@@ -1563,6 +1570,7 @@ static void frame(void) {
     // Update ECS world and scene
     ecs_world_progress(&state.ecs_world, dt);
     ecs_scene_update(&state.ecs_scene);
+    jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms());
     scene_solver_process_auto_queue(&state.ecs_scene);
 
     // Update gizmo (must be after ecs_scene_update for correct world matrices)

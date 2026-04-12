@@ -19,7 +19,9 @@
 #include "../components/transform_comp.h"
 #include "../components/renderable_comp.h"
 #include "../components/selectable_comp.h"
+#include "../components/jsonl_observer_comp.h"
 #include "../math/math_undo_editor.h"
+#include "../jsonl_observer_system.h"
 #include "../undo_redo_exec.h"
 #include <ctype.h>
 #include <float.h>
@@ -240,6 +242,86 @@ static inline int ui_geometry_manager_compare_entities(ecs_world_state_t *w, ecs
     if (a < b) return -1;
     if (a > b) return 1;
     return 0;
+}
+
+static inline void ui_entity_inspector_draw_jsonl_observer_controls(ui_entity_inspector_state_t *state,
+                                                                     ecs_world_state_t *w,
+                                                                     ecs_entity_t sketch_entity,
+                                                                     ecs_scene_t *scene,
+                                                                     bool in_active_workspace) {
+    (void)state;
+    if (!w || sketch_entity == 0 || !scene) return;
+    JsonlObserverComp *observer = ecs_world_get_jsonl_observer(w, sketch_entity);
+    if (!observer || !observer->linked) {
+        igTextDisabled("No linked JSONL observer for this sketch.");
+        return;
+    }
+
+    igTextDisabled("JSONL Observer");
+    igTextWrapped("Script edits can be overwritten by next successful JSONL re-parse while JSONL link is active.");
+    if (in_active_workspace) {
+        igTextDisabled("Observer controls moved to Active Sketch Workspace");
+    }
+
+    bool observe_enabled = observer->observe_enabled;
+    if (igCheckbox("Observe file##jsonl_observe_enabled", &observe_enabled)) {
+        observer->observe_enabled = observe_enabled;
+        if (observe_enabled) {
+            observer->retry_count = 0u;
+            observer->next_retry_at_ms = 0u;
+        }
+    }
+
+    int interval_ms = (int)((observer->interval_ms > 0u) ? observer->interval_ms : JSONL_OBSERVER_DEFAULT_INTERVAL_MS);
+    igSetNextItemWidth(180.0f);
+    if (igSliderInt("Observe interval (ms)##jsonl_observe_interval", &interval_ms, 50, 5000, "%d", ImGuiSliderFlags_None)) {
+        if (interval_ms < 50) interval_ms = 50;
+        observer->interval_ms = (uint32_t)interval_ms;
+    }
+
+    igText("Source: %s", observer->source_path[0] ? observer->source_path : "(none)");
+    igTextDisabled("Retries: %u / %u", (unsigned)observer->retry_count, (unsigned)observer->max_retries);
+
+    igSetNextItemWidth(180.0f);
+    if (igInputFloat("Scale##jsonl_observer_scale", &observer->scale, 0.01f, 0.1f, "%.3f", ImGuiInputTextFlags_CharsDecimal)) {
+        if (observer->scale <= 0.0f) observer->scale = 1.0f;
+    }
+    igText("Rotation (degrees):");
+    igPushItemWidth(80.0f);
+    float rot_x_deg = mdcad_undo_editor_rad_to_deg(observer->rotation_x);
+    float rot_y_deg = mdcad_undo_editor_rad_to_deg(observer->rotation_y);
+    float rot_z_deg = mdcad_undo_editor_rad_to_deg(observer->rotation_z);
+    if (igDragFloat("X##jsonl_observer_rotation_x", &rot_x_deg, 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None)) {
+        observer->rotation_x = mdcad_undo_editor_deg_to_rad(rot_x_deg);
+    }
+    igSameLine(0, 10);
+    if (igDragFloat("Y##jsonl_observer_rotation_y", &rot_y_deg, 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None)) {
+        observer->rotation_y = mdcad_undo_editor_deg_to_rad(rot_y_deg);
+    }
+    igSameLine(0, 10);
+    if (igDragFloat("Z##jsonl_observer_rotation_z", &rot_z_deg, 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None)) {
+        observer->rotation_z = mdcad_undo_editor_deg_to_rad(rot_z_deg);
+    }
+    igPopItemWidth();
+    igCheckbox("Shift to center##jsonl_observer_shift_to_center", &observer->shift_to_center);
+
+    if (igButton("Re-parse now##jsonl_observer_reparse_now", (ImVec2){0, 0})) {
+        (void)jsonl_observer_manual_reparse(scene, sketch_entity);
+        scene_refresh_sketch_metadata(scene, sketch_entity);
+    }
+
+    igDummy((ImVec2){0.0f, 6.0f});
+    igTextDisabled("Observer messages (two most recent)");
+    if (observer->message_count == 0) {
+        igTextDisabled("No observer messages.");
+    } else {
+        for (uint32_t i = 0; i < observer->message_count; i++) {
+            const char *prefix = "[INFO]";
+            if (observer->message_severity[i] == JSONL_OBSERVER_MSG_WARNING) prefix = "[WARN]";
+            else if (observer->message_severity[i] == JSONL_OBSERVER_MSG_ERROR) prefix = "[ERROR]";
+            igTextWrapped("%s %s", prefix, observer->messages[i]);
+        }
+    }
 }
 
 static inline void ui_geometry_manager_sort_rows(ecs_world_state_t *w,
@@ -1307,8 +1389,11 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
         bool suppress_solver_in_inspector = (state->active_sketch_workspace_open && state->active_sketch == e);
         if (!suppress_solver_in_inspector) {
             ui_entity_inspector_draw_solver_section(state, w, e, &sketch, scene);
+            igDummy((ImVec2){0.0f, 8.0f});
+            ui_entity_inspector_draw_jsonl_observer_controls(state, w, e, scene, false);
         } else {
             igTextDisabled("Solver controls moved to Active Sketch Workspace.");
+            igTextDisabled("Observer controls moved to Active Sketch Workspace.");
         }
     }
 
@@ -2354,6 +2439,8 @@ static inline void ui_entity_inspector_draw(ui_entity_inspector_state_t *state) 
 
                 if (active_sketch) {
                     ui_entity_inspector_draw_solver_section(state, state->world, sketch_entity, &active_sketch, scene);
+                    igDummy((ImVec2){0.0f, 10.0f});
+                    ui_entity_inspector_draw_jsonl_observer_controls(state, state->world, sketch_entity, scene, true);
                     igDummy((ImVec2){0.0f, 10.0f});
                     igSeparator();
                     igDummy((ImVec2){0.0f, 10.0f});
