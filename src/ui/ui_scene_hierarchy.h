@@ -2075,7 +2075,7 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 state->jsonl_sketch_entry_count = entry_count;
                 state->jsonl_sketch_element_count = element_count;
                 state->jsonl_sketch_import_popup_open = true;
-                igOpenPopup_Str("Import JSONL as Sketch", ImGuiPopupFlags_None);
+                igOpenPopup_Str("Import JSONL as Sketch Options", ImGuiPopupFlags_None);
             } else {
                 snprintf(state->last_status, sizeof(state->last_status),
                          "JSONL Sketch Import Error: %s", jsonl_error_string(err));
@@ -2232,7 +2232,13 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
     }
 
     // JSONL as Sketch import popup
-    if (igBeginPopupModal("Import JSONL as Sketch", &state->jsonl_sketch_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGuiViewport *jsonl_sketch_viewport = igGetMainViewport();
+    ImVec2 jsonl_sketch_center = {
+        jsonl_sketch_viewport->WorkPos.x + jsonl_sketch_viewport->WorkSize.x * 0.5f,
+        jsonl_sketch_viewport->WorkPos.y + jsonl_sketch_viewport->WorkSize.y * 0.5f
+    };
+    igSetNextWindowPos(jsonl_sketch_center, ImGuiCond_Always, (ImVec2){0.5f, 0.5f});
+    if (igBeginPopupModal("Import JSONL as Sketch Options", &state->jsonl_sketch_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         igText("File: %s", state->jsonl_sketch_import_path);
         igText("Entries: %d", state->jsonl_sketch_entry_count);
         igText("Elements: %d", state->jsonl_sketch_element_count);
