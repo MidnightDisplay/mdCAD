@@ -3,7 +3,7 @@
 //
 // Parses .jsonl files containing geometry log entries from .NET geometry libs.
 // Each line is a JSON object with Name, Elements[] containing typed geometry.
-// Supports: Point3D, Line3D, Arc3D, PolyLine3D, Polygon3D.
+// Supports: Point3D, Line3D, Arc3D, Circle3D, PolyLine3D, Polygon3D.
 //
 // Uses cJSON for JSON parsing. Parser matches only the class name suffix
 // (e.g., "Point3D") and does NOT rely on hardcoded .NET namespaces.
@@ -493,6 +493,19 @@ static inline bool jsonl_parse_element(const cJSON *elem_json, jsonl_element_t *
     }
     else if (strcmp(class_name, "Arc3D") == 0) {
         return jsonl_parse_arc3d(geom, element);
+    }
+    else if (strcmp(class_name, "Circle3D") == 0) {
+        cJSON *center_json = cJSON_GetObjectItemCaseSensitive(geom, "Center");
+        cJSON *radius_json = cJSON_GetObjectItemCaseSensitive(geom, "Radius");
+        cJSON *axis_json = cJSON_GetObjectItemCaseSensitive(geom, "Axis");
+        if (!center_json || !radius_json || !axis_json || !cJSON_IsNumber(radius_json)) return false;
+        element->type = JSONL_GEOM_ARC;
+        element->data.arc.center = jsonl_parse_point3d(center_json);
+        element->data.arc.radius = (float)radius_json->valuedouble;
+        element->data.arc.normal = mdcad_import_vec3_normalize_safe(jsonl_parse_vector3d(axis_json));
+        element->data.arc.start_angle = 0.0f;
+        element->data.arc.end_angle = 6.28318530718f;
+        return true;
     }
     else if (strcmp(class_name, "PolyLine3D") == 0) {
         cJSON *points_arr = cJSON_GetObjectItemCaseSensitive(geom, "Points");

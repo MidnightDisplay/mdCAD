@@ -24,6 +24,7 @@
 #include "../ply_mesh_import_job.h"
 #include "../jsonl_loader.h"
 #include "../jsonl_import_job.h"
+#include "../jsonl_sketch_import_job.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -139,6 +140,18 @@ typedef struct {
     jsonl_import_job_t jsonl_import_job;
     bool jsonl_import_progress_popup_open;
 
+    // JSONL Sketch Import state
+    file_browser_t jsonl_sketch_browser;
+    bool jsonl_sketch_import_popup_open;
+    char jsonl_sketch_import_path[512];
+    int jsonl_sketch_entry_count;
+    int jsonl_sketch_element_count;
+    int jsonl_sketch_unit_index;
+    bool jsonl_sketch_use_colours;
+    float jsonl_sketch_default_colour[3];
+    bool jsonl_sketch_shift_to_center;
+    float jsonl_sketch_rotation[3];
+
     // About window
     ui_about_state_t about;
 } ui_scene_hierarchy_state_t;
@@ -243,6 +256,22 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     jsonl_import_job_init(&state->jsonl_import_job);
     state->jsonl_import_progress_popup_open = false;
 
+    // Initialize JSONL sketch import state
+    file_browser_init(&state->jsonl_sketch_browser);
+    state->jsonl_sketch_import_popup_open = false;
+    state->jsonl_sketch_import_path[0] = '\0';
+    state->jsonl_sketch_entry_count = 0;
+    state->jsonl_sketch_element_count = 0;
+    state->jsonl_sketch_unit_index = 0;
+    state->jsonl_sketch_use_colours = true;
+    state->jsonl_sketch_default_colour[0] = 1.0f;
+    state->jsonl_sketch_default_colour[1] = 1.0f;
+    state->jsonl_sketch_default_colour[2] = 1.0f;
+    state->jsonl_sketch_shift_to_center = false;
+    state->jsonl_sketch_rotation[0] = 0.0f;
+    state->jsonl_sketch_rotation[1] = 0.0f;
+    state->jsonl_sketch_rotation[2] = 0.0f;
+
     // Initialize about window
     ui_about_init(&state->about);
 }
@@ -264,6 +293,7 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     file_browser_shutdown(&state->ply_browser);
     file_browser_shutdown(&state->ply_mesh_browser);
     file_browser_shutdown(&state->jsonl_browser);
+    file_browser_shutdown(&state->jsonl_sketch_browser);
 
     // Cleanup any running import job
     if (ply_import_job_is_running(&state->import_job)) {
@@ -1219,6 +1249,10 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 file_browser_open_file(&state->jsonl_browser, "Import JSONL", ".jsonl",
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
+            if (igMenuItem_Bool("Import JSONL as Sketch", NULL, false, true)) {
+                file_browser_open_file(&state->jsonl_sketch_browser, "Import JSONL as Sketch", ".jsonl",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
             igSeparator();
             igCheckbox("Clear on Load", &state->clear_on_load);
             igSeparator();
@@ -2025,6 +2059,44 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         file_browser_clear_result(&state->jsonl_browser);
     }
 
+    // Handle JSONL-as-sketch file browser (opens import options popup when file is selected)
+    if (file_browser_draw(&state->jsonl_sketch_browser)) {
+        const char *path = file_browser_get_result(&state->jsonl_sketch_browser);
+        if (path && path[0]) {
+            strncpy(state->jsonl_sketch_import_path, path, sizeof(state->jsonl_sketch_import_path) - 1);
+            state->jsonl_sketch_import_path[sizeof(state->jsonl_sketch_import_path) - 1] = '\0';
+
+            int entry_count = 0, element_count = 0;
+            bool has_mesh = false;
+            int mesh_verts = 0, mesh_faces = 0;
+            jsonl_error_t err = jsonl_quick_scan_mesh(path, &entry_count, &element_count,
+                                                       &has_mesh, &mesh_verts, &mesh_faces);
+            if (err == JSONL_OK) {
+                state->jsonl_sketch_entry_count = entry_count;
+                state->jsonl_sketch_element_count = element_count;
+                state->jsonl_sketch_import_popup_open = true;
+                igOpenPopup_Str("Import JSONL as Sketch", ImGuiPopupFlags_None);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Sketch Import Error: %s", jsonl_error_string(err));
+            }
+
+            const char *last_sep_j = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win_j = strrchr(path, '\\');
+            if (last_sep_win_j > last_sep_j) last_sep_j = last_sep_win_j;
+#endif
+            if (last_sep_j && last_sep_j > path) {
+                size_t dir_len = (size_t)(last_sep_j - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->jsonl_sketch_browser);
+    }
+
     // JSONL Import Options Popup
     if (igBeginPopupModal("Import JSONL Options", &state->jsonl_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         // File info
@@ -2156,6 +2228,95 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             igCloseCurrentPopup();
         }
 
+        igEndPopup();
+    }
+
+    // JSONL as Sketch import popup
+    if (igBeginPopupModal("Import JSONL as Sketch", &state->jsonl_sketch_import_popup_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        igText("File: %s", state->jsonl_sketch_import_path);
+        igText("Entries: %d", state->jsonl_sketch_entry_count);
+        igText("Elements: %d", state->jsonl_sketch_element_count);
+        igSeparator();
+
+        igText("Units:");
+        const char* jsonl_sketch_unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##jsonl_sketch_units", &state->jsonl_sketch_unit_index, jsonl_sketch_unit_items, 3, -1);
+        igSeparator();
+
+        igCheckbox("Import Colours##jsonl_sketch", &state->jsonl_sketch_use_colours);
+        if (!state->jsonl_sketch_use_colours) {
+            igColorEdit3("Default Colour##jsonl_sketch", state->jsonl_sketch_default_colour, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass##jsonl_sketch", &state->jsonl_sketch_shift_to_center);
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##jsonl_sketch_rot", &state->jsonl_sketch_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##jsonl_sketch_rot", &state->jsonl_sketch_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##jsonl_sketch_rot", &state->jsonl_sketch_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+        igSeparator();
+
+        igTextWrapped("Observer link is created with Observe file ON by default. Mesh entries are ignored in sketch import.");
+        igSeparator();
+
+        if (igButton("Import##jsonl_as_sketch", (ImVec2){120, 0})) {
+            float scale = 1.0f;
+            switch (state->jsonl_sketch_unit_index) {
+                case 1: scale = 0.001f; break;
+                case 2: scale = 0.0254f; break;
+                default: scale = 1.0f; break;
+            }
+            vec4_t default_colour = vec4_make(
+                state->jsonl_sketch_default_colour[0],
+                state->jsonl_sketch_default_colour[1],
+                state->jsonl_sketch_default_colour[2],
+                1.0f
+            );
+
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->jsonl_sketch_rotation[0] * deg_to_rad;
+            float rot_y = state->jsonl_sketch_rotation[1] * deg_to_rad;
+            float rot_z = state->jsonl_sketch_rotation[2] * deg_to_rad;
+
+            ecs_entity_t imported_sketch = 0;
+            char import_error[192] = {0};
+            bool started = jsonl_sketch_import_job_start(
+                state->scene,
+                state->jsonl_sketch_import_path,
+                scale,
+                state->jsonl_sketch_use_colours,
+                default_colour,
+                state->jsonl_sketch_shift_to_center,
+                rot_x, rot_y, rot_z,
+                &imported_sketch,
+                import_error, sizeof(import_error)
+            );
+            if (started) {
+                state->cache_dirty = true;
+                if (imported_sketch != 0) {
+                    selection_set_single(state->selection, imported_sketch);
+                }
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "Imported JSONL as Sketch");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Sketch Import Error: %s",
+                         import_error[0] ? import_error : "unknown failure");
+            }
+
+            state->jsonl_sketch_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+        igSameLine(0, -1);
+        if (igButton("Cancel##jsonl_as_sketch", (ImVec2){120, 0})) {
+            state->jsonl_sketch_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
         igEndPopup();
     }
 

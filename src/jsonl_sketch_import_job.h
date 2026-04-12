@@ -9,9 +9,11 @@
 #include "components/jsonl_observer_comp.h"
 #include "components/label_comp.h"
 #include "scripting/sketch_script_apply.h"
+#include "math/math_import.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -72,34 +74,32 @@ static inline void jsonl_observer_restore_settings(JsonlObserverComp *dst,
 }
 
 static inline bool jsonl_sketch_import_apply_element_to_sketch(ecs_scene_t *scene,
-                                                               ecs_entity_t sketch,
-                                                               const jsonl_element_t *elem,
-                                                               const JsonlObserverComp *settings) {
+                                                                ecs_entity_t sketch,
+                                                                const jsonl_element_t *elem,
+                                                                const JsonlObserverComp *settings,
+                                                                bool use_element_colours,
+                                                                vec4_t fallback_colour) {
     if (!scene || sketch == 0 || !elem) return false;
 
     float scale = (settings && settings->scale > 0.0f) ? settings->scale : 1.0f;
-    float rx = settings ? settings->rotation_x : 0.0f;
-    float ry = settings ? settings->rotation_y : 0.0f;
-    float rz = settings ? settings->rotation_z : 0.0f;
-    bool shift = settings ? settings->shift_to_center : false;
-    (void)rx; (void)ry; (void)rz; (void)shift; // Reserved for full transform matrix parity.
+    vec4_t colour = use_element_colours ? elem->colour : fallback_colour;
 
     switch (elem->type) {
         case JSONL_GEOM_POINT: {
             vec3_t p = vec3_scale(elem->data.point.point, scale);
-            return scene_add_point_to_sketch(scene, sketch, p, elem->colour, 0.01f) != 0;
+            return scene_add_point_to_sketch(scene, sketch, p, colour, 0.01f) != 0;
         }
         case JSONL_GEOM_LINE: {
             vec3_t a = vec3_scale(elem->data.line.start, scale);
             vec3_t b = vec3_scale(elem->data.line.end, scale);
-            return scene_add_line_to_sketch(scene, sketch, a, b, elem->colour, 1.0f) != 0;
+            return scene_add_line_to_sketch(scene, sketch, a, b, colour, 1.0f) != 0;
         }
         case JSONL_GEOM_ARC: {
             vec3_t c = vec3_scale(elem->data.arc.center, scale);
             float r = elem->data.arc.radius * scale;
             return scene_add_arc_to_sketch(scene, sketch, c, r,
                                            elem->data.arc.start_angle, elem->data.arc.end_angle,
-                                           elem->data.arc.normal, elem->colour, 1.0f) != 0;
+                                           elem->data.arc.normal, colour, 1.0f) != 0;
         }
         case JSONL_GEOM_POLYLINE:
         case JSONL_GEOM_POLYGON: {
@@ -110,7 +110,7 @@ static inline bool jsonl_sketch_import_apply_element_to_sketch(ecs_scene_t *scen
                 int j = (i + 1) % count;
                 vec3_t a = vec3_scale(elem->data.polyline.points[i], scale);
                 vec3_t b = vec3_scale(elem->data.polyline.points[j], scale);
-                if (!scene_add_line_to_sketch(scene, sketch, a, b, elem->colour, 1.0f)) {
+                if (!scene_add_line_to_sketch(scene, sketch, a, b, colour, 1.0f)) {
                     return false;
                 }
             }
@@ -128,13 +128,16 @@ static inline bool jsonl_sketch_import_apply_data_to_sketch(ecs_scene_t *scene,
                                                              ecs_entity_t sketch,
                                                              const jsonl_data_t *data,
                                                              const JsonlObserverComp *settings,
+                                                             bool use_element_colours,
+                                                             vec4_t fallback_colour,
                                                              jsonl_sketch_counts_t *out_counts) {
     if (!scene || sketch == 0 || !data) return false;
     jsonl_sketch_counts_t counts = {0};
     for (int e = 0; e < data->entry_count; e++) {
         const jsonl_log_entry_t *entry = &data->entries[e];
         for (int i = 0; i < entry->element_count; i++) {
-            if (!jsonl_sketch_import_apply_element_to_sketch(scene, sketch, &entry->elements[i], settings)) {
+            if (!jsonl_sketch_import_apply_element_to_sketch(scene, sketch, &entry->elements[i], settings,
+                                                             use_element_colours, fallback_colour)) {
                 return false;
             }
             if (entry->elements[i].type != JSONL_GEOM_MESH) {
@@ -149,6 +152,195 @@ static inline bool jsonl_sketch_import_apply_data_to_sketch(ecs_scene_t *scene,
         }
     }
     if (out_counts) *out_counts = counts;
+    return true;
+}
+
+static inline void jsonl_sketch_import_apply_settings_to_data(jsonl_data_t *data,
+                                                               const JsonlObserverComp *settings) {
+    if (!data || !settings) return;
+
+    const bool shift_to_center = settings->shift_to_center;
+    const bool has_rotation = (settings->rotation_x != 0.0f ||
+                               settings->rotation_y != 0.0f ||
+                               settings->rotation_z != 0.0f);
+    const float scale = (settings->scale > 0.0f) ? settings->scale : 1.0f;
+
+    vec3_t sum = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
+    int point_count = 0;
+    for (int e = 0; e < data->entry_count; e++) {
+        jsonl_log_entry_t *entry = &data->entries[e];
+        for (int i = 0; i < entry->element_count; i++) {
+            jsonl_element_t *elem = &entry->elements[i];
+            switch (elem->type) {
+                case JSONL_GEOM_POINT:
+                    sum = mdcad_import_vec3_add(sum, elem->data.point.point);
+                    point_count++;
+                    break;
+                case JSONL_GEOM_LINE:
+                    sum = mdcad_import_vec3_add(sum, elem->data.line.start);
+                    sum = mdcad_import_vec3_add(sum, elem->data.line.end);
+                    point_count += 2;
+                    break;
+                case JSONL_GEOM_ARC:
+                    sum = mdcad_import_vec3_add(sum, elem->data.arc.center);
+                    point_count++;
+                    break;
+                case JSONL_GEOM_POLYLINE:
+                case JSONL_GEOM_POLYGON:
+                    for (int p = 0; p < elem->data.polyline.count; p++) {
+                        sum = mdcad_import_vec3_add(sum, elem->data.polyline.points[p]);
+                        point_count++;
+                    }
+                    break;
+                case JSONL_GEOM_MESH:
+                default:
+                    break;
+            }
+        }
+    }
+
+    vec3_t com = mdcad_import_vec3_make(0.0f, 0.0f, 0.0f);
+    if (shift_to_center && point_count > 0) {
+        com = mdcad_import_vec3_average(sum, point_count);
+    }
+    mat4_t rot_matrix = has_rotation
+        ? mdcad_import_rotation_xyz(settings->rotation_x, settings->rotation_y, settings->rotation_z)
+        : mdcad_import_mat4_identity();
+
+    for (int e = 0; e < data->entry_count; e++) {
+        jsonl_log_entry_t *entry = &data->entries[e];
+        for (int i = 0; i < entry->element_count; i++) {
+            jsonl_element_t *elem = &entry->elements[i];
+
+            #define JSONL_SKETCH_XFORM_POINT(pt) \
+                do { \
+                    pt = mdcad_import_transform_point(pt, shift_to_center, com, has_rotation, rot_matrix, scale); \
+                } while (0)
+
+            switch (elem->type) {
+                case JSONL_GEOM_POINT:
+                    JSONL_SKETCH_XFORM_POINT(elem->data.point.point);
+                    break;
+                case JSONL_GEOM_LINE:
+                    JSONL_SKETCH_XFORM_POINT(elem->data.line.start);
+                    JSONL_SKETCH_XFORM_POINT(elem->data.line.end);
+                    break;
+                case JSONL_GEOM_ARC:
+                    JSONL_SKETCH_XFORM_POINT(elem->data.arc.center);
+                    if (scale != 1.0f) elem->data.arc.radius *= scale;
+                    if (has_rotation) {
+                        elem->data.arc.normal = mdcad_import_mat4_mul_point(rot_matrix, elem->data.arc.normal);
+                        elem->data.arc.normal = mdcad_import_vec3_normalize_safe(elem->data.arc.normal);
+                    }
+                    break;
+                case JSONL_GEOM_POLYLINE:
+                case JSONL_GEOM_POLYGON:
+                    for (int p = 0; p < elem->data.polyline.count; p++) {
+                        JSONL_SKETCH_XFORM_POINT(elem->data.polyline.points[p]);
+                    }
+                    break;
+                case JSONL_GEOM_MESH:
+                default:
+                    break;
+            }
+
+            #undef JSONL_SKETCH_XFORM_POINT
+        }
+    }
+}
+
+static inline bool jsonl_sketch_import_job_start(ecs_scene_t *scene,
+                                                 const char *filepath,
+                                                 float scale,
+                                                 bool use_jsonl_colours,
+                                                 vec4_t default_colour,
+                                                 bool shift_to_center,
+                                                 float rotation_x,
+                                                 float rotation_y,
+                                                 float rotation_z,
+                                                 ecs_entity_t *out_sketch,
+                                                 char *out_error,
+                                                 size_t out_error_size) {
+    if (out_sketch) *out_sketch = 0;
+    if (out_error && out_error_size > 0) out_error[0] = '\0';
+    if (!scene || !filepath || filepath[0] == '\0') {
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "Invalid sketch import request.");
+        }
+        return false;
+    }
+
+    jsonl_parse_state_t parse = {0};
+    jsonl_error_t err = jsonl_open(filepath, &parse);
+    if (err != JSONL_OK) {
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "JSONL open failed: %s", jsonl_error_string(err));
+        }
+        return false;
+    }
+    while (!jsonl_is_complete(&parse) && parse.error == JSONL_OK) {
+        (void)jsonl_parse_lines_chunk(&parse, 64);
+    }
+    jsonl_close(&parse);
+    if (parse.error != JSONL_OK) {
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "JSONL parse failed: %s", jsonl_error_string(parse.error));
+        }
+        jsonl_parse_state_free(&parse);
+        return false;
+    }
+
+    char sketch_name[LABEL_NAME_MAX] = {0};
+    jsonl_observer_label_from_path(filepath, sketch_name, sizeof(sketch_name));
+    ecs_entity_t sketch = scene_add_sketch(scene, sketch_name[0] ? sketch_name : "Sketch", filepath, default_colour);
+    if (sketch == 0) {
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "Failed to create sketch entity.");
+        }
+        jsonl_parse_state_free(&parse);
+        return false;
+    }
+
+    JsonlObserverComp observer = jsonl_observer_comp_default();
+    jsonl_observer_comp_set_path(&observer, filepath);
+    observer.observe_enabled = true; // D-01: ON by default.
+    observer.scale = (scale > 0.0f) ? scale : 1.0f;
+    observer.rotation_x = rotation_x;
+    observer.rotation_y = rotation_y;
+    observer.rotation_z = rotation_z;
+    observer.shift_to_center = shift_to_center;
+    ecs_world_set_jsonl_observer(scene->world, sketch, &observer);
+    if (ecs_world_get_jsonl_observer(scene->world, sketch) == NULL) {
+        scene_remove_entity(scene, sketch); // D-02 transactional rollback on observer-link failure.
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "Failed to link JSONL observer to sketch.");
+        }
+        jsonl_parse_state_free(&parse);
+        return false;
+    }
+    jsonl_observer_apply_label_contract(scene, sketch, filepath);
+
+    jsonl_sketch_import_apply_settings_to_data(&parse.data, &observer);
+    jsonl_sketch_counts_t counts = {0};
+    bool applied = jsonl_sketch_import_apply_data_to_sketch(scene,
+                                                            sketch,
+                                                            &parse.data,
+                                                            &observer,
+                                                            use_jsonl_colours,
+                                                            default_colour,
+                                                            &counts);
+    if (!applied) {
+        scene_remove_entity(scene, sketch);
+        if (out_error && out_error_size > 0) {
+            snprintf(out_error, out_error_size, "Failed mapping JSONL geometry into sketch.");
+        }
+        jsonl_parse_state_free(&parse);
+        return false;
+    }
+    scene_refresh_sketch_metadata(scene, sketch);
+    scene_script_reemit_for_sketch(scene, sketch);
+    if (out_sketch) *out_sketch = sketch;
+    jsonl_parse_state_free(&parse);
     return true;
 }
 
@@ -249,6 +441,7 @@ static inline jsonl_reparse_result_t jsonl_sketch_reparse_transactional(ecs_scen
 
     JsonlObserverComp settings_copy;
     jsonl_observer_snapshot_settings(observer, &settings_copy);
+    jsonl_sketch_import_apply_settings_to_data(&parse.data, &settings_copy);
 
     // Stage new geometry first. Commit by deleting old only after successful build.
     ecs_entity_t *new_children = NULL;
@@ -262,7 +455,8 @@ static inline jsonl_reparse_result_t jsonl_sketch_reparse_transactional(ecs_scen
         for (int i = 0; i < entry->element_count && applied; i++) {
             const jsonl_element_t *elem = &entry->elements[i];
             int before = scene_count_sketch_geometry(scene, sketch);
-            if (!jsonl_sketch_import_apply_element_to_sketch(scene, sketch, elem, &settings_copy)) {
+            if (!jsonl_sketch_import_apply_element_to_sketch(scene, sketch, elem, &settings_copy,
+                                                             true, vec4_make(1.0f, 1.0f, 1.0f, 1.0f))) {
                 applied = false;
                 break;
             }
