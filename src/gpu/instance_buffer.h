@@ -376,6 +376,17 @@ static inline int instance_buffer_count(instance_buffer_t *ib) {
     return ib->count;
 }
 
+// Count currently occupied (live) slots.
+// Unlike instance_buffer_count(), this excludes freed holes retained for reuse.
+static inline int instance_buffer_live_count(instance_buffer_t *ib) {
+    if (!ib) return 0;
+    int live = 0;
+    for (int i = 0; i < ib->count; i++) {
+        if (ib->slot_to_entity[i] != 0) live++;
+    }
+    return live;
+}
+
 static inline int instance_buffer_capacity(instance_buffer_t *ib) {
     return ib->capacity;
 }

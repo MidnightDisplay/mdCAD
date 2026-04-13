@@ -15,6 +15,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#endif
 
 typedef struct {
     uint32_t geometry_count;
@@ -23,6 +32,124 @@ typedef struct {
 
 static inline uint64_t jsonl_observer_now_ms(void) {
     return scene_solver_now_ms();
+}
+
+static inline bool jsonl_observer_read_source_metadata(const char *filepath,
+                                                       uint64_t *out_size_bytes,
+                                                       uint64_t *out_mtime_unix_ns) {
+    if (!filepath || filepath[0] == '\0' || !out_size_bytes || !out_mtime_unix_ns) return false;
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA attrs;
+    if (!GetFileAttributesExA(filepath, GetFileExInfoStandard, &attrs)) {
+        return false;
+    }
+    uint64_t size_hi = (uint64_t)attrs.nFileSizeHigh;
+    uint64_t size_lo = (uint64_t)attrs.nFileSizeLow;
+    *out_size_bytes = (size_hi << 32) | size_lo;
+
+    FILETIME write_time = attrs.ftLastWriteTime;
+    uint64_t ticks_100ns = ((uint64_t)write_time.dwHighDateTime << 32) | (uint64_t)write_time.dwLowDateTime;
+    // Windows FILETIME epoch (1601-01-01) to Unix epoch (1970-01-01)
+    const uint64_t EPOCH_DIFF_100NS = 116444736000000000ULL;
+    if (ticks_100ns > EPOCH_DIFF_100NS) {
+        *out_mtime_unix_ns = (ticks_100ns - EPOCH_DIFF_100NS) * 100ULL;
+    } else {
+        *out_mtime_unix_ns = 0ULL;
+    }
+    return true;
+#else
+    struct stat st;
+    if (stat(filepath, &st) != 0) {
+        return false;
+    }
+    *out_size_bytes = (uint64_t)st.st_size;
+#if defined(__APPLE__)
+    *out_mtime_unix_ns = ((uint64_t)st.st_mtimespec.tv_sec * 1000000000ULL) + (uint64_t)st.st_mtimespec.tv_nsec;
+#elif defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200809L)
+    *out_mtime_unix_ns = ((uint64_t)st.st_mtim.tv_sec * 1000000000ULL) + (uint64_t)st.st_mtim.tv_nsec;
+#else
+    *out_mtime_unix_ns = (uint64_t)st.st_mtime * 1000000000ULL;
+#endif
+    return true;
+#endif
+}
+
+static inline bool jsonl_observer_hash_file_fnv1a64(const char *filepath, uint64_t *out_hash) {
+    if (!filepath || filepath[0] == '\0' || !out_hash) return false;
+    FILE *f = fopen(filepath, "rb");
+    if (!f) return false;
+
+    uint64_t hash = 1469598103934665603ULL;
+    unsigned char buf[4096];
+    for (;;) {
+        size_t n = fread(buf, 1, sizeof(buf), f);
+        for (size_t i = 0; i < n; i++) {
+            hash ^= (uint64_t)buf[i];
+            hash *= 1099511628211ULL;
+        }
+        if (n < sizeof(buf)) {
+            if (ferror(f)) {
+                fclose(f);
+                return false;
+            }
+            break;
+        }
+    }
+    fclose(f);
+    *out_hash = hash;
+    return true;
+}
+
+static inline bool jsonl_observer_stamp_source_state(JsonlObserverComp *observer, const char *filepath) {
+    if (!observer || !filepath || filepath[0] == '\0') return false;
+    uint64_t size_bytes = 0;
+    uint64_t mtime_ns = 0;
+    uint64_t hash = 0;
+    if (!jsonl_observer_read_source_metadata(filepath, &size_bytes, &mtime_ns)) return false;
+    if (!jsonl_observer_hash_file_fnv1a64(filepath, &hash)) return false;
+    observer->source_state_valid = true;
+    observer->last_source_size_bytes = size_bytes;
+    observer->last_source_mtime_unix_ns = mtime_ns;
+    observer->last_source_hash = hash;
+    return true;
+}
+
+static inline bool jsonl_observer_source_changed(JsonlObserverComp *observer,
+                                                 const char *filepath,
+                                                 bool *out_changed) {
+    if (out_changed) *out_changed = true;
+    if (!observer || !filepath || filepath[0] == '\0') return false;
+
+    uint64_t size_bytes = 0;
+    uint64_t mtime_ns = 0;
+    if (!jsonl_observer_read_source_metadata(filepath, &size_bytes, &mtime_ns)) return false;
+
+    if (observer->source_state_valid &&
+        observer->last_source_size_bytes == size_bytes &&
+        observer->last_source_mtime_unix_ns == mtime_ns) {
+        if (out_changed) *out_changed = false;
+        return true;
+    }
+
+    if (!observer->source_state_valid) {
+        if (out_changed) *out_changed = true;
+        return true;
+    }
+
+    uint64_t hash = 0;
+    if (!jsonl_observer_hash_file_fnv1a64(filepath, &hash)) return false;
+
+    if (observer->last_source_hash == hash) {
+        observer->source_state_valid = true;
+        observer->last_source_size_bytes = size_bytes;
+        observer->last_source_mtime_unix_ns = mtime_ns;
+        observer->last_source_hash = hash;
+        if (out_changed) *out_changed = false;
+        return true;
+    }
+
+    if (out_changed) *out_changed = true;
+    return true;
 }
 
 static inline void jsonl_observer_label_from_path(const char *filepath,
@@ -303,7 +430,7 @@ static inline bool jsonl_sketch_import_job_start(ecs_scene_t *scene,
 
     JsonlObserverComp observer = jsonl_observer_comp_default();
     jsonl_observer_comp_set_path(&observer, filepath);
-    observer.observe_enabled = false; // Import default: OFF until user opts in.
+    observer.observe_enabled = true; // Import default: ON (opt-out).
     observer.scale = (scale > 0.0f) ? scale : 1.0f;
     observer.rotation_x = rotation_x;
     observer.rotation_y = rotation_y;
@@ -339,6 +466,8 @@ static inline bool jsonl_sketch_import_job_start(ecs_scene_t *scene,
     }
     scene_refresh_sketch_metadata(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
+    (void)jsonl_observer_stamp_source_state(&observer, filepath);
+    ecs_world_set_jsonl_observer(scene->world, sketch, &observer);
     if (out_sketch) *out_sketch = sketch;
     jsonl_parse_state_free(&parse);
     return true;
@@ -517,6 +646,9 @@ static inline jsonl_reparse_result_t jsonl_sketch_reparse_transactional(ecs_scen
     observer->retry_count = 0u;
     observer->next_retry_at_ms = 0u;
     jsonl_observer_restore_settings(observer, &settings_copy);
+    if (!jsonl_observer_stamp_source_state(observer, observer->source_path)) {
+        observer->source_state_valid = false;
+    }
     scene_refresh_sketch_metadata(scene, sketch);
     scene_script_reemit_for_sketch(scene, sketch);
 

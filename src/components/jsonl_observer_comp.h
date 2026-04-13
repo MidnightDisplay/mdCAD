@@ -37,6 +37,10 @@ typedef struct {
     bool shift_to_center;
 
     char source_path[JSONL_OBSERVER_PATH_MAX];
+    bool source_state_valid;
+    uint64_t last_source_size_bytes;
+    uint64_t last_source_mtime_unix_ns;
+    uint64_t last_source_hash;
 
     uint32_t message_count;
     uint8_t message_severity[JSONL_OBSERVER_MESSAGE_HISTORY];

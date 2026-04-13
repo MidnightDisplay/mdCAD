@@ -263,6 +263,13 @@ static inline void gizmo_update(gizmo_t *g,
     // Compute gizmo center based on mode
     ecs_world_state_t *world = (ecs_world_state_t*)SCENE_WORLD(scene_ptr);
 
+    if (g->vertex_mode.active) {
+        ecs_entity_t vm_entity = (ecs_entity_t)g->vertex_mode.target_entity;
+        if (vm_entity == 0 || !ecs_is_alive(world->world, vm_entity)) {
+            gizmo_vertex_mode_exit(&g->vertex_mode);
+        }
+    }
+
     if (g->edit_mode == GIZMO_GEOMETRY_MODE && g->vertex_mode.active) {
         // Geometry mode: center at selected vertices
         ecs_entity_t entity = (ecs_entity_t)g->vertex_mode.target_entity;
@@ -285,6 +292,9 @@ static inline void gizmo_update(gizmo_t *g,
         int fallback_count = 0;
         for (int i = 0; i < selection->count; i++) {
             ecs_entity_t e = selection->entities[i];
+            if (!ecs_is_alive(world->world, e)) {
+                continue;
+            }
             vec3_t midpoint = vec3_make(0, 0, 0);
             if (gizmo_active_sketch_line_midpoint(world, e, &midpoint)) {
                 line_midpoint_sum = vec3_add(line_midpoint_sum, midpoint);

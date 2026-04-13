@@ -2085,6 +2085,14 @@ static inline void scene_remove_entity(ecs_scene_t *scene, ecs_entity_t e) {
     if (!ecs_is_alive(scene->world->world, e)) return;
     ecs_entity_t parent = ecs_world_get_parent(scene->world, e);
 
+    // Keep selection/hover tags coherent before entity destruction.
+    if (ecs_world_is_selected(scene->world, e)) {
+        ecs_world_deselect(scene->world, e);
+    }
+    if (ecs_world_is_hovered(scene->world, e)) {
+        ecs_world_clear_hovered(scene->world, e);
+    }
+
     // First, recursively delete all children
     // We need to collect children first because deleting modifies the hierarchy
     // Process in batches to handle unlimited children
@@ -5961,11 +5969,11 @@ static inline void ecs_scene_draw(ecs_scene_t *scene,
 //------------------------------------------------------------------------------
 
 static inline int ecs_scene_line_count(ecs_scene_t *scene) {
-    return instance_buffer_count(&scene->batches.lines.instances);
+    return instance_buffer_live_count(&scene->batches.lines.instances);
 }
 
 static inline int ecs_scene_point_count(ecs_scene_t *scene) {
-    return instance_buffer_count(&scene->batches.points.instances);
+    return instance_buffer_live_count(&scene->batches.points.instances);
 }
 
 static inline int ecs_scene_triangle_count(ecs_scene_t *scene) {

@@ -99,6 +99,28 @@ static inline bool jsonl_observer_tick_one(ecs_scene_t *scene, ecs_entity_t sket
         return false;
     }
 
+    bool source_changed = true;
+    if (jsonl_observer_source_changed(obs, obs->source_path, &source_changed)) {
+        if (!source_changed) {
+            obs->retry_count = 0u;
+            obs->next_retry_at_ms = now_ms + obs->interval_ms;
+            return false;
+        }
+    } else {
+        if (obs->retry_count < obs->max_retries) {
+            obs->retry_count++;
+        }
+        obs->next_retry_at_ms = now_ms + obs->interval_ms;
+        jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
+                                         "Observer source check failed; will retry.");
+        if (obs->retry_count >= obs->max_retries) {
+            obs->observe_enabled = false;
+            jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_ERROR,
+                                             "Observe auto-disabled after max retries.");
+        }
+        return false;
+    }
+
     jsonl_reparse_result_t result = jsonl_sketch_reparse_transactional(scene, sketch, obs);
     if (result.success) {
         obs->retry_count = 0u;

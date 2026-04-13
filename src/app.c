@@ -376,11 +376,47 @@ static inline bool mdcad_selection_is_active_sketch_standalone_points(ecs_entity
     if (active_sketch == 0) return false;
     if (state.selection.count <= 0) return false;
     for (int i = 0; i < state.selection.count; i++) {
-        if (!mdcad_is_active_sketch_standalone_point_entity(state.selection.entities[i], active_sketch)) {
+        ecs_entity_t selected = selection_get(&state.selection, i);
+        if (!mdcad_is_active_sketch_standalone_point_entity(selected, active_sketch)) {
             return false;
         }
     }
     return true;
+}
+
+static void mdcad_maintain_live_selection_refs(void) {
+    selection_prune_dead(&state.selection);
+
+    if (state.selected_constraint_entity != 0 &&
+        !ecs_is_alive(state.ecs_world.world, state.selected_constraint_entity)) {
+        state.selected_constraint_entity = 0;
+    }
+    if (state.constraint_dimension_popup_constraint != 0 &&
+        !ecs_is_alive(state.ecs_world.world, state.constraint_dimension_popup_constraint)) {
+        state.constraint_dimension_popup_constraint = 0;
+        state.constraint_dimension_popup_open = false;
+        state.constraint_dimension_popup_open_request = false;
+    }
+    if (state.script_editor_sketch != 0 &&
+        !ecs_is_alive(state.ecs_world.world, state.script_editor_sketch)) {
+        state.script_editor_sketch = 0;
+        state.script_editor_open = false;
+        state.script_editor_initialized = false;
+        state.script_editor_has_unsaved_edits = false;
+    }
+    if (state.script_io_sketch != 0 &&
+        !ecs_is_alive(state.ecs_world.world, state.script_io_sketch)) {
+        state.script_io_sketch = 0;
+        state.script_io_open = false;
+        state.script_io_slider_drag_active = false;
+        state.script_io_slider_drag_sketch = 0;
+        state.script_io_slider_drag_input_id[0] = '\0';
+    }
+    if (state.entity_inspector.active_sketch != 0 &&
+        !ecs_is_alive(state.ecs_world.world, state.entity_inspector.active_sketch)) {
+        state.entity_inspector.active_sketch = 0;
+        state.entity_inspector.active_sketch_workspace_open = false;
+    }
 }
 
 static inline bool mdcad_is_active_sketch_line_entity(ecs_entity_t entity, ecs_entity_t active_sketch) {
@@ -1726,6 +1762,8 @@ static void init(void) {
 // Frame
 //------------------------------------------------------------------------------
 static void frame(void) {
+    mdcad_maintain_live_selection_refs();
+
     // Handle ImGui settings persistence
     imgui_storage_frame();
 
@@ -2061,7 +2099,7 @@ static void frame(void) {
                                 state.gizmo_drag_start_line_a = (vec3_t*)malloc(count * sizeof(vec3_t));
                                 state.gizmo_drag_start_line_b = (vec3_t*)malloc(count * sizeof(vec3_t));
                                 for (int i = 0; i < count; i++) {
-                                    ecs_entity_t e = state.selection.entities[i];
+                                    ecs_entity_t e = selection_get(&state.selection, i);
                                     state.gizmo_drag_entities[i] = e;
                                     if (direct_point_mode) {
                                         const GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, e);

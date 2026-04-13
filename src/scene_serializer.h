@@ -589,6 +589,17 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         json_write_indent(b, depth + 3);
         json_builder_appendf(b, "\"shift_to_center\": %s,\n", jsonl_observer->shift_to_center ? "true" : "false");
         json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"source_state_valid\": %s,\n", jsonl_observer->source_state_valid ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"last_source_size_bytes\": %llu,\n",
+                             (unsigned long long)jsonl_observer->last_source_size_bytes);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"last_source_mtime_unix_ns\": %llu,\n",
+                             (unsigned long long)jsonl_observer->last_source_mtime_unix_ns);
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"last_source_hash\": %llu,\n",
+                             (unsigned long long)jsonl_observer->last_source_hash);
+        json_write_indent(b, depth + 3);
         json_builder_append(b, "\"source_path\": ");
         json_write_string_escaped(b, jsonl_observer->source_path);
         json_builder_append(b, ",\n");
@@ -1982,6 +1993,22 @@ static inline bool json_parse_jsonl_observer(json_parser_t *p, loaded_entity_t *
         } else if (strcmp(key, "shift_to_center") == 0) {
             if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
             ent->jsonl_observer.shift_to_center = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "source_state_valid") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->jsonl_observer.source_state_valid = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "last_source_size_bytes") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.last_source_size_bytes = (uint64_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "last_source_mtime_unix_ns") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.last_source_mtime_unix_ns = (uint64_t)p->num_value;
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "last_source_hash") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.last_source_hash = (uint64_t)p->num_value;
             if (!json_next_token(p)) return false;
         } else if (strcmp(key, "source_path") == 0) {
             if (p->token != JSON_TOK_STRING) return false;
