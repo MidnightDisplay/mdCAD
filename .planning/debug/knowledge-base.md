@@ -28,3 +28,10 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Files changed:** src/undo_redo.h, src/undo_redo_exec.h, src/tests/endpoint_pick_test.c
 ---
 
+## jsonl-large-file-parses-zero-entities — Large JSONL import silently completed with 0 entities
+- **Date:** 2026-04-13
+- **Error patterns:** jsonl large file, parses 0 entities, import-as-sketch, no explicit error, >4MB line, truncated entry
+- **Root cause:** Incremental parser used fixed 4MB fgets line buffer and ignored jsonl_parse_entry failures, so >4MB single-line JSONL entries were truncated/skipped without parse.error; import/reparse paths then reported success with zero entities.
+- **Fix:** Replaced fixed-cap fgets line reads with dynamic realloc-backed line reader across JSONL scan/parse paths; now non-empty parse-entry failures set JSONL_ERROR_PARSE_ERROR so malformed/truncated input fails explicitly.
+- **Files changed:** src/jsonl_loader.h, src/tests/jsonl_loader_limits_test.c, src/CMakeLists.txt
+---
