@@ -136,6 +136,57 @@ typedef struct {
 } jsonl_parse_state_t;
 
 //------------------------------------------------------------------------------
+// Internal: dynamic line reader (heap growth, no fixed hard cap)
+//------------------------------------------------------------------------------
+
+static inline jsonl_error_t jsonl_read_line_dynamic(FILE *f,
+                                                    char **line_buf,
+                                                    size_t *line_cap,
+                                                    size_t *out_len) {
+    if (!f || !line_buf || !line_cap || !out_len) return JSONL_ERROR_PARSE_ERROR;
+    *out_len = 0;
+
+    if (!*line_buf || *line_cap == 0) {
+        *line_cap = 64u * 1024u; // start at 64KB and grow as needed
+        *line_buf = (char*)malloc(*line_cap);
+        if (!*line_buf) {
+            *line_cap = 0;
+            return JSONL_ERROR_MEMORY_ALLOCATION;
+        }
+        (*line_buf)[0] = '\0';
+    }
+
+    size_t len = 0;
+    for (;;) {
+        if (*line_cap - len < 2) {
+            if (*line_cap > ((size_t)-1) / 2u) {
+                return JSONL_ERROR_MEMORY_ALLOCATION;
+            }
+            size_t next_cap = (*line_cap) * 2u;
+            char *next = (char*)realloc(*line_buf, next_cap);
+            if (!next) return JSONL_ERROR_MEMORY_ALLOCATION;
+            *line_buf = next;
+            *line_cap = next_cap;
+        }
+
+        char *chunk = fgets((*line_buf) + len, (int)(*line_cap - len), f);
+        if (!chunk) {
+            if (len == 0) {
+                return JSONL_OK; // EOF/no data
+            }
+            break; // partial line at EOF
+        }
+
+        len += strlen((*line_buf) + len);
+        if (len > 0 && (*line_buf)[len - 1] == '\n') break; // full line
+        if (feof(f)) break;
+    }
+
+    *out_len = len;
+    return JSONL_OK;
+}
+
+//------------------------------------------------------------------------------
 // Internal: Extract class name suffix from $type string
 // e.g., "Geo.NET.Geometry.Line3D, Geo.NET Core" -> "Line3D"
 //------------------------------------------------------------------------------
@@ -646,13 +697,15 @@ static inline jsonl_error_t jsonl_quick_scan(const char *filepath,
     *out_entry_count = 0;
     *out_element_count = 0;
 
-    char *line_buf = (char*)malloc(1024 * 1024);  // 1MB line buffer
-    if (!line_buf) {
-        fclose(f);
-        return JSONL_ERROR_MEMORY_ALLOCATION;
-    }
+    char *line_buf = NULL;
+    size_t line_cap = 0;
+    jsonl_error_t scan_err = JSONL_OK;
+    for (;;) {
+        size_t line_len = 0;
+        scan_err = jsonl_read_line_dynamic(f, &line_buf, &line_cap, &line_len);
+        if (scan_err != JSONL_OK) break;
+        if (line_len == 0) break;
 
-    while (fgets(line_buf, 1024 * 1024, f)) {
         // Skip empty lines
         char *p = line_buf;
         while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
@@ -660,19 +713,21 @@ static inline jsonl_error_t jsonl_quick_scan(const char *filepath,
 
         // Quick parse just to count elements
         cJSON *root = cJSON_Parse(p);
-        if (root) {
-            (*out_entry_count)++;
-            cJSON *elements = cJSON_GetObjectItemCaseSensitive(root, "Elements");
-            if (elements && cJSON_IsArray(elements)) {
-                *out_element_count += cJSON_GetArraySize(elements);
-            }
-            cJSON_Delete(root);
+        if (!root) {
+            scan_err = JSONL_ERROR_PARSE_ERROR;
+            break;
         }
+        (*out_entry_count)++;
+        cJSON *elements = cJSON_GetObjectItemCaseSensitive(root, "Elements");
+        if (elements && cJSON_IsArray(elements)) {
+            *out_element_count += cJSON_GetArraySize(elements);
+        }
+        cJSON_Delete(root);
     }
 
     free(line_buf);
     fclose(f);
-    return JSONL_OK;
+    return scan_err;
 }
 
 //------------------------------------------------------------------------------
@@ -717,15 +772,19 @@ static inline jsonl_error_t jsonl_open(const char *filepath, jsonl_parse_state_t
 static inline int jsonl_parse_lines_chunk(jsonl_parse_state_t *state, int max_lines) {
     if (!state->file || state->error != JSONL_OK) return 0;
 
-    // Allocate line buffer (JSONL lines can be very long)
-    char *line_buf = (char*)malloc(4 * 1024 * 1024);  // 4MB line buffer
-    if (!line_buf) {
-        state->error = JSONL_ERROR_MEMORY_ALLOCATION;
-        return 0;
-    }
+    char *line_buf = NULL;
+    size_t line_cap = 0;
 
     int parsed = 0;
-    while (parsed < max_lines && fgets(line_buf, 4 * 1024 * 1024, state->file)) {
+    while (parsed < max_lines) {
+        size_t line_len = 0;
+        jsonl_error_t read_err = jsonl_read_line_dynamic(state->file, &line_buf, &line_cap, &line_len);
+        if (read_err != JSONL_OK) {
+            state->error = read_err;
+            break;
+        }
+        if (line_len == 0) break; // EOF
+
         // Skip empty lines
         char *p = line_buf;
         while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
@@ -750,6 +809,9 @@ static inline int jsonl_parse_lines_chunk(jsonl_parse_state_t *state, int max_li
             state->data.entries[state->data.entry_count] = entry;
             state->data.total_elements += entry.element_count;
             state->data.entry_count++;
+        } else {
+            state->error = JSONL_ERROR_PARSE_ERROR;
+            break;
         }
 
         state->lines_parsed++;
@@ -889,60 +951,63 @@ static inline jsonl_error_t jsonl_quick_scan_mesh(const char *filepath,
     *out_entry_count = 0;
     *out_element_count = 0;
 
-    // Use larger buffer for mesh data
-    char *line_buf = (char*)malloc(8 * 1024 * 1024);  // 8MB line buffer for mesh JSONL
-    if (!line_buf) {
-        fclose(f);
-        return JSONL_ERROR_MEMORY_ALLOCATION;
-    }
+    char *line_buf = NULL;
+    size_t line_cap = 0;
+    jsonl_error_t scan_err = JSONL_OK;
+    for (;;) {
+        size_t line_len = 0;
+        scan_err = jsonl_read_line_dynamic(f, &line_buf, &line_cap, &line_len);
+        if (scan_err != JSONL_OK) break;
+        if (line_len == 0) break;
 
-    while (fgets(line_buf, 8 * 1024 * 1024, f)) {
         // Skip empty lines
         char *p = line_buf;
         while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
         if (*p == '\0') continue;
 
         cJSON *root = cJSON_Parse(p);
-        if (root) {
-            (*out_entry_count)++;
-            cJSON *elements = cJSON_GetObjectItemCaseSensitive(root, "Elements");
-            if (elements && cJSON_IsArray(elements)) {
-                int elem_count = cJSON_GetArraySize(elements);
-                *out_element_count += elem_count;
+        if (!root) {
+            scan_err = JSONL_ERROR_PARSE_ERROR;
+            break;
+        }
+        (*out_entry_count)++;
+        cJSON *elements = cJSON_GetObjectItemCaseSensitive(root, "Elements");
+        if (elements && cJSON_IsArray(elements)) {
+            int elem_count = cJSON_GetArraySize(elements);
+            *out_element_count += elem_count;
 
-                // Check each element for mesh type
-                cJSON *elem;
-                cJSON_ArrayForEach(elem, elements) {
-                    cJSON *geom = cJSON_GetObjectItemCaseSensitive(elem, "Element");
-                    if (geom) {
-                        cJSON *type_field = cJSON_GetObjectItemCaseSensitive(geom, "$type");
-                        if (type_field && cJSON_IsString(type_field)) {
-                            const char *type_str = type_field->valuestring;
-                            // Check if it's a MeshBody
-                            if (strstr(type_str, "MeshBody") != NULL) {
-                                *out_has_mesh = true;
+            // Check each element for mesh type
+            cJSON *elem;
+            cJSON_ArrayForEach(elem, elements) {
+                cJSON *geom = cJSON_GetObjectItemCaseSensitive(elem, "Element");
+                if (geom) {
+                    cJSON *type_field = cJSON_GetObjectItemCaseSensitive(geom, "$type");
+                    if (type_field && cJSON_IsString(type_field)) {
+                        const char *type_str = type_field->valuestring;
+                        // Check if it's a MeshBody
+                        if (strstr(type_str, "MeshBody") != NULL) {
+                            *out_has_mesh = true;
 
-                                // Count vertices and faces
-                                cJSON *points = cJSON_GetObjectItemCaseSensitive(geom, "_Points");
-                                cJSON *indices = cJSON_GetObjectItemCaseSensitive(geom, "_Indices");
-                                if (points && cJSON_IsArray(points)) {
-                                    *out_mesh_vertex_count += cJSON_GetArraySize(points);
-                                }
-                                if (indices && cJSON_IsArray(indices)) {
-                                    *out_mesh_face_count += cJSON_GetArraySize(indices) / 3;
-                                }
+                            // Count vertices and faces
+                            cJSON *points = cJSON_GetObjectItemCaseSensitive(geom, "_Points");
+                            cJSON *indices = cJSON_GetObjectItemCaseSensitive(geom, "_Indices");
+                            if (points && cJSON_IsArray(points)) {
+                                *out_mesh_vertex_count += cJSON_GetArraySize(points);
+                            }
+                            if (indices && cJSON_IsArray(indices)) {
+                                *out_mesh_face_count += cJSON_GetArraySize(indices) / 3;
                             }
                         }
                     }
                 }
             }
-            cJSON_Delete(root);
         }
+        cJSON_Delete(root);
     }
 
     free(line_buf);
     fclose(f);
-    return JSONL_OK;
+    return scan_err;
 }
 
 #endif // JSONL_LOADER_H
