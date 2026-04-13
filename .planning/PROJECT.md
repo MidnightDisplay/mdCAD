@@ -10,11 +10,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.4` — Solver Robustness + Sketch Gizmo Corrections (2026-04-09)
+**Shipped:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity (2026-04-13)
 
-**Current milestone:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity
+**Current milestone:** none (v1.5 archived)
 
-**Current focus:** Phase 34 deterministic closure gate complete; milestone v1.5 ready for closure flow.
+**Current focus:** start next milestone definition and requirement capture.
 
 ## Requirements
 
@@ -49,12 +49,13 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Explicit coincidence authoring semantics now preserve deterministic ArcAxisLine/tangency pair intent with durable lifecycle + script roundtrip behavior (`COIN-01..02`) — Validated in Phase 32: explicit-coincidence-authoring-semantics
 - ✓ Large-jump mixed arc/line workflows now use staged robustness semantics with transactional rollback/recovery and deterministic diagnostics/parity behavior for equivalent PARALLEL/ALONG setups (`SROB-01..03`, `DIAG-01..02`, `PARI-01..02`) — Validated in Phase 33: large-jump-robustness-and-parallel-along-parity
 - ✓ Deterministic v1.5 closure gate now proves canonical Windows Vulkan baseline + immediate rerun parity for targeted 7-test suite (`DIAG-03`) — Validated in Phase 34: deterministic-v1-5-closure-gate
+- ✓ Observable JSONL sketch import now supports persisted observer state, transactional reparse safety, and stable large-script editor/apply behavior with user-approved UAT (`P35-01..06`) — Validated in Phase 35: observable-jsonl-as-sketch-import-with-optional-live-file-observer
 
 ### Active
 
-- [ ] Improve solver convergence reliability for remaining edge-case large-jump edits in mixed arc/line closed-loop sketches.
-- [ ] Make ArcAxisLine and line-end/arc-end tangency authoring explicit with required coincidence constraints and stable solve behavior.
-- [ ] Continue refining behavior parity edge cases where `PARALLEL`-based arrangements should match equivalent `ALONG`-based workflows.
+- [ ] Define v1.6 milestone scope and requirements.
+- [ ] Convert post-v1.5 Nyquist validation debt into explicit closure/cleanup tasks (Phase 33 and 35 validation metadata alignment).
+- [ ] Continue reliability hardening for newly shipped JSONL observer/reparse workflows under long-running edit sessions.
 
 ### Out of Scope
 
@@ -82,13 +83,15 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - v1.4 delivered line-line `PARALLEL`/`PERPENDICULAR` coverage, principal-axis ALONG reliability, tangency drag robustness, and active-sketch line gizmo endpoint-authority behavior.
 - v1.4 closure is deterministic on Windows Vulkan with build + canonical seven-test baseline + immediate rerun pass evidence captured in phase verification artifacts.
 - Solver architecture documentation is now published with practical code anchors, literature references, and a targeted debugging primer.
-- Milestone `v1.5` is phase-complete through Phase 34, including deterministic closure sign-off evidence (canonical 7/7 baseline + immediate rerun 7/7).
+- Milestone `v1.5` is shipped with Phases 31-35 complete and archived.
+- v1.5 delivered descriptor-safe script re-apply fidelity, explicit coincidence authoring semantics, parity-safe large-jump solver behavior, deterministic Windows Vulkan closure parity, and observable JSONL sketch import with transactional observer reparse semantics.
+- Milestone audit result is `tech_debt`: no functional blockers; follow-up validation metadata cleanup is deferred.
 ## Next Milestone Goals
 
-1. Stabilize solver outcomes for large-jump edits in quarter-arc loop and multi-constraint tangency workflows.
-2. Promote explicit coincidence authoring semantics around ArcAxisLine and tangency relations to remove implicit-flaky behavior.
-3. Improve parity and responsiveness in larger linked sketches where `PARALLEL` should behave like equivalent axis-aligned setups.
-4. Fix script re-apply so geometry/constraint intent and visual metadata survive roundtrip reload.
+1. Define and prioritize v1.6 requirements from latest user workflows and deferred debt.
+2. Preserve deterministic closure discipline by maintaining baseline+rereun evidence for all future milestone gates.
+3. Expand integration coverage around import/observer/scripting boundaries to prevent regressions in high-entity scenes.
+4. Continue native stability-first delivery on Windows Vulkan while preserving existing cross-platform behavior.
 
 ## Constraints
 
@@ -114,7 +117,8 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Pivot v1.2 from deferred platform validation to sketch/constraint/scripting feature expansion | New proposal defines a higher-value capability set with interconnected systems | Active for v1.2 |
 | Scope v1.4 as robustness-first with targeted UX corrections and solver documentation | User-reported reliability issues now block smooth sketch editing; docs reduce future solver iteration risk | Completed in v1.4 |
 | Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Completed in v1.4 |
-| Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Active for v1.5 |
+| Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
+| Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
 
 ## Evolution
 
@@ -134,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-11 after Phase 33 execution and gap-closure completion*
+*Last updated: 2026-04-13 after v1.5 milestone completion*

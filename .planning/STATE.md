@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Solver Workflow Robustness + Script Reapply Integrity
-status: executing
-stopped_at: Completed 35-03-PLAN.md
-last_updated: "2026-04-12T23:30:51.945Z"
-last_activity: 2026-04-12
+status: milestone_complete
+stopped_at: Milestone v1.5 archived and tagged
+last_updated: "2026-04-13T09:36:08Z"
+last_activity: 2026-04-13
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 12
   completed_plans: 12
-  percent: 50
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 35 — observable-jsonl-as-sketch-import-with-optional-live-file-observer
+**Current focus:** Milestone closure complete for v1.5; ready to initialize next milestone.
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 35 (observable-jsonl-as-sketch-import-with-optional-live-file-observer) — EXECUTING
+Phase: 35 (observable-jsonl-as-sketch-import-with-optional-live-file-observer) — COMPLETE
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-12
+Status: Milestone shipped
+Last activity: 2026-04-13
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
-- In scope: solver large-jump robustness, deterministic diagnostics, explicit coincidence authoring semantics, PARALLEL/ALONG parity, and script re-apply integrity.
-- Deterministic closure remains mandatory via baseline + immediate rerun parity evidence.
+- Milestone v1.5 scope delivered: solver large-jump robustness, deterministic diagnostics, explicit coincidence authoring semantics, PARALLEL/ALONG parity, script re-apply integrity, and observable JSONL sketch import with transactional observer reparse behavior.
+- Closure evidence includes canonical deterministic gate parity and Phase 35 verification/UAT coverage.
 
 ## Accumulated Context
 
@@ -89,14 +89,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Discuss, plan, and execute Phase 35 (Observable JSONL as sketch import with optional live file observer).
+- Initialize next milestone requirements and roadmap (`/gsd-new-milestone`).
 
 ### Blockers/Concerns
 
-- No active blockers for Phase 34; deterministic closure gate passed baseline + immediate rerun.
+- No active milestone blockers.
 
 ## Session Continuity
 
-Last session: 2026-04-12T23:30:51.928Z
-Stopped at: Completed 35-03-PLAN.md
-Resume file: None
+Last session: 2026-04-13T09:36:08Z
+Stopped at: Milestone v1.5 archived and tagged
+Resume file: .planning/ROADMAP.md

@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.5 Solver Workflow Robustness + Script Reapply Integrity (Shipped: 2026-04-13)
+
+**Phases completed:** 5 phases, 12 plans, 18 tasks
+
+**Key accomplishments:**
+
+- Delivered script re-apply fidelity preservation for descriptor semantics and color metadata with deterministic repeat-apply behavior.
+- Delivered explicit ArcAxisLine and line-end/arc-end tangency coincidence authoring semantics with deterministic lifecycle persistence.
+- Closed large-jump PARALLEL/ALONG parity regressions via context-driven authority selection and deterministic bidirectional follow behavior.
+- Re-closed deterministic Windows Vulkan milestone gate with canonical baseline+rereun parity evidence and DIAG-03 satisfied verification.
+- Shipped JSONL-as-sketch import with persisted observer state, transactional reparse/relink semantics, observer UX relocation, and large-script stability fixes (blank editor/apply crash resolved).
+
+**Audit:** [v1.5-MILESTONE-AUDIT.md](v1.5-MILESTONE-AUDIT.md) — tech_debt (no closure blockers; deferred validation metadata cleanup)
+
+**Archives:**
+
+- [v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md)
+- [v1.5-REQUIREMENTS.md](milestones/v1.5-REQUIREMENTS.md)
+
+---
+
 ## v1.4 Solver Robustness + Sketch Gizmo Corrections (Shipped: 2026-04-09)
 
 **Phases completed:** 5 phases, 10 plans, 22 tasks
