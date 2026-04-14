@@ -4,8 +4,8 @@ milestone: v1.5
 milestone_name: Solver Workflow Robustness + Script Reapply Integrity
 status: milestone_complete
 stopped_at: Milestone v1.5 archived and tagged
-last_updated: "2026-04-13T09:36:08Z"
-last_activity: 2026-04-13
+last_updated: "2026-04-14T00:00:00Z"
+last_activity: 2026-04-14
 progress:
   total_phases: 5
   completed_phases: 5
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 Phase: 35 (observable-jsonl-as-sketch-import-with-optional-live-file-observer) — COMPLETE
 Plan: 3 of 3
 Status: Milestone shipped
-Last activity: 2026-04-13
+Last activity: 2026-04-14
 
 Progress: [██████████] 100%
 
@@ -95,8 +95,14 @@ Recent decisions affecting current work:
 
 - No active milestone blockers.
 
+### Quick Tasks Completed
+
+| Date       | ID         | Task | Status | Commit |
+|------------|------------|------|--------|--------|
+| 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
+
 ## Session Continuity
 
-Last session: 2026-04-13T09:36:08Z
-Stopped at: Milestone v1.5 archived and tagged
-Resume file: .planning/ROADMAP.md
+Last session: 2026-04-14T00:00:00Z
+Stopped at: Quick task 260414-mkp completed (viewport-only 4x MSAA)
+Resume file: .planning/quick/260414-mkp-enable-4x-msaa-for-main-viewport-only-ex/260414-mkp-SUMMARY.md
