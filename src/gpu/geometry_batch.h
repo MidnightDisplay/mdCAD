@@ -377,6 +377,7 @@ static inline void geom_line_batch_init(geom_line_batch_t* batch) {
             .write_enabled = true,
             .pixel_format = SG_PIXELFORMAT_DEPTH
         },
+        .sample_count = MDCAD_VIEWPORT_MSAA_SAMPLES,
         .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
         .cull_mode = SG_CULLMODE_NONE,
         .label = "ecs-line-pipeline"
@@ -575,6 +576,7 @@ static inline void geom_point_batch_init(geom_point_batch_t* batch) {
             .write_enabled = true,
             .pixel_format = SG_PIXELFORMAT_DEPTH
         },
+        .sample_count = MDCAD_VIEWPORT_MSAA_SAMPLES,
         .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
         .cull_mode = SG_CULLMODE_NONE,
         .label = "ecs-point-pipeline"
@@ -811,6 +813,7 @@ static inline void geom_triangle_batch_init(geom_triangle_batch_t* batch) {
             .write_enabled = true,
             .pixel_format = SG_PIXELFORMAT_DEPTH
         },
+        .sample_count = MDCAD_VIEWPORT_MSAA_SAMPLES,
         .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
         .cull_mode = SG_CULLMODE_NONE,
         .label = "ecs-triangle-pipeline"

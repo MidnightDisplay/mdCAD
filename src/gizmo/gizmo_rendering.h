@@ -180,6 +180,7 @@ static inline void gizmo_rendering_init(gizmo_rendering_t *gr) {
             .write_enabled = false,
             .pixel_format = SG_PIXELFORMAT_DEPTH
         },
+        .sample_count = MDCAD_VIEWPORT_MSAA_SAMPLES,
         .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
         .cull_mode = SG_CULLMODE_NONE,
         .label = "gizmo-line-pipeline"
@@ -246,6 +247,7 @@ static inline void gizmo_rendering_init(gizmo_rendering_t *gr) {
             .write_enabled = false,
             .pixel_format = SG_PIXELFORMAT_DEPTH
         },
+        .sample_count = MDCAD_VIEWPORT_MSAA_SAMPLES,
         .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
         .cull_mode = SG_CULLMODE_NONE,
         .label = "gizmo-point-pipeline"

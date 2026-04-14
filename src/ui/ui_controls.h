@@ -7,6 +7,7 @@
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "sokol_gfx.h"
+#include "../platform.h"
 #include "../orbit_camera.h"
 #include "ui_theme.h"
 
@@ -40,6 +41,12 @@ static inline void ui_controls_init(ui_controls_state_t* ctrl, orbit_camera_t* c
 
     // Initialize pass action
     pass_action->colors[0].load_action = SG_LOADACTION_CLEAR;
+#if MDCAD_VIEWPORT_MSAA_SAMPLES > 1
+    // Offscreen MSAA color attachment is resolved to a single-sample texture each pass.
+    pass_action->colors[0].store_action = SG_STOREACTION_DONTCARE;
+#else
+    pass_action->colors[0].store_action = SG_STOREACTION_STORE;
+#endif
     pass_action->colors[0].clear_value.a = 1.0f;
     pass_action->depth.load_action = SG_LOADACTION_CLEAR;
     pass_action->depth.clear_value = 1.0f;

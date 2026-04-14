@@ -1939,6 +1939,7 @@ static void frame(void) {
         .action = state.offscreen_pass_action,
         .attachments = {
             .colors[0] = state.viewport_rt.color_att_view,
+            .resolves[0] = state.viewport_rt.resolve_att_view,
             .depth_stencil = state.viewport_rt.depth_att_view,
         }
     });
