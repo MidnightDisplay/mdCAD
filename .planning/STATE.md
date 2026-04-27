@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
-status: defining_requirements
-stopped_at: Milestone v1.6 initialized; defining requirements
+status: ready_to_plan
+stopped_at: Roadmap approved; ready to plan Phase 36
 last_updated: "2026-04-27T00:00:00Z"
 last_activity: 2026-04-27
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.6 requirement and roadmap definition for observable flat JSONL import.
+**Current focus:** Milestone v1.6 roadmap approved; ready for Phase 36 planning.
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 36 of 40 (Flat Import Entry & Configuration)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-27 — Milestone v1.6 started
+Status: Ready to plan
+Last activity: 2026-04-27 — v1.6 roadmap created (phases 36-40)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -87,11 +87,11 @@ Recent decisions affecting current work:
 
 - Phase 35 added: Observable JSONL as sketch import with optional live file observer.
 - Milestone v1.6 initialized: Observable Flat JSONL Import for Large Geometry Dumps.
+- Roadmap v1.6 created: phases 36-40 map 11/11 requirements.
 
 ### Pending Todos
 
-- Define and approve v1.6 requirements (`/gsd-new-milestone` workflow in progress).
-- Create and approve v1.6 roadmap phases.
+- Plan and execute Phase 36 for flat import entry/configuration.
 
 ### Blockers/Concerns
 
@@ -105,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-14T00:00:00Z
-Stopped at: Quick task 260414-mkp completed (viewport-only 4x MSAA)
-Resume file: .planning/quick/260414-mkp-enable-4x-msaa-for-main-viewport-only-ex/260414-mkp-SUMMARY.md
+Last session: 2026-04-27T00:00:00Z
+Stopped at: v1.6 roadmap approved; ready for `/gsd-plan-phase 36`
+Resume file: None

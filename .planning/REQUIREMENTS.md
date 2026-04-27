@@ -48,27 +48,25 @@ Explicit exclusions for v1.6.
 
 ## Traceability
 
-Will be populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIMP-01 | TBD | Pending |
-| FIMP-02 | TBD | Pending |
-| FIMP-03 | TBD | Pending |
-| OBSF-01 | TBD | Pending |
-| OBSF-02 | TBD | Pending |
-| OBSF-03 | TBD | Pending |
-| OBSF-04 | TBD | Pending |
-| OBSF-05 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| PERF-03 | TBD | Pending |
+| FIMP-01 | Phase 36 | Pending |
+| FIMP-02 | Phase 36 | Pending |
+| FIMP-03 | Phase 37 | Pending |
+| OBSF-01 | Phase 38 | Pending |
+| OBSF-02 | Phase 38 | Pending |
+| OBSF-03 | Phase 38 | Pending |
+| OBSF-04 | Phase 39 | Pending |
+| OBSF-05 | Phase 38 | Pending |
+| PERF-01 | Phase 40 | Pending |
+| PERF-02 | Phase 38 | Pending |
+| PERF-03 | Phase 40 | Pending |
 
 **Coverage:**
 - v1 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11 ⚠️
+- Mapped to phases: 11
+- Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-04-27*
-*Last updated: 2026-04-27 after v1.6 milestone requirement definition*
+*Last updated: 2026-04-27 after v1.6 roadmap mapping*
