@@ -77,6 +77,7 @@ typedef struct {
     int total_entities_created;
     ecs_entity_t root_entity;
     ecs_entity_t *entry_entities;  // one per log entry (sub-anchors)
+    int created_entry_anchor_count;
 
     // Parenting state
     int parented_count;
@@ -175,6 +176,7 @@ static inline bool jsonl_import_job_start(jsonl_import_job_t *job,
     job->total_entities_created = 0;
     job->root_entity = 0;
     job->entry_entities = NULL;
+    job->created_entry_anchor_count = 0;
     job->parented_count = 0;
     job->total_to_parent = 0;
     job->all_created_entities = NULL;
@@ -414,6 +416,107 @@ static inline ecs_entity_t jsonl_import_job_create_entity(
     }
 }
 
+static inline void jsonl_import_job_extract_root_base_name(const char *filepath,
+                                                           char *out_name,
+                                                           size_t out_name_size) {
+    if (!out_name || out_name_size == 0) return;
+    out_name[0] = '\0';
+    if (!filepath || filepath[0] == '\0') return;
+
+    const char *fname = filepath;
+    const char *sep = strrchr(filepath, '/');
+#ifdef _WIN32
+    const char *sep_win = strrchr(filepath, '\\');
+    if (sep_win && (!sep || sep_win > sep)) sep = sep_win;
+#endif
+    if (sep) fname = sep + 1;
+
+    size_t stem_len = strlen(fname);
+    const char *dot = strrchr(fname, '.');
+    if (dot && dot > fname) {
+        stem_len = (size_t)(dot - fname);
+    }
+
+    if (stem_len == 0) {
+        strncpy(out_name, "JSONL Import", out_name_size - 1);
+        out_name[out_name_size - 1] = '\0';
+        return;
+    }
+
+    if (stem_len > out_name_size - 1) {
+        stem_len = out_name_size - 1;
+    }
+    memcpy(out_name, fname, stem_len);
+    out_name[stem_len] = '\0';
+}
+
+static inline bool jsonl_import_job_label_name_exists(ecs_scene_t *scene, const char *name) {
+    if (!scene || !scene->world || !name || name[0] == '\0') return false;
+
+    ecs_world_state_t *w = scene->world;
+    ecs_query_t *q = ecs_query(w->world, {
+        .terms = {
+            { .id = w->LabelComp_id },
+        },
+    });
+    if (!q) return false;
+
+    bool exists = false;
+    ecs_iter_t it = ecs_query_iter(w->world, q);
+    while (ecs_query_next(&it) && !exists) {
+        for (int i = 0; i < it.count; i++) {
+            LabelComp *label = ecs_world_get_label(w, it.entities[i]);
+            if (label && strcmp(label->name, name) == 0) {
+                exists = true;
+                break;
+            }
+        }
+    }
+
+    ecs_query_fini(q);
+    return exists;
+}
+
+static inline void jsonl_import_job_resolve_unique_root_name(ecs_scene_t *scene,
+                                                             const char *base_name,
+                                                             char *out_name,
+                                                             size_t out_name_size) {
+    if (!out_name || out_name_size == 0) return;
+    out_name[0] = '\0';
+
+    if (!base_name || base_name[0] == '\0') {
+        strncpy(out_name, "JSONL Import", out_name_size - 1);
+        out_name[out_name_size - 1] = '\0';
+        return;
+    }
+
+    strncpy(out_name, base_name, out_name_size - 1);
+    out_name[out_name_size - 1] = '\0';
+
+    int suffix = 2;
+    char candidate[LABEL_NAME_MAX];
+    while (jsonl_import_job_label_name_exists(scene, out_name)) {
+        snprintf(candidate, sizeof(candidate), "%s (%d)", base_name, suffix++);
+        strncpy(out_name, candidate, out_name_size - 1);
+        out_name[out_name_size - 1] = '\0';
+    }
+}
+
+static inline bool jsonl_import_job_ensure_entry_anchor(jsonl_import_job_t *job,
+                                                        ecs_scene_t *scene,
+                                                        int entry_idx,
+                                                        const jsonl_log_entry_t *entry) {
+    if (!job || !scene || !entry || !job->entry_entities || entry_idx < 0) return false;
+    if (job->entry_entities[entry_idx] != 0) return true;
+
+    job->entry_entities[entry_idx] = scene_add_anchor(scene, entry->name, entry->description);
+    if (job->entry_entities[entry_idx] == 0) {
+        return false;
+    }
+    job->created_entry_anchor_count++;
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Process one chunk of work - returns true when job is complete
 //------------------------------------------------------------------------------
@@ -508,21 +611,18 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
 
             // Create root anchor entity (transform-only, no GPU slot)
             {
-                const char *fname = job->filepath;
-                const char *sep = strrchr(job->filepath, '/');
-#ifdef _WIN32
-                const char *sep_win = strrchr(job->filepath, '\\');
-                if (sep_win > sep) sep = sep_win;
-#endif
-                if (sep) fname = sep + 1;
-                job->root_entity = scene_add_anchor(scene, fname, "JSONL import root");
-            }
-
-            // Create entry anchor entities (one per log entry, transform-only)
-            for (int i = 0; i < num_entries; i++) {
-                job->entry_entities[i] = scene_add_anchor(scene,
-                    job->parse_state.data.entries[i].name,
-                    job->parse_state.data.entries[i].description);
+                char root_base[LABEL_NAME_MAX];
+                char root_name[LABEL_NAME_MAX];
+                jsonl_import_job_extract_root_base_name(job->filepath, root_base, sizeof(root_base));
+                jsonl_import_job_resolve_unique_root_name(scene, root_base, root_name, sizeof(root_name));
+                job->root_entity = scene_add_anchor(scene, root_name, job->filepath);
+                if (job->root_entity == 0) {
+                    job->state = JSONL_JOB_ERROR;
+                    job->error = JSONL_ERROR_MEMORY_ALLOCATION;
+                    snprintf(job->status_message, sizeof(job->status_message),
+                             "Failed to create import root anchor");
+                    return true;
+                }
             }
 
             job->current_entry_idx = 0;
@@ -580,6 +680,13 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                         if ((int)i0 < mesh->vertex_count &&
                             (int)i1 < mesh->vertex_count &&
                             (int)i2 < mesh->vertex_count) {
+                            if (!jsonl_import_job_ensure_entry_anchor(job, scene, job->current_entry_idx, entry)) {
+                                job->state = JSONL_JOB_ERROR;
+                                job->error = JSONL_ERROR_MEMORY_ALLOCATION;
+                                snprintf(job->status_message, sizeof(job->status_message),
+                                         "Failed to create entry anchor");
+                                return true;
+                            }
 
                             vec3_t a = mesh->vertices[i0];
                             vec3_t b = mesh->vertices[i1];
@@ -613,6 +720,14 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                     ecs_entity_t e = jsonl_import_job_create_entity(job, scene, elem);
 
                     if (e != 0) {
+                        if (!jsonl_import_job_ensure_entry_anchor(job, scene, job->current_entry_idx, entry)) {
+                            scene_remove_entity(scene, e);
+                            job->state = JSONL_JOB_ERROR;
+                            job->error = JSONL_ERROR_MEMORY_ALLOCATION;
+                            snprintf(job->status_message, sizeof(job->status_message),
+                                     "Failed to create entry anchor");
+                            return true;
+                        }
                         // Tag as import-pending
                         ecs_add_id(scene->world->world, e, scene->world->ImportPending_tag);
 
@@ -666,8 +781,8 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
         // Check if entity creation is complete
         if (job->current_entry_idx >= data->entry_count) {
             // Set up parenting phase
-            // Total to parent: all_created_count (geometry -> entry) + entry_count (entry -> root)
-            job->total_to_parent = job->all_created_count + data->entry_count;
+            // Total to parent: all_created_count (geometry -> entry) + created entry anchors (entry -> root)
+            job->total_to_parent = job->all_created_count + job->created_entry_anchor_count;
             job->parented_count = 0;
             job->state = JSONL_JOB_PARENTING_ENTITIES;
             snprintf(job->status_message, sizeof(job->status_message),
@@ -686,7 +801,7 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
         ecs_world_state_t *w = scene->world;
 
         snprintf(job->status_message, sizeof(job->status_message),
-                 "Parenting %d entities...", job->all_created_count + data->entry_count);
+                 "Parenting %d entities...", job->all_created_count + job->created_entry_anchor_count);
 
         // Batch parent + remove ImportPending in one defer block
         ecs_defer_begin(w->world);
@@ -717,7 +832,7 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
         }
 
         // Store entry count before freeing
-        int num_entries = data->entry_count;
+        int num_entries = job->created_entry_anchor_count;
 
         // Free tracking arrays
         if (job->all_created_entities) {
@@ -836,6 +951,7 @@ static inline void jsonl_import_job_reset(jsonl_import_job_t *job) {
     job->observer_contract.captured = false;
     job->observer_contract.link_enabled = false;
     job->observer_contract.source_path[0] = '\0';
+    job->created_entry_anchor_count = 0;
 }
 
 //------------------------------------------------------------------------------
