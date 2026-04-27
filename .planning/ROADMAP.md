@@ -54,7 +54,10 @@ Plans:
   3. User can trigger manual refresh that re-imports into the same anchor identity.
   4. On refresh success, anchor content is replaced atomically; on refresh failure, last-good anchor content is preserved.
   5. Refresh path uses anchor-subtree replacement without sketch/script pipeline behavior.
-**Plans**: TBD
+**Plans**: 2
+Plans:
+- [ ] 38-01-PLAN.md — Add Phase 38 RED-first observer metadata/inspector contracts and durable persistence wiring.
+- [ ] 38-02-PLAN.md — Implement inspector-driven background transactional flat refresh with same-root subtree replacement.
 
 ### Phase 39: Automatic Observer Safety Loop
 **Goal**: Optional automatic refresh behaves safely during unstable file-write windows.  
@@ -82,6 +85,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
-| 38. Observable Link + Manual Transactional Refresh | 0/TBD | Not started | - |
+| 38. Observable Link + Manual Transactional Refresh | 0/2 | Planned | - |
 | 39. Automatic Observer Safety Loop | 0/TBD | Not started | - |
 | 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |
