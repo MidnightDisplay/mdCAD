@@ -67,7 +67,10 @@ Plans:
   1. When observability is enabled, file changes trigger automatic refresh attempts.
   2. Rapid consecutive file writes are debounced rather than causing refresh thrash.
   3. Failed automatic refresh attempts use retry behavior and then auto-disable when safety limits are hit.
-**Plans**: TBD
+**Plans**: 2
+Plans:
+- [ ] 39-01-PLAN.md — Add Wave 0 auto-safety CTest scaffold and inspector safety control contract guards.
+- [ ] 39-02-PLAN.md — Implement flat auto observer safety loop runtime + inspector lifecycle semantics + OBSF-04 regressions.
 
 ### Phase 40: Large-Dump Stability & Interaction Coherence
 **Goal**: Large-file flat import/refresh stays responsive and scene interactions remain coherent over repeated refreshes.  
