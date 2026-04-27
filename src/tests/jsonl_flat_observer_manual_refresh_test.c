@@ -431,6 +431,54 @@ static int test_flat_manual_refresh_failure_preserves_last_good_and_relinks_labe
     return failed;
 }
 
+static int test_flat_manual_refresh_works_after_auto_disable(void) {
+    const char *fixture = "jsonl_flat_observer_manual_after_disable.jsonl";
+    const char *first_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}}]}"
+    };
+    const char *second_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}}]}"
+    };
+    if (!write_jsonl_fixture_lines(fixture, first_lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 1) failed = 1;
+
+    if (!failed) {
+        observer->observe_enabled = false;
+        observer->max_retries = 2u;
+        observer->retry_count = observer->max_retries;
+    }
+
+    if (!failed && !write_jsonl_fixture_lines(fixture, second_lines, 1)) failed = 1;
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, NULL)) failed = 1;
+    if (!failed && !tick_refresh_until_idle(&scene, root, 10000)) failed = 1;
+
+    if (!failed && count_geometry_under_root(&scene, root) != 2) failed = 1;
+    if (!failed && observer->observe_enabled) failed = 1;
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct {
     const char *name;
@@ -446,6 +494,8 @@ int main(void) {
           test_flat_manual_refresh_success_replaces_subtree_and_fallbacks_selection },
         { "test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label",
           test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label },
+        { "test_flat_manual_refresh_works_after_auto_disable",
+          test_flat_manual_refresh_works_after_auto_disable },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
