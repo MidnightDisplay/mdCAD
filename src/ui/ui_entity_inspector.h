@@ -348,15 +348,32 @@ static inline void ui_entity_inspector_draw_jsonl_flat_observer_controls(ui_enti
     bool linked = observer->linked;
     if (igCheckbox("Link file for refresh##jsonl_flat_root_link", &linked)) {
         observer->linked = linked;
+        if (!observer->linked) {
+            observer->observe_enabled = false;
+        } else if (observer->source_path[0] != '\0') {
+            observer->observe_enabled = true;
+            observer->next_retry_at_ms = 0u;
+        }
     }
 
     bool observe_auto = observer->observe_enabled;
+    if (!observer->linked) igBeginDisabled(true);
     if (igCheckbox("Observe automatically##jsonl_flat_root_observe_auto", &observe_auto)) {
-        observer->observe_enabled = observe_auto;
+        observer->observe_enabled = observer->linked ? observe_auto : false;
     }
+    if (!observer->linked) igEndDisabled();
+
+    if (observer->max_retries == 0u) {
+        observer->max_retries = JSONL_OBSERVER_DEFAULT_MAX_RETRIES;
+    }
+    igTextDisabled("Safety retries: %u / %u", (unsigned)observer->retry_count, (unsigned)observer->max_retries);
 
     igTextWrapped("Source path: %s", observer->source_path[0] ? observer->source_path : "(none)");
-    if (observer->observe_enabled && observer->source_path[0] == '\0') {
+    if (!observer->linked) {
+        igTextDisabled("Link is OFF; observing is paused.");
+    } else if (!observer->observe_enabled && observer->retry_count >= observer->max_retries) {
+        igTextDisabled("Observe auto-disabled after max retries.");
+    } else if (observer->observe_enabled && observer->source_path[0] == '\0') {
         igTextDisabled("Observe is ON but source path is missing; waiting for a valid path.");
     }
 
@@ -368,7 +385,13 @@ static inline void ui_entity_inspector_draw_jsonl_flat_observer_controls(ui_enti
     if (file_browser_draw(&source_browser)) {
         const char *chosen_path = file_browser_get_result(&source_browser);
         if (chosen_path && chosen_path[0]) {
-            (void)jsonl_observer_relink(scene, root_entity, chosen_path);
+            if (jsonl_observer_relink(scene, root_entity, chosen_path)) {
+                observer = ecs_world_get_jsonl_observer(w, root_entity);
+                if (observer && observer->linked) {
+                    observer->observe_enabled = true;
+                    observer->next_retry_at_ms = 0u;
+                }
+            }
         }
         file_browser_clear_result(&source_browser);
     }
