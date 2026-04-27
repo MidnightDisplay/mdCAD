@@ -80,7 +80,10 @@ Plans:
   1. User can run large flat JSONL import and refresh without app lockups or crashes.
   2. During large import/refresh activity, app interaction remains responsive enough for continued operation.
   3. Across repeated refreshes, anchor selection, hierarchy visibility, and inspector interaction remain coherent.
-**Plans**: TBD
+**Plans**: 2
+Plans:
+- [ ] 40-01-PLAN.md — Implement bounded single-flight + coalesced rerun runtime with advisory timing evidence for large refresh stability.
+- [ ] 40-02-PLAN.md — Add repeated-refresh anchor coherence coverage, hierarchy continuity guardrails, and manual very-large stress evidence protocol/checkpoint.
 
 ## Progress
 
