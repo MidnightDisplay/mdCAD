@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps
 
-**Current focus:** phase 37 anchor-scoped flat ingest implementation after phase 36 entry/config contract completion.
+**Current focus:** phase 38 observable link + manual transactional refresh implementation after phase 37 anchor-scoped ingest completion.
 
 ## Current Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
 
@@ -61,11 +61,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Deterministic v1.5 closure gate now proves canonical Windows Vulkan baseline + immediate rerun parity for targeted 7-test suite (`DIAG-03`) — Validated in Phase 34: deterministic-v1-5-closure-gate
 - ✓ Observable JSONL sketch import now supports persisted observer state, transactional reparse safety, and stable large-script editor/apply behavior with user-approved UAT (`P35-01..06`) — Validated in Phase 35: observable-jsonl-as-sketch-import-with-optional-live-file-observer
 - ✓ Flat-large JSONL import entry/configuration contract now provides dedicated menu path, mirrored pre-import options, and forward-compatible observer opt-in capture defaults (`FIMP-01`, `FIMP-02`) — Validated in Phase 36: flat-import-entry-configuration
+- ✓ Anchor-scoped flat ingest now creates deterministic root->entry->geometry hierarchies with empty-entry skip, root name suffixing, and selection invariance (`FIMP-03`) — Validated in Phase 37: anchor-scoped-flat-ingest
 
 ### Active
 
 - [ ] Define v1.6 requirements and phase mapping for observable flat JSONL import.
-- [ ] Deliver flat non-sketch JSONL geometry import under a single anchor entity.
 - [ ] Add optional observer linking and sketch-style refresh controls for flat JSONL imports.
 - [ ] Validate high-entity refresh stability/performance for large JSONL geometry dumps.
 
@@ -99,6 +99,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - v1.5 delivered descriptor-safe script re-apply fidelity, explicit coincidence authoring semantics, parity-safe large-jump solver behavior, deterministic Windows Vulkan closure parity, and observable JSONL sketch import with transactional observer reparse semantics.
 - Milestone audit result is `tech_debt`: no functional blockers; follow-up validation metadata cleanup is deferred.
 - Phase 36 is complete for milestone `v1.6`, establishing the flat-large JSONL entry/configuration contract and requirement validation for `FIMP-01`/`FIMP-02`.
+- Phase 37 is complete for milestone `v1.6`, delivering anchor-scoped flat ingest behavior and requirement validation for `FIMP-03`.
 ## Next Milestone Goals
 
 1. Add a new import action and dialog path for flat JSONL scene import.
@@ -152,4 +153,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-27 after completing phase 36*
+*Last updated: 2026-04-27 after completing phase 37*

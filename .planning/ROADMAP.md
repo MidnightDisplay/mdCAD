@@ -13,7 +13,7 @@
 ## Phases
 
 - [x] **Phase 36: Flat Import Entry & Configuration** - Users can start dedicated flat JSONL import and set transform/color options before execution. (completed 2026-04-27)
-- [ ] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities.
+- [x] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities. (completed 2026-04-27)
 - [ ] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor.
 - [ ] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections.
 - [ ] **Phase 40: Large-Dump Stability & Interaction Coherence** - Large import/refresh remains responsive and anchor interactions stay coherent across repeats.
@@ -41,8 +41,8 @@
   3. Re-running import creates a new controlled flat import anchor structure rather than sketch-managed structures.
 **Plans**: 2
 Plans:
-- [ ] 37-01-PLAN.md — Add Phase 37 RED-first anchor-scoped ingest contract tests and CTest wiring.
-- [ ] 37-02-PLAN.md — Implement root/entry/geometry ingest hierarchy, naming collisions, reimport behavior, and selection invariance.
+- [x] 37-01-PLAN.md — Add Phase 37 RED-first anchor-scoped ingest contract tests and CTest wiring.
+- [x] 37-02-PLAN.md — Implement root/entry/geometry ingest hierarchy, naming collisions, reimport behavior, and selection invariance.
 
 ### Phase 38: Observable Link + Manual Transactional Refresh
 **Goal**: Users can opt into observability and manually refresh an imported anchor with transactional safety.  
@@ -81,7 +81,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
-| 37. Anchor-Scoped Flat Ingest | 0/TBD | Not started | - |
+| 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
 | 38. Observable Link + Manual Transactional Refresh | 0/TBD | Not started | - |
 | 39. Automatic Observer Safety Loop | 0/TBD | Not started | - |
 | 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |

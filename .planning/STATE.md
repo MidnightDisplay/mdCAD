@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
 status: planning
-stopped_at: Phase 37 context gathered
-last_updated: "2026-04-27T13:11:15.301Z"
+stopped_at: Phase 37 complete
+last_updated: "2026-04-27T14:03:35.488Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 20
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 37 — Anchor-Scoped Flat Ingest
+**Current focus:** Phase 38 — observable-link-+-manual-transactional-refresh
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 37
+Phase: 38
 Plan: Not started
-Status: Ready to plan Phase 37
+Status: Ready to plan Phase 38
 Last activity: 2026-04-27
 
-Progress: [██░░░░░░░░] 20%
+Progress: [████░░░░░░] 40%
 
 ## Milestone Scope
 
@@ -91,7 +91,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Discuss and plan Phase 37 anchor-scoped flat ingest.
+- Discuss and plan Phase 38 observable link + manual transactional refresh.
 
 ### Blockers/Concerns
 
@@ -106,5 +106,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-04-27T13:11:15.298Z
-Stopped at: Phase 37 context gathered
-Resume file: .planning/phases/37-anchor-scoped-flat-ingest/37-CONTEXT.md
+Stopped at: Phase 37 complete
+Resume file: .planning/phases/37-anchor-scoped-flat-ingest/37-VERIFICATION.md
