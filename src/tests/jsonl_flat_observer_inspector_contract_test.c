@@ -68,6 +68,8 @@ static int test_flat_inspector_minimal_surface_contract(void) {
     if (!contains_required(src, "Link file for refresh##jsonl_flat_root_link")) failed = 1;
     if (!contains_required(src, "Source path: %s")) failed = 1;
     if (!contains_required(src, "Choose source...##jsonl_flat_root_choose_source")) failed = 1;
+    if (!contains_required(src, "Observe automatically##jsonl_flat_root_observe_auto")) failed = 1;
+    if (!contains_required(src, "Observe is ON but source path is missing; waiting for a valid path.")) failed = 1;
     if (!contains_required(src, "Re-import now##jsonl_flat_root_reimport_now")) failed = 1;
     if (!contains_required(src, "Last refresh result")) failed = 1;
     if (!contains_required(src, "jsonl_observer_request_flat_refresh")) failed = 1;

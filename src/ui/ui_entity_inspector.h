@@ -350,7 +350,15 @@ static inline void ui_entity_inspector_draw_jsonl_flat_observer_controls(ui_enti
         observer->linked = linked;
     }
 
+    bool observe_auto = observer->observe_enabled;
+    if (igCheckbox("Observe automatically##jsonl_flat_root_observe_auto", &observe_auto)) {
+        observer->observe_enabled = observe_auto;
+    }
+
     igTextWrapped("Source path: %s", observer->source_path[0] ? observer->source_path : "(none)");
+    if (observer->observe_enabled && observer->source_path[0] == '\0') {
+        igTextDisabled("Observe is ON but source path is missing; waiting for a valid path.");
+    }
 
     if (igButton("Choose source...##jsonl_flat_root_choose_source", (ImVec2){0, 0})) {
         file_browser_open_file(&source_browser, "Choose JSONL source", ".jsonl",
