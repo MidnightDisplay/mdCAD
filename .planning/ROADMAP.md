@@ -14,7 +14,7 @@
 
 - [x] **Phase 36: Flat Import Entry & Configuration** - Users can start dedicated flat JSONL import and set transform/color options before execution. (completed 2026-04-27)
 - [x] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities. (completed 2026-04-27)
-- [ ] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor.
+- [x] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor. (completed 2026-04-27)
 - [ ] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections.
 - [ ] **Phase 40: Large-Dump Stability & Interaction Coherence** - Large import/refresh remains responsive and anchor interactions stay coherent across repeats.
 
@@ -56,8 +56,8 @@ Plans:
   5. Refresh path uses anchor-subtree replacement without sketch/script pipeline behavior.
 **Plans**: 2
 Plans:
-- [ ] 38-01-PLAN.md — Add Phase 38 RED-first observer metadata/inspector contracts and durable persistence wiring.
-- [ ] 38-02-PLAN.md — Implement inspector-driven background transactional flat refresh with same-root subtree replacement.
+- [x] 38-01-PLAN.md — Add Phase 38 RED-first observer metadata/inspector contracts and durable persistence wiring.
+- [x] 38-02-PLAN.md — Implement inspector-driven background transactional flat refresh with same-root subtree replacement.
 
 ### Phase 39: Automatic Observer Safety Loop
 **Goal**: Optional automatic refresh behaves safely during unstable file-write windows.  
@@ -85,6 +85,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
-| 38. Observable Link + Manual Transactional Refresh | 0/2 | Planned | - |
+| 38. Observable Link + Manual Transactional Refresh | 2/2 | Complete | 2026-04-27 |
 | 39. Automatic Observer Safety Loop | 0/TBD | Not started | - |
 | 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |
