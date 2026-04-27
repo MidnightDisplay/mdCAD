@@ -147,6 +147,45 @@ static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, js
     slot->selection = NULL;
 }
 
+static inline void jsonl_observer_comp_push_message_unique(JsonlObserverComp *obs,
+                                                           jsonl_observer_msg_severity_t severity,
+                                                           const char *message) {
+    if (!obs || !message) return;
+    if (obs->message_count > 0u) {
+        uint32_t idx = obs->message_count - 1u;
+        if (idx < JSONL_OBSERVER_MESSAGE_HISTORY &&
+            obs->message_severity[idx] == (uint8_t)severity &&
+            strcmp(obs->messages[idx], message) == 0) {
+            return;
+        }
+    }
+    jsonl_observer_comp_push_message(obs, severity, message);
+}
+
+static inline void jsonl_observer_apply_retry_policy(JsonlObserverComp *obs,
+                                                     uint64_t now_ms,
+                                                     const char *warning_message) {
+    if (!obs) return;
+    if (obs->max_retries == 0u) obs->max_retries = JSONL_OBSERVER_DEFAULT_MAX_RETRIES;
+    if (obs->interval_ms == 0u) obs->interval_ms = JSONL_OBSERVER_DEFAULT_INTERVAL_MS;
+
+    if (obs->retry_count < obs->max_retries) {
+        obs->retry_count++;
+    }
+    obs->next_retry_at_ms = now_ms + obs->interval_ms;
+
+    jsonl_observer_comp_push_message_unique(
+        obs,
+        JSONL_OBSERVER_MSG_WARNING,
+        warning_message ? warning_message : "Observer source check failed; will retry.");
+
+    if (obs->retry_count >= obs->max_retries) {
+        obs->observe_enabled = false;
+        jsonl_observer_comp_push_message_unique(obs, JSONL_OBSERVER_MSG_ERROR,
+                                                "Observe auto-disabled after max retries.");
+    }
+}
+
 static inline JsonlObserverComp* jsonl_observer_ensure_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch) {
     if (!scene || sketch == 0) return NULL;
     JsonlObserverComp *obs = ecs_world_get_jsonl_observer(scene->world, sketch);
@@ -279,6 +318,9 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
             slot->stage_root = slot->job.root_entity;
             if (jsonl_observer_commit_flat_refresh(scene, slot)) {
                 if (obs) {
+                    if (obs->source_path[0] != '\0') {
+                        (void)jsonl_observer_stamp_source_state(obs, obs->source_path);
+                    }
                     char msg[JSONL_OBSERVER_MESSAGE_MAX];
                     snprintf(msg, sizeof(msg), "Re-import applied (%u geometry).",
                              (unsigned)slot->job.total_entities_created);
@@ -302,6 +344,57 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
 
         jsonl_observer_reset_flat_refresh_slot(scene, slot);
     }
+}
+
+static inline bool jsonl_observer_tick_one_flat(ecs_scene_t *scene, ecs_entity_t root_entity, uint64_t now_ms) {
+    if (!scene || root_entity == 0) return false;
+    if (ecs_world_get_sketch(scene->world, root_entity)) return false;
+
+    JsonlObserverComp *obs = ecs_world_get_jsonl_observer(scene->world, root_entity);
+    if (!obs || !obs->linked || !obs->observe_enabled) return false;
+
+    if (obs->max_retries == 0u) obs->max_retries = JSONL_OBSERVER_DEFAULT_MAX_RETRIES;
+    if (obs->interval_ms == 0u) obs->interval_ms = JSONL_OBSERVER_DEFAULT_INTERVAL_MS;
+    if (obs->scale <= 0.0f) obs->scale = 1.0f;
+
+    if (obs->next_retry_at_ms != 0u && now_ms < obs->next_retry_at_ms) {
+        return false;
+    }
+
+    if (obs->source_path[0] == '\0') {
+        obs->next_retry_at_ms = now_ms + obs->interval_ms;
+        jsonl_observer_comp_push_message_unique(
+            obs,
+            JSONL_OBSERVER_MSG_WARNING,
+            "Observe is ON but source path is missing; waiting for a valid path.");
+        return false;
+    }
+
+    bool source_changed = true;
+    if (!jsonl_observer_source_changed(obs, obs->source_path, &source_changed)) {
+        jsonl_observer_apply_retry_policy(obs, now_ms, "Observer source check failed; will retry.");
+        return false;
+    }
+
+    if (!source_changed) {
+        obs->retry_count = 0u;
+        obs->next_retry_at_ms = now_ms + obs->interval_ms;
+        return false;
+    }
+
+    if (jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
+        obs->next_retry_at_ms = now_ms + obs->interval_ms;
+        return false;
+    }
+
+    if (jsonl_observer_request_flat_refresh(scene, root_entity, NULL)) {
+        obs->retry_count = 0u;
+        obs->next_retry_at_ms = now_ms + obs->interval_ms;
+        return true;
+    }
+
+    jsonl_observer_apply_retry_policy(obs, now_ms, "Observed re-import failed.");
+    return false;
 }
 
 static inline bool jsonl_observer_manual_reparse(ecs_scene_t *scene, ecs_entity_t sketch) {
@@ -389,14 +482,18 @@ static inline void jsonl_observer_system_tick(ecs_scene_t *scene, uint64_t now_m
     ecs_world_state_t *w = scene->world;
     ecs_query_t *q = ecs_query(w->world, {
         .terms = {
-            { .id = w->SketchComp_id },
             { .id = w->JsonlObserverComp_id }
         }
     });
     ecs_iter_t it = ecs_query_iter(w->world, q);
     while (ecs_query_next(&it)) {
         for (int i = 0; i < it.count; i++) {
-            (void)jsonl_observer_tick_one(scene, it.entities[i], now_ms);
+            ecs_entity_t e = it.entities[i];
+            if (ecs_world_get_sketch(w, e)) {
+                (void)jsonl_observer_tick_one(scene, e, now_ms);
+            } else {
+                (void)jsonl_observer_tick_one_flat(scene, e, now_ms);
+            }
         }
     }
     ecs_query_fini(q);
