@@ -39,7 +39,10 @@
   1. A single root anchor is created for each flat import run.
   2. Imported entries appear as plain non-sketch scene entities under that anchor.
   3. Re-running import creates a new controlled flat import anchor structure rather than sketch-managed structures.
-**Plans**: TBD
+**Plans**: 2
+Plans:
+- [ ] 37-01-PLAN.md — Add Phase 37 RED-first anchor-scoped ingest contract tests and CTest wiring.
+- [ ] 37-02-PLAN.md — Implement root/entry/geometry ingest hierarchy, naming collisions, reimport behavior, and selection invariance.
 
 ### Phase 38: Observable Link + Manual Transactional Refresh
 **Goal**: Users can opt into observability and manually refresh an imported anchor with transactional safety.  
