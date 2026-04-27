@@ -15,6 +15,7 @@
 #include "jsonl_loader.h"
 #include "math/math_import.h"
 #include "ecs/ecs_scene.h"
+#include "components/jsonl_observer_comp.h"
 #include "sokol_time.h"
 #include <string.h>
 
@@ -42,6 +43,12 @@ typedef enum {
     JSONL_JOB_ERROR
 } jsonl_job_state_t;
 
+typedef struct {
+    bool captured;
+    bool link_enabled;
+    char source_path[JSONL_OBSERVER_PATH_MAX];
+} jsonl_import_observer_contract_t;
+
 //------------------------------------------------------------------------------
 // Import job structure
 //------------------------------------------------------------------------------
@@ -59,6 +66,7 @@ typedef struct {
     bool shift_to_com;
     float rotation_x, rotation_y, rotation_z;  // radians
     int mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
+    jsonl_import_observer_contract_t observer_contract;
 
     // Parse state
     jsonl_parse_state_t parse_state;
@@ -115,6 +123,9 @@ static inline void jsonl_import_job_init(jsonl_import_job_t *job) {
     job->rotation_y = 0.0f;
     job->rotation_z = 0.0f;
     job->mesh_import_mode = 0;  // Default: Single Mesh (efficient)
+    job->observer_contract.captured = false;
+    job->observer_contract.link_enabled = false;
+    job->observer_contract.source_path[0] = '\0';
     job->transforms_applied = false;
     job->last_iteration_time_ms = 0.0;
     job->timing_sample_count = 0;
@@ -154,6 +165,9 @@ static inline bool jsonl_import_job_start(jsonl_import_job_t *job,
     job->rotation_x = rotation_x;
     job->rotation_y = rotation_y;
     job->rotation_z = rotation_z;
+    job->observer_contract.captured = false;
+    job->observer_contract.link_enabled = false;
+    job->observer_contract.source_path[0] = '\0';
 
     // Reset state
     job->current_entry_idx = 0;
@@ -819,6 +833,28 @@ static inline void jsonl_import_job_reset(jsonl_import_job_t *job) {
     job->progress = 0.0f;
     job->status_message[0] = '\0';
     job->transforms_applied = false;
+    job->observer_contract.captured = false;
+    job->observer_contract.link_enabled = false;
+    job->observer_contract.source_path[0] = '\0';
+}
+
+//------------------------------------------------------------------------------
+// Capture observer-link contract for forward-compatible refresh workflows
+//------------------------------------------------------------------------------
+
+static inline void jsonl_import_job_set_observer_contract(jsonl_import_job_t *job,
+                                                          bool link_enabled,
+                                                          const char *source_path) {
+    if (!job) return;
+
+    job->observer_contract.captured = true;
+    job->observer_contract.link_enabled = link_enabled;
+    if (link_enabled && source_path) {
+        strncpy(job->observer_contract.source_path, source_path, JSONL_OBSERVER_PATH_MAX - 1);
+        job->observer_contract.source_path[JSONL_OBSERVER_PATH_MAX - 1] = '\0';
+    } else {
+        job->observer_contract.source_path[0] = '\0';
+    }
 }
 
 //------------------------------------------------------------------------------

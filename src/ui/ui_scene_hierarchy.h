@@ -140,6 +140,25 @@ typedef struct {
     jsonl_import_job_t jsonl_import_job;
     bool jsonl_import_progress_popup_open;
 
+    // JSONL Flat Large Dump import state
+    file_browser_t jsonl_flat_browser;
+    bool jsonl_flat_import_popup_open;
+    char jsonl_flat_import_path[512];
+    int jsonl_flat_entry_count;
+    int jsonl_flat_element_count;
+    int jsonl_flat_unit_index;
+    bool jsonl_flat_use_colours;
+    float jsonl_flat_default_colour[3];
+    bool jsonl_flat_shift_to_com;
+    float jsonl_flat_rotation[3];
+    bool jsonl_flat_has_mesh_data;
+    int jsonl_flat_mesh_vertex_count;
+    int jsonl_flat_mesh_face_count;
+    int jsonl_flat_mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
+    bool jsonl_flat_link_file_for_refresh;
+    jsonl_import_job_t jsonl_flat_import_job;
+    bool jsonl_flat_import_progress_popup_open;
+
     // JSONL Sketch Import state
     file_browser_t jsonl_sketch_browser;
     bool jsonl_sketch_import_popup_open;
@@ -256,6 +275,29 @@ static inline void ui_scene_hierarchy_init(ui_scene_hierarchy_state_t *state,
     jsonl_import_job_init(&state->jsonl_import_job);
     state->jsonl_import_progress_popup_open = false;
 
+    // Initialize JSONL flat-large import state
+    file_browser_init(&state->jsonl_flat_browser);
+    state->jsonl_flat_import_popup_open = false;
+    state->jsonl_flat_import_path[0] = '\0';
+    state->jsonl_flat_entry_count = 0;
+    state->jsonl_flat_element_count = 0;
+    state->jsonl_flat_unit_index = 0;
+    state->jsonl_flat_use_colours = true;
+    state->jsonl_flat_default_colour[0] = 1.0f;
+    state->jsonl_flat_default_colour[1] = 1.0f;
+    state->jsonl_flat_default_colour[2] = 1.0f;
+    state->jsonl_flat_shift_to_com = false;
+    state->jsonl_flat_rotation[0] = 0.0f;
+    state->jsonl_flat_rotation[1] = 0.0f;
+    state->jsonl_flat_rotation[2] = 0.0f;
+    state->jsonl_flat_has_mesh_data = false;
+    state->jsonl_flat_mesh_vertex_count = 0;
+    state->jsonl_flat_mesh_face_count = 0;
+    state->jsonl_flat_mesh_import_mode = 0;
+    state->jsonl_flat_link_file_for_refresh = false;
+    jsonl_import_job_init(&state->jsonl_flat_import_job);
+    state->jsonl_flat_import_progress_popup_open = false;
+
     // Initialize JSONL sketch import state
     file_browser_init(&state->jsonl_sketch_browser);
     state->jsonl_sketch_import_popup_open = false;
@@ -293,6 +335,7 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
     file_browser_shutdown(&state->ply_browser);
     file_browser_shutdown(&state->ply_mesh_browser);
     file_browser_shutdown(&state->jsonl_browser);
+    file_browser_shutdown(&state->jsonl_flat_browser);
     file_browser_shutdown(&state->jsonl_sketch_browser);
 
     // Cleanup any running import job
@@ -312,6 +355,12 @@ static inline void ui_scene_hierarchy_shutdown(ui_scene_hierarchy_state_t *state
         jsonl_import_job_cancel(&state->jsonl_import_job, state->scene);
     }
     jsonl_import_job_reset(&state->jsonl_import_job);
+
+    // Cleanup any running JSONL flat-large import job
+    if (jsonl_import_job_is_running(&state->jsonl_flat_import_job)) {
+        jsonl_import_job_cancel(&state->jsonl_flat_import_job, state->scene);
+    }
+    jsonl_import_job_reset(&state->jsonl_flat_import_job);
 }
 
 //------------------------------------------------------------------------------
@@ -1249,6 +1298,10 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
                 file_browser_open_file(&state->jsonl_browser, "Import JSONL", ".jsonl",
                                        state->last_folder[0] ? state->last_folder : NULL);
             }
+            if (igMenuItem_Bool("Import JSONL (Flat Large Dump)...", NULL, false, true)) {
+                file_browser_open_file(&state->jsonl_flat_browser, "Import JSONL (Flat Large Dump)", ".jsonl",
+                                       state->last_folder[0] ? state->last_folder : NULL);
+            }
             if (igMenuItem_Bool("Import JSONL as Sketch", NULL, false, true)) {
                 file_browser_open_file(&state->jsonl_sketch_browser, "Import JSONL as Sketch", ".jsonl",
                                        state->last_folder[0] ? state->last_folder : NULL);
@@ -2059,6 +2112,47 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         file_browser_clear_result(&state->jsonl_browser);
     }
 
+    // Handle JSONL flat-large file browser (opens dedicated import options popup when file is selected)
+    if (file_browser_draw(&state->jsonl_flat_browser)) {
+        const char *path = file_browser_get_result(&state->jsonl_flat_browser);
+        if (path && path[0]) {
+            strncpy(state->jsonl_flat_import_path, path, sizeof(state->jsonl_flat_import_path) - 1);
+            state->jsonl_flat_import_path[sizeof(state->jsonl_flat_import_path) - 1] = '\0';
+
+            int entry_count = 0, element_count = 0;
+            bool has_mesh = false;
+            int mesh_verts = 0, mesh_faces = 0;
+            jsonl_error_t err = jsonl_quick_scan_mesh(path, &entry_count, &element_count,
+                                                       &has_mesh, &mesh_verts, &mesh_faces);
+            if (err == JSONL_OK) {
+                state->jsonl_flat_entry_count = entry_count;
+                state->jsonl_flat_element_count = element_count;
+                state->jsonl_flat_has_mesh_data = has_mesh;
+                state->jsonl_flat_mesh_vertex_count = mesh_verts;
+                state->jsonl_flat_mesh_face_count = mesh_faces;
+                state->jsonl_flat_import_popup_open = true;
+                igOpenPopup_Str("Import JSONL Flat Large Dump Options", ImGuiPopupFlags_None);
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Flat Import Error: %s", jsonl_error_string(err));
+            }
+
+            const char *last_sep_j = strrchr(path, '/');
+#ifdef _WIN32
+            const char *last_sep_win_j = strrchr(path, '\\');
+            if (last_sep_win_j > last_sep_j) last_sep_j = last_sep_win_j;
+#endif
+            if (last_sep_j && last_sep_j > path) {
+                size_t dir_len = (size_t)(last_sep_j - path);
+                if (dir_len < sizeof(state->last_folder)) {
+                    memcpy(state->last_folder, path, dir_len);
+                    state->last_folder[dir_len] = '\0';
+                }
+            }
+        }
+        file_browser_clear_result(&state->jsonl_flat_browser);
+    }
+
     // Handle JSONL-as-sketch file browser (opens import options popup when file is selected)
     if (file_browser_draw(&state->jsonl_sketch_browser)) {
         const char *path = file_browser_get_result(&state->jsonl_sketch_browser);
@@ -2231,6 +2325,128 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
         igEndPopup();
     }
 
+    // JSONL flat-large import popup
+    ImGuiViewport *jsonl_flat_viewport = igGetMainViewport();
+    ImVec2 jsonl_flat_center = {
+        jsonl_flat_viewport->WorkPos.x + jsonl_flat_viewport->WorkSize.x * 0.5f,
+        jsonl_flat_viewport->WorkPos.y + jsonl_flat_viewport->WorkSize.y * 0.5f
+    };
+    igSetNextWindowPos(jsonl_flat_center, ImGuiCond_Always, (ImVec2){0.5f, 0.5f});
+    if (igBeginPopupModal("Import JSONL Flat Large Dump Options",
+                          &state->jsonl_flat_import_popup_open,
+                          ImGuiWindowFlags_AlwaysAutoResize)) {
+        igText("File: %s", state->jsonl_flat_import_path);
+        igText("Entries: %d", state->jsonl_flat_entry_count);
+        igText("Elements: %d", state->jsonl_flat_element_count);
+        igSeparator();
+
+        igText("Units:");
+        const char* jsonl_flat_unit_items[] = { "Meters (1:1)", "Millimeters (0.001)", "Inches (0.0254)" };
+        igCombo_Str_arr("##jsonl_flat_units", &state->jsonl_flat_unit_index, jsonl_flat_unit_items, 3, -1);
+        igSeparator();
+
+        igCheckbox("Import Colours##jsonl_flat", &state->jsonl_flat_use_colours);
+        if (!state->jsonl_flat_use_colours) {
+            igColorEdit3("Default Colour##jsonl_flat", state->jsonl_flat_default_colour, ImGuiColorEditFlags_None);
+        }
+        igSeparator();
+
+        igText("Transformations:");
+        igCheckbox("Shift to Centre of Mass##jsonl_flat", &state->jsonl_flat_shift_to_com);
+        igText("Rotation (degrees):");
+        igPushItemWidth(80);
+        igDragFloat("X##jsonl_flat_rot", &state->jsonl_flat_rotation[0], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Y##jsonl_flat_rot", &state->jsonl_flat_rotation[1], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igSameLine(0, 10);
+        igDragFloat("Z##jsonl_flat_rot", &state->jsonl_flat_rotation[2], 1.0f, -360.0f, 360.0f, "%.1f", ImGuiSliderFlags_None);
+        igPopItemWidth();
+
+        if (state->jsonl_flat_has_mesh_data) {
+            igSeparator();
+            igText("Mesh Import Options");
+            igText("Mesh vertices: %d, faces: %d",
+                   state->jsonl_flat_mesh_vertex_count, state->jsonl_flat_mesh_face_count);
+
+            igRadioButton_IntPtr("Single Mesh Entity (efficient)##jsonl_flat", &state->jsonl_flat_mesh_import_mode, 0);
+            igRadioButton_IntPtr("Individual Triangles (selectable)##jsonl_flat", &state->jsonl_flat_mesh_import_mode, 1);
+        }
+
+        igSeparator();
+        igCheckbox("Link file for refresh (optional)", &state->jsonl_flat_link_file_for_refresh);
+        igTextWrapped("Stores observer-link intent for later refresh support. Default is OFF.");
+        igSeparator();
+
+        if (igButton("Import##jsonl_flat", (ImVec2){120, 0})) {
+            float scale = 1.0f;
+            switch (state->jsonl_flat_unit_index) {
+                case 1: scale = 0.001f; break;
+                case 2: scale = 0.0254f; break;
+                default: scale = 1.0f; break;
+            }
+
+            vec4_t default_colour = vec4_make(
+                state->jsonl_flat_default_colour[0],
+                state->jsonl_flat_default_colour[1],
+                state->jsonl_flat_default_colour[2],
+                1.0f
+            );
+
+            float deg_to_rad = 3.14159265359f / 180.0f;
+            float rot_x = state->jsonl_flat_rotation[0] * deg_to_rad;
+            float rot_y = state->jsonl_flat_rotation[1] * deg_to_rad;
+            float rot_z = state->jsonl_flat_rotation[2] * deg_to_rad;
+
+            bool started = jsonl_import_job_start(
+                &state->jsonl_flat_import_job,
+                state->jsonl_flat_import_path,
+                scale,
+                state->jsonl_flat_use_colours,
+                default_colour,
+                state->jsonl_flat_shift_to_com,
+                rot_x, rot_y, rot_z
+            );
+
+            if (state->jsonl_flat_has_mesh_data) {
+                jsonl_import_job_set_mesh_mode(&state->jsonl_flat_import_job, state->jsonl_flat_mesh_import_mode);
+            }
+            jsonl_import_job_set_observer_contract(&state->jsonl_flat_import_job,
+                                                   state->jsonl_flat_link_file_for_refresh,
+                                                   state->jsonl_flat_import_path);
+
+            if (started) {
+                if (jsonl_import_job_should_sync(&state->jsonl_flat_import_job)) {
+                    while (!jsonl_import_job_tick(&state->jsonl_flat_import_job, state->scene)) {
+                    }
+                    if (state->jsonl_flat_import_job.state == JSONL_JOB_COMPLETE) {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "%s", state->jsonl_flat_import_job.status_message);
+                        state->cache_dirty = true;
+                    } else {
+                        snprintf(state->last_status, sizeof(state->last_status),
+                                 "JSONL Flat Import Error: %s", state->jsonl_flat_import_job.status_message);
+                    }
+                    jsonl_import_job_reset(&state->jsonl_flat_import_job);
+                } else {
+                    state->jsonl_flat_import_progress_popup_open = true;
+                }
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "JSONL Flat Import Error: %s", state->jsonl_flat_import_job.status_message);
+            }
+
+            state->jsonl_flat_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+
+        igSameLine(0, -1);
+        if (igButton("Cancel##jsonl_flat", (ImVec2){120, 0})) {
+            state->jsonl_flat_import_popup_open = false;
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+
     // JSONL as Sketch import popup
     ImGuiViewport *jsonl_sketch_viewport = igGetMainViewport();
     ImVec2 jsonl_sketch_center = {
@@ -2323,6 +2539,83 @@ static inline void ui_scene_hierarchy_draw(ui_scene_hierarchy_state_t *state) {
             state->jsonl_sketch_import_popup_open = false;
             igCloseCurrentPopup();
         }
+        igEndPopup();
+    }
+
+    // JSONL flat-large progress popup
+    if (state->jsonl_flat_import_progress_popup_open) {
+        igOpenPopup_Str("Importing JSONL Flat Large Dump", ImGuiPopupFlags_None);
+    }
+
+    if (igBeginPopupModal("Importing JSONL Flat Large Dump", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        const char *jsonl_flat_filename = state->jsonl_flat_import_path;
+        const char *last_sep_jf = strrchr(state->jsonl_flat_import_path, '/');
+#ifdef _WIN32
+        const char *last_sep_win_jf = strrchr(state->jsonl_flat_import_path, '\\');
+        if (last_sep_win_jf > last_sep_jf) last_sep_jf = last_sep_win_jf;
+#endif
+        if (last_sep_jf) jsonl_flat_filename = last_sep_jf + 1;
+
+        igText("File: %s", jsonl_flat_filename);
+        igSeparator();
+
+        igProgressBar(state->jsonl_flat_import_job.progress, (ImVec2){-FLT_MIN, 0}, NULL);
+        igText("%s", state->jsonl_flat_import_job.status_message);
+
+        bool show_jsonl_flat_timing = jsonl_import_job_is_running(&state->jsonl_flat_import_job) &&
+                                      state->jsonl_flat_import_job.last_iteration_time_ms > 0;
+        if (show_jsonl_flat_timing) {
+            float seconds_per_it = (float)state->jsonl_flat_import_job.last_iteration_time_ms / 1000.0f;
+            igText("%.0f%%  |  %.3f s/it",
+                   state->jsonl_flat_import_job.progress * 100.0f,
+                   seconds_per_it);
+        } else if (state->jsonl_flat_import_job.state == JSONL_JOB_COMPLETE) {
+            igText("100%% - Complete");
+        } else if (state->jsonl_flat_import_job.state == JSONL_JOB_ERROR) {
+            igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "Error!");
+        } else {
+            igText("%.0f%%", state->jsonl_flat_import_job.progress * 100.0f);
+        }
+
+        igSeparator();
+
+        float jsonl_flat_btn_width = 120.0f;
+        float jsonl_flat_avail_width = igGetContentRegionAvail().x;
+        igSetCursorPosX(igGetCursorPosX() + (jsonl_flat_avail_width - jsonl_flat_btn_width) * 0.5f);
+
+        bool jsonl_flat_is_finished = (state->jsonl_flat_import_job.state == JSONL_JOB_COMPLETE ||
+                                       state->jsonl_flat_import_job.state == JSONL_JOB_ERROR ||
+                                       state->jsonl_flat_import_job.state == JSONL_JOB_CANCELLED);
+        const char *jsonl_flat_btn_label = jsonl_flat_is_finished ? "Close" : "Cancel";
+
+        if (igButton(jsonl_flat_btn_label, (ImVec2){jsonl_flat_btn_width, 0})) {
+            if (!jsonl_flat_is_finished) {
+                jsonl_import_job_cancel(&state->jsonl_flat_import_job, state->scene);
+                snprintf(state->last_status, sizeof(state->last_status), "JSONL flat import cancelled");
+            } else {
+                snprintf(state->last_status, sizeof(state->last_status),
+                         "%s", state->jsonl_flat_import_job.status_message);
+            }
+            state->jsonl_flat_import_progress_popup_open = false;
+            state->cache_dirty = true;
+            jsonl_import_job_reset(&state->jsonl_flat_import_job);
+            igCloseCurrentPopup();
+        }
+
+        if (jsonl_import_job_is_running(&state->jsonl_flat_import_job)) {
+            bool jsonl_flat_complete = jsonl_import_job_tick(&state->jsonl_flat_import_job, state->scene);
+            if (jsonl_flat_complete) {
+                state->cache_dirty = true;
+                if (state->jsonl_flat_import_job.state == JSONL_JOB_COMPLETE) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "%s", state->jsonl_flat_import_job.status_message);
+                } else if (state->jsonl_flat_import_job.state == JSONL_JOB_ERROR) {
+                    snprintf(state->last_status, sizeof(state->last_status),
+                             "JSONL Flat Import Error: %s", state->jsonl_flat_import_job.status_message);
+                }
+            }
+        }
+
         igEndPopup();
     }
 
