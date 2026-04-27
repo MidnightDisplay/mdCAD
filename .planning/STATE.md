@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
-status: ready_to_plan
-stopped_at: Roadmap approved; ready to plan Phase 36
-last_updated: "2026-04-27T00:00:00Z"
-last_activity: 2026-04-27
+status: planning
+stopped_at: Phase 36 context gathered
+last_updated: "2026-04-27T10:31:54.766Z"
+last_activity: 2026-04-27 — v1.6 roadmap created (phases 36-40)
 progress:
   total_phases: 5
   completed_phases: 0
@@ -105,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-27T00:00:00Z
-Stopped at: v1.6 roadmap approved; ready for `/gsd-plan-phase 36`
-Resume file: None
+Last session: 2026-04-27T10:31:54.763Z
+Stopped at: Phase 36 context gathered
+Resume file: .planning/phases/36-flat-import-entry-configuration/36-CONTEXT.md
