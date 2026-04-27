@@ -1,57 +1,89 @@
-# Feature Research
+# Feature Landscape
 
-**Domain:** CAD solver workflow robustness + script re-apply integrity (v1.5)  
-**Researched:** 2026-04-10  
-**Confidence:** HIGH
+**Domain:** CAD-style large geometry log workflows (v1.6 Observable Flat JSONL Import)  
+**Researched:** 2026-04-27  
+**Confidence:** HIGH (repo context + shipped v1.5 observer/import behavior)
 
-## Feature Landscape
+## Table Stakes
 
-### Table Stakes (Users Expect These)
+Features users expect for this milestone. Missing any of these makes the feature feel incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Deterministic solve outcomes for identical operations | Mature CAD expectation | MEDIUM | Same input -> same outcome class + diagnostics |
-| Large-jump edit robustness in mixed arc/line loops | Users expect no "wiggle to latch" | HIGH | Must converge or fail transactionally |
-| Explicit coincidence authoring for ArcAxisLine/tangency workflows | Hidden implicit links are fragile | MEDIUM | Coincidence should be first-class constraints |
-| PARALLEL behavior parity vs equivalent ALONG setups | Equivalent intent should behave equivalently | HIGH | Especially rectangular/lattice workflows |
-| Script re-apply integrity (constraint remap + color preservation) | Reapply should be lossless | HIGH | Preserve semantics despite ECS ID churn |
-| Typed actionable diagnostics | Users need clear recovery guidance | MEDIUM | Avoid ambiguous unsupported-participant failures |
+| Separate menu path: `File -> Import JSONL (Flat / Large)` | Users need explicit intent: "fast large dump import," not sketch workflow | Low | Must not replace existing JSONL Geometry Log or JSONL as Sketch entries |
+| Dedicated flat import dialog | Users expect to confirm scale/rotation/center/color behavior before heavy import | Medium | Reuse proven JSONL options shape; keep terminology clear that output is non-sketch entities |
+| Import into one anchor entity | Large dump workflows expect one controllable root for selection, hide/show, delete, and refresh | Medium | No per-entry sketch conversion; plain scene entities only |
+| Optional observer link at import time | Users need live-update option without forcing it for huge files | Medium | Opt-in toggle in dialog; link metadata attaches to anchor |
+| Manual refresh (`Re-import now`) | CAD operators expect deterministic "pull latest file now" control | Medium | Must work even when auto-observe is off/disabled |
+| Transactional refresh semantics | Users expect "all-or-nothing" replacement, never partial corruption on parse/read failure | High | Keep last good anchor content on failure |
+| Stable behavior on huge files (hundreds of thousands of geometries) | Core reason for milestone | High | Prioritize responsiveness and no UI lock/crash during import/refresh |
 
-### Differentiators (Competitive Advantage)
+## Differentiators
+
+Features that make this especially strong for large-geometry log workflows.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Determinism contract surfaced in workflow/logs | Improves trust in scripting workflows | MEDIUM | Useful for support/debug loops |
-| Re-apply semantic diff visibility | Makes remap behavior auditable | MEDIUM | Great for script-heavy users |
+| Flat refresh replaces only anchor subtree (not sketch/script pipeline) | Much faster and lower overhead for huge logs | High | Primary performance differentiator vs sketch-observer flow |
+| Observer defaults tuned for safety on huge logs | Avoid runaway retries and UI spam during file-lock churn | Medium | Reuse retry/debounce/auto-disable pattern already proven in observer flow |
+| Import mode explicitly branded for "Large Geometry Dumps" | Reduces wrong-path usage and support confusion | Low | UX clarity is a practical differentiator |
+| Clear status + recent observer messages on anchor | Operators can diagnose refresh failures quickly | Medium | Reuse "latest-two messages" style behavior |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+## Anti-Features
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Unlimited hidden retry/tolerance inflation | Seems to improve solve success quickly | Degrades determinism/perf and hides root cause | Bounded deterministic adaptive strategy |
-| Silent auto-rewriting of user constraints | "Just make it solve" convenience | Breaks intent traceability | Transactional fail + explicit diagnostics |
-| Scope creep to new constraint families in this milestone | Feature pressure | Delays robustness closure | Keep v1.5 focused on robustness/replay integrity |
+Explicitly avoid these in v1.6.
 
-## MVP Definition
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|--------------------|
+| Auto-convert flat import into sketch entities | Reintroduces heavy sketch/script overhead; defeats milestone purpose | Keep flat mode strictly plain scene entities |
+| Silent partial refresh on parse errors | Causes mixed old/new geometry and trust loss | Keep transactional replace-or-rollback |
+| Forced observer ON by default for flat mode | Dangerous on giant files; can surprise users with heavy background reparses | Make observer opt-in in flat import dialog |
+| Per-entry anchor hierarchy in flat mode | Adds hierarchy bloat and slows large-scene operations | Single anchor with flat children only |
+| Adding constraint inference/authoring in this milestone | Scope creep; unrelated to large dump refresh performance | Keep import unconstrained and non-sketch |
 
-### Launch With (v1.5)
+## Feature Dependencies
 
-- [ ] Deterministic large-jump solve behavior for target user workflows
-- [ ] Explicit coincidence semantics for ArcAxisLine + endpoint tangency authoring
-- [ ] PARALLEL vs ALONG parity for equivalent arrangements
-- [ ] Script re-apply descriptor fidelity and color preservation
-- [ ] Typed diagnostics for solve/replay failure classes
+```text
+Separate menu entry
+  -> Dedicated flat import dialog
+    -> Import options capture (units/transform/color + observe opt-in)
+      -> Flat import job (plain entities under one anchor)
+        -> Anchor metadata/link persistence
+          -> Manual refresh
+            -> Auto-observe refresh loop
+              -> Transactional replacement + retry/debounce/auto-disable messaging
+```
 
-### Add After Validation (v1.5.x)
+## MVP Recommendation (v1.6)
 
-- [ ] Recovery-hint UX layer on top of typed diagnostics
-- [ ] Re-apply diff report for advanced debugging
+Prioritize:
+1. Separate flat import menu + dialog (explicit mode separation)
+2. One-anchor flat entity import with large-file-safe execution
+3. Optional observer link with manual refresh and transactional re-import
+4. Reuse observer retry/debounce/auto-disable + recent-message UX on anchor
 
-### Future Consideration (v2+)
+Defer:
+- Any sketch/script integration for flat mode
+- Smart diff/patch refresh (full anchor replace is acceptable for v1.6)
+- New geometry semantics beyond existing JSONL type handling
 
-- [ ] Broader automatic constraint repair systems
-- [ ] Runtime-selectable advanced solver strategy plugins
+## Scoping Notes for /gsd-new-milestone
 
----
-*Feature research for: v1.5 Solver Workflow Robustness + Script Re-apply Integrity*  
-*Researched: 2026-04-10*
+Use requirement slices like:
+- **FIMP-01**: User can launch flat JSONL import from dedicated File menu action.
+- **FIMP-02**: Import creates one anchor with plain scene-entity geometry (non-sketch).
+- **FIMP-03**: Import dialog supports transform/color options and observer opt-in.
+- **FIMP-04**: Manual refresh re-imports source into same anchor transactionally.
+- **FIMP-05**: Auto-observe refresh uses retry/debounce/auto-disable safety semantics.
+- **FIMP-06**: Huge-file workflow remains responsive and stable under repeated refresh.
+
+## Sources
+
+- `.planning/PROJECT.md` (v1.6 scope and goals)
+- `.planning/STATE.md` (milestone focus and constraints)
+- `.planning/phases/35-.../35-CONTEXT.md` (observer semantics baseline)
+- `.planning/phases/35-.../35-UAT.md` (observer UX/behavior validation baseline)
+- `src/ui/ui_scene_hierarchy.h` (existing import menu/dialog patterns)
+- `src/jsonl_import_job.h` (current JSONL geometry-log import behavior)
+- `src/components/jsonl_observer_comp.h` (observer state model)
+- `src/jsonl_observer_system.h` (manual/auto reparse, retry/debounce behavior)
