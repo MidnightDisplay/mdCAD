@@ -15,7 +15,7 @@
 - [x] **Phase 36: Flat Import Entry & Configuration** - Users can start dedicated flat JSONL import and set transform/color options before execution. (completed 2026-04-27)
 - [x] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities. (completed 2026-04-27)
 - [x] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor. (completed 2026-04-27)
-- [ ] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections.
+- [x] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections. (completed 2026-04-27)
 - [ ] **Phase 40: Large-Dump Stability & Interaction Coherence** - Large import/refresh remains responsive and anchor interactions stay coherent across repeats.
 
 ## Phase Details
@@ -70,7 +70,7 @@ Plans:
 **Plans**: 2
 Plans:
 - [x] 39-01-PLAN.md — Add Wave 0 auto-safety CTest scaffold and inspector safety control contract guards.
-- [ ] 39-02-PLAN.md — Implement flat auto observer safety loop runtime + inspector lifecycle semantics + OBSF-04 regressions.
+- [x] 39-02-PLAN.md — Implement flat auto observer safety loop runtime + inspector lifecycle semantics + OBSF-04 regressions.
 
 ### Phase 40: Large-Dump Stability & Interaction Coherence
 **Goal**: Large-file flat import/refresh stays responsive and scene interactions remain coherent over repeated refreshes.  
@@ -89,5 +89,5 @@ Plans:
 | 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
 | 38. Observable Link + Manual Transactional Refresh | 2/2 | Complete | 2026-04-27 |
-| 39. Automatic Observer Safety Loop | 1/2 | In Progress|  |
+| 39. Automatic Observer Safety Loop | 2/2 | Complete    | 2026-04-27 |
 | 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |
