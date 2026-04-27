@@ -69,7 +69,7 @@ Plans:
   3. Failed automatic refresh attempts use retry behavior and then auto-disable when safety limits are hit.
 **Plans**: 2
 Plans:
-- [ ] 39-01-PLAN.md — Add Wave 0 auto-safety CTest scaffold and inspector safety control contract guards.
+- [x] 39-01-PLAN.md — Add Wave 0 auto-safety CTest scaffold and inspector safety control contract guards.
 - [ ] 39-02-PLAN.md — Implement flat auto observer safety loop runtime + inspector lifecycle semantics + OBSF-04 regressions.
 
 ### Phase 40: Large-Dump Stability & Interaction Coherence
@@ -89,5 +89,5 @@ Plans:
 | 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
 | 38. Observable Link + Manual Transactional Refresh | 2/2 | Complete | 2026-04-27 |
-| 39. Automatic Observer Safety Loop | 0/TBD | Not started | - |
+| 39. Automatic Observer Safety Loop | 1/2 | In Progress|  |
 | 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |

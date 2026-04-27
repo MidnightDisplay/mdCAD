@@ -18,7 +18,7 @@ Requirements for milestone **v1.6: Observable Flat JSONL Import for Large Geomet
 - [ ] **OBSF-01**: User can opt in or opt out of file observability during flat import, with default set to OFF.
 - [ ] **OBSF-02**: Imported anchor stores source-link metadata and replay settings required for refresh.
 - [ ] **OBSF-03**: User can trigger manual refresh to re-import source data into the same anchor.
-- [ ] **OBSF-04**: Automatic observer refresh uses debounce/retry/auto-disable safety behavior for unstable file-write windows.
+- [x] **OBSF-04**: Automatic observer refresh uses debounce/retry/auto-disable safety behavior for unstable file-write windows.
 - [ ] **OBSF-05**: Refresh is transactional: commit on success, preserve last-good anchor content on failure.
 
 ### Large-File Reliability
@@ -56,7 +56,7 @@ Explicit exclusions for v1.6.
 | OBSF-01 | Phase 38 | Pending |
 | OBSF-02 | Phase 38 | Pending |
 | OBSF-03 | Phase 38 | Pending |
-| OBSF-04 | Phase 39 | Pending |
+| OBSF-04 | Phase 39 | Complete |
 | OBSF-05 | Phase 38 | Pending |
 | PERF-01 | Phase 40 | Pending |
 | PERF-02 | Phase 38 | Pending |
