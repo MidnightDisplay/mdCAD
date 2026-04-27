@@ -12,9 +12,19 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Shipped:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity (2026-04-13)
 
-**Current milestone:** none (v1.5 archived)
+**Current milestone:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps
 
-**Current focus:** start next milestone definition and requirement capture.
+**Current focus:** define requirements and roadmap for high-volume flat JSONL observable import.
+
+## Current Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
+
+**Goal:** Add a high-performance JSONL import mode that flattens geometry log entries into plain scene entities under one import anchor, with optional live file observability and refresh semantics tuned for very large files.
+
+**Target features:**
+- New import menu action and dialog for a flat JSONL import mode
+- Import geometry log entries as non-sketch scene entities under a single import anchor
+- Attach observer metadata/component to the import anchor with an opt-out toggle in the import dialog
+- Reuse sketch-style refresh behavior for anchor re-import while preserving large-scene efficiency
 
 ## Requirements
 
@@ -53,9 +63,10 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Define v1.6 milestone scope and requirements.
-- [ ] Convert post-v1.5 Nyquist validation debt into explicit closure/cleanup tasks (Phase 33 and 35 validation metadata alignment).
-- [ ] Continue reliability hardening for newly shipped JSONL observer/reparse workflows under long-running edit sessions.
+- [ ] Define v1.6 requirements and phase mapping for observable flat JSONL import.
+- [ ] Deliver flat non-sketch JSONL geometry import under a single anchor entity.
+- [ ] Add optional observer linking and sketch-style refresh controls for flat JSONL imports.
+- [ ] Validate high-entity refresh stability/performance for large JSONL geometry dumps.
 
 ### Out of Scope
 
@@ -88,10 +99,10 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone audit result is `tech_debt`: no functional blockers; follow-up validation metadata cleanup is deferred.
 ## Next Milestone Goals
 
-1. Define and prioritize v1.6 requirements from latest user workflows and deferred debt.
-2. Preserve deterministic closure discipline by maintaining baseline+rereun evidence for all future milestone gates.
-3. Expand integration coverage around import/observer/scripting boundaries to prevent regressions in high-entity scenes.
-4. Continue native stability-first delivery on Windows Vulkan while preserving existing cross-platform behavior.
+1. Add a new import action and dialog path for flat JSONL scene import.
+2. Flatten geometry log entries into plain scene entities beneath one import anchor.
+3. Attach optional file observability to the anchor and support sketch-like refresh flows.
+4. Prioritize responsiveness and reliability for very large geometry log files.
 
 ## Constraints
 
@@ -119,6 +130,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Completed in v1.4 |
 | Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
 | Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
+| Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Active for v1.6 |
 
 ## Evolution
 
@@ -138,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after v1.5 milestone completion*
+*Last updated: 2026-04-27 after starting milestone v1.6*

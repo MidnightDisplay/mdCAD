@@ -1,43 +1,43 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Solver Workflow Robustness + Script Reapply Integrity
-status: milestone_complete
-stopped_at: Milestone v1.5 archived and tagged
-last_updated: "2026-04-14T00:00:00Z"
-last_activity: 2026-04-14
+milestone: v1.6
+milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
+status: defining_requirements
+stopped_at: Milestone v1.6 initialized; defining requirements
+last_updated: "2026-04-27T00:00:00Z"
+last_activity: 2026-04-27
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-10)
+See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone closure complete for v1.5; ready to initialize next milestone.
+**Current focus:** Milestone v1.6 requirement and roadmap definition for observable flat JSONL import.
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 35 (observable-jsonl-as-sketch-import-with-optional-live-file-observer) — COMPLETE
-Plan: 3 of 3
-Status: Milestone shipped
-Last activity: 2026-04-14
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-27 — Milestone v1.6 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
-- Milestone v1.5 scope delivered: solver large-jump robustness, deterministic diagnostics, explicit coincidence authoring semantics, PARALLEL/ALONG parity, script re-apply integrity, and observable JSONL sketch import with transactional observer reparse behavior.
-- Closure evidence includes canonical deterministic gate parity and Phase 35 verification/UAT coverage.
+- Milestone v1.6 scope: observable flat JSONL scene import for high-entity files with import-anchor observability and efficient refresh behavior.
+- Target capability: import geometry log entries as plain scene entities under one anchor while preserving optional file-linked live updates.
 
 ## Accumulated Context
 
@@ -86,10 +86,12 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 35 added: Observable JSONL as sketch import with optional live file observer.
+- Milestone v1.6 initialized: Observable Flat JSONL Import for Large Geometry Dumps.
 
 ### Pending Todos
 
-- Initialize next milestone requirements and roadmap (`/gsd-new-milestone`).
+- Define and approve v1.6 requirements (`/gsd-new-milestone` workflow in progress).
+- Create and approve v1.6 roadmap phases.
 
 ### Blockers/Concerns
 
