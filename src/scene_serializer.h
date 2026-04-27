@@ -188,7 +188,7 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
     // Only serialize entities that contribute to persisted scene state.
     // This keeps transient anchor entities out of save files.
     if (!t) return;
-    if (!g && !sketch && !constraint) return;
+    if (!g && !sketch && !constraint && !jsonl_observer) return;
 
     ecs_entity_t parent = ecs_world_get_parent(w, e);
 
@@ -561,7 +561,7 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         wrote_component = true;
     }
 
-    if (jsonl_observer && jsonl_observer->linked) {
+    if (jsonl_observer) {
         if (wrote_component) json_builder_append(b, ",\n");
         json_write_indent(b, depth + 2);
         json_builder_append(b, "\"jsonl_observer\": {\n");
@@ -588,6 +588,10 @@ static inline void scene_write_entity_json(json_builder_t *b, ecs_scene_t *scene
         json_builder_appendf(b, "\"rotation_z\": %.6g,\n", jsonl_observer->rotation_z);
         json_write_indent(b, depth + 3);
         json_builder_appendf(b, "\"shift_to_center\": %s,\n", jsonl_observer->shift_to_center ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"use_jsonl_colours\": %s,\n", jsonl_observer->use_jsonl_colours ? "true" : "false");
+        json_write_indent(b, depth + 3);
+        json_builder_appendf(b, "\"mesh_import_mode\": %d,\n", jsonl_observer->mesh_import_mode);
         json_write_indent(b, depth + 3);
         json_builder_appendf(b, "\"source_state_valid\": %s,\n", jsonl_observer->source_state_valid ? "true" : "false");
         json_write_indent(b, depth + 3);
@@ -1994,6 +1998,14 @@ static inline bool json_parse_jsonl_observer(json_parser_t *p, loaded_entity_t *
             if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
             ent->jsonl_observer.shift_to_center = (p->token == JSON_TOK_TRUE);
             if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "use_jsonl_colours") == 0) {
+            if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
+            ent->jsonl_observer.use_jsonl_colours = (p->token == JSON_TOK_TRUE);
+            if (!json_next_token(p)) return false;
+        } else if (strcmp(key, "mesh_import_mode") == 0) {
+            if (p->token != JSON_TOK_NUMBER) return false;
+            ent->jsonl_observer.mesh_import_mode = (int)p->num_value;
+            if (!json_next_token(p)) return false;
         } else if (strcmp(key, "source_state_valid") == 0) {
             if (p->token != JSON_TOK_TRUE && p->token != JSON_TOK_FALSE) return false;
             ent->jsonl_observer.source_state_valid = (p->token == JSON_TOK_TRUE);
@@ -2012,7 +2024,8 @@ static inline bool json_parse_jsonl_observer(json_parser_t *p, loaded_entity_t *
             if (!json_next_token(p)) return false;
         } else if (strcmp(key, "source_path") == 0) {
             if (p->token != JSON_TOK_STRING) return false;
-            jsonl_observer_comp_set_path(&ent->jsonl_observer, p->str_value);
+            strncpy(ent->jsonl_observer.source_path, p->str_value, JSONL_OBSERVER_PATH_MAX - 1);
+            ent->jsonl_observer.source_path[JSONL_OBSERVER_PATH_MAX - 1] = '\0';
             if (!json_next_token(p)) return false;
         } else if (strcmp(key, "message_count") == 0) {
             if (p->token != JSON_TOK_NUMBER) return false;
@@ -2283,6 +2296,26 @@ static inline ecs_entity_t scene_create_from_loaded(ecs_scene_t *scene, loaded_e
         }
         if (ent->has_jsonl_observer) {
             ecs_world_set_jsonl_observer(scene->world, e, &ent->jsonl_observer);
+        }
+        return e;
+    }
+
+    if (ent->has_jsonl_observer && !ent->has_geometry && !ent->has_sketch && !ent->has_constraint) {
+        const char *label_name = (ent->has_label && ent->label.name[0] != '\0') ? ent->label.name : "JSONL Import";
+        const char *label_desc = ent->has_label ? ent->label.description : "";
+        e = scene_add_anchor(scene, label_name, label_desc);
+        if (e == 0) return 0;
+
+        TransformComp *t = ecs_world_get_transform(scene->world, e);
+        if (t) {
+            t->position = ent->position;
+            t->rotation = ent->rotation;
+            t->scale = ent->scale;
+            t->dirty = true;
+        }
+        ecs_world_set_jsonl_observer(scene->world, e, &ent->jsonl_observer);
+        if (ent->has_script_identity) {
+            ecs_world_set_script_identity(scene->world, e, &ent->script_identity);
         }
         return e;
     }

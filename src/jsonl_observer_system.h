@@ -5,8 +5,147 @@
 #define JSONL_OBSERVER_SYSTEM_H
 
 #include "ecs/ecs_scene.h"
+#include "selection.h"
+#include "jsonl_import_job.h"
 #include "jsonl_sketch_import_job.h"
 #include "components/jsonl_observer_comp.h"
+
+#define JSONL_OBSERVER_MAX_FLAT_REFRESHES 8
+
+typedef struct {
+    bool active;
+    ecs_world_state_t *world;
+    ecs_entity_t target_root;
+    ecs_entity_t stage_root;
+    jsonl_import_job_t job;
+    selection_buffer_t *selection;
+} jsonl_flat_refresh_slot_t;
+
+static inline jsonl_flat_refresh_slot_t *jsonl_observer_flat_refresh_slots(void) {
+    static jsonl_flat_refresh_slot_t slots[JSONL_OBSERVER_MAX_FLAT_REFRESHES];
+    return slots;
+}
+
+static inline bool jsonl_observer_is_descendant_of(ecs_scene_t *scene,
+                                                   ecs_entity_t entity,
+                                                   ecs_entity_t ancestor) {
+    if (!scene || entity == 0 || ancestor == 0) return false;
+    ecs_entity_t current = entity;
+    while (current != 0 && ecs_is_alive(scene->world->world, current)) {
+        if (current == ancestor) return true;
+        current = scene_get_parent(scene, current);
+    }
+    return false;
+}
+
+static inline bool jsonl_observer_selected_descendant_replaced(const jsonl_flat_refresh_slot_t *slot,
+                                                               ecs_scene_t *scene) {
+    if (!slot || !slot->selection || !scene || slot->target_root == 0) return false;
+    selection_buffer_t *sel = slot->selection;
+    for (int i = 0; i < selection_count(sel); i++) {
+        ecs_entity_t selected = selection_get(sel, i);
+        if (selected == 0 || selected == slot->target_root) continue;
+        if (jsonl_observer_is_descendant_of(scene, selected, slot->target_root)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline jsonl_flat_refresh_slot_t *jsonl_observer_find_flat_refresh_slot(ecs_scene_t *scene,
+                                                                                ecs_entity_t root_entity) {
+    if (!scene || root_entity == 0) return NULL;
+    jsonl_flat_refresh_slot_t *slots = jsonl_observer_flat_refresh_slots();
+    for (int i = 0; i < JSONL_OBSERVER_MAX_FLAT_REFRESHES; i++) {
+        if (slots[i].active && slots[i].world == scene->world && slots[i].target_root == root_entity) {
+            return &slots[i];
+        }
+    }
+    return NULL;
+}
+
+static inline jsonl_flat_refresh_slot_t *jsonl_observer_alloc_flat_refresh_slot(void) {
+    jsonl_flat_refresh_slot_t *slots = jsonl_observer_flat_refresh_slots();
+    for (int i = 0; i < JSONL_OBSERVER_MAX_FLAT_REFRESHES; i++) {
+        if (!slots[i].active) return &slots[i];
+    }
+    return NULL;
+}
+
+static inline bool jsonl_observer_commit_flat_refresh(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
+    if (!scene || !slot || slot->target_root == 0 || slot->stage_root == 0) return false;
+
+    int old_child_count = scene_count_children(scene, slot->target_root);
+    int new_child_count = scene_count_children(scene, slot->stage_root);
+
+    ecs_entity_t *old_children = NULL;
+    ecs_entity_t *new_children = NULL;
+
+    if (old_child_count > 0) {
+        old_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)old_child_count);
+        if (!old_children) return false;
+    }
+    if (new_child_count > 0) {
+        new_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)new_child_count);
+        if (!new_children) {
+            free(old_children);
+            return false;
+        }
+    }
+
+    int old_collected = 0;
+    int new_collected = 0;
+    if (old_child_count > 0) {
+        old_collected = scene_get_children(scene, slot->target_root, old_children, old_child_count);
+    }
+    if (new_child_count > 0) {
+        new_collected = scene_get_children(scene, slot->stage_root, new_children, new_child_count);
+    }
+
+    bool move_selection_to_root = jsonl_observer_selected_descendant_replaced(slot, scene);
+
+    if (new_collected > 0) {
+        scene_set_parent_batch(scene, new_children, new_collected, slot->target_root);
+    }
+    for (int i = 0; i < old_collected; i++) {
+        ecs_entity_t old_child = old_children[i];
+        if (old_child != 0 && ecs_is_alive(scene->world->world, old_child)) {
+            scene_remove_entity(scene, old_child);
+        }
+    }
+    if (ecs_is_alive(scene->world->world, slot->stage_root)) {
+        scene_remove_entity(scene, slot->stage_root);
+    }
+    slot->stage_root = 0;
+
+    if (move_selection_to_root && slot->selection) {
+        selection_set_single(slot->selection, slot->target_root);
+    }
+
+    free(old_children);
+    free(new_children);
+    return true;
+}
+
+static inline void jsonl_observer_abort_flat_refresh_stage(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
+    if (!scene || !slot) return;
+    if (slot->stage_root != 0 && ecs_is_alive(scene->world->world, slot->stage_root)) {
+        scene_remove_entity(scene, slot->stage_root);
+    }
+    slot->stage_root = 0;
+}
+
+static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
+    if (!slot) return;
+    if (scene) {
+        jsonl_observer_abort_flat_refresh_stage(scene, slot);
+    }
+    jsonl_import_job_reset(&slot->job);
+    slot->active = false;
+    slot->world = NULL;
+    slot->target_root = 0;
+    slot->selection = NULL;
+}
 
 static inline JsonlObserverComp* jsonl_observer_ensure_for_sketch(ecs_scene_t *scene, ecs_entity_t sketch) {
     if (!scene || sketch == 0) return NULL;
@@ -65,6 +204,104 @@ static inline bool jsonl_observer_relink(ecs_scene_t *scene, ecs_entity_t sketch
     // Label.name + Label.description contract is applied via helper above.
     jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_INFO, "Relinked JSONL source.");
     return true;
+}
+
+static inline bool jsonl_observer_request_flat_refresh(ecs_scene_t *scene,
+                                                       ecs_entity_t root_entity,
+                                                       selection_buffer_t *selection) {
+    if (!scene || root_entity == 0 || !ecs_is_alive(scene->world->world, root_entity)) return false;
+    if (ecs_world_get_sketch(scene->world, root_entity)) return false;
+
+    JsonlObserverComp *obs = ecs_world_get_jsonl_observer(scene->world, root_entity);
+    if (!obs || obs->source_path[0] == '\0') return false;
+
+    if (jsonl_observer_find_flat_refresh_slot(scene, root_entity)) {
+        return false;
+    }
+
+    jsonl_flat_refresh_slot_t *slot = jsonl_observer_alloc_flat_refresh_slot();
+    if (!slot) {
+        jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
+                                         "Refresh queue full; try again shortly.");
+        return false;
+    }
+
+    memset(slot, 0, sizeof(*slot));
+    slot->active = true;
+    slot->world = scene->world;
+    slot->target_root = root_entity;
+    slot->selection = selection;
+    jsonl_import_job_init(&slot->job);
+    jsonl_import_job_set_mesh_mode(&slot->job, obs->mesh_import_mode);
+
+    vec4_t default_colour = vec4_make(1.0f, 1.0f, 1.0f, 1.0f);
+    bool started = jsonl_import_job_start(&slot->job,
+                                          obs->source_path,
+                                          obs->scale,
+                                          obs->use_jsonl_colours,
+                                          default_colour,
+                                          obs->shift_to_center,
+                                          obs->rotation_x,
+                                          obs->rotation_y,
+                                          obs->rotation_z);
+    if (!started) {
+        jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
+                                         slot->job.status_message[0] ? slot->job.status_message
+                                                                     : "Failed to start flat refresh.");
+        jsonl_observer_reset_flat_refresh_slot(scene, slot);
+        return false;
+    }
+
+    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_INFO, "Flat refresh started.");
+    return true;
+}
+
+static inline bool jsonl_observer_is_flat_refresh_running(ecs_scene_t *scene, ecs_entity_t root_entity) {
+    return jsonl_observer_find_flat_refresh_slot(scene, root_entity) != NULL;
+}
+
+static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
+    if (!scene) return;
+    jsonl_flat_refresh_slot_t *slots = jsonl_observer_flat_refresh_slots();
+    for (int i = 0; i < JSONL_OBSERVER_MAX_FLAT_REFRESHES; i++) {
+        jsonl_flat_refresh_slot_t *slot = &slots[i];
+        if (!slot->active) continue;
+
+        bool done = jsonl_import_job_tick(&slot->job, scene);
+        if (!done) continue;
+
+        JsonlObserverComp *obs = NULL;
+        if (slot->target_root != 0 && ecs_is_alive(scene->world->world, slot->target_root)) {
+            obs = ecs_world_get_jsonl_observer(scene->world, slot->target_root);
+        }
+
+        if (slot->job.state == JSONL_JOB_COMPLETE && slot->job.root_entity != 0) {
+            slot->stage_root = slot->job.root_entity;
+            if (jsonl_observer_commit_flat_refresh(scene, slot)) {
+                if (obs) {
+                    char msg[JSONL_OBSERVER_MESSAGE_MAX];
+                    snprintf(msg, sizeof(msg), "Re-import applied (%u geometry).",
+                             (unsigned)slot->job.total_entities_created);
+                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_INFO, msg);
+                }
+            } else {
+                jsonl_observer_abort_flat_refresh_stage(scene, slot);
+                if (obs) {
+                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
+                                                     "Flat refresh failed; kept last-good content.");
+                }
+            }
+        } else {
+            jsonl_observer_abort_flat_refresh_stage(scene, slot);
+            if (obs) {
+                jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
+                                                 slot->job.status_message[0] ? slot->job.status_message
+                                                                             : "Flat refresh failed; kept last-good content.");
+            }
+        }
+
+        jsonl_observer_reset_flat_refresh_slot(scene, slot);
+    }
 }
 
 static inline bool jsonl_observer_manual_reparse(ecs_scene_t *scene, ecs_entity_t sketch) {

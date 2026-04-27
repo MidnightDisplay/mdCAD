@@ -35,6 +35,8 @@ typedef struct {
     float rotation_y;
     float rotation_z;
     bool shift_to_center;
+    bool use_jsonl_colours;
+    int mesh_import_mode;  // 0 = Single Mesh, 1 = Individual Triangles
 
     char source_path[JSONL_OBSERVER_PATH_MAX];
     bool source_state_valid;
@@ -58,6 +60,8 @@ static inline JsonlObserverComp jsonl_observer_comp_default(void) {
     c.rotation_y = 0.0f;
     c.rotation_z = 0.0f;
     c.shift_to_center = false;
+    c.use_jsonl_colours = true;
+    c.mesh_import_mode = 0;
     return c;
 }
 

@@ -286,6 +286,30 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     target_link_libraries(jsonl_flat_anchor_scoped_ingest_test PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME jsonl_flat_anchor_scoped_ingest_test COMMAND jsonl_flat_anchor_scoped_ingest_test)
+
+    add_executable(jsonl_flat_observer_manual_refresh_test tests/jsonl_flat_observer_manual_refresh_test.c)
+    target_compile_features(jsonl_flat_observer_manual_refresh_test PRIVATE c_std_11)
+    target_include_directories(jsonl_flat_observer_manual_refresh_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_flat_observer_manual_refresh_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_flat_observer_manual_refresh_test COMMAND jsonl_flat_observer_manual_refresh_test)
+
+    add_executable(jsonl_flat_observer_inspector_contract_test tests/jsonl_flat_observer_inspector_contract_test.c)
+    target_compile_features(jsonl_flat_observer_inspector_contract_test PRIVATE c_std_11)
+    target_include_directories(jsonl_flat_observer_inspector_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(jsonl_flat_observer_inspector_contract_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME jsonl_flat_observer_inspector_contract_test COMMAND jsonl_flat_observer_inspector_contract_test)
 endif()
 
 # Emscripten-specific linker options

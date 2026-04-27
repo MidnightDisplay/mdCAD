@@ -1900,6 +1900,7 @@ static void frame(void) {
     ecs_world_progress(&state.ecs_world, dt);
     ecs_scene_update(&state.ecs_scene);
     jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms());
+    jsonl_observer_tick_flat_refreshes(&state.ecs_scene);
     scene_solver_process_auto_queue(&state.ecs_scene);
 
     // Update gizmo (must be after ecs_scene_update for correct world matrices)

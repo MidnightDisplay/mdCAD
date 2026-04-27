@@ -831,6 +831,23 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
             if (r) r->instance_dirty = true;
         }
 
+        if (job->root_entity != 0 && job->observer_contract.captured) {
+            JsonlObserverComp observer = jsonl_observer_comp_default();
+            observer.scale = job->scale;
+            observer.rotation_x = job->rotation_x;
+            observer.rotation_y = job->rotation_y;
+            observer.rotation_z = job->rotation_z;
+            observer.shift_to_center = job->shift_to_com;
+            observer.use_jsonl_colours = job->use_jsonl_colours;
+            observer.mesh_import_mode = job->mesh_import_mode;
+            observer.linked = job->observer_contract.link_enabled;
+            if (job->observer_contract.source_path[0] != '\0') {
+                jsonl_observer_comp_set_path(&observer, job->observer_contract.source_path);
+                observer.linked = job->observer_contract.link_enabled;
+            }
+            ecs_world_set_jsonl_observer(w, job->root_entity, &observer);
+        }
+
         // Store entry count before freeing
         int num_entries = job->created_entry_anchor_count;
 
@@ -965,7 +982,7 @@ static inline void jsonl_import_job_set_observer_contract(jsonl_import_job_t *jo
 
     job->observer_contract.captured = true;
     job->observer_contract.link_enabled = link_enabled;
-    if (link_enabled && source_path) {
+    if (source_path) {
         strncpy(job->observer_contract.source_path, source_path, JSONL_OBSERVER_PATH_MAX - 1);
         job->observer_contract.source_path[JSONL_OBSERVER_PATH_MAX - 1] = '\0';
     } else {

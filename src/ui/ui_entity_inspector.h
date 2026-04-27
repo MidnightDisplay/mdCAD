@@ -22,6 +22,7 @@
 #include "../components/jsonl_observer_comp.h"
 #include "../math/math_undo_editor.h"
 #include "../jsonl_observer_system.h"
+#include "ui_file_browser.h"
 #include "../undo_redo_exec.h"
 #include <ctype.h>
 #include <float.h>
@@ -321,6 +322,75 @@ static inline void ui_entity_inspector_draw_jsonl_observer_controls(ui_entity_in
             else if (observer->message_severity[i] == JSONL_OBSERVER_MSG_ERROR) prefix = "[ERROR]";
             igTextWrapped("%s %s", prefix, observer->messages[i]);
         }
+    }
+}
+
+static inline void ui_entity_inspector_draw_jsonl_flat_observer_controls(ui_entity_inspector_state_t *state,
+                                                                          ecs_world_state_t *w,
+                                                                          ecs_entity_t root_entity,
+                                                                          ecs_scene_t *scene) {
+    if (!state || !w || !scene || root_entity == 0) return;
+    if (ecs_world_get_sketch(w, root_entity)) return;
+
+    JsonlObserverComp *observer = ecs_world_get_jsonl_observer(w, root_entity);
+    if (!observer) return;
+
+    static file_browser_t source_browser;
+    static bool source_browser_initialized = false;
+    if (!source_browser_initialized) {
+        file_browser_init(&source_browser);
+        source_browser_initialized = true;
+    }
+
+    igDummy((ImVec2){0.0f, 8.0f});
+    igTextDisabled("JSONL Flat Refresh");
+
+    bool linked = observer->linked;
+    if (igCheckbox("Link file for refresh##jsonl_flat_root_link", &linked)) {
+        observer->linked = linked;
+    }
+
+    igTextWrapped("Source path: %s", observer->source_path[0] ? observer->source_path : "(none)");
+
+    if (igButton("Choose source...##jsonl_flat_root_choose_source", (ImVec2){0, 0})) {
+        file_browser_open_file(&source_browser, "Choose JSONL source", ".jsonl",
+                               observer->source_path[0] ? observer->source_path : NULL);
+    }
+
+    if (file_browser_draw(&source_browser)) {
+        const char *chosen_path = file_browser_get_result(&source_browser);
+        if (chosen_path && chosen_path[0]) {
+            (void)jsonl_observer_relink(scene, root_entity, chosen_path);
+        }
+        file_browser_clear_result(&source_browser);
+    }
+
+    bool refresh_running = jsonl_observer_is_flat_refresh_running(scene, root_entity);
+    bool can_refresh = (observer->source_path[0] != '\0');
+    if (!can_refresh || refresh_running) {
+        igBeginDisabled(true);
+    }
+    if (igButton("Re-import now##jsonl_flat_root_reimport_now", (ImVec2){0, 0})) {
+        (void)jsonl_observer_request_flat_refresh(scene, root_entity, state->selection);
+    }
+    if (!can_refresh || refresh_running) {
+        igEndDisabled();
+    }
+
+    if (refresh_running) {
+        igTextDisabled("Refresh in progress...");
+    }
+
+    igDummy((ImVec2){0.0f, 6.0f});
+    igTextDisabled("Last refresh result");
+    if (observer->message_count == 0) {
+        igTextDisabled("No refresh messages.");
+    } else {
+        uint32_t idx = observer->message_count - 1u;
+        const char *prefix = "[INFO]";
+        if (observer->message_severity[idx] == JSONL_OBSERVER_MSG_WARNING) prefix = "[WARN]";
+        else if (observer->message_severity[idx] == JSONL_OBSERVER_MSG_ERROR) prefix = "[ERROR]";
+        igTextWrapped("%s %s", prefix, observer->messages[idx]);
     }
 }
 
@@ -1577,6 +1647,10 @@ static inline void ui_entity_inspector_draw_single(ui_entity_inspector_state_t *
             }
             igEndPopup();
         }
+    }
+
+    if (!sketch && scene) {
+        ui_entity_inspector_draw_jsonl_flat_observer_controls(state, w, e, scene);
     }
 
     if (sketch &&
