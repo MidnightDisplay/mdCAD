@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps
 
-**Current focus:** define requirements and roadmap for high-volume flat JSONL observable import.
+**Current focus:** phase 37 anchor-scoped flat ingest implementation after phase 36 entry/config contract completion.
 
 ## Current Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
 
@@ -60,6 +60,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Large-jump mixed arc/line workflows now use staged robustness semantics with transactional rollback/recovery and deterministic diagnostics/parity behavior for equivalent PARALLEL/ALONG setups (`SROB-01..03`, `DIAG-01..02`, `PARI-01..02`) — Validated in Phase 33: large-jump-robustness-and-parallel-along-parity
 - ✓ Deterministic v1.5 closure gate now proves canonical Windows Vulkan baseline + immediate rerun parity for targeted 7-test suite (`DIAG-03`) — Validated in Phase 34: deterministic-v1-5-closure-gate
 - ✓ Observable JSONL sketch import now supports persisted observer state, transactional reparse safety, and stable large-script editor/apply behavior with user-approved UAT (`P35-01..06`) — Validated in Phase 35: observable-jsonl-as-sketch-import-with-optional-live-file-observer
+- ✓ Flat-large JSONL import entry/configuration contract now provides dedicated menu path, mirrored pre-import options, and forward-compatible observer opt-in capture defaults (`FIMP-01`, `FIMP-02`) — Validated in Phase 36: flat-import-entry-configuration
 
 ### Active
 
@@ -97,6 +98,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.5` is shipped with Phases 31-35 complete and archived.
 - v1.5 delivered descriptor-safe script re-apply fidelity, explicit coincidence authoring semantics, parity-safe large-jump solver behavior, deterministic Windows Vulkan closure parity, and observable JSONL sketch import with transactional observer reparse semantics.
 - Milestone audit result is `tech_debt`: no functional blockers; follow-up validation metadata cleanup is deferred.
+- Phase 36 is complete for milestone `v1.6`, establishing the flat-large JSONL entry/configuration contract and requirement validation for `FIMP-01`/`FIMP-02`.
 ## Next Milestone Goals
 
 1. Add a new import action and dialog path for flat JSONL scene import.
@@ -150,4 +152,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-27 after starting milestone v1.6*
+*Last updated: 2026-04-27 after completing phase 36*

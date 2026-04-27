@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
-status: planning
-stopped_at: Phase 36 context gathered
-last_updated: "2026-04-27T10:31:54.766Z"
-last_activity: 2026-04-27 — v1.6 roadmap created (phases 36-40)
+status: ready_to_plan
+stopped_at: Phase 36 complete
+last_updated: "2026-04-27T19:24:00.000Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 20
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.6 roadmap approved; ready for Phase 36 planning.
+**Current focus:** Phase 37 — Anchor-Scoped Flat Ingest
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 36 of 40 (Flat Import Entry & Configuration)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-04-27 — v1.6 roadmap created (phases 36-40)
+Phase: 37
+Plan: Not started
+Status: Ready to plan Phase 37
+Last activity: 2026-04-27
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20%
 
 ## Milestone Scope
 
@@ -91,7 +91,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan and execute Phase 36 for flat import entry/configuration.
+- Discuss and plan Phase 37 anchor-scoped flat ingest.
 
 ### Blockers/Concerns
 
@@ -106,5 +106,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-04-27T10:31:54.763Z
-Stopped at: Phase 36 context gathered
-Resume file: .planning/phases/36-flat-import-entry-configuration/36-CONTEXT.md
+Stopped at: Phase 36 complete
+Resume file: .planning/phases/36-flat-import-entry-configuration/36-VERIFICATION.md

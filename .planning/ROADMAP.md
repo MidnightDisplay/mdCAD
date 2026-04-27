@@ -12,7 +12,7 @@
 
 ## Phases
 
-- [ ] **Phase 36: Flat Import Entry & Configuration** - Users can start dedicated flat JSONL import and set transform/color options before execution.
+- [x] **Phase 36: Flat Import Entry & Configuration** - Users can start dedicated flat JSONL import and set transform/color options before execution. (completed 2026-04-27)
 - [ ] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities.
 - [ ] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor.
 - [ ] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections.
@@ -28,7 +28,7 @@
   1. User can start flat JSONL import from a dedicated import menu/mode.
   2. User can set scale, rotation, shift, and color behavior before import.
   3. Import uses the options the user selected when execution begins.
-**Plans**: TBD  
+**Plans**: 2 (complete)  
 **UI hint**: yes
 
 ### Phase 37: Anchor-Scoped Flat Ingest
@@ -77,7 +77,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Flat Import Entry & Configuration | 0/TBD | Not started | - |
+| 36. Flat Import Entry & Configuration | 2/2 | Complete    | 2026-04-27 |
 | 37. Anchor-Scoped Flat Ingest | 0/TBD | Not started | - |
 | 38. Observable Link + Manual Transactional Refresh | 0/TBD | Not started | - |
 | 39. Automatic Observer Safety Loop | 0/TBD | Not started | - |
