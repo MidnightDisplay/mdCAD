@@ -28,6 +28,22 @@ static bool write_jsonl_fixture_lines(const char *path, const char *const *lines
     return true;
 }
 
+static bool write_jsonl_point_fixture(const char *path, int point_count) {
+    if (!path || point_count <= 0) return false;
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+    for (int i = 0; i < point_count; i++) {
+        if (fprintf(f,
+                    "{\"Name\":\"Entry_%d\",\"Elements\":[{\"Name\":\"P_%d\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":%d,\"Y\":0,\"Z\":0}}]}\n",
+                    i, i, i) < 0) {
+            fclose(f);
+            return false;
+        }
+    }
+    fclose(f);
+    return true;
+}
+
 static bool run_flat_import_to_completion(ecs_scene_t *scene,
                                           const char *path,
                                           bool link_enabled,
@@ -98,6 +114,16 @@ static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity
         jsonl_observer_tick_flat_refreshes(scene);
     }
     return !jsonl_observer_is_flat_refresh_running(scene, root_entity);
+}
+
+static int count_active_refresh_slots(ecs_scene_t *scene) {
+    if (!scene) return 0;
+    int count = 0;
+    jsonl_flat_refresh_slot_t *slots = jsonl_observer_flat_refresh_slots();
+    for (int i = 0; i < JSONL_OBSERVER_MAX_FLAT_REFRESHES; i++) {
+        if (slots[i].active && slots[i].world == scene->world) count++;
+    }
+    return count;
 }
 
 static bool observer_contains_message(const JsonlObserverComp *observer, const char *needle) {
@@ -272,6 +298,150 @@ static int test_flat_observe_changed_source_runs_one_refresh_and_stamps_state(vo
     return failed;
 }
 
+static int test_flat_observe_burst_coalesces_one_pending_rerun(void) {
+    const char *fixture = "jsonl_flat_observer_coalesced_rerun.jsonl";
+    if (!write_jsonl_point_fixture(fixture, 8)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, &job)) {
+        fprintf(stderr, "  fail: initial import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer\n");
+            failed = 1;
+        }
+    }
+    if (!failed) {
+        observer->linked = true;
+        observer->observe_enabled = true;
+        observer->interval_ms = 1u;
+        observer->max_retries = 5u;
+        observer->retry_count = 0u;
+        observer->next_retry_at_ms = 0u;
+        if (!jsonl_observer_stamp_source_state(observer, fixture)) {
+            fprintf(stderr, "  fail: stamp source state failed\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_point_fixture(fixture, 16)) {
+        fprintf(stderr, "  fail: write 16-point fixture failed\n");
+        failed = 1;
+    }
+    if (!failed) {
+        uint64_t now_ms = scene_solver_now_ms();
+        jsonl_observer_system_tick(&scene, now_ms);
+        if (!jsonl_observer_is_flat_refresh_running(&scene, root)) {
+            fprintf(stderr, "  fail: initial refresh did not start\n");
+            failed = 1;
+        }
+        if (count_active_refresh_slots(&scene) != 1) {
+            fprintf(stderr, "  fail: expected 1 active slot after start\n");
+            failed = 1;
+        }
+
+        if (!write_jsonl_point_fixture(fixture, 24)) {
+            fprintf(stderr, "  fail: write 24-point fixture failed\n");
+            failed = 1;
+        }
+        jsonl_observer_system_tick(&scene, now_ms + 1u);
+
+        if (!write_jsonl_point_fixture(fixture, 32)) {
+            fprintf(stderr, "  fail: write 32-point fixture failed\n");
+            failed = 1;
+        }
+        jsonl_observer_system_tick(&scene, now_ms + 2u);
+
+        jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(&scene, root);
+        if (!slot || !slot->pending_rerun) {
+            fprintf(stderr, "  fail: pending rerun was not set while running\n");
+            failed = 1;
+        }
+        if (count_active_refresh_slots(&scene) != 1) {
+            fprintf(stderr, "  fail: expected bounded active slots during burst\n");
+            failed = 1;
+        }
+
+        if (!tick_refresh_until_idle(&scene, root, 40000)) {
+            fprintf(stderr, "  fail: refresh did not drain to idle\n");
+            failed = 1;
+        }
+        if (jsonl_observer_is_flat_refresh_running(&scene, root)) {
+            fprintf(stderr, "  fail: refresh still running after idle wait\n");
+            failed = 1;
+        }
+        if (count_geometry_under_root(&scene, root) != 32) {
+            fprintf(stderr, "  fail: expected 32 geometry after coalesced rerun\n");
+            failed = 1;
+        }
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
+static int test_flat_observe_tiered_fixtures_stay_operational(void) {
+    static const int tiers[] = { 24, 240, 1200 };
+    int failed = 0;
+
+    for (int t = 0; t < (int)(sizeof(tiers) / sizeof(tiers[0])) && !failed; t++) {
+        char fixture[128];
+        snprintf(fixture, sizeof(fixture), "jsonl_flat_observer_tier_%d.jsonl", tiers[t]);
+
+        if (!write_jsonl_point_fixture(fixture, tiers[t])) return 1;
+
+        ecs_world_state_t world = {0};
+        ecs_scene_t scene = {0};
+        ecs_world_init(&world);
+        ecs_scene_init(&scene, &world);
+
+        jsonl_import_job_t job = {0};
+        if (!run_flat_import_to_completion(&scene, fixture, true, &job)) failed = 1;
+
+        ecs_entity_t root = job.root_entity;
+        JsonlObserverComp *observer = NULL;
+        if (!failed) {
+            observer = ecs_world_get_jsonl_observer(&world, root);
+            if (!observer) failed = 1;
+        }
+        if (!failed) {
+            observer->linked = true;
+            observer->observe_enabled = true;
+            observer->interval_ms = 1u;
+            observer->next_retry_at_ms = 0u;
+            if (!jsonl_observer_stamp_source_state(observer, fixture)) failed = 1;
+        }
+
+        if (!failed && !write_jsonl_point_fixture(fixture, tiers[t] + 5)) failed = 1;
+        if (!failed) {
+            uint64_t now_ms = scene_solver_now_ms();
+            jsonl_observer_system_tick(&scene, now_ms);
+            if (!tick_refresh_until_idle(&scene, root, 40000)) failed = 1;
+            if (count_geometry_under_root(&scene, root) != tiers[t] + 5) failed = 1;
+        }
+
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        remove(fixture);
+    }
+
+    return failed;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct {
     const char *name;
@@ -288,6 +458,10 @@ int main(void) {
           test_flat_observe_auto_disables_after_retries_exhausted },
         { "test_flat_observe_changed_source_runs_one_refresh_and_stamps_state",
           test_flat_observe_changed_source_runs_one_refresh_and_stamps_state },
+        { "test_flat_observe_burst_coalesces_one_pending_rerun",
+          test_flat_observe_burst_coalesces_one_pending_rerun },
+        { "test_flat_observe_tiered_fixtures_stay_operational",
+          test_flat_observe_tiered_fixtures_stay_operational },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
