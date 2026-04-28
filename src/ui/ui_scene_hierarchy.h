@@ -25,6 +25,7 @@
 #include "../jsonl_loader.h"
 #include "../jsonl_import_job.h"
 #include "../jsonl_sketch_import_job.h"
+#include "../jsonl_observer_system.h"
 
 #include <stdlib.h>  // for rand(), qsort(), malloc(), realloc(), free()
 #include <string.h>  // for strstr(), strlen()
@@ -941,6 +942,19 @@ static inline ui_hierarchy_entry_t* ui_hierarchy_find_entry(ui_scene_hierarchy_s
     return NULL;
 }
 
+static inline bool ui_scene_hierarchy_is_flat_observer_anchor(ui_scene_hierarchy_state_t *state,
+                                                               ecs_entity_t e) {
+    if (!state || !state->scene || e == 0) return false;
+    if (ecs_world_get_sketch(state->scene->world, e)) return false;
+    return ecs_world_get_jsonl_observer(state->scene->world, e) != NULL;
+}
+
+static inline bool ui_scene_hierarchy_is_flat_observer_refresh_running(ui_scene_hierarchy_state_t *state,
+                                                                        ecs_entity_t e) {
+    if (!ui_scene_hierarchy_is_flat_observer_anchor(state, e)) return false;
+    return jsonl_observer_is_flat_refresh_running(state->scene, e);
+}
+
 //------------------------------------------------------------------------------
 // Internal: Draw single entity as leaf (no children)
 //------------------------------------------------------------------------------
@@ -1067,18 +1081,21 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
 
     bool is_selected = selection_contains(sel, e);
     bool has_children = scene_has_children(state->scene, e);
+    bool anchor_refresh_running = ui_scene_hierarchy_is_flat_observer_refresh_running(state, e);
 
     // Create label: "Type - Name #ID" or "Type #ID" if no label
     char label[256];
     LabelComp *lbl = ecs_world_get_label(state->scene->world, e);
     if (lbl && lbl->name[0]) {
-        snprintf(label, sizeof(label), "[%s] - %s #%llu",
+        snprintf(label, sizeof(label), "[%s] - %s #%llu%s",
                  lbl->name, geometry_type_name(type),
-                 (unsigned long long)e);
+                 (unsigned long long)e,
+                 anchor_refresh_running ? " (refreshing)" : "");
     } else {
-        snprintf(label, sizeof(label), "- %s #%llu",
+        snprintf(label, sizeof(label), "- %s #%llu%s",
                  geometry_type_name(type),
-                 (unsigned long long)e);
+                 (unsigned long long)e,
+                 anchor_refresh_running ? " (refreshing)" : "");
     }
 
     // Tree node flags
@@ -1104,14 +1121,14 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
     }
 
     // Drag source: allow dragging this entity
-    if (igBeginDragDropSource(ImGuiDragDropFlags_None)) {
+    if (!anchor_refresh_running && igBeginDragDropSource(ImGuiDragDropFlags_None)) {
         igSetDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, &e, sizeof(ecs_entity_t), ImGuiCond_Once);
         igText("Move %s #%llu", geometry_type_name(type), (unsigned long long)e);
         igEndDragDropSource();
     }
 
     // Drop target: allow dropping other entities onto this one (making them children)
-    if (igBeginDragDropTarget()) {
+    if (!anchor_refresh_running && igBeginDragDropTarget()) {
         const ImGuiPayload* payload = igAcceptDragDropPayload(UI_HIERARCHY_DRAG_DROP_TYPE, ImGuiDragDropFlags_None);
         if (payload) {
             ecs_entity_t dragged_entity = *(ecs_entity_t*)payload->Data;
@@ -1130,6 +1147,10 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
 
     // Right-click context menu
     if (igBeginPopupContextItem(NULL, ImGuiPopupFlags_MouseButtonRight)) {
+        if (anchor_refresh_running) {
+            igTextDisabled("Flat refresh running; anchor structure edits are temporarily locked.");
+            igSeparator();
+        }
         if (igMenuItem_Bool("Select", NULL, false, true)) {
             selection_set_single(sel, e);
         }
@@ -1137,17 +1158,19 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
             selection_add(sel, e);
         }
         igSeparator();
-        if (igMenuItem_Bool("Make Child of Selected", NULL, false, sel->count == 1 && sel->entities[0] != e)) {
+        if (igMenuItem_Bool("Make Child of Selected", NULL, false,
+                            !anchor_refresh_running && sel->count == 1 && sel->entities[0] != e)) {
             ecs_entity_t parent = sel->entities[0];
             scene_set_parent(state->scene, e, parent);
             state->cache_dirty = true;
         }
-        if (igMenuItem_Bool("Unparent", NULL, false, scene_has_parent(state->scene, e))) {
+        if (igMenuItem_Bool("Unparent", NULL, false,
+                            !anchor_refresh_running && scene_has_parent(state->scene, e))) {
             scene_set_parent(state->scene, e, 0);
             state->cache_dirty = true;
         }
         igSeparator();
-        if (igMenuItem_Bool("Delete", "Del", false, true)) {
+        if (igMenuItem_Bool("Delete", "Del", false, !anchor_refresh_running)) {
             selection_remove(sel, e);
             scene_remove_entity(state->scene, e);
             entity_deleted = true;

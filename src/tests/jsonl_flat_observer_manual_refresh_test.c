@@ -29,6 +29,22 @@ static bool write_jsonl_fixture_lines(const char *path, const char *const *lines
     return true;
 }
 
+static bool write_jsonl_point_fixture(const char *path, int point_count) {
+    if (!path || point_count <= 0) return false;
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+    for (int i = 0; i < point_count; i++) {
+        if (fprintf(f,
+                    "{\"Name\":\"Entry_%d\",\"Elements\":[{\"Name\":\"P_%d\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":%d,\"Y\":0,\"Z\":0}}]}\n",
+                    i, i, i) < 0) {
+            fclose(f);
+            return false;
+        }
+    }
+    fclose(f);
+    return true;
+}
+
 static bool run_flat_import_to_completion(ecs_scene_t *scene,
                                           const char *path,
                                           bool link_enabled,
@@ -479,6 +495,80 @@ static int test_flat_manual_refresh_works_after_auto_disable(void) {
     return failed;
 }
 
+static int test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence(void) {
+    static const int tiers[] = { 24, 240, 1200 };
+    int failed = 0;
+
+    for (int t = 0; t < (int)(sizeof(tiers) / sizeof(tiers[0])) && !failed; t++) {
+        char fixture[128];
+        snprintf(fixture, sizeof(fixture), "jsonl_flat_observer_coherence_tier_%d.jsonl", tiers[t]);
+        if (!write_jsonl_point_fixture(fixture, tiers[t])) return 1;
+
+        ecs_world_state_t world = {0};
+        ecs_scene_t scene = {0};
+        selection_buffer_t selection = {0};
+        ecs_world_init(&world);
+        ecs_scene_init(&scene, &world);
+        selection_init(&selection, &world);
+
+        jsonl_import_job_t job = {0};
+        ecs_entity_t root = 0;
+        if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+            failed = 1;
+        }
+        if (!failed) {
+            root = job.root_entity;
+            if (root == 0 || !ecs_is_alive(world.world, root)) failed = 1;
+        }
+
+        for (int cycle = 0; cycle < 3 && !failed; cycle++) {
+            ecs_entity_t selected_child = find_first_geometry_under_root(&scene, root);
+            if (selected_child == 0 || !ecs_is_alive(world.world, selected_child)) {
+                failed = 1;
+                break;
+            }
+            selection_set_single(&selection, selected_child);
+            if (selection_count(&selection) != 1 || selection_get(&selection, 0) != selected_child) {
+                failed = 1;
+                break;
+            }
+
+            if (!write_jsonl_point_fixture(fixture, tiers[t] + cycle + 1)) {
+                failed = 1;
+                break;
+            }
+            if (!jsonl_observer_request_flat_refresh(&scene, root, &selection)) {
+                failed = 1;
+                break;
+            }
+            if (!tick_refresh_until_idle(&scene, root, 50000)) {
+                failed = 1;
+                break;
+            }
+
+            if (!ecs_is_alive(world.world, root)) {
+                failed = 1;
+                break;
+            }
+            if (selection_count(&selection) != 1 || selection_get(&selection, 0) != root) {
+                failed = 1;
+                break;
+            }
+            if (count_geometry_under_root(&scene, root) != tiers[t] + cycle + 1) {
+                failed = 1;
+                break;
+            }
+        }
+
+        selection_shutdown(&selection);
+        ecs_scene_shutdown(&scene);
+        ecs_world_shutdown(&world);
+        remove(fixture);
+    }
+
+    return failed;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct {
     const char *name;
@@ -496,6 +586,8 @@ int main(void) {
           test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label },
         { "test_flat_manual_refresh_works_after_auto_disable",
           test_flat_manual_refresh_works_after_auto_disable },
+        { "test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence",
+          test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
