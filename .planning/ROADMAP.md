@@ -16,7 +16,7 @@
 - [x] **Phase 37: Anchor-Scoped Flat Ingest** - Flat import creates one stable anchor and places imported entries as plain non-sketch entities. (completed 2026-04-27)
 - [x] **Phase 38: Observable Link + Manual Transactional Refresh** - Anchor stores observer link metadata and supports manual safe refresh into same anchor. (completed 2026-04-27)
 - [x] **Phase 39: Automatic Observer Safety Loop** - Optional live observer refresh runs with debounce/retry/auto-disable protections. (completed 2026-04-27)
-- [ ] **Phase 40: Large-Dump Stability & Interaction Coherence** - Large import/refresh remains responsive and anchor interactions stay coherent across repeats.
+- [x] **Phase 40: Large-Dump Stability & Interaction Coherence** - Large import/refresh remains responsive and anchor interactions stay coherent across repeats. (completed 2026-04-27)
 
 ## Phase Details
 
@@ -83,7 +83,7 @@ Plans:
 **Plans**: 2
 Plans:
 - [x] 40-01-PLAN.md — Implement bounded single-flight + coalesced rerun runtime with advisory timing evidence for large refresh stability.
-- [ ] 40-02-PLAN.md — Add repeated-refresh anchor coherence coverage, hierarchy continuity guardrails, and manual very-large stress evidence protocol/checkpoint.
+- [x] 40-02-PLAN.md — Add repeated-refresh anchor coherence coverage, hierarchy continuity guardrails, and manual very-large stress evidence protocol/checkpoint.
 
 ## Progress
 
@@ -93,4 +93,4 @@ Plans:
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
 | 38. Observable Link + Manual Transactional Refresh | 2/2 | Complete | 2026-04-27 |
 | 39. Automatic Observer Safety Loop | 2/2 | Complete    | 2026-04-27 |
-| 40. Large-Dump Stability & Interaction Coherence | 1/2 | In Progress | - |
+| 40. Large-Dump Stability & Interaction Coherence | 2/2 | Complete | 2026-04-27 |
