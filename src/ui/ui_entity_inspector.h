@@ -414,6 +414,7 @@ static inline void ui_entity_inspector_draw_jsonl_flat_observer_controls(ui_enti
 
     igDummy((ImVec2){0.0f, 6.0f});
     igTextDisabled("Last refresh result");
+    igTextDisabled("Timing evidence is advisory only (not a hard failure gate).");
     if (observer->message_count == 0) {
         igTextDisabled("No refresh messages.");
     } else {

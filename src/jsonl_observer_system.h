@@ -11,12 +11,15 @@
 #include "components/jsonl_observer_comp.h"
 
 #define JSONL_OBSERVER_MAX_FLAT_REFRESHES 8
+#define JSONL_OBSERVER_ADVISORY_REFRESH_MS 250u
 
 typedef struct {
     bool active;
+    bool pending_rerun;
     ecs_world_state_t *world;
     ecs_entity_t target_root;
     ecs_entity_t stage_root;
+    uint64_t started_at_ms;
     jsonl_import_job_t job;
     selection_buffer_t *selection;
 } jsonl_flat_refresh_slot_t;
@@ -142,8 +145,10 @@ static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, js
     }
     jsonl_import_job_reset(&slot->job);
     slot->active = false;
+    slot->pending_rerun = false;
     slot->world = NULL;
     slot->target_root = 0;
+    slot->started_at_ms = 0u;
     slot->selection = NULL;
 }
 
@@ -254,7 +259,13 @@ static inline bool jsonl_observer_request_flat_refresh(ecs_scene_t *scene,
     JsonlObserverComp *obs = ecs_world_get_jsonl_observer(scene->world, root_entity);
     if (!obs || obs->source_path[0] == '\0') return false;
 
-    if (jsonl_observer_find_flat_refresh_slot(scene, root_entity)) {
+    jsonl_flat_refresh_slot_t *existing = jsonl_observer_find_flat_refresh_slot(scene, root_entity);
+    if (existing) {
+        if (!existing->pending_rerun) {
+            existing->pending_rerun = true;
+            jsonl_observer_comp_push_message_unique(obs, JSONL_OBSERVER_MSG_INFO,
+                                                    "Refresh coalesced; pending rerun queued.");
+        }
         return false;
     }
 
@@ -267,8 +278,10 @@ static inline bool jsonl_observer_request_flat_refresh(ecs_scene_t *scene,
 
     memset(slot, 0, sizeof(*slot));
     slot->active = true;
+    slot->pending_rerun = false;
     slot->world = scene->world;
     slot->target_root = root_entity;
+    slot->started_at_ms = scene_solver_now_ms();
     slot->selection = selection;
     jsonl_import_job_init(&slot->job);
     jsonl_import_job_set_mesh_mode(&slot->job, obs->mesh_import_mode);
@@ -309,6 +322,15 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
         bool done = jsonl_import_job_tick(&slot->job, scene);
         if (!done) continue;
 
+        bool rerun_pending = slot->pending_rerun;
+        ecs_entity_t rerun_root = slot->target_root;
+        selection_buffer_t *rerun_selection = slot->selection;
+        uint64_t elapsed_ms = 0u;
+        uint64_t now_ms = scene_solver_now_ms();
+        if (slot->started_at_ms != 0u && now_ms >= slot->started_at_ms) {
+            elapsed_ms = now_ms - slot->started_at_ms;
+        }
+
         JsonlObserverComp *obs = NULL;
         if (slot->target_root != 0 && ecs_is_alive(scene->world->world, slot->target_root)) {
             obs = ecs_world_get_jsonl_observer(scene->world, slot->target_root);
@@ -322,27 +344,54 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
                         (void)jsonl_observer_stamp_source_state(obs, obs->source_path);
                     }
                     char msg[JSONL_OBSERVER_MESSAGE_MAX];
-                    snprintf(msg, sizeof(msg), "Re-import applied (%u geometry).",
-                             (unsigned)slot->job.total_entities_created);
+                    snprintf(msg, sizeof(msg), "Re-import applied (%u geometry, %llums).",
+                             (unsigned)slot->job.total_entities_created,
+                             (unsigned long long)elapsed_ms);
                     jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_INFO, msg);
+                    if (elapsed_ms >= JSONL_OBSERVER_ADVISORY_REFRESH_MS) {
+                        char advisory[JSONL_OBSERVER_MESSAGE_MAX];
+                        snprintf(advisory, sizeof(advisory),
+                                 "Advisory: refresh took %llums (timing evidence only).",
+                                 (unsigned long long)elapsed_ms);
+                        jsonl_observer_comp_push_message_unique(obs, JSONL_OBSERVER_MSG_WARNING, advisory);
+                    }
                 }
             } else {
                 jsonl_observer_abort_flat_refresh_stage(scene, slot);
                 if (obs) {
-                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
-                                                     "Flat refresh failed; kept last-good content.");
+                    char msg[JSONL_OBSERVER_MESSAGE_MAX];
+                    snprintf(msg, sizeof(msg), "Flat refresh failed after %llums; kept last-good content.",
+                             (unsigned long long)elapsed_ms);
+                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING, msg);
                 }
             }
         } else {
             jsonl_observer_abort_flat_refresh_stage(scene, slot);
             if (obs) {
-                jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING,
-                                                 slot->job.status_message[0] ? slot->job.status_message
-                                                                             : "Flat refresh failed; kept last-good content.");
+                if (slot->job.status_message[0]) {
+                    char msg[JSONL_OBSERVER_MESSAGE_MAX];
+                    snprintf(msg, sizeof(msg), "%s (%llums).", slot->job.status_message,
+                             (unsigned long long)elapsed_ms);
+                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING, msg);
+                } else {
+                    char msg[JSONL_OBSERVER_MESSAGE_MAX];
+                    snprintf(msg, sizeof(msg), "Flat refresh failed after %llums; kept last-good content.",
+                             (unsigned long long)elapsed_ms);
+                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING, msg);
+                }
             }
         }
 
         jsonl_observer_reset_flat_refresh_slot(scene, slot);
+        if (rerun_pending && rerun_root != 0 && ecs_is_alive(scene->world->world, rerun_root)) {
+            if (!jsonl_observer_request_flat_refresh(scene, rerun_root, rerun_selection)) {
+                JsonlObserverComp *rerun_obs = ecs_world_get_jsonl_observer(scene->world, rerun_root);
+                if (rerun_obs) {
+                    jsonl_observer_comp_push_message_unique(rerun_obs, JSONL_OBSERVER_MSG_WARNING,
+                                                            "Coalesced rerun could not start.");
+                }
+            }
+        }
     }
 }
 
@@ -383,6 +432,7 @@ static inline bool jsonl_observer_tick_one_flat(ecs_scene_t *scene, ecs_entity_t
     }
 
     if (jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
+        (void)jsonl_observer_request_flat_refresh(scene, root_entity, NULL);
         obs->next_retry_at_ms = now_ms + obs->interval_ms;
         return false;
     }
