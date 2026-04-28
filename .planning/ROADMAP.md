@@ -82,7 +82,7 @@ Plans:
   3. Across repeated refreshes, anchor selection, hierarchy visibility, and inspector interaction remain coherent.
 **Plans**: 2
 Plans:
-- [ ] 40-01-PLAN.md — Implement bounded single-flight + coalesced rerun runtime with advisory timing evidence for large refresh stability.
+- [x] 40-01-PLAN.md — Implement bounded single-flight + coalesced rerun runtime with advisory timing evidence for large refresh stability.
 - [ ] 40-02-PLAN.md — Add repeated-refresh anchor coherence coverage, hierarchy continuity guardrails, and manual very-large stress evidence protocol/checkpoint.
 
 ## Progress
@@ -93,4 +93,4 @@ Plans:
 | 37. Anchor-Scoped Flat Ingest | 2/2 | Complete    | 2026-04-27 |
 | 38. Observable Link + Manual Transactional Refresh | 2/2 | Complete | 2026-04-27 |
 | 39. Automatic Observer Safety Loop | 2/2 | Complete    | 2026-04-27 |
-| 40. Large-Dump Stability & Interaction Coherence | 0/TBD | Not started | - |
+| 40. Large-Dump Stability & Interaction Coherence | 1/2 | In Progress | - |
