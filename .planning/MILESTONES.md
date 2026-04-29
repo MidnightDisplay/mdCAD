@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.6 Observable Flat JSONL Import for Large Geometry Dumps (Shipped: 2026-04-27)
+
+**Phases completed:** 5 phases, 10 plans, 17 tasks
+
+**Key accomplishments:**
+
+- Added a dedicated flat-large JSONL import path with mirrored pre-import options and observer opt-in default OFF.
+- Delivered anchor-scoped flat ingest as plain non-sketch entities with deterministic root naming and lazy entry-anchor creation.
+- Shipped observer metadata persistence and manual transactional same-root re-import for flat imports.
+- Added automatic observer safety behavior (debounce/retry/auto-disable) with bounded single-flight + coalesced rerun semantics.
+- Closed repeated-refresh coherence with selection remap, hierarchy guardrails (tree + filter paths), and manual very-large stress evidence.
+
+**Audit:** [v1.6-MILESTONE-AUDIT.md](milestones/v1.6-MILESTONE-AUDIT.md) — tech_debt (no closure blockers; traceability/nyquist metadata cleanup deferred)
+
+**Archives:**
+
+- [v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md)
+- [v1.6-REQUIREMENTS.md](milestones/v1.6-REQUIREMENTS.md)
+
+---
+
 ## v1.5 Solver Workflow Robustness + Script Reapply Integrity (Shipped: 2026-04-13)
 
 **Phases completed:** 5 phases, 12 plans, 18 tasks

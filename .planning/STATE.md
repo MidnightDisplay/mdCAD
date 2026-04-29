@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
-status: executing
-stopped_at: Phase 40 execution completed
-last_updated: "2026-04-27T21:40:00.000Z"
-last_activity: 2026-04-27
+status: milestone_complete
+stopped_at: v1.6 archived
+last_updated: "2026-04-28T14:30:00.000Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,26 +18,26 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-27)
+See: .planning/PROJECT.md (updated 2026-04-28)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.6 closure
+**Current focus:** Planning next milestone
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 40
-Plan: 2 of 2
-Status: Complete
-Last activity: 2026-04-27
+Phase: -
+Plan: -
+Status: Milestone Complete
+Last activity: 2026-04-28
 
 Progress: [██████████] 100%
 
 ## Milestone Scope
 
-- Milestone v1.6 scope: observable flat JSONL scene import for high-entity files with import-anchor observability and efficient refresh behavior.
-- Target capability: import geometry log entries as plain scene entities under one anchor while preserving optional file-linked live updates.
+- Milestone v1.6 shipped: observable flat JSONL scene import for high-entity files with import-anchor observability and efficient refresh behavior.
+- Next scope is pending `/gsd-new-milestone`.
 
 ## Accumulated Context
 
@@ -88,10 +88,11 @@ Recent decisions affecting current work:
 - Phase 35 added: Observable JSONL as sketch import with optional live file observer.
 - Milestone v1.6 initialized: Observable Flat JSONL Import for Large Geometry Dumps.
 - Roadmap v1.6 created: phases 36-40 map 11/11 requirements.
+- Milestone v1.6 archived to `.planning/milestones/v1.6-{ROADMAP,REQUIREMENTS}.md`.
 
 ### Pending Todos
 
-- Run milestone completion/audit flow for v1.6 archival readiness.
+- Start `/gsd-new-milestone` to define v1.7 requirements and roadmap.
 
 ### Blockers/Concerns
 
@@ -105,6 +106,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-27T20:29:02.495Z
-Stopped at: Completed 40-02-PLAN.md
-Resume file: .planning/phases/40-large-dump-stability-interaction-coherence/40-02-SUMMARY.md
+Last session: 2026-04-28T14:30:00.000Z
+Stopped at: Archived milestone v1.6
+Resume file: .planning/MILESTONES.md

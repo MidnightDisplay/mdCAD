@@ -10,21 +10,22 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.5` — Solver Workflow Robustness + Script Reapply Integrity (2026-04-13)
+**Shipped:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps (2026-04-27)
 
-**Current milestone:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps
+**Current milestone:** not started (`/gsd-new-milestone`)
 
-**Current focus:** phase 38 observable link + manual transactional refresh implementation after phase 37 anchor-scoped ingest completion.
+**Current focus:** define v1.7 requirements and roadmap.
 
-## Current Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
+## Last Shipped Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
 
-**Goal:** Add a high-performance JSONL import mode that flattens geometry log entries into plain scene entities under one import anchor, with optional live file observability and refresh semantics tuned for very large files.
+**Goal:** Deliver a high-performance flat JSONL import mode for very large geometry dumps with optional observer-driven refresh.
 
-**Target features:**
-- New import menu action and dialog for a flat JSONL import mode
-- Import geometry log entries as non-sketch scene entities under a single import anchor
-- Attach observer metadata/component to the import anchor with an opt-out toggle in the import dialog
-- Reuse sketch-style refresh behavior for anchor re-import while preserving large-scene efficiency
+**Delivered features:**
+- Dedicated flat JSONL import menu action and dialog path
+- Anchor-scoped non-sketch ingest hierarchy with deterministic naming
+- Persisted observer metadata with manual transactional same-anchor refresh
+- Automatic observer safety loop (debounce/retry/auto-disable) and bounded coalesced reruns
+- Repeated-refresh interaction coherence guardrails and manual very-large stress evidence
 
 ## Requirements
 
@@ -62,12 +63,14 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Observable JSONL sketch import now supports persisted observer state, transactional reparse safety, and stable large-script editor/apply behavior with user-approved UAT (`P35-01..06`) — Validated in Phase 35: observable-jsonl-as-sketch-import-with-optional-live-file-observer
 - ✓ Flat-large JSONL import entry/configuration contract now provides dedicated menu path, mirrored pre-import options, and forward-compatible observer opt-in capture defaults (`FIMP-01`, `FIMP-02`) — Validated in Phase 36: flat-import-entry-configuration
 - ✓ Anchor-scoped flat ingest now creates deterministic root->entry->geometry hierarchies with empty-entry skip, root name suffixing, and selection invariance (`FIMP-03`) — Validated in Phase 37: anchor-scoped-flat-ingest
+- ✓ Observable flat-root manual/automatic refresh now preserves same-anchor transactional semantics with observer metadata durability and safety lifecycle behavior (`OBSF-01..05`) — Validated in Phases 38-39
+- ✓ Large-dump refresh stability/coherence now satisfies bounded coalescing, no-lockup stress gate, and repeated-refresh interaction invariants (`PERF-01..03`) — Validated in Phase 40
 
 ### Active
 
-- [ ] Define v1.6 requirements and phase mapping for observable flat JSONL import.
-- [ ] Add optional observer linking and sketch-style refresh controls for flat JSONL imports.
-- [ ] Validate high-entity refresh stability/performance for large JSONL geometry dumps.
+- [ ] Define v1.7 milestone scope and requirement set.
+- [ ] Map new requirements to phases and validation gates.
+- [ ] Start the next milestone execution cycle.
 
 ### Out of Scope
 
@@ -98,14 +101,15 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.5` is shipped with Phases 31-35 complete and archived.
 - v1.5 delivered descriptor-safe script re-apply fidelity, explicit coincidence authoring semantics, parity-safe large-jump solver behavior, deterministic Windows Vulkan closure parity, and observable JSONL sketch import with transactional observer reparse semantics.
 - Milestone audit result is `tech_debt`: no functional blockers; follow-up validation metadata cleanup is deferred.
-- Phase 36 is complete for milestone `v1.6`, establishing the flat-large JSONL entry/configuration contract and requirement validation for `FIMP-01`/`FIMP-02`.
-- Phase 37 is complete for milestone `v1.6`, delivering anchor-scoped flat ingest behavior and requirement validation for `FIMP-03`.
+- Milestone `v1.6` is shipped with Phases 36-40 complete and archived.
+- v1.6 delivered flat-large JSONL import UX, anchor-scoped ingest, observer metadata/manual transactional refresh, automatic safety loop, and repeated-refresh coherence closure.
+- Milestone audit result is `tech_debt`: no blocker gaps; follow-up traceability/Nyquist metadata cleanup is deferred.
 ## Next Milestone Goals
 
-1. Add a new import action and dialog path for flat JSONL scene import.
-2. Flatten geometry log entries into plain scene entities beneath one import anchor.
-3. Attach optional file observability to the anchor and support sketch-like refresh flows.
-4. Prioritize responsiveness and reliability for very large geometry log files.
+1. Define v1.7 requirements with explicit user-facing outcomes.
+2. Convert deferred validation/traceability metadata debt into planned closure work.
+3. Establish the next roadmap slice and begin phase planning.
+4. Preserve current native build reliability while expanding capability.
 
 ## Constraints
 
@@ -133,7 +137,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Lock final v1.4 closure on a canonical deterministic 7-test Windows Vulkan rerun gate and solver architecture docs | Keeps phase-close confidence reproducible and improves future solver debugging velocity | Completed in v1.4 |
 | Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
 | Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
-| Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Active for v1.6 |
+| Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Completed in v1.6 |
 
 ## Evolution
 
@@ -153,4 +157,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-27 after completing phase 37*
+*Last updated: 2026-04-28 after completing milestone v1.6*
