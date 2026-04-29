@@ -39,7 +39,9 @@ completed: 2026-04-27
    - anchor rows show `"(refreshing)"`,
    - drag/drop and structural edits are blocked during running refresh,
    - context menu shows explicit lock reason.
-4. Added and filled `.planning/.../40-STRESS-PROTOCOL.md` with hybrid-gate interpretation and recorded manual checkpoint outcome (`APPROVED`).
+4. Extended hierarchy lock propagation to filtered leaf rendering so descendants under a refreshing anchor cannot bypass structure-edit guardrails.
+5. Wired auto-refresh selection coherence through `jsonl_observer_system_tick(..., selection)` and added `test_flat_observe_auto_refresh_preserves_selection_to_root` in auto-safety coverage.
+6. Added and filled `.planning/.../40-STRESS-PROTOCOL.md` with hybrid-gate interpretation and recorded manual checkpoint outcome (`APPROVED`).
 
 ## Verification
 

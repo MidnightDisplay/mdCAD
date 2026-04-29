@@ -16,8 +16,8 @@ score: 3/3 must-haves verified
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | Large flat import/refresh runs without lockup or crash. | ✓ VERIFIED | Manual checkpoint recorded in `.planning/phases/40-large-dump-stability-interaction-coherence/40-STRESS-PROTOCOL.md` with hard-gate PASS and approved outcome. |
-| 2 | During refresh activity, interaction remains usable for continued operation. | ✓ VERIFIED | `src/ui/ui_scene_hierarchy.h` now marks running anchors and blocks destructive structure edits during active refresh (`anchor_refresh_running` + guarded drag/drop/context actions). |
-| 3 | Across repeated refreshes, anchor selection/hierarchy/inspector behavior remains coherent. | ✓ VERIFIED | Repeated-cycle tests in `src/tests/jsonl_flat_observer_manual_refresh_test.c` and continuity contract checks in `src/tests/jsonl_flat_observer_inspector_contract_test.c` pass. |
+| 2 | During refresh activity, interaction remains usable for continued operation. | ✓ VERIFIED | `src/ui/ui_scene_hierarchy.h` now marks running anchors and blocks destructive structure edits during active refresh in both tree and filtered leaf rendering paths. |
+| 3 | Across repeated refreshes, anchor selection/hierarchy/inspector behavior remains coherent. | ✓ VERIFIED | Repeated-cycle tests in `src/tests/jsonl_flat_observer_manual_refresh_test.c`, auto-path remap coverage in `src/tests/jsonl_flat_observer_auto_safety_test.c`, and continuity contract checks in `src/tests/jsonl_flat_observer_inspector_contract_test.c` pass. |
 
 ## Behavioral Checks
 

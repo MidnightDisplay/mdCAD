@@ -1899,7 +1899,7 @@ static void frame(void) {
     // Update ECS world and scene
     ecs_world_progress(&state.ecs_world, dt);
     ecs_scene_update(&state.ecs_scene);
-    jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms());
+    jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms(), &state.selection);
     jsonl_observer_tick_flat_refreshes(&state.ecs_scene);
     scene_solver_process_auto_queue(&state.ecs_scene);
 

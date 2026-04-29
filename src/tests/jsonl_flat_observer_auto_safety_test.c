@@ -106,6 +106,35 @@ static int count_geometry_under_root(ecs_scene_t *scene, ecs_entity_t root) {
     return geometry_count;
 }
 
+static ecs_entity_t find_first_geometry_under_root(ecs_scene_t *scene, ecs_entity_t root) {
+    if (!scene || root == 0) return 0;
+    int root_child_count = scene_count_children(scene, root);
+    if (root_child_count <= 0) return 0;
+
+    ecs_entity_t *root_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)root_child_count);
+    if (!root_children) return 0;
+    int root_collected = scene_get_children(scene, root, root_children, root_child_count);
+
+    ecs_entity_t first_geom = 0;
+    for (int i = 0; i < root_collected && first_geom == 0; i++) {
+        ecs_entity_t entry = root_children[i];
+        int entry_child_count = scene_count_children(scene, entry);
+        if (entry_child_count <= 0) continue;
+        ecs_entity_t *entry_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)entry_child_count);
+        if (!entry_children) continue;
+        int entry_collected = scene_get_children(scene, entry, entry_children, entry_child_count);
+        for (int j = 0; j < entry_collected; j++) {
+            if (ecs_world_get_geometry(scene->world, entry_children[j])) {
+                first_geom = entry_children[j];
+                break;
+            }
+        }
+        free(entry_children);
+    }
+    free(root_children);
+    return first_geom;
+}
+
 static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity, int max_ticks) {
     for (int i = 0; i < max_ticks; i++) {
         if (!jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
@@ -168,8 +197,8 @@ static int test_flat_observe_missing_path_warns_without_retry_budget(void) {
         observer->next_retry_at_ms = 0u;
 
         uint64_t now_ms = scene_solver_now_ms();
-        jsonl_observer_system_tick(&scene, now_ms);
-        jsonl_observer_system_tick(&scene, now_ms + 2u);
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
+        jsonl_observer_system_tick(&scene, now_ms + 2u, NULL);
 
         if (observer->retry_count != 0u) failed = 1;
         if (!observer->observe_enabled) failed = 1;
@@ -218,8 +247,8 @@ static int test_flat_observe_auto_disables_after_retries_exhausted(void) {
         observer->next_retry_at_ms = 0u;
 
         uint64_t now_ms = scene_solver_now_ms();
-        jsonl_observer_system_tick(&scene, now_ms);
-        jsonl_observer_system_tick(&scene, now_ms + 2u);
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
+        jsonl_observer_system_tick(&scene, now_ms + 2u, NULL);
 
         if (observer->retry_count != 2u) failed = 1;
         if (observer->observe_enabled) failed = 1;
@@ -279,16 +308,16 @@ static int test_flat_observe_changed_source_runs_one_refresh_and_stamps_state(vo
 
     if (!failed) {
         uint64_t now_ms = scene_solver_now_ms();
-        jsonl_observer_system_tick(&scene, now_ms);
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
         if (!jsonl_observer_is_flat_refresh_running(&scene, root)) failed = 1;
 
-        jsonl_observer_system_tick(&scene, now_ms + 1u);
+        jsonl_observer_system_tick(&scene, now_ms + 1u, NULL);
         if (!tick_refresh_until_idle(&scene, root, 20000)) failed = 1;
         if (count_geometry_under_root(&scene, root) <= initial_geometry_count) failed = 1;
         if (observer->retry_count != 0u) failed = 1;
         if (!observer->observe_enabled) failed = 1;
 
-        jsonl_observer_system_tick(&scene, now_ms + 5u);
+        jsonl_observer_system_tick(&scene, now_ms + 5u, NULL);
         if (jsonl_observer_is_flat_refresh_running(&scene, root)) failed = 1;
     }
 
@@ -342,7 +371,7 @@ static int test_flat_observe_burst_coalesces_one_pending_rerun(void) {
     }
     if (!failed) {
         uint64_t now_ms = scene_solver_now_ms();
-        jsonl_observer_system_tick(&scene, now_ms);
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
         if (!jsonl_observer_is_flat_refresh_running(&scene, root)) {
             fprintf(stderr, "  fail: initial refresh did not start\n");
             failed = 1;
@@ -356,13 +385,13 @@ static int test_flat_observe_burst_coalesces_one_pending_rerun(void) {
             fprintf(stderr, "  fail: write 24-point fixture failed\n");
             failed = 1;
         }
-        jsonl_observer_system_tick(&scene, now_ms + 1u);
+        jsonl_observer_system_tick(&scene, now_ms + 1u, NULL);
 
         if (!write_jsonl_point_fixture(fixture, 32)) {
             fprintf(stderr, "  fail: write 32-point fixture failed\n");
             failed = 1;
         }
-        jsonl_observer_system_tick(&scene, now_ms + 2u);
+        jsonl_observer_system_tick(&scene, now_ms + 2u, NULL);
 
         jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(&scene, root);
         if (!slot || !slot->pending_rerun) {
@@ -429,7 +458,7 @@ static int test_flat_observe_tiered_fixtures_stay_operational(void) {
         if (!failed && !write_jsonl_point_fixture(fixture, tiers[t] + 5)) failed = 1;
         if (!failed) {
             uint64_t now_ms = scene_solver_now_ms();
-            jsonl_observer_system_tick(&scene, now_ms);
+            jsonl_observer_system_tick(&scene, now_ms, NULL);
             if (!tick_refresh_until_idle(&scene, root, 40000)) failed = 1;
             if (count_geometry_under_root(&scene, root) != tiers[t] + 5) failed = 1;
         }
@@ -439,6 +468,64 @@ static int test_flat_observe_tiered_fixtures_stay_operational(void) {
         remove(fixture);
     }
 
+    return failed;
+}
+
+static int test_flat_observe_auto_refresh_preserves_selection_to_root(void) {
+    const char *fixture = "jsonl_flat_observer_auto_selection_remap.jsonl";
+    const char *first_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}}]}"
+    };
+    const char *second_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}}]}"
+    };
+
+    if (!write_jsonl_fixture_lines(fixture, first_lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    selection_buffer_t selection = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    selection_init(&selection, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, &job)) failed = 1;
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) failed = 1;
+    }
+    if (!failed) {
+        observer->linked = true;
+        observer->observe_enabled = true;
+        observer->interval_ms = 1u;
+        observer->max_retries = 5u;
+        observer->retry_count = 0u;
+        observer->next_retry_at_ms = 0u;
+        if (!jsonl_observer_stamp_source_state(observer, fixture)) failed = 1;
+    }
+    if (!failed) {
+        ecs_entity_t child = find_first_geometry_under_root(&scene, root);
+        if (child == 0 || !ecs_is_alive(world.world, child)) failed = 1;
+        else selection_set_single(&selection, child);
+    }
+
+    if (!failed && !write_jsonl_fixture_lines(fixture, second_lines, 1)) failed = 1;
+    if (!failed) {
+        uint64_t now_ms = scene_solver_now_ms();
+        jsonl_observer_system_tick(&scene, now_ms, &selection);
+        if (!tick_refresh_until_idle(&scene, root, 20000)) failed = 1;
+        if (selection_count(&selection) != 1 || selection_get(&selection, 0) != root) failed = 1;
+    }
+
+    selection_shutdown(&selection);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
     return failed;
 }
 
@@ -462,6 +549,8 @@ int main(void) {
           test_flat_observe_burst_coalesces_one_pending_rerun },
         { "test_flat_observe_tiered_fixtures_stay_operational",
           test_flat_observe_tiered_fixtures_stay_operational },
+        { "test_flat_observe_auto_refresh_preserves_selection_to_root",
+          test_flat_observe_auto_refresh_preserves_selection_to_root },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {

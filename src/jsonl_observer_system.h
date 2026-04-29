@@ -395,7 +395,10 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
     }
 }
 
-static inline bool jsonl_observer_tick_one_flat(ecs_scene_t *scene, ecs_entity_t root_entity, uint64_t now_ms) {
+static inline bool jsonl_observer_tick_one_flat(ecs_scene_t *scene,
+                                                ecs_entity_t root_entity,
+                                                uint64_t now_ms,
+                                                selection_buffer_t *selection) {
     if (!scene || root_entity == 0) return false;
     if (ecs_world_get_sketch(scene->world, root_entity)) return false;
 
@@ -432,12 +435,12 @@ static inline bool jsonl_observer_tick_one_flat(ecs_scene_t *scene, ecs_entity_t
     }
 
     if (jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
-        (void)jsonl_observer_request_flat_refresh(scene, root_entity, NULL);
+        (void)jsonl_observer_request_flat_refresh(scene, root_entity, selection);
         obs->next_retry_at_ms = now_ms + obs->interval_ms;
         return false;
     }
 
-    if (jsonl_observer_request_flat_refresh(scene, root_entity, NULL)) {
+    if (jsonl_observer_request_flat_refresh(scene, root_entity, selection)) {
         obs->retry_count = 0u;
         obs->next_retry_at_ms = now_ms + obs->interval_ms;
         return true;
@@ -527,7 +530,9 @@ static inline bool jsonl_observer_tick_one(ecs_scene_t *scene, ecs_entity_t sket
     return false;
 }
 
-static inline void jsonl_observer_system_tick(ecs_scene_t *scene, uint64_t now_ms) {
+static inline void jsonl_observer_system_tick(ecs_scene_t *scene,
+                                              uint64_t now_ms,
+                                              selection_buffer_t *selection) {
     if (!scene) return;
     ecs_world_state_t *w = scene->world;
     ecs_query_t *q = ecs_query(w->world, {
@@ -542,7 +547,7 @@ static inline void jsonl_observer_system_tick(ecs_scene_t *scene, uint64_t now_m
             if (ecs_world_get_sketch(w, e)) {
                 (void)jsonl_observer_tick_one(scene, e, now_ms);
             } else {
-                (void)jsonl_observer_tick_one_flat(scene, e, now_ms);
+                (void)jsonl_observer_tick_one_flat(scene, e, now_ms, selection);
             }
         }
     }
