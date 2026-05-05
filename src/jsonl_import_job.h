@@ -16,6 +16,7 @@
 #include "math/math_import.h"
 #include "ecs/ecs_scene.h"
 #include "components/jsonl_observer_comp.h"
+#include "jsonl_sketch_import_job.h"
 #include "sokol_time.h"
 #include <string.h>
 
@@ -517,6 +518,36 @@ static inline bool jsonl_import_job_ensure_entry_anchor(jsonl_import_job_t *job,
     return true;
 }
 
+static inline void jsonl_import_job_arm_linked_observer_baseline(const jsonl_import_job_t *job,
+                                                                 JsonlObserverComp *observer,
+                                                                 bool *out_observe_disabled) {
+    if (out_observe_disabled) *out_observe_disabled = false;
+    if (!job || !observer) return;
+
+    if (!job->observer_contract.captured ||
+        !job->observer_contract.link_enabled ||
+        job->observer_contract.source_path[0] == '\0') {
+        return;
+    }
+
+    if (jsonl_observer_stamp_source_state(observer, job->observer_contract.source_path)) {
+        jsonl_observer_comp_push_message(observer, JSONL_OBSERVER_MSG_INFO,
+                                         "Linked import baseline armed; waiting for external file changes.");
+        return;
+    }
+
+    observer->observe_enabled = false;
+    observer->retry_count = 0u;
+    observer->next_retry_at_ms = 0u;
+    observer->source_state_valid = false;
+    observer->last_source_size_bytes = 0u;
+    observer->last_source_mtime_unix_ns = 0u;
+    observer->last_source_hash = 0u;
+    jsonl_observer_comp_push_message(observer, JSONL_OBSERVER_MSG_WARNING,
+                                     "Linked import baseline unavailable; observe disabled for safety.");
+    if (out_observe_disabled) *out_observe_disabled = true;
+}
+
 //------------------------------------------------------------------------------
 // Process one chunk of work - returns true when job is complete
 //------------------------------------------------------------------------------
@@ -831,6 +862,7 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
             if (r) r->instance_dirty = true;
         }
 
+        bool observe_disabled_for_safety = false;
         if (job->root_entity != 0 && job->observer_contract.captured) {
             JsonlObserverComp observer = jsonl_observer_comp_default();
             observer.scale = job->scale;
@@ -845,6 +877,7 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
                 jsonl_observer_comp_set_path(&observer, job->observer_contract.source_path);
                 observer.linked = job->observer_contract.link_enabled;
             }
+            jsonl_import_job_arm_linked_observer_baseline(job, &observer, &observe_disabled_for_safety);
             ecs_world_set_jsonl_observer(w, job->root_entity, &observer);
         }
 
@@ -878,9 +911,15 @@ static inline bool jsonl_import_job_tick(jsonl_import_job_t *job, ecs_scene_t *s
             job->timing_sample_count++;
         }
 
-        snprintf(job->status_message, sizeof(job->status_message),
-                 "Imported %d elements in %d entries",
-                 job->total_elements, num_entries);
+        if (observe_disabled_for_safety) {
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Imported %d elements in %d entries; observe disabled (baseline unavailable)",
+                     job->total_elements, num_entries);
+        } else {
+            snprintf(job->status_message, sizeof(job->status_message),
+                     "Imported %d elements in %d entries",
+                     job->total_elements, num_entries);
+        }
         return true;
     }
 
