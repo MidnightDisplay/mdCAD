@@ -157,6 +157,59 @@ static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity
     return !jsonl_observer_is_flat_refresh_running(scene, root_entity);
 }
 
+static bool observer_contains_message(const JsonlObserverComp *observer, const char *needle) {
+    if (!observer || !needle || needle[0] == '\0') return false;
+    for (uint32_t i = 0u; i < observer->message_count && i < JSONL_OBSERVER_MESSAGE_HISTORY; i++) {
+        if (strstr(observer->messages[i], needle) != NULL) return true;
+    }
+    return false;
+}
+
+static bool run_flat_import_until_parenting(ecs_scene_t *scene,
+                                            const char *path,
+                                            bool link_enabled,
+                                            float scale,
+                                            bool use_jsonl_colours,
+                                            bool shift_to_center,
+                                            float rotation_x,
+                                            float rotation_y,
+                                            float rotation_z,
+                                            int mesh_mode,
+                                            jsonl_import_job_t *out_job) {
+    if (!scene || !path || !out_job) return false;
+
+    jsonl_import_job_t job = {0};
+    jsonl_import_job_init(&job);
+    jsonl_import_job_set_mesh_mode(&job, mesh_mode);
+
+    bool started = jsonl_import_job_start(&job,
+                                          path,
+                                          scale,
+                                          use_jsonl_colours,
+                                          vec4_make(1, 1, 1, 1),
+                                          shift_to_center,
+                                          rotation_x,
+                                          rotation_y,
+                                          rotation_z);
+    if (!started) return false;
+
+    jsonl_import_job_set_observer_contract(&job, link_enabled, path);
+
+    int guard = 20000;
+    while (job.state != JSONL_JOB_PARENTING_ENTITIES) {
+        if (jsonl_import_job_tick(&job, scene)) {
+            return false;
+        }
+        if (--guard <= 0) {
+            jsonl_import_job_cancel(&job, scene);
+            return false;
+        }
+    }
+
+    *out_job = job;
+    return true;
+}
+
 static int verify_loaded_observer_metadata(const char *json, const char *source_path) {
     if (!json || !source_path) return 1;
 
@@ -316,6 +369,89 @@ static int test_flat_observer_metadata_persisted_when_unlinked(void) {
     }
 
     free(json);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
+static int test_flat_linked_import_baseline_failure_keeps_geometry_and_disables_observe(void) {
+    const char *fixture = "jsonl_flat_linked_import_baseline_failure.jsonl";
+    const char *lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":2,\"Z\":3}}]}"
+    };
+    if (!write_jsonl_fixture_lines(fixture, lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    jsonl_import_job_t job = {0};
+    int failed = 0;
+    if (!run_flat_import_until_parenting(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: could not drive linked import to parenting\n");
+        failed = 1;
+    }
+
+    if (!failed && remove(fixture) != 0) {
+        fprintf(stderr, "  fail: could not remove fixture before baseline arming\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        if (!jsonl_import_job_tick(&job, &scene)) {
+            fprintf(stderr, "  fail: final parenting tick did not complete import\n");
+            failed = 1;
+        } else if (job.state != JSONL_JOB_COMPLETE || job.root_entity == 0) {
+            fprintf(stderr, "  fail: linked import did not complete after baseline failure\n");
+            failed = 1;
+        }
+    }
+
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        if (!ecs_is_alive(world.world, job.root_entity)) {
+            fprintf(stderr, "  fail: root entity not alive after baseline failure\n");
+            failed = 1;
+        }
+    }
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, job.root_entity);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer on root after baseline failure\n");
+            failed = 1;
+        }
+    }
+    if (!failed && count_geometry_under_root(&scene, job.root_entity) != 1) {
+        fprintf(stderr, "  fail: geometry count changed after baseline failure fallback\n");
+        failed = 1;
+    }
+    if (!failed && strcmp(observer->source_path, fixture) != 0) {
+        fprintf(stderr, "  fail: source_path mismatch after baseline failure: '%s'\n", observer->source_path);
+        failed = 1;
+    }
+    if (!failed && !observer->linked) {
+        fprintf(stderr, "  fail: linked flag should stay true after baseline failure\n");
+        failed = 1;
+    }
+    if (!failed && observer->observe_enabled) {
+        fprintf(stderr, "  fail: observe should auto-disable after baseline failure\n");
+        failed = 1;
+    }
+    if (!failed && observer->source_state_valid) {
+        fprintf(stderr, "  fail: source_state_valid should stay false after failed baseline arm\n");
+        failed = 1;
+    }
+    if (!failed && !observer_contains_message(observer, "observe disabled")) {
+        fprintf(stderr, "  fail: missing observer warning about disabled observe\n");
+        failed = 1;
+    }
+    if (!failed && strstr(job.status_message, "observe disabled") == NULL) {
+        fprintf(stderr, "  fail: import status_message missing safe fallback text: '%s'\n", job.status_message);
+        failed = 1;
+    }
+
     ecs_scene_shutdown(&scene);
     ecs_world_shutdown(&world);
     remove(fixture);
@@ -580,6 +716,8 @@ int main(void) {
 
     static const test_case_t tests[] = {
         { "test_flat_observer_metadata_persisted_when_unlinked", test_flat_observer_metadata_persisted_when_unlinked },
+        { "test_flat_linked_import_baseline_failure_keeps_geometry_and_disables_observe",
+          test_flat_linked_import_baseline_failure_keeps_geometry_and_disables_observe },
         { "test_flat_manual_refresh_success_replaces_subtree_and_fallbacks_selection",
           test_flat_manual_refresh_success_replaces_subtree_and_fallbacks_selection },
         { "test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label",

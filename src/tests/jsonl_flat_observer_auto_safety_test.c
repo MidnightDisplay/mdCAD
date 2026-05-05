@@ -163,6 +163,94 @@ static bool observer_contains_message(const JsonlObserverComp *observer, const c
     return false;
 }
 
+static int test_flat_linked_import_stamps_baseline_and_stays_idle(void) {
+    const char *fixture = "jsonl_flat_linked_import_idle.jsonl";
+    if (!write_jsonl_point_fixture(fixture, 1200)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    int initial_geometry_count = 0;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer on linked import root\n");
+            failed = 1;
+        }
+    }
+    if (!failed) {
+        initial_geometry_count = count_geometry_under_root(&scene, root);
+        if (initial_geometry_count != 1200) {
+            fprintf(stderr, "  fail: expected 1200 geometry after import, got %d\n", initial_geometry_count);
+            failed = 1;
+        }
+    }
+    if (!failed && !observer->linked) {
+        fprintf(stderr, "  fail: linked import observer should stay linked\n");
+        failed = 1;
+    }
+    if (!failed && !observer->observe_enabled) {
+        fprintf(stderr, "  fail: linked import observer should keep auto-observe enabled\n");
+        failed = 1;
+    }
+    if (!failed && !observer->source_state_valid) {
+        fprintf(stderr, "  fail: linked import observer baseline was not stamped\n");
+        failed = 1;
+    }
+    if (!failed && !observer_contains_message(observer, "baseline armed")) {
+        fprintf(stderr, "  fail: linked import observer missing baseline armed message\n");
+        failed = 1;
+    }
+    if (!failed && count_active_refresh_slots(&scene) != 0) {
+        fprintf(stderr, "  fail: refresh slots should be idle immediately after import\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        uint64_t base_ms = scene_solver_now_ms();
+        for (int i = 0; i < 4; i++) {
+            uint64_t tick_ms = base_ms + (uint64_t)(i * 1100u);
+            jsonl_observer_system_tick(&scene, tick_ms, NULL);
+            if (jsonl_observer_is_flat_refresh_running(&scene, root)) {
+                fprintf(stderr, "  fail: unchanged source started an auto-refresh on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+            if (count_active_refresh_slots(&scene) != 0) {
+                fprintf(stderr, "  fail: active refresh slot count drifted on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+            if (count_geometry_under_root(&scene, root) != initial_geometry_count) {
+                fprintf(stderr, "  fail: geometry count drifted on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+        }
+    }
+
+    if (!failed && observer->retry_count != 0u) {
+        fprintf(stderr, "  fail: idle linked import should not spend retry budget\n");
+        failed = 1;
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_observe_missing_path_warns_without_retry_budget(void) {
     const char *fixture = "jsonl_flat_observer_auto_missing_path.jsonl";
     const char *lines[] = {
@@ -539,6 +627,8 @@ int main(void) {
     stm_setup();
 
     static const test_case_t tests[] = {
+        { "test_flat_linked_import_stamps_baseline_and_stays_idle",
+          test_flat_linked_import_stamps_baseline_and_stays_idle },
         { "test_flat_observe_missing_path_warns_without_retry_budget",
           test_flat_observe_missing_path_warns_without_retry_budget },
         { "test_flat_observe_auto_disables_after_retries_exhausted",
