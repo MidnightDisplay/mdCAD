@@ -78,6 +78,7 @@ Recent decisions affecting current work:
 | Date       | ID         | Task | Status | Commit |
 |------------|------------|------|--------|--------|
 | 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
+| 2026-05-05 | 260505-p42v | Create missing Phase 42 verification artifact | done |  |
 
 ## Session Continuity
 
