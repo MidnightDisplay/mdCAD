@@ -4,16 +4,16 @@ milestone: v1.7
 milestone_name: Linked Flat JSONL Large-File Refresh Stability
 current_phase: 42
 current_phase_name: Refresh & Teardown Stability
-status: planning
-stopped_at: Phase 42 planned; ready for execution
-last_updated: "2026-05-05T15:30:00.000Z"
-last_activity: 2026-05-05 - Phase 42 planned
+status: executing
+stopped_at: Phase 42 plan 01 complete; plan 02 next
+last_updated: "2026-05-05T16:12:00.000Z"
+last_activity: 2026-05-05 -- Phase 42 plan 01 completed
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 5
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -23,18 +23,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 42 — Refresh & Teardown Stability
+**Current focus:** Phase 42 — refresh-teardown-stability
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 42 (Refresh & Teardown Stability)
-Plan: 42-01..42-03 ready
-Status: Planned; ready to execute
-Last activity: 2026-05-05 - Phase 42 planned
+Phase: 42 (refresh-teardown-stability) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 42
+Last activity: 2026-05-05 -- Phase 42 plan 01 completed
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Milestone Scope
 
@@ -66,9 +66,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 42 plans 42-01 through 42-03.
-- Fix the observed reload and `Re-import now` slot-growth behavior from the Phase 41 manual pass.
-- Close the remaining linked refresh/delete cleanup issues in v1.7.
+- Execute Phase 42 plans 42-02 and 42-03.
+- Cancel active refresh work cleanly when linked flat import roots are deleted.
+- Run the four-scenario `lamp_11.jsonl` acceptance pass once teardown work lands.
 
 ### Blockers/Concerns
 
