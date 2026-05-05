@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability
 
-**Current focus:** define and execute a focused bug-fix milestone for large linked flat JSONL imports.
+**Current focus:** Phase 41 is complete; plan and execute Phase 42 for the remaining linked refresh and teardown stability work.
 
 ## Current Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
 
@@ -74,10 +74,11 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Anchor-scoped flat ingest now creates deterministic root->entry->geometry hierarchies with empty-entry skip, root name suffixing, and selection invariance (`FIMP-03`) — Validated in Phase 37: anchor-scoped-flat-ingest
 - ✓ Observable flat-root manual/automatic refresh now preserves same-anchor transactional semantics with observer metadata durability and safety lifecycle behavior (`OBSF-01..05`) — Validated in Phases 38-39
 - ✓ Large-dump refresh stability/coherence now satisfies bounded coalescing, no-lockup stress gate, and repeated-refresh interaction invariants (`PERF-01..03`) — Validated in Phase 40
+- ✓ Linked flat JSONL initial import now arms its baseline at commit time, stays visually complete after settle, and records converged Scene Hierarchy totals under live linking (`FIMP-05`, `FIMP-06`) — Validated in Phase 41: linked-import-convergence
 
 ### Active
 
-- [ ] Large linked flat JSONL imports keep the full rendered geometry visible when observer linkage is enabled.
+- [ ] Linked flat import refresh and `Re-import now` activity does not double or unboundedly grow line/point slot occupancy across repeated reloads.
 - [ ] Linked flat import refresh activity does not delete, duplicate, or orphan earlier line/point slot allocations.
 - [ ] Deleting a linked flat import root fully cleans scene entities and GPU-visible geometry with no dangling artifacts.
 
@@ -116,13 +117,14 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 - Milestone `v1.6` is shipped with Phases 36-40 complete and archived.
 - v1.6 delivered flat-large JSONL import UX, anchor-scoped ingest, observer metadata/manual transactional refresh, automatic safety loop, and repeated-refresh coherence closure.
 - Milestone audit result is `tech_debt`: no blocker gaps; follow-up traceability/Nyquist metadata cleanup is deferred.
-- Milestone `v1.7` is starting as a focused bug-fix milestone for linked flat JSONL large-file refresh/render cleanup correctness.
+- Milestone `v1.7` Phase 41 is complete: initial linked flat JSONL imports now converge with automated regression coverage and recorded `lamp_11.jsonl` manual PASS evidence.
+- Phase 42 remains to close repeated refresh/re-import slot-growth behavior and delete cleanup correctness.
 ## Next Milestone Goals
 
-1. Reproduce and diagnose the linked flat JSONL large-file corruption using the provided `lamp_11.jsonl` scenario.
-2. Restore deterministic scene/render-slot ownership across import, refresh, and delete lifecycle events.
-3. Add milestone validation that protects against partial geometry loss and dangling cleanup artifacts for linked flat imports.
-4. Preserve current native build reliability while closing the v1.6 regression.
+1. Eliminate the repeated refresh and `Re-import now` slot-growth behavior observed after the Phase 41 initial-load fix.
+2. Restore deterministic scene/render-slot ownership across linked refresh and delete lifecycle events.
+3. Add validation that protects against refresh-time partial geometry loss, buffer inflation, and dangling cleanup artifacts.
+4. Preserve current native build reliability while closing the remaining v1.7 regression surface.
 
 ## Constraints
 
@@ -151,7 +153,7 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 | Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
 | Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
 | Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Completed in v1.6 |
-| Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | — Pending |
+| Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | Phase 41 complete; Phase 42 remaining |
 
 ## Evolution
 
@@ -171,4 +173,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 after starting milestone v1.7*
+*Last updated: 2026-05-05 after Phase 41 completion*
