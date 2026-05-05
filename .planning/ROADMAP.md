@@ -9,48 +9,10 @@
 - ✅ **v1.4 Solver Robustness + Sketch Gizmo Corrections** — Phases 26-30 shipped 2026-04-09 ([archive](milestones/v1.4-ROADMAP.md))
 - ✅ **v1.5 Solver Workflow Robustness + Script Reapply Integrity** — Phases 31-35 shipped 2026-04-13 ([archive](milestones/v1.5-ROADMAP.md))
 - ✅ **v1.6 Observable Flat JSONL Import for Large Geometry Dumps** — Phases 36-40 shipped 2026-04-27 ([archive](milestones/v1.6-ROADMAP.md))
-- ◆ **v1.7 Linked Flat JSONL Large-File Refresh Stability** — Phases 41-42 complete; awaiting audit/archive
+- ✅ **v1.7 Linked Flat JSONL Large-File Refresh Stability** — Phases 41-42 shipped 2026-05-05 ([archive](milestones/v1.7-ROADMAP.md))
 
-## Phases
+## Active Milestone
 
-- [x] **Phase 41: Linked Import Convergence** - Users can complete a linked large flat JSONL import and keep the full rendered geometry after import settles. (completed 2026-05-05)
-- [x] **Phase 42: Refresh & Teardown Stability** - Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state. (completed 2026-05-05)
+No active milestone roadmap is open. Start the next milestone with `/gsd-new-milestone`.
 
-## Phase Details
-
-### Phase 41: Linked Import Convergence
-**Goal**: Users can complete a linked large flat JSONL import and keep the full rendered geometry after import settles.  
-**Depends on**: Phase 40  
-**Requirements**: FIMP-05, FIMP-06  
-**Success Criteria** (what must be TRUE):
-  1. User can import a large flat JSONL file with linking enabled and still see the full line/point geometry after the import settles.
-  2. Scene Hierarchy totals for the linked import converge to the committed final counts instead of continuing to climb.
-  3. The committed linked import remains visually complete rather than collapsing to a later tail subset.
-**Plans**: 2 plans
-
-Plans:
-- [x] 41-01-PLAN.md — Arm linked-import observer baseline at commit time and lock deterministic no-self-refresh regressions.
-- [x] 41-02-PLAN.md — Record the exact lamp_11 manual convergence checklist and run the blocking acceptance pass.
-
-### Phase 42: Refresh & Teardown Stability
-**Goal**: Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state.  
-**Depends on**: Phase 41  
-**Requirements**: OBSF-07, OBSF-08, PERF-04, PERF-05  
-**Success Criteria** (what must be TRUE):
-  1. User can leave observer refresh enabled without the visible geometry collapsing to a tail subset or points-only remnants.
-  2. User can refresh a linked large flat import and see replaced geometry removed cleanly without premature deletion of retained geometry.
-  3. After import or refresh settles, rendered coverage and counts stop changing from observer-related background churn.
-  4. User can delete a previously refreshed linked flat import root and remove all related line/point instances from both the viewport and slot-buffer debug state.
-**Plans**: 3 plans
-
-Plans:
-- [x] 42-01-PLAN.md — Lock exact settled refresh occupancy, no-late-churn behavior, and cleanup-anomaly safety fallback.
-- [x] 42-02-PLAN.md — Cancel active refresh work on delete and prove teardown plus undo restore only committed content.
-- [x] 42-03-PLAN.md — Capture the four-scenario `lamp_11.jsonl` lifecycle checklist and blocking manual closeout pass.
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 41. Linked Import Convergence | 2/2 | Complete | 2026-05-05 |
-| 42. Refresh & Teardown Stability | 3/3 | Complete | 2026-05-05 |
+Next phase number: **43**

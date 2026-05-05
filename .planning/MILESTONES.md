@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.7 Linked Flat JSONL Large-File Refresh Stability (Shipped: 2026-05-05)
+
+**Phases completed:** 2 phases, 5 plans, 10 tasks
+
+**Key accomplishments:**
+
+- Fixed linked flat import startup so observer baselines arm at commit time and initial linked imports settle without self-refresh drift.
+- Proved the initial `lamp_11.jsonl` linked import path converges with stable viewport, hierarchy, and slot-buffer state.
+- Closed linked refresh collapse/late-churn regressions with exact-footprint slot compaction and cleanup-anomaly fallback.
+- Routed linked-root delete through shared cancel-before-delete ordering so refresh teardown and undo restore only committed content.
+- Recorded PASS real-file lifecycle evidence for auto-reload, repeated manual refresh, delete after refresh history, and delete while refresh is active.
+
+**Audit:** [v1.7-MILESTONE-AUDIT.md](milestones/v1.7-MILESTONE-AUDIT.md) — tech_debt (all requirements satisfied; `Clear Scene` lifecycle parity and Nyquist validation backfill deferred)
+
+**Archives:**
+
+- [v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md)
+- [v1.7-REQUIREMENTS.md](milestones/v1.7-REQUIREMENTS.md)
+
+---
+
 ## v1.6 Observable Flat JSONL Import for Large Geometry Dumps (Shipped: 2026-04-27)
 
 **Phases completed:** 5 phases, 10 plans, 17 tasks

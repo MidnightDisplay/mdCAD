@@ -10,22 +10,24 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps (2026-04-27)
+**Shipped:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability (2026-05-05)
 
-**Current milestone:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability
+**Current milestone:** None — run `/gsd-new-milestone` to define the next scope
 
-**Current focus:** Phase 41 is complete; plan and execute Phase 42 for the remaining linked refresh and teardown stability work.
+**Current focus:** Decide the next milestone scope and whether to pay down v1.7 validation / `Clear Scene` lifecycle debt first.
 
-## Current Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
+## Last Shipped Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
 
 **Goal:** Fix the large-file regression in linked flat JSONL imports so import, refresh, and deletion all preserve the full rendered geometry.
 
-**Target features:**
-- Reproduce and isolate the linked large-file regression triggered by `Link file for refresh (optional)` on flat JSONL imports
-- Preserve full line-segment and joint-point visibility across initial import and subsequent observer-driven refresh activity
-- Remove all line/point instances cleanly when deleting a linked flat import root so no orphaned viewport or slot-buffer artifacts remain
+**Delivered features:**
+- Linked flat imports now arm their observer baseline at commit time and settle without self-refresh drift.
+- Observer-driven refresh now returns to exact live slot occupancy with safe anomaly fallback and no late churn.
+- Linked-root delete now cancels active refresh work before teardown and keeps undo limited to last committed content.
+- Real-file `lamp_11.jsonl` lifecycle evidence now records PASS results for auto-reload, repeated manual refresh, settled delete cleanup, and delete during refresh.
 
-## Last Shipped Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
+<details>
+<summary>Previous shipped milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps</summary>
 
 **Goal:** Deliver a high-performance flat JSONL import mode for very large geometry dumps with optional observer-driven refresh.
 
@@ -35,6 +37,8 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - Persisted observer metadata with manual transactional same-anchor refresh
 - Automatic observer safety loop (debounce/retry/auto-disable) and bounded coalesced reruns
 - Repeated-refresh interaction coherence guardrails and manual very-large stress evidence
+
+</details>
 
 ## Requirements
 
@@ -75,12 +79,14 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Observable flat-root manual/automatic refresh now preserves same-anchor transactional semantics with observer metadata durability and safety lifecycle behavior (`OBSF-01..05`) — Validated in Phases 38-39
 - ✓ Large-dump refresh stability/coherence now satisfies bounded coalescing, no-lockup stress gate, and repeated-refresh interaction invariants (`PERF-01..03`) — Validated in Phase 40
 - ✓ Linked flat JSONL initial import now arms its baseline at commit time, stays visually complete after settle, and records converged Scene Hierarchy totals under live linking (`FIMP-05`, `FIMP-06`) — Validated in Phase 41: linked-import-convergence
+- ✓ Linked flat JSONL refresh/delete lifecycle now preserves exact settled footprint, transactional replacement, delete cleanup, and manual large-file closure evidence (`OBSF-07`, `OBSF-08`, `PERF-04`, `PERF-05`) — Validated in Phase 42: refresh-teardown-stability
 
 ### Active
 
-- [ ] Linked flat import refresh and `Re-import now` activity does not double or unboundedly grow line/point slot occupancy across repeated reloads.
-- [ ] Linked flat import refresh activity does not delete, duplicate, or orphan earlier line/point slot allocations.
-- [ ] Deleting a linked flat import root fully cleans scene entities and GPU-visible geometry with no dangling artifacts.
+- [ ] Define the next milestone requirements and scope.
+- [ ] Decide whether to close `Clear Scene` lifecycle parity for linked-refresh roots before the next feature milestone.
+- [ ] Decide whether to backfill Nyquist validation artifacts for Phases 41-42 before or within the next milestone.
+- [ ] Re-evaluate deferred flat-import enhancements (`FIMP-04`, `OBSF-06`) against the next user priority.
 
 ### Out of Scope
 
@@ -117,14 +123,15 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 - Milestone `v1.6` is shipped with Phases 36-40 complete and archived.
 - v1.6 delivered flat-large JSONL import UX, anchor-scoped ingest, observer metadata/manual transactional refresh, automatic safety loop, and repeated-refresh coherence closure.
 - Milestone audit result is `tech_debt`: no blocker gaps; follow-up traceability/Nyquist metadata cleanup is deferred.
-- Milestone `v1.7` Phase 41 is complete: initial linked flat JSONL imports now converge with automated regression coverage and recorded `lamp_11.jsonl` manual PASS evidence.
-- Phase 42 remains to close repeated refresh/re-import slot-growth behavior and delete cleanup correctness.
+- Milestone `v1.7` is shipped with Phases 41-42 complete and archived.
+- v1.7 delivers stable linked flat JSONL convergence across initial load, observer refresh, repeated manual refresh, and linked-root deletion on the real `lamp_11.jsonl` dataset.
+- Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
 ## Next Milestone Goals
 
-1. Eliminate the repeated refresh and `Re-import now` slot-growth behavior observed after the Phase 41 initial-load fix.
-2. Restore deterministic scene/render-slot ownership across linked refresh and delete lifecycle events.
-3. Add validation that protects against refresh-time partial geometry loss, buffer inflation, and dangling cleanup artifacts.
-4. Preserve current native build reliability while closing the remaining v1.7 regression surface.
+1. Decide whether to spend the next milestone on `Clear Scene` lifecycle parity and validation metadata backfill or on new product capability.
+2. If flat-import work continues, evaluate deferred enhancements like diff/patch refresh and advanced observer scheduling controls.
+3. Preserve current native build reliability while scoping the next milestone.
+4. Start the next milestone with explicit requirements rather than carrying v1.7 debt implicitly.
 
 ## Constraints
 
@@ -153,7 +160,9 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 | Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
 | Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
 | Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Completed in v1.6 |
-| Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | Phase 41 complete; Phase 42 remaining |
+| Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | Completed in v1.7 |
+| Arm linked flat import observer baseline at import commit time | Prevent immediate self-refresh drift on the first linked import settle | Completed in v1.7 |
+| Use exact-footprint refresh compaction plus cancel-before-delete teardown ordering | The large-file regression was a lifecycle correctness problem, not a signal to redesign the entire slot-buffer architecture | Completed in v1.7 |
 
 ## Evolution
 
@@ -173,4 +182,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 after Phase 41 completion*
+*Last updated: 2026-05-05 after v1.7 milestone completion*
