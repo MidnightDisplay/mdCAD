@@ -9,12 +9,12 @@
 - ✅ **v1.4 Solver Robustness + Sketch Gizmo Corrections** — Phases 26-30 shipped 2026-04-09 ([archive](milestones/v1.4-ROADMAP.md))
 - ✅ **v1.5 Solver Workflow Robustness + Script Reapply Integrity** — Phases 31-35 shipped 2026-04-13 ([archive](milestones/v1.5-ROADMAP.md))
 - ✅ **v1.6 Observable Flat JSONL Import for Large Geometry Dumps** — Phases 36-40 shipped 2026-04-27 ([archive](milestones/v1.6-ROADMAP.md))
-- ◆ **v1.7 Linked Flat JSONL Large-File Refresh Stability** — Phases 41-42 planned
+- ◆ **v1.7 Linked Flat JSONL Large-File Refresh Stability** — Phases 41-42 complete; awaiting audit/archive
 
 ## Phases
 
 - [x] **Phase 41: Linked Import Convergence** - Users can complete a linked large flat JSONL import and keep the full rendered geometry after import settles. (completed 2026-05-05)
-- [ ] **Phase 42: Refresh & Teardown Stability** - Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state.
+- [x] **Phase 42: Refresh & Teardown Stability** - Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state. (completed 2026-05-05)
 
 ## Phase Details
 
@@ -46,11 +46,11 @@ Plans:
 Plans:
 - [x] 42-01-PLAN.md — Lock exact settled refresh occupancy, no-late-churn behavior, and cleanup-anomaly safety fallback.
 - [x] 42-02-PLAN.md — Cancel active refresh work on delete and prove teardown plus undo restore only committed content.
-- [ ] 42-03-PLAN.md — Capture the four-scenario `lamp_11.jsonl` lifecycle checklist and blocking manual closeout pass.
+- [x] 42-03-PLAN.md — Capture the four-scenario `lamp_11.jsonl` lifecycle checklist and blocking manual closeout pass.
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 41. Linked Import Convergence | 2/2 | Complete | 2026-05-05 |
-| 42. Refresh & Teardown Stability | 2/3 | Executing | - |
+| 42. Refresh & Teardown Stability | 3/3 | Complete | 2026-05-05 |

@@ -21,7 +21,7 @@ Use this checklist to close Phase 42 with explicit real-file evidence for linked
 3. Keep `Scene Hierarchy`, `Entity Inspector`, and `Slot Buffer Debug` available while collecting evidence.
 4. For Scenario 1, rewrite or regenerate the exact same watched `lamp_11.jsonl` path once while `Observe automatically` stays ON so auto-reload actually fires.
 5. Wait for every refresh to settle before recording evidence unless the scenario explicitly says to delete while refresh is active.
-6. Replace every `TBD` marker before closing the phase.
+6. Replace every evidence placeholder before closing the phase.
 
 ## Scenario 1 - linked auto-reload
 
@@ -37,11 +37,11 @@ Use this checklist to close Phase 42 with explicit real-file evidence for linked
 
 ### Evidence
 
-- Viewport result: TBD
-- Scene Hierarchy evidence: TBD
-- Slot Buffer evidence: TBD
-- Observer/Inspector evidence: TBD
-- Scenario verdict: TBD
+- Viewport result: PASS
+- Scene Hierarchy evidence: PASS
+- Slot Buffer evidence: PASS
+- Observer/Inspector evidence: PASS
+- Scenario verdict: PASS
 
 ## Scenario 2 - repeated manual Re-import now
 
@@ -55,11 +55,11 @@ Use this checklist to close Phase 42 with explicit real-file evidence for linked
 
 ### Evidence
 
-- Viewport result: TBD
-- Scene Hierarchy evidence: TBD
-- Slot Buffer evidence: TBD
-- Observer/Inspector evidence: TBD
-- Scenario verdict: TBD
+- Viewport result: PASS
+- Scene Hierarchy evidence: PASS
+- Slot Buffer evidence: PASS
+- Observer/Inspector evidence: PASS
+- Scenario verdict: PASS
 
 ## Scenario 3 - delete after settled refresh history
 
@@ -74,11 +74,11 @@ Use this checklist to close Phase 42 with explicit real-file evidence for linked
 
 ### Evidence
 
-- Viewport result: TBD
-- Scene Hierarchy evidence: TBD
-- Slot Buffer evidence: TBD
-- Observer/Inspector evidence: TBD
-- Scenario verdict: TBD
+- Viewport result: PASS
+- Scene Hierarchy evidence: PASS
+- Slot Buffer evidence: PASS
+- Observer/Inspector evidence: PASS
+- Scenario verdict: PASS
 
 ## Scenario 4 - delete while refresh is active
 
@@ -95,12 +95,12 @@ Use this checklist to close Phase 42 with explicit real-file evidence for linked
 
 ### Evidence
 
-- Viewport result: TBD
-- Scene Hierarchy evidence: TBD
-- Slot Buffer evidence: TBD
-- Observer/Inspector evidence: TBD
-- Scenario verdict: TBD
+- Viewport result: PASS
+- Scene Hierarchy evidence: PASS
+- Slot Buffer evidence: PASS
+- Observer/Inspector evidence: PASS
+- Scenario verdict: PASS
 
 ## Overall verdict
 
-Overall verdict: TBD
+Overall verdict: PASS

@@ -12,13 +12,13 @@
 
 ### Anchor Observer Refresh
 
-- [ ] **OBSF-07**: User can keep a linked large flat import under observer refresh without the visible geometry collapsing to a tail subset or joints-only remnants.
-- [ ] **OBSF-08**: User can refresh a linked large flat import transactionally so replaced geometry is removed cleanly and retained geometry is not prematurely deleted during re-import.
+- [x] **OBSF-07**: User can keep a linked large flat import under observer refresh without the visible geometry collapsing to a tail subset or joints-only remnants.
+- [x] **OBSF-08**: User can refresh a linked large flat import transactionally so replaced geometry is removed cleanly and retained geometry is not prematurely deleted during re-import.
 
 ### Large-File Reliability
 
-- [ ] **PERF-04**: User can delete a linked flat import root after prior refresh activity and remove all related line and point instances from both the viewport and slot-buffer debug state.
-- [ ] **PERF-05**: User can rely on large linked flat imports reaching a stable final visible state after import or refresh instead of continuing observer-related background churn that changes counts or rendered coverage late.
+- [x] **PERF-04**: User can delete a linked flat import root after prior refresh activity and remove all related line and point instances from both the viewport and slot-buffer debug state.
+- [x] **PERF-05**: User can rely on large linked flat imports reaching a stable final visible state after import or refresh instead of continuing observer-related background churn that changes counts or rendered coverage late.
 
 ## v1.8+ Requirements (Deferred)
 
@@ -42,10 +42,10 @@
 |-------------|-------|--------|
 | FIMP-05 | Phase 41 | Complete |
 | FIMP-06 | Phase 41 | Complete |
-| OBSF-07 | Phase 42 | Pending |
-| OBSF-08 | Phase 42 | Pending |
-| PERF-04 | Phase 42 | Pending |
-| PERF-05 | Phase 42 | Pending |
+| OBSF-07 | Phase 42 | Complete |
+| OBSF-08 | Phase 42 | Complete |
+| PERF-04 | Phase 42 | Complete |
+| PERF-05 | Phase 42 | Complete |
 
 **Coverage:**
 - v1.7 requirements: 6 total
@@ -54,4 +54,4 @@
 
 ---
 *Requirements defined: 2026-05-05*
-*Last updated: 2026-05-05 after Phase 41 completion*
+*Last updated: 2026-05-05 after Phase 42 completion*

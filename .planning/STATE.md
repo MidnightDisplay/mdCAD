@@ -5,15 +5,15 @@ milestone_name: Linked Flat JSONL Large-File Refresh Stability
 current_phase: 42
 current_phase_name: Refresh & Teardown Stability
 status: executing
-stopped_at: Phase 42 manual checklist ready; awaiting human verification
-last_updated: "2026-05-05T16:45:00.000Z"
-last_activity: 2026-05-05 -- Phase 42 manual checklist prepared
+stopped_at: Phase 42 complete; milestone audit/archive next
+last_updated: "2026-05-05T22:23:49.999+01:00"
+last_activity: 2026-05-05 -- Phase 42 completed with manual lifecycle evidence
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 42 (refresh-teardown-stability) — EXECUTING
-Plan: 3 of 3
-Status: Executing Phase 42
-Last activity: 2026-05-05 -- Phase 42 manual checklist prepared
+Plan: Complete
+Status: Phase complete; milestone closeout pending
+Last activity: 2026-05-05 -- Phase 42 completed with manual lifecycle evidence
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -66,9 +66,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 42 plan 42-03.
-- Create the blocking four-scenario `lamp_11.jsonl` manual checklist.
-- Run the manual lifecycle pass and capture viewport, hierarchy, and slot-buffer evidence.
+- Run milestone audit for v1.7 or explicitly accept closing without one.
+- Archive the completed v1.7 milestone and prepare the next milestone.
 
 ### Blockers/Concerns
 
