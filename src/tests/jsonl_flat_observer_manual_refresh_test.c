@@ -4,6 +4,7 @@
 #include "../jsonl_observer_system.h"
 #include "../scene_serializer.h"
 #include "../selection.h"
+#include "../undo_redo_exec.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -183,6 +184,11 @@ typedef struct {
     int point_slots;
 } slot_footprint_t;
 
+typedef struct {
+    int line_matches;
+    int point_matches;
+} slot_owner_match_counts_t;
+
 static void accumulate_renderable_slot_footprint(const RenderableComp *r, slot_footprint_t *footprint) {
     if (!r || !footprint || r->instance_slot == 0xFFFFFFFF) return;
 
@@ -239,6 +245,39 @@ static slot_footprint_t count_slot_footprint_under_root(ecs_scene_t *scene, ecs_
     return footprint;
 }
 
+static bool entity_list_contains(const ecs_entity_t *entities, int count, ecs_entity_t target) {
+    if (!entities || count <= 0 || target == 0) return false;
+    for (int i = 0; i < count; i++) {
+        if (entities[i] == target) return true;
+    }
+    return false;
+}
+
+static slot_owner_match_counts_t count_slot_owner_matches_for_entities(ecs_scene_t *scene,
+                                                                       const ecs_entity_t *entities,
+                                                                       int entity_count) {
+    slot_owner_match_counts_t matches = {0};
+    if (!scene || !entities || entity_count <= 0) return matches;
+
+    instance_buffer_t *line_ib = &scene->batches.lines.instances;
+    instance_buffer_t *point_ib = &scene->batches.points.instances;
+
+    for (int slot = 0; slot < line_ib->count; slot++) {
+        ecs_entity_t owner = (ecs_entity_t)line_ib->slot_to_entity[slot];
+        if (entity_list_contains(entities, entity_count, owner)) {
+            matches.line_matches++;
+        }
+    }
+    for (int slot = 0; slot < point_ib->count; slot++) {
+        ecs_entity_t owner = (ecs_entity_t)point_ib->slot_to_entity[slot];
+        if (entity_list_contains(entities, entity_count, owner)) {
+            matches.point_matches++;
+        }
+    }
+
+    return matches;
+}
+
 static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity, int max_ticks) {
     for (int i = 0; i < max_ticks; i++) {
         if (!jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
@@ -247,6 +286,38 @@ static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity
         jsonl_observer_tick_flat_refreshes(scene);
     }
     return !jsonl_observer_is_flat_refresh_running(scene, root_entity);
+}
+
+static bool tick_refresh_until_stage_work_started(ecs_scene_t *scene,
+                                                  ecs_entity_t root_entity,
+                                                  int max_ticks,
+                                                  ecs_entity_t *out_stage_root) {
+    if (out_stage_root) *out_stage_root = 0;
+
+    for (int i = 0; i < max_ticks; i++) {
+        jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(scene, root_entity);
+        if (slot &&
+            slot->job.root_entity != 0 &&
+            slot->job.total_entities_created > 0 &&
+            slot->job.state != JSONL_JOB_COMPLETE) {
+            if (out_stage_root) *out_stage_root = slot->job.root_entity;
+            return true;
+        }
+        if (!jsonl_observer_is_flat_refresh_running(scene, root_entity)) {
+            return false;
+        }
+        jsonl_observer_tick_flat_refreshes(scene);
+    }
+
+    jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(scene, root_entity);
+    if (slot &&
+        slot->job.root_entity != 0 &&
+        slot->job.total_entities_created > 0 &&
+        slot->job.state != JSONL_JOB_COMPLETE) {
+        if (out_stage_root) *out_stage_root = slot->job.root_entity;
+        return true;
+    }
+    return false;
 }
 
 static bool observer_contains_message(const JsonlObserverComp *observer, const char *needle) {
@@ -893,6 +964,234 @@ static int test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observ
     return failed;
 }
 
+static int test_flat_delete_after_refresh_history_clears_geometry_and_slots(void) {
+    const char *fixture = "jsonl_flat_observer_delete_after_refresh.jsonl";
+    int failed = 0;
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_entity_t *deleted_entities = NULL;
+    int deleted_count = 0;
+    int deleted_capacity = 0;
+
+    if (!write_jsonl_polyline_fixture(fixture, 12, 0.0f)) return 1;
+
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed for delete-after-refresh test\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    if (!failed && !write_jsonl_polyline_fixture(fixture, 18, 3.0f)) {
+        fprintf(stderr, "  fail: fixture rewrite failed before settled refresh delete test\n");
+        failed = 1;
+    }
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, NULL)) {
+        fprintf(stderr, "  fail: refresh request failed before settled delete test\n");
+        failed = 1;
+    }
+    if (!failed && !tick_refresh_until_idle(&scene, root, 50000)) {
+        fprintf(stderr, "  fail: refresh did not settle before settled delete test\n");
+        failed = 1;
+    }
+
+    slot_footprint_t footprint = {0};
+    if (!failed) {
+        footprint = count_slot_footprint_under_root(&scene, root);
+        if (footprint.line_slots <= 0 || footprint.point_slots <= 0) {
+            fprintf(stderr, "  fail: expected committed line+point footprint before delete lines=%d points=%d\n",
+                    footprint.line_slots, footprint.point_slots);
+            failed = 1;
+        }
+    }
+
+    if (!failed &&
+        !undo_collect_delete_subtree_recursive(&scene, root, &deleted_entities, &deleted_count, &deleted_capacity)) {
+        fprintf(stderr, "  fail: could not collect subtree ids before settled delete\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        jsonl_observer_cancel_flat_refresh_for_root(&scene, root);
+        scene_remove_entity(&scene, root);
+    }
+
+    if (!failed && ecs_is_alive(world.world, root)) {
+        fprintf(stderr, "  fail: root still alive after settled delete\n");
+        failed = 1;
+    }
+    if (!failed && jsonl_observer_is_flat_refresh_running(&scene, root)) {
+        fprintf(stderr, "  fail: refresh slot still active after settled delete\n");
+        failed = 1;
+    }
+    if (!failed) {
+        slot_owner_match_counts_t matches =
+            count_slot_owner_matches_for_entities(&scene, deleted_entities, deleted_count);
+        if (matches.line_matches != 0 || matches.point_matches != 0) {
+            fprintf(stderr, "  fail: deleted subtree still owns slots after settled delete lines=%d points=%d\n",
+                    matches.line_matches, matches.point_matches);
+            failed = 1;
+        }
+    }
+    if (!failed &&
+        (instance_buffer_live_count(&scene.batches.lines.instances) != 0 ||
+         instance_buffer_live_count(&scene.batches.points.instances) != 0)) {
+        fprintf(stderr, "  fail: slot buffers still show live geometry after settled delete lines=%d points=%d\n",
+                instance_buffer_live_count(&scene.batches.lines.instances),
+                instance_buffer_live_count(&scene.batches.points.instances));
+        failed = 1;
+    }
+
+    if (deleted_entities) free(deleted_entities);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
+static int test_flat_delete_during_refresh_cancels_stage_and_undo_restores_last_committed(void) {
+    const char *fixture = "jsonl_flat_observer_delete_during_refresh.jsonl";
+    int failed = 0;
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    selection_buffer_t selection = {0};
+    undo_redo_t undo = {0};
+    ecs_entity_t *deleted_entities = NULL;
+    int deleted_count = 0;
+    int deleted_capacity = 0;
+
+    if (!write_jsonl_point_fixture(fixture, 24)) return 1;
+
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    selection_init(&selection, &world);
+    undo_redo_init(&undo, &scene, 16);
+    undo_redo_set_selection(&undo, &selection);
+
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed for delete-during-refresh test\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    int committed_geometry_count = 0;
+    if (!failed) {
+        committed_geometry_count = count_geometry_under_root(&scene, root);
+        if (committed_geometry_count != 24) {
+            fprintf(stderr, "  fail: unexpected committed geometry count before active delete expected=24 got=%d\n",
+                    committed_geometry_count);
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_point_fixture(fixture, 240)) {
+        fprintf(stderr, "  fail: fixture rewrite failed before active delete test\n");
+        failed = 1;
+    }
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, &selection)) {
+        fprintf(stderr, "  fail: refresh request failed before active delete test\n");
+        failed = 1;
+    }
+
+    ecs_entity_t stage_root = 0;
+    if (!failed && !tick_refresh_until_stage_work_started(&scene, root, 50000, &stage_root)) {
+        fprintf(stderr, "  fail: refresh never reached staged-work state before delete\n");
+        failed = 1;
+    }
+    if (!failed && (stage_root == 0 || !ecs_is_alive(world.world, stage_root))) {
+        fprintf(stderr, "  fail: stage root not alive during active delete test root=%llu\n",
+                (unsigned long long)stage_root);
+        failed = 1;
+    }
+
+    if (!failed &&
+        !undo_collect_delete_subtree_recursive(&scene, root, &deleted_entities, &deleted_count, &deleted_capacity)) {
+        fprintf(stderr, "  fail: could not collect committed subtree ids before active delete\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        ecs_entity_t to_delete[1] = { root };
+        undo_cmd_bulk_delete_entities(&undo, to_delete, 1);
+        jsonl_observer_cancel_flat_refresh_for_root(&scene, root);
+        scene_remove_entity(&scene, root);
+    }
+
+    if (!failed && ecs_is_alive(world.world, root)) {
+        fprintf(stderr, "  fail: root still alive after active-refresh delete\n");
+        failed = 1;
+    }
+    if (!failed && stage_root != 0 && ecs_is_alive(world.world, stage_root)) {
+        fprintf(stderr, "  fail: stage root survived active-refresh delete stage_root=%llu\n",
+                (unsigned long long)stage_root);
+        failed = 1;
+    }
+    if (!failed && jsonl_observer_is_flat_refresh_running(&scene, root)) {
+        fprintf(stderr, "  fail: refresh slot still active after active-refresh delete\n");
+        failed = 1;
+    }
+    if (!failed) {
+        slot_owner_match_counts_t matches =
+            count_slot_owner_matches_for_entities(&scene, deleted_entities, deleted_count);
+        if (matches.line_matches != 0 || matches.point_matches != 0) {
+            fprintf(stderr, "  fail: deleted committed subtree still owns slots after active delete lines=%d points=%d\n",
+                    matches.line_matches, matches.point_matches);
+            failed = 1;
+        }
+    }
+    if (!failed &&
+        (instance_buffer_live_count(&scene.batches.lines.instances) != 0 ||
+         instance_buffer_live_count(&scene.batches.points.instances) != 0)) {
+        fprintf(stderr, "  fail: staged leftovers remain after active delete lines=%d points=%d\n",
+                instance_buffer_live_count(&scene.batches.lines.instances),
+                instance_buffer_live_count(&scene.batches.points.instances));
+        failed = 1;
+    }
+
+    if (!failed && !undo_redo_undo(&undo)) {
+        fprintf(stderr, "  fail: undo did not restore deleted root after active delete\n");
+        failed = 1;
+    }
+
+    ecs_entity_t restored_root = 0;
+    if (!failed) {
+        if (undo.current != 0 || undo.count <= 0 || undo.commands[undo.current].type != CMD_BULK_DELETE_ENTITIES) {
+            fprintf(stderr, "  fail: undo stack not positioned on bulk delete command after undo current=%d count=%d type=%d\n",
+                    undo.current, undo.count,
+                    (undo.count > 0) ? (int)undo.commands[undo.current].type : -1);
+            failed = 1;
+        } else {
+            restored_root = (ecs_entity_t)undo.commands[undo.current].data.bulk_delete.entity_ids[0];
+            if (restored_root == 0 || !ecs_is_alive(world.world, restored_root)) {
+                fprintf(stderr, "  fail: restored root invalid after undo root=%llu\n",
+                        (unsigned long long)restored_root);
+                failed = 1;
+            }
+        }
+    }
+    if (!failed && count_geometry_under_root(&scene, restored_root) != committed_geometry_count) {
+        fprintf(stderr, "  fail: undo restored wrong committed geometry count expected=%d got=%d\n",
+                committed_geometry_count, count_geometry_under_root(&scene, restored_root));
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, restored_root) == 240) {
+        fprintf(stderr, "  fail: undo restored staged payload instead of committed content\n");
+        failed = 1;
+    }
+
+    if (deleted_entities) free(deleted_entities);
+    undo_redo_shutdown(&undo);
+    selection_shutdown(&selection);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence(void) {
     static const int tiers[] = { 24, 240, 1200 };
     int failed = 0;
@@ -1015,6 +1314,10 @@ int main(void) {
           test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint },
         { "test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe",
           test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe },
+        { "test_flat_delete_after_refresh_history_clears_geometry_and_slots",
+          test_flat_delete_after_refresh_history_clears_geometry_and_slots },
+        { "test_flat_delete_during_refresh_cancels_stage_and_undo_restores_last_committed",
+          test_flat_delete_during_refresh_cancels_stage_and_undo_restores_last_committed },
         { "test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence",
           test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence },
     };
