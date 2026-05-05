@@ -29,25 +29,37 @@ Use this checklist to prove the Phase 41 linked flat-import fix against the real
    - `Source path:`
    - `Observe automatically`
    - `Last refresh result`
-10. Fill the evidence fields below and replace every `TBD` marker.
+10. The evidence fields below have been completed for this run.
 
 ## Evidence fields
 
-- Viewport result: TBD
+- Viewport result: PASS
   - PASS = full committed geometry remains visible after the import settles.
   - FAIL = visible result collapses, drops major geometry, or leaves points-only remnants.
 
-- Scene Hierarchy first committed total: TBD
+- Scene Hierarchy first committed total: 1724453
 
-- Scene Hierarchy settled total: TBD
+- Scene Hierarchy settled total: 1724453
 
-- Slot Buffer note: TBD
+- Slot Buffer note: PASS
   - PASS = slot occupancy stays consistent after settling with no disappearing early-slot chunk.
   - FAIL = slot occupancy drops a large early chunk, tail-only remainder, or dangling remnants.
 
-- Observer status note: TBD
+- Observer status note: 
+Source path - correct; 
+Observe automatically - ON; 
+Message - 
+"Last refresh result
+Timing evidence is advisory only (not a hard failure gate).
+[INFO] Linked import baseline armed; waiting for external file changes."
   - Record the exact `Source path`, whether `Observe automatically` is on or off, and the latest `Last refresh result` message.
 
-- Final verdict: TBD
+- Final verdict: PASS
   - PASS only if the viewport remains complete, the first committed and settled hierarchy totals converge instead of continuing to climb, the slot buffers stay stable, and the observer status is consistent with a settled linked import.
   - FAIL for any geometry collapse, continued count churn, slot-buffer instability, or unexpected observer state.
+
+## Deferred follow-up observations (Phase 42 scope)
+
+- Linked file reload doubled slot-buffer occupancy to exactly 2x the entity footprint: the reimported entities landed in the tail half while the total slot count stayed inflated.
+- Repeated `Re-import now` runs kept growing occupancy until the 2097152 slot-capacity limit, after which issues started to appear.
+- These observations affect later refresh/re-import behavior rather than the initial linked-import convergence that Phase 41 was scoped to fix.
