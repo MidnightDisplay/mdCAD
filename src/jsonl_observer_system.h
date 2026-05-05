@@ -16,6 +16,7 @@
 typedef struct {
     bool active;
     bool pending_rerun;
+    bool selection_root_fallback;
     ecs_world_state_t *world;
     ecs_entity_t target_root;
     ecs_entity_t stage_root;
@@ -55,6 +56,21 @@ static inline bool jsonl_observer_selected_descendant_replaced(const jsonl_flat_
     return false;
 }
 
+static inline bool jsonl_observer_selection_targets_root_descendant(selection_buffer_t *selection,
+                                                                    ecs_scene_t *scene,
+                                                                    ecs_entity_t root_entity) {
+    if (!selection || !scene || root_entity == 0) return false;
+    selection_buffer_t *sel = selection;
+    for (int i = 0; i < selection_count(sel); i++) {
+        ecs_entity_t selected = selection_get(sel, i);
+        if (selected == 0 || selected == root_entity) continue;
+        if (jsonl_observer_is_descendant_of(scene, selected, root_entity)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static inline jsonl_flat_refresh_slot_t *jsonl_observer_find_flat_refresh_slot(ecs_scene_t *scene,
                                                                                 ecs_entity_t root_entity) {
     if (!scene || root_entity == 0) return NULL;
@@ -73,6 +89,139 @@ static inline jsonl_flat_refresh_slot_t *jsonl_observer_alloc_flat_refresh_slot(
         if (!slots[i].active) return &slots[i];
     }
     return NULL;
+}
+
+static inline bool *jsonl_observer_force_next_flat_cleanup_failure_flag_for_tests(void) {
+    static bool force_failure = false;
+    return &force_failure;
+}
+
+static inline void jsonl_observer_force_next_flat_cleanup_failure_for_tests(void) {
+    *jsonl_observer_force_next_flat_cleanup_failure_flag_for_tests() = true;
+}
+
+static inline bool jsonl_observer_consume_next_flat_cleanup_failure_for_tests(void) {
+    bool *flag = jsonl_observer_force_next_flat_cleanup_failure_flag_for_tests();
+    bool should_fail = *flag;
+    *flag = false;
+    return should_fail;
+}
+
+static inline void jsonl_observer_rebind_line_slot_owner(ecs_scene_t *scene,
+                                                         uint64_t entity_id,
+                                                         int old_slot,
+                                                         int new_slot) {
+    if (!scene || entity_id == 0) return;
+    ecs_entity_t entity = (ecs_entity_t)entity_id;
+    if (!ecs_is_alive(scene->world->world, entity)) return;
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, entity);
+    if (!r) return;
+
+    switch ((geometry_type_t)r->batch_id) {
+        case GEOM_LINE:
+        case GEOM_POLYLINE:
+        case GEOM_ARC:
+        case GEOM_POLYGON:
+        case GEOM_HELIX:
+        case GEOM_BEZIER:
+            if (r->instance_slot == (uint32_t)old_slot) {
+                r->instance_slot = (uint32_t)new_slot;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static inline void jsonl_observer_rebind_point_slot_owner(ecs_scene_t *scene,
+                                                          uint64_t entity_id,
+                                                          int old_slot,
+                                                          int new_slot) {
+    if (!scene || entity_id == 0) return;
+    ecs_entity_t entity = (ecs_entity_t)entity_id;
+    if (!ecs_is_alive(scene->world->world, entity)) return;
+
+    RenderableComp *r = ecs_world_get_renderable(scene->world, entity);
+    if (!r) return;
+
+    switch ((geometry_type_t)r->batch_id) {
+        case GEOM_POINT:
+        case GEOM_POINT_CLOUD:
+            if (r->instance_slot == (uint32_t)old_slot) {
+                r->instance_slot = (uint32_t)new_slot;
+            }
+            break;
+        case GEOM_POLYLINE:
+        case GEOM_ARC:
+        case GEOM_POLYGON:
+        case GEOM_HELIX:
+        case GEOM_BEZIER:
+            if (r->join_slot_start == (uint32_t)old_slot) {
+                r->join_slot_start = (uint32_t)new_slot;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static inline void jsonl_observer_compact_instance_buffer(instance_buffer_t *ib,
+                                                          ecs_scene_t *scene,
+                                                          bool point_buffer) {
+    if (!ib) return;
+
+    int old_count = ib->count;
+    if (old_count <= 0) {
+        ib->free_count = 0;
+        return;
+    }
+
+    int write = 0;
+    bool changed = (ib->free_count != 0);
+    for (int read = 0; read < old_count; read++) {
+        uint64_t entity_id = ib->slot_to_entity[read];
+        if (entity_id == 0) {
+            changed = true;
+            continue;
+        }
+
+        if (read != write) {
+            memmove((char *)ib->staging + ((size_t)write * ib->instance_size),
+                    (char *)ib->staging + ((size_t)read * ib->instance_size),
+                    ib->instance_size);
+            ib->slot_to_entity[write] = entity_id;
+            ib->slot_geom_type[write] = ib->slot_geom_type[read];
+            ib->slot_to_entity[read] = 0;
+            ib->slot_geom_type[read] = 0;
+            if (point_buffer) {
+                jsonl_observer_rebind_point_slot_owner(scene, entity_id, read, write);
+            } else {
+                jsonl_observer_rebind_line_slot_owner(scene, entity_id, read, write);
+            }
+            changed = true;
+        }
+        write++;
+    }
+
+    if (!changed && write == old_count) return;
+
+    for (int slot = write; slot < old_count; slot++) {
+        ib->slot_to_entity[slot] = 0;
+        ib->slot_geom_type[slot] = 0;
+    }
+
+    ib->count = write;
+    ib->free_count = 0;
+    ib->needs_upload = true;
+    ib->dirty_min = 0;
+    ib->dirty_max = (old_count > 0) ? (old_count - 1) : -1;
+}
+
+static inline void jsonl_observer_compact_flat_render_buffers(ecs_scene_t *scene) {
+    if (!scene) return;
+    jsonl_observer_compact_instance_buffer(&scene->batches.lines.instances, scene, false);
+    jsonl_observer_compact_instance_buffer(&scene->batches.points.instances, scene, true);
 }
 
 static inline bool jsonl_observer_commit_flat_refresh(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
@@ -105,7 +254,8 @@ static inline bool jsonl_observer_commit_flat_refresh(ecs_scene_t *scene, jsonl_
         new_collected = scene_get_children(scene, slot->stage_root, new_children, new_child_count);
     }
 
-    bool move_selection_to_root = jsonl_observer_selected_descendant_replaced(slot, scene);
+    bool move_selection_to_root = slot->selection_root_fallback ||
+                                  jsonl_observer_selected_descendant_replaced(slot, scene);
 
     if (new_collected > 0) {
         scene_set_parent_batch(scene, new_children, new_collected, slot->target_root);
@@ -142,10 +292,12 @@ static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, js
     if (!slot) return;
     if (scene) {
         jsonl_observer_abort_flat_refresh_stage(scene, slot);
+        jsonl_observer_compact_flat_render_buffers(scene);
     }
     jsonl_import_job_reset(&slot->job);
     slot->active = false;
     slot->pending_rerun = false;
+    slot->selection_root_fallback = false;
     slot->world = NULL;
     slot->target_root = 0;
     slot->started_at_ms = 0u;
@@ -165,6 +317,22 @@ static inline void jsonl_observer_comp_push_message_unique(JsonlObserverComp *ob
         }
     }
     jsonl_observer_comp_push_message(obs, severity, message);
+}
+
+static inline void jsonl_observer_apply_flat_cleanup_anomaly_policy(JsonlObserverComp *obs,
+                                                                    uint64_t elapsed_ms) {
+    if (!obs) return;
+
+    char msg[JSONL_OBSERVER_MESSAGE_MAX];
+    snprintf(msg, sizeof(msg), "Flat refresh failed after %llums; kept last-good content.",
+             (unsigned long long)elapsed_ms);
+    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING, msg);
+
+    obs->observe_enabled = false;
+    jsonl_observer_comp_push_message_unique(
+        obs,
+        JSONL_OBSERVER_MSG_WARNING,
+        "Refresh cleanup anomaly detected; observe disabled for safety.");
 }
 
 static inline void jsonl_observer_apply_retry_policy(JsonlObserverComp *obs,
@@ -261,6 +429,12 @@ static inline bool jsonl_observer_request_flat_refresh(ecs_scene_t *scene,
 
     jsonl_flat_refresh_slot_t *existing = jsonl_observer_find_flat_refresh_slot(scene, root_entity);
     if (existing) {
+        if (selection) {
+            existing->selection = selection;
+        }
+        if (jsonl_observer_selection_targets_root_descendant(selection, scene, root_entity)) {
+            existing->selection_root_fallback = true;
+        }
         if (!existing->pending_rerun) {
             existing->pending_rerun = true;
             jsonl_observer_comp_push_message_unique(obs, JSONL_OBSERVER_MSG_INFO,
@@ -279,6 +453,7 @@ static inline bool jsonl_observer_request_flat_refresh(ecs_scene_t *scene,
     memset(slot, 0, sizeof(*slot));
     slot->active = true;
     slot->pending_rerun = false;
+    slot->selection_root_fallback = jsonl_observer_selection_targets_root_descendant(selection, scene, root_entity);
     slot->world = scene->world;
     slot->target_root = root_entity;
     slot->started_at_ms = scene_solver_now_ms();
@@ -338,7 +513,8 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
 
         if (slot->job.state == JSONL_JOB_COMPLETE && slot->job.root_entity != 0) {
             slot->stage_root = slot->job.root_entity;
-            if (jsonl_observer_commit_flat_refresh(scene, slot)) {
+            bool force_cleanup_failure = jsonl_observer_consume_next_flat_cleanup_failure_for_tests();
+            if (!force_cleanup_failure && jsonl_observer_commit_flat_refresh(scene, slot)) {
                 if (obs) {
                     if (obs->source_path[0] != '\0') {
                         (void)jsonl_observer_stamp_source_state(obs, obs->source_path);
@@ -359,10 +535,7 @@ static inline void jsonl_observer_tick_flat_refreshes(ecs_scene_t *scene) {
             } else {
                 jsonl_observer_abort_flat_refresh_stage(scene, slot);
                 if (obs) {
-                    char msg[JSONL_OBSERVER_MESSAGE_MAX];
-                    snprintf(msg, sizeof(msg), "Flat refresh failed after %llums; kept last-good content.",
-                             (unsigned long long)elapsed_ms);
-                    jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_WARNING, msg);
+                    jsonl_observer_apply_flat_cleanup_anomaly_policy(obs, elapsed_ms);
                 }
             }
         } else {

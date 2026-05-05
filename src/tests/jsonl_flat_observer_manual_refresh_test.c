@@ -912,47 +912,72 @@ static int test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence(vo
         jsonl_import_job_t job = {0};
         ecs_entity_t root = 0;
         if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+            fprintf(stderr, "  fail: initial flat import failed for tier=%d\n", tiers[t]);
             failed = 1;
         }
         if (!failed) {
             root = job.root_entity;
-            if (root == 0 || !ecs_is_alive(world.world, root)) failed = 1;
+            if (root == 0 || !ecs_is_alive(world.world, root)) {
+                fprintf(stderr, "  fail: root invalid after initial import for tier=%d root=%llu alive=%d\n",
+                        tiers[t], (unsigned long long)root,
+                        (int)(root != 0 && ecs_is_alive(world.world, root)));
+                failed = 1;
+            }
         }
 
         for (int cycle = 0; cycle < 3 && !failed; cycle++) {
             ecs_entity_t selected_child = find_first_geometry_under_root(&scene, root);
             if (selected_child == 0 || !ecs_is_alive(world.world, selected_child)) {
+                fprintf(stderr, "  fail: selected child invalid before cycle=%d tier=%d child=%llu\n",
+                        cycle, tiers[t], (unsigned long long)selected_child);
                 failed = 1;
                 break;
             }
             selection_set_single(&selection, selected_child);
             if (selection_count(&selection) != 1 || selection_get(&selection, 0) != selected_child) {
+                fprintf(stderr, "  fail: selection did not hold child before cycle=%d tier=%d count=%d selected=%llu expected=%llu\n",
+                        cycle, tiers[t], selection_count(&selection),
+                        (unsigned long long)selection_get(&selection, 0),
+                        (unsigned long long)selected_child);
                 failed = 1;
                 break;
             }
 
             if (!write_jsonl_point_fixture(fixture, tiers[t] + cycle + 1)) {
+                fprintf(stderr, "  fail: fixture rewrite failed for cycle=%d tier=%d target_count=%d\n",
+                        cycle, tiers[t], tiers[t] + cycle + 1);
                 failed = 1;
                 break;
             }
             if (!jsonl_observer_request_flat_refresh(&scene, root, &selection)) {
+                fprintf(stderr, "  fail: refresh request rejected for cycle=%d tier=%d\n", cycle, tiers[t]);
                 failed = 1;
                 break;
             }
             if (!tick_refresh_until_idle(&scene, root, 50000)) {
+                fprintf(stderr, "  fail: refresh did not settle for cycle=%d tier=%d\n", cycle, tiers[t]);
                 failed = 1;
                 break;
             }
 
             if (!ecs_is_alive(world.world, root)) {
+                fprintf(stderr, "  fail: root died after cycle=%d tier=%d root=%llu\n",
+                        cycle, tiers[t], (unsigned long long)root);
                 failed = 1;
                 break;
             }
             if (selection_count(&selection) != 1 || selection_get(&selection, 0) != root) {
+                fprintf(stderr, "  fail: selection did not fall back to root after cycle=%d tier=%d count=%d selected=%llu expected=%llu\n",
+                        cycle, tiers[t], selection_count(&selection),
+                        (unsigned long long)selection_get(&selection, 0),
+                        (unsigned long long)root);
                 failed = 1;
                 break;
             }
             if (count_geometry_under_root(&scene, root) != tiers[t] + cycle + 1) {
+                fprintf(stderr, "  fail: geometry count mismatch after cycle=%d tier=%d expected=%d got=%d\n",
+                        cycle, tiers[t], tiers[t] + cycle + 1,
+                        count_geometry_under_root(&scene, root));
                 failed = 1;
                 break;
             }
