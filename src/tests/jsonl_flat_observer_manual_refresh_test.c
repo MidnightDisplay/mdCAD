@@ -45,6 +45,37 @@ static bool write_jsonl_point_fixture(const char *path, int point_count) {
     return true;
 }
 
+static bool write_jsonl_polyline_fixture(const char *path, int point_count, float y_offset) {
+    if (!path || point_count < 2) return false;
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+
+    if (fputs("{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"Polyline\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.PolyLine3D\",\"Points\":[", f) < 0) {
+        fclose(f);
+        return false;
+    }
+
+    for (int i = 0; i < point_count; i++) {
+        if (i > 0 && fputs(",", f) < 0) {
+            fclose(f);
+            return false;
+        }
+        float y = y_offset + ((i % 2) ? 1.0f : 0.0f);
+        if (fprintf(f, "{\"X\":%d,\"Y\":%.3f,\"Z\":0}", i, (double)y) < 0) {
+            fclose(f);
+            return false;
+        }
+    }
+
+    if (fputs("]}}]}\n", f) < 0) {
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+    return true;
+}
+
 static bool run_flat_import_to_completion(ecs_scene_t *scene,
                                           const char *path,
                                           bool link_enabled,
@@ -145,6 +176,67 @@ static int count_geometry_under_root(ecs_scene_t *scene, ecs_entity_t root) {
 
     free(root_children);
     return geometry_count;
+}
+
+typedef struct {
+    int line_slots;
+    int point_slots;
+} slot_footprint_t;
+
+static void accumulate_renderable_slot_footprint(const RenderableComp *r, slot_footprint_t *footprint) {
+    if (!r || !footprint || r->instance_slot == 0xFFFFFFFF) return;
+
+    switch ((geometry_type_t)r->batch_id) {
+        case GEOM_LINE:
+            footprint->line_slots += 1;
+            break;
+        case GEOM_POINT:
+            footprint->point_slots += 1;
+            break;
+        case GEOM_POLYLINE:
+        case GEOM_POLYGON:
+        case GEOM_ARC:
+        case GEOM_BEZIER:
+        case GEOM_HELIX:
+            footprint->line_slots += (int)r->segment_count;
+            footprint->point_slots += (int)r->join_count;
+            break;
+        case GEOM_POINT_CLOUD:
+            footprint->point_slots += (int)r->segment_count;
+            break;
+        default:
+            break;
+    }
+}
+
+static slot_footprint_t count_slot_footprint_under_root(ecs_scene_t *scene, ecs_entity_t root) {
+    slot_footprint_t footprint = {0};
+    if (!scene || root == 0) return footprint;
+
+    int root_child_count = scene_count_children(scene, root);
+    if (root_child_count <= 0) return footprint;
+
+    ecs_entity_t *root_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)root_child_count);
+    if (!root_children) return footprint;
+    int root_collected = scene_get_children(scene, root, root_children, root_child_count);
+
+    for (int i = 0; i < root_collected; i++) {
+        ecs_entity_t entry = root_children[i];
+        int entry_child_count = scene_count_children(scene, entry);
+        if (entry_child_count <= 0) continue;
+
+        ecs_entity_t *entry_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)entry_child_count);
+        if (!entry_children) continue;
+        int entry_collected = scene_get_children(scene, entry, entry_children, entry_child_count);
+        for (int j = 0; j < entry_collected; j++) {
+            RenderableComp *r = ecs_world_get_renderable(scene->world, entry_children[j]);
+            accumulate_renderable_slot_footprint(r, &footprint);
+        }
+        free(entry_children);
+    }
+
+    free(root_children);
+    return footprint;
 }
 
 static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity, int max_ticks) {
@@ -631,6 +723,176 @@ static int test_flat_manual_refresh_works_after_auto_disable(void) {
     return failed;
 }
 
+static int test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint(void) {
+    const char *fixture = "jsonl_flat_observer_manual_exact_footprint.jsonl";
+    const int cycle_points[] = { 4, 4, 6 };
+    const float cycle_offsets[] = { 0.0f, 3.0f, 6.0f };
+    if (!write_jsonl_polyline_fixture(fixture, cycle_points[0], cycle_offsets[0])) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    for (int cycle = 0; cycle < 3 && !failed; cycle++) {
+        if (!write_jsonl_polyline_fixture(fixture, cycle_points[cycle], cycle_offsets[cycle])) {
+            fprintf(stderr, "  fail: write fixture for cycle %d failed\n", cycle);
+            failed = 1;
+            break;
+        }
+        if (!jsonl_observer_request_flat_refresh(&scene, root, NULL)) {
+            fprintf(stderr, "  fail: manual refresh request %d failed\n", cycle);
+            failed = 1;
+            break;
+        }
+        if (!tick_refresh_until_idle(&scene, root, 50000)) {
+            fprintf(stderr, "  fail: manual refresh %d did not settle\n", cycle);
+            failed = 1;
+            break;
+        }
+
+        slot_footprint_t expected = count_slot_footprint_under_root(&scene, root);
+        int live_line_slots = instance_buffer_live_count(&scene.batches.lines.instances);
+        int live_point_slots = instance_buffer_live_count(&scene.batches.points.instances);
+        if (live_line_slots != expected.line_slots) {
+            fprintf(stderr, "  fail: cycle %d live line slots mismatch expected=%d got=%d\n",
+                    cycle, expected.line_slots, live_line_slots);
+            failed = 1;
+            break;
+        }
+        if (live_point_slots != expected.point_slots) {
+            fprintf(stderr, "  fail: cycle %d live point slots mismatch expected=%d got=%d\n",
+                    cycle, expected.point_slots, live_point_slots);
+            failed = 1;
+            break;
+        }
+        if (scene.batches.lines.instances.count != expected.line_slots) {
+            fprintf(stderr, "  fail: cycle %d line slot span mismatch expected=%d got=%d\n",
+                    cycle, expected.line_slots, scene.batches.lines.instances.count);
+            failed = 1;
+            break;
+        }
+        if (scene.batches.points.instances.count != expected.point_slots) {
+            fprintf(stderr, "  fail: cycle %d point slot span mismatch expected=%d got=%d\n",
+                    cycle, expected.point_slots, scene.batches.points.instances.count);
+            failed = 1;
+            break;
+        }
+        if (scene.batches.lines.instances.free_count != 0) {
+            fprintf(stderr, "  fail: cycle %d line buffer retained %d free slots\n",
+                    cycle, scene.batches.lines.instances.free_count);
+            failed = 1;
+            break;
+        }
+        if (scene.batches.points.instances.free_count != 0) {
+            fprintf(stderr, "  fail: cycle %d point buffer retained %d free slots\n",
+                    cycle, scene.batches.points.instances.free_count);
+            failed = 1;
+            break;
+        }
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
+static int test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe(void) {
+    const char *fixture = "jsonl_flat_observer_cleanup_anomaly.jsonl";
+    const char *first_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}}]}"
+    };
+    const char *second_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}}]}"
+    };
+    if (!write_jsonl_fixture_lines(fixture, first_lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    int old_geometry_count = 0;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer\n");
+            failed = 1;
+        }
+    }
+    if (!failed) {
+        old_geometry_count = count_geometry_under_root(&scene, root);
+        if (old_geometry_count != 1) {
+            fprintf(stderr, "  fail: expected initial geometry count 1, got %d\n", old_geometry_count);
+            failed = 1;
+        }
+    }
+    if (!failed && !write_jsonl_fixture_lines(fixture, second_lines, 1)) {
+        fprintf(stderr, "  fail: rewrite fixture failed\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        jsonl_observer_force_next_flat_cleanup_failure_for_tests();
+        if (!jsonl_observer_request_flat_refresh(&scene, root, NULL)) {
+            fprintf(stderr, "  fail: manual refresh request failed\n");
+            failed = 1;
+        }
+    }
+    if (!failed && !tick_refresh_until_idle(&scene, root, 10000)) {
+        fprintf(stderr, "  fail: refresh did not settle after forced anomaly\n");
+        failed = 1;
+    }
+
+    if (!failed && count_geometry_under_root(&scene, root) != old_geometry_count) {
+        fprintf(stderr, "  fail: cleanup anomaly changed committed geometry count\n");
+        failed = 1;
+    }
+    if (!failed && observer->observe_enabled) {
+        fprintf(stderr, "  fail: cleanup anomaly should disable observe\n");
+        failed = 1;
+    }
+    if (!failed && !observer_contains_message(observer, "observe disabled")) {
+        fprintf(stderr, "  fail: missing safety-disable warning after cleanup anomaly\n");
+        failed = 1;
+    }
+    if (!failed && strcmp(observer->source_path, fixture) != 0) {
+        fprintf(stderr, "  fail: cleanup anomaly should keep source_path intact\n");
+        failed = 1;
+    }
+    if (!failed && !observer->linked) {
+        fprintf(stderr, "  fail: cleanup anomaly should keep linked=true\n");
+        failed = 1;
+    }
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, NULL)) {
+        fprintf(stderr, "  fail: manual refresh should remain available after cleanup anomaly\n");
+        failed = 1;
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence(void) {
     static const int tiers[] = { 24, 240, 1200 };
     int failed = 0;
@@ -724,6 +986,10 @@ int main(void) {
           test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label },
         { "test_flat_manual_refresh_works_after_auto_disable",
           test_flat_manual_refresh_works_after_auto_disable },
+        { "test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint",
+          test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint },
+        { "test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe",
+          test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe },
         { "test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence",
           test_flat_manual_refresh_repeated_cycles_preserve_anchor_coherence },
     };

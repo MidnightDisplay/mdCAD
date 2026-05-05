@@ -44,6 +44,37 @@ static bool write_jsonl_point_fixture(const char *path, int point_count) {
     return true;
 }
 
+static bool write_jsonl_polyline_fixture(const char *path, int point_count, float y_offset) {
+    if (!path || point_count < 2) return false;
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+
+    if (fputs("{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"Polyline\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.PolyLine3D\",\"Points\":[", f) < 0) {
+        fclose(f);
+        return false;
+    }
+
+    for (int i = 0; i < point_count; i++) {
+        if (i > 0 && fputs(",", f) < 0) {
+            fclose(f);
+            return false;
+        }
+        float y = y_offset + ((i % 2) ? 1.0f : 0.0f);
+        if (fprintf(f, "{\"X\":%d,\"Y\":%.3f,\"Z\":0}", i, (double)y) < 0) {
+            fclose(f);
+            return false;
+        }
+    }
+
+    if (fputs("]}}]}\n", f) < 0) {
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+    return true;
+}
+
 static bool run_flat_import_to_completion(ecs_scene_t *scene,
                                           const char *path,
                                           bool link_enabled,
@@ -104,6 +135,67 @@ static int count_geometry_under_root(ecs_scene_t *scene, ecs_entity_t root) {
 
     free(root_children);
     return geometry_count;
+}
+
+typedef struct {
+    int line_slots;
+    int point_slots;
+} slot_footprint_t;
+
+static void accumulate_renderable_slot_footprint(const RenderableComp *r, slot_footprint_t *footprint) {
+    if (!r || !footprint || r->instance_slot == 0xFFFFFFFF) return;
+
+    switch ((geometry_type_t)r->batch_id) {
+        case GEOM_LINE:
+            footprint->line_slots += 1;
+            break;
+        case GEOM_POINT:
+            footprint->point_slots += 1;
+            break;
+        case GEOM_POLYLINE:
+        case GEOM_POLYGON:
+        case GEOM_ARC:
+        case GEOM_BEZIER:
+        case GEOM_HELIX:
+            footprint->line_slots += (int)r->segment_count;
+            footprint->point_slots += (int)r->join_count;
+            break;
+        case GEOM_POINT_CLOUD:
+            footprint->point_slots += (int)r->segment_count;
+            break;
+        default:
+            break;
+    }
+}
+
+static slot_footprint_t count_slot_footprint_under_root(ecs_scene_t *scene, ecs_entity_t root) {
+    slot_footprint_t footprint = {0};
+    if (!scene || root == 0) return footprint;
+
+    int root_child_count = scene_count_children(scene, root);
+    if (root_child_count <= 0) return footprint;
+
+    ecs_entity_t *root_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)root_child_count);
+    if (!root_children) return footprint;
+    int root_collected = scene_get_children(scene, root, root_children, root_child_count);
+
+    for (int i = 0; i < root_collected; i++) {
+        ecs_entity_t entry = root_children[i];
+        int entry_child_count = scene_count_children(scene, entry);
+        if (entry_child_count <= 0) continue;
+
+        ecs_entity_t *entry_children = (ecs_entity_t *)malloc(sizeof(ecs_entity_t) * (size_t)entry_child_count);
+        if (!entry_children) continue;
+        int entry_collected = scene_get_children(scene, entry, entry_children, entry_child_count);
+        for (int j = 0; j < entry_collected; j++) {
+            RenderableComp *r = ecs_world_get_renderable(scene->world, entry_children[j]);
+            accumulate_renderable_slot_footprint(r, &footprint);
+        }
+        free(entry_children);
+    }
+
+    free(root_children);
+    return footprint;
 }
 
 static ecs_entity_t find_first_geometry_under_root(ecs_scene_t *scene, ecs_entity_t root) {
@@ -511,6 +603,138 @@ static int test_flat_observe_burst_coalesces_one_pending_rerun(void) {
     return failed;
 }
 
+static int test_flat_observe_auto_refresh_settles_to_exact_live_footprint(void) {
+    const char *fixture = "jsonl_flat_observer_auto_exact_footprint.jsonl";
+    if (!write_jsonl_polyline_fixture(fixture, 4, 0.0f)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    if (!run_flat_import_to_completion(&scene, fixture, true, &job)) {
+        fprintf(stderr, "  fail: initial linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer on linked root\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed) {
+        observer->linked = true;
+        observer->observe_enabled = true;
+        observer->interval_ms = 1u;
+        observer->max_retries = 5u;
+        observer->retry_count = 0u;
+        observer->next_retry_at_ms = 0u;
+        if (!jsonl_observer_stamp_source_state(observer, fixture)) {
+            fprintf(stderr, "  fail: stamp source state failed\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_polyline_fixture(fixture, 6, 3.0f)) {
+        fprintf(stderr, "  fail: rewrite fixture failed\n");
+        failed = 1;
+    }
+
+    slot_footprint_t expected = {0};
+    int settled_line_count = 0;
+    int settled_point_count = 0;
+    int settled_line_free = 0;
+    int settled_point_free = 0;
+    if (!failed) {
+        uint64_t now_ms = scene_solver_now_ms();
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
+        if (!jsonl_observer_is_flat_refresh_running(&scene, root)) {
+            fprintf(stderr, "  fail: auto refresh did not start\n");
+            failed = 1;
+        }
+        if (!failed && !tick_refresh_until_idle(&scene, root, 20000)) {
+            fprintf(stderr, "  fail: auto refresh did not settle\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed) {
+        expected = count_slot_footprint_under_root(&scene, root);
+        settled_line_count = scene.batches.lines.instances.count;
+        settled_point_count = scene.batches.points.instances.count;
+        settled_line_free = scene.batches.lines.instances.free_count;
+        settled_point_free = scene.batches.points.instances.free_count;
+        int live_line_slots = instance_buffer_live_count(&scene.batches.lines.instances);
+        int live_point_slots = instance_buffer_live_count(&scene.batches.points.instances);
+
+        if (expected.line_slots != 5 || expected.point_slots != 4) {
+            fprintf(stderr, "  fail: expected 6-point polyline footprint 5/4, got %d/%d\n",
+                    expected.line_slots, expected.point_slots);
+            failed = 1;
+        }
+        if (!failed && live_line_slots != expected.line_slots) {
+            fprintf(stderr, "  fail: live line slots mismatch expected=%d got=%d\n",
+                    expected.line_slots, live_line_slots);
+            failed = 1;
+        }
+        if (!failed && live_point_slots != expected.point_slots) {
+            fprintf(stderr, "  fail: live point slots mismatch expected=%d got=%d\n",
+                    expected.point_slots, live_point_slots);
+            failed = 1;
+        }
+        if (!failed && settled_line_count != expected.line_slots) {
+            fprintf(stderr, "  fail: settled line slot span mismatch expected=%d got=%d\n",
+                    expected.line_slots, settled_line_count);
+            failed = 1;
+        }
+        if (!failed && settled_point_count != expected.point_slots) {
+            fprintf(stderr, "  fail: settled point slot span mismatch expected=%d got=%d\n",
+                    expected.point_slots, settled_point_count);
+            failed = 1;
+        }
+        if (!failed && settled_line_free != 0) {
+            fprintf(stderr, "  fail: settled line buffer retained %d free slots\n", settled_line_free);
+            failed = 1;
+        }
+        if (!failed && settled_point_free != 0) {
+            fprintf(stderr, "  fail: settled point buffer retained %d free slots\n", settled_point_free);
+            failed = 1;
+        }
+    }
+
+    if (!failed) {
+        uint64_t base_ms = scene_solver_now_ms() + 10u;
+        for (int i = 0; i < 3; i++) {
+            jsonl_observer_system_tick(&scene, base_ms + (uint64_t)(i * 2u), NULL);
+            if (jsonl_observer_is_flat_refresh_running(&scene, root)) {
+                fprintf(stderr, "  fail: unchanged source started a late refresh on settle tick %d\n", i);
+                failed = 1;
+                break;
+            }
+            if (scene.batches.lines.instances.count != settled_line_count ||
+                scene.batches.points.instances.count != settled_point_count ||
+                scene.batches.lines.instances.free_count != settled_line_free ||
+                scene.batches.points.instances.free_count != settled_point_free) {
+                fprintf(stderr, "  fail: settled slot footprint drifted on late tick %d\n", i);
+                failed = 1;
+                break;
+            }
+        }
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_observe_tiered_fixtures_stay_operational(void) {
     static const int tiers[] = { 24, 240, 1200 };
     int failed = 0;
@@ -639,6 +863,8 @@ int main(void) {
           test_flat_observe_burst_coalesces_one_pending_rerun },
         { "test_flat_observe_tiered_fixtures_stay_operational",
           test_flat_observe_tiered_fixtures_stay_operational },
+        { "test_flat_observe_auto_refresh_settles_to_exact_live_footprint",
+          test_flat_observe_auto_refresh_settles_to_exact_live_footprint },
         { "test_flat_observe_auto_refresh_preserves_selection_to_root",
           test_flat_observe_auto_refresh_preserves_selection_to_root },
     };
