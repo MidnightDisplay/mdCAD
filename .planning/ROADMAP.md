@@ -26,7 +26,11 @@
   1. User can import a large flat JSONL file with linking enabled and still see the full line/point geometry after the import settles.
   2. Scene Hierarchy totals for the linked import converge to the committed final counts instead of continuing to climb.
   3. The committed linked import remains visually complete rather than collapsing to a later tail subset.
-**Plans**: 0 (not started)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 41-01-PLAN.md — Arm linked-import observer baseline at commit time and lock deterministic no-self-refresh regressions.
+- [ ] 41-02-PLAN.md — Record the exact lamp_11 manual convergence checklist and run the blocking acceptance pass.
 
 ### Phase 42: Refresh & Teardown Stability
 **Goal**: Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state.  
