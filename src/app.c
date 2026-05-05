@@ -1865,21 +1865,8 @@ static void frame(void) {
             if (count > 0) {
                 ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
                 selection_copy_entities(&state.selection, to_delete, count);
-
-                // Record one atomic delete command so undo can restore coupled side-effects (e.g., constraints).
-                undo_cmd_bulk_delete_entities(&state.undo_redo, to_delete, count);
-
-                // Clear selection first (before deleting entities)
-                selection_clear(&state.selection);
-
-                // Delete all entities
-                for (int i = 0; i < count; i++) {
-                    scene_remove_entity(&state.ecs_scene, to_delete[i]);
-                }
+                ui_scene_hierarchy_delete_entities(&state.scene_hierarchy, to_delete, count);
                 free(to_delete);
-
-                // Mark scene hierarchy cache dirty
-                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
             }
         }
     }

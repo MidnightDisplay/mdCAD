@@ -280,12 +280,44 @@ static inline bool jsonl_observer_commit_flat_refresh(ecs_scene_t *scene, jsonl_
     return true;
 }
 
+static inline void jsonl_observer_abort_flat_refresh_inflight_entities(ecs_scene_t *scene,
+                                                                       jsonl_flat_refresh_slot_t *slot) {
+    if (!scene || !slot) return;
+
+    jsonl_import_job_t *job = &slot->job;
+    if (job->root_entity != 0 && ecs_is_alive(scene->world->world, job->root_entity)) {
+        scene_remove_entity(scene, job->root_entity);
+    }
+
+    if (job->entry_entities) {
+        int entry_count = job->parse_state.data.entry_count;
+        for (int i = 0; i < entry_count; i++) {
+            ecs_entity_t entry = job->entry_entities[i];
+            if (entry != 0 && ecs_is_alive(scene->world->world, entry)) {
+                scene_remove_entity(scene, entry);
+            }
+        }
+    }
+
+    if (job->all_created_entities) {
+        for (int i = 0; i < job->all_created_count; i++) {
+            ecs_entity_t created = job->all_created_entities[i];
+            if (created != 0 && ecs_is_alive(scene->world->world, created)) {
+                scene_remove_entity(scene, created);
+            }
+        }
+    }
+
+    job->root_entity = 0;
+}
+
 static inline void jsonl_observer_abort_flat_refresh_stage(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
     if (!scene || !slot) return;
     if (slot->stage_root != 0 && ecs_is_alive(scene->world->world, slot->stage_root)) {
         scene_remove_entity(scene, slot->stage_root);
     }
     slot->stage_root = 0;
+    jsonl_observer_abort_flat_refresh_inflight_entities(scene, slot);
 }
 
 static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, jsonl_flat_refresh_slot_t *slot) {
@@ -302,6 +334,20 @@ static inline void jsonl_observer_reset_flat_refresh_slot(ecs_scene_t *scene, js
     slot->target_root = 0;
     slot->started_at_ms = 0u;
     slot->selection = NULL;
+}
+
+static inline void jsonl_observer_cancel_flat_refresh_for_root(ecs_scene_t *scene, ecs_entity_t root_entity) {
+    if (!scene || root_entity == 0 || !ecs_is_alive(scene->world->world, root_entity)) return;
+
+    jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(scene, root_entity);
+    if (!slot) return;
+
+    JsonlObserverComp *obs = ecs_world_get_jsonl_observer(scene->world, root_entity);
+    jsonl_observer_reset_flat_refresh_slot(scene, slot);
+    if (obs) {
+        jsonl_observer_comp_push_message(obs, JSONL_OBSERVER_MSG_INFO,
+                                         "Refresh canceled because the linked root was deleted.");
+    }
 }
 
 static inline void jsonl_observer_comp_push_message_unique(JsonlObserverComp *obs,

@@ -955,17 +955,51 @@ static inline bool ui_scene_hierarchy_is_flat_observer_refresh_running(ui_scene_
     return jsonl_observer_is_flat_refresh_running(state->scene, e);
 }
 
-static inline bool ui_scene_hierarchy_is_under_refreshing_flat_anchor(ui_scene_hierarchy_state_t *state,
-                                                                       ecs_entity_t e) {
-    if (!state || !state->scene || e == 0) return false;
-    ecs_entity_t current = scene_get_parent(state->scene, e);
+static inline ecs_entity_t ui_scene_hierarchy_find_refreshing_flat_anchor(ui_scene_hierarchy_state_t *state,
+                                                                           ecs_entity_t e) {
+    if (!state || !state->scene || e == 0) return 0;
+    ecs_entity_t current = e;
     while (current != 0 && ecs_is_alive(state->scene->world->world, current)) {
         if (ui_scene_hierarchy_is_flat_observer_refresh_running(state, current)) {
-            return true;
+            return current;
         }
         current = scene_get_parent(state->scene, current);
     }
-    return false;
+    return 0;
+}
+
+static inline bool ui_scene_hierarchy_is_under_refreshing_flat_anchor(ui_scene_hierarchy_state_t *state,
+                                                                       ecs_entity_t e) {
+    ecs_entity_t refresh_anchor = ui_scene_hierarchy_find_refreshing_flat_anchor(state, e);
+    return refresh_anchor != 0 && refresh_anchor != e;
+}
+
+static inline void ui_scene_hierarchy_delete_entities(ui_scene_hierarchy_state_t *state,
+                                                      const ecs_entity_t *entities,
+                                                      int count) {
+    if (!state || !state->scene || !entities || count <= 0) return;
+
+    if (state->undo_redo) {
+        undo_cmd_bulk_delete_entities(state->undo_redo, (ecs_entity_t*)entities, count);
+    }
+
+    for (int i = 0; i < count; i++) {
+        ecs_entity_t e = entities[i];
+        if (e == 0 || !ecs_is_alive(state->scene->world->world, e)) continue;
+
+        ecs_entity_t refresh_anchor = ui_scene_hierarchy_find_refreshing_flat_anchor(state, e);
+        jsonl_observer_cancel_flat_refresh_for_root(state->scene, refresh_anchor != 0 ? refresh_anchor : e);
+
+        if (state->selection) {
+            selection_remove(state->selection, e);
+        }
+        scene_remove_entity(state->scene, e);
+    }
+
+    if (state->selection) {
+        selection_prune_dead(state->selection);
+    }
+    state->cache_dirty = true;
 }
 
 //------------------------------------------------------------------------------
@@ -1073,9 +1107,11 @@ static inline bool ui_scene_hierarchy_draw_entity_leaf(ui_scene_hierarchy_state_
             state->cache_dirty = true;
         }
         igSeparator();
-        if (igMenuItem_Bool("Delete", "Del", false, !locked_by_refresh)) {
-            selection_remove(sel, e);
-            scene_remove_entity(state->scene, e);
+        if (locked_by_refresh) {
+            igTextDisabled("Delete will cancel the running flat refresh.");
+        }
+        if (igMenuItem_Bool("Delete", "Del", false, true)) {
+            ui_scene_hierarchy_delete_entities(state, &e, 1);
             entity_deleted = true;
         }
         igEndPopup();
@@ -1194,9 +1230,11 @@ static inline bool ui_scene_hierarchy_draw_entity_tree(ui_scene_hierarchy_state_
             state->cache_dirty = true;
         }
         igSeparator();
-        if (igMenuItem_Bool("Delete", "Del", false, !locked_by_refresh)) {
-            selection_remove(sel, e);
-            scene_remove_entity(state->scene, e);
+        if (locked_by_refresh) {
+            igTextDisabled("Delete will cancel the running flat refresh.");
+        }
+        if (igMenuItem_Bool("Delete", "Del", false, true)) {
+            ui_scene_hierarchy_delete_entities(state, &e, 1);
             entity_deleted = true;
         }
         igEndPopup();
