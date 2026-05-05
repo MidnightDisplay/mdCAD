@@ -29,7 +29,7 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 41-01-PLAN.md — Arm linked-import observer baseline at commit time and lock deterministic no-self-refresh regressions.
+- [x] 41-01-PLAN.md — Arm linked-import observer baseline at commit time and lock deterministic no-self-refresh regressions.
 - [ ] 41-02-PLAN.md — Record the exact lamp_11 manual convergence checklist and run the blocking acceptance pass.
 
 ### Phase 42: Refresh & Teardown Stability
@@ -47,5 +47,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 41. Linked Import Convergence | 0/0 | Pending | - |
+| 41. Linked Import Convergence | 1/2 | In Progress|  |
 | 42. Refresh & Teardown Stability | 0/0 | Pending | - |
