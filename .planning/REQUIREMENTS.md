@@ -40,18 +40,18 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIMP-05 | Phase TBD | Pending |
-| FIMP-06 | Phase TBD | Pending |
-| OBSF-07 | Phase TBD | Pending |
-| OBSF-08 | Phase TBD | Pending |
-| PERF-04 | Phase TBD | Pending |
-| PERF-05 | Phase TBD | Pending |
+| FIMP-05 | Phase 41 | Pending |
+| FIMP-06 | Phase 41 | Pending |
+| OBSF-07 | Phase 42 | Pending |
+| OBSF-08 | Phase 42 | Pending |
+| PERF-04 | Phase 42 | Pending |
+| PERF-05 | Phase 42 | Pending |
 
 **Coverage:**
 - v1.7 requirements: 6 total
-- Mapped to phases: 0
-- Unmapped: 6 ⚠️
+- Mapped to phases: 6
+- Unmapped: 0 ✅
 
 ---
 *Requirements defined: 2026-05-05*
-*Last updated: 2026-05-05 after initial definition*
+*Last updated: 2026-05-05 after roadmap creation*
