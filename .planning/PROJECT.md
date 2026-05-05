@@ -2,7 +2,7 @@
 
 ## What This Is
 
-mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of Sokol, Dear ImGui, and Flecs. v1.0 shipped a staged migration of core runtime math from the local `src/math3d.h` toward a project-owned `cglm` foundation while preserving native workflow stability.
+mdCAD is a cross-platform CAD viewer and geometry editor built in C on top of Sokol, Dear ImGui, and Flecs. It supports interactive scene editing, GPU-accelerated rendering, sketch/constraint workflows, import/export, and linked JSONL-driven geometry refresh across native targets.
 
 ## Core Value
 
@@ -12,9 +12,18 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Shipped:** `v1.6` — Observable Flat JSONL Import for Large Geometry Dumps (2026-04-27)
 
-**Current milestone:** not started (`/gsd-new-milestone`)
+**Current milestone:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability
 
-**Current focus:** define v1.7 requirements and roadmap.
+**Current focus:** define and execute a focused bug-fix milestone for large linked flat JSONL imports.
+
+## Current Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
+
+**Goal:** Fix the large-file regression in linked flat JSONL imports so import, refresh, and deletion all preserve the full rendered geometry.
+
+**Target features:**
+- Reproduce and isolate the linked large-file regression triggered by `Link file for refresh (optional)` on flat JSONL imports
+- Preserve full line-segment and joint-point visibility across initial import and subsequent observer-driven refresh activity
+- Remove all line/point instances cleanly when deleting a linked flat import root so no orphaned viewport or slot-buffer artifacts remain
 
 ## Last Shipped Milestone: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
 
@@ -68,12 +77,13 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Define v1.7 milestone scope and requirement set.
-- [ ] Map new requirements to phases and validation gates.
-- [ ] Start the next milestone execution cycle.
+- [ ] Large linked flat JSONL imports keep the full rendered geometry visible when observer linkage is enabled.
+- [ ] Linked flat import refresh activity does not delete, duplicate, or orphan earlier line/point slot allocations.
+- [ ] Deleting a linked flat import root fully cleans scene entities and GPU-visible geometry with no dangling artifacts.
 
 ### Out of Scope
 
+- Broad flat-import UX expansion beyond correctness of the linked large-file import, refresh, and deletion paths — keep v1.7 focused on regression closure
 - Full repo-wide big-bang replacement in a single step — staged migration is easier to verify and safer for existing native builds
 - Adoption of a C++ math library — the codebase is intentionally C-first and the user explicitly rejected C++ for this work
 - macOS parity as an equal-time dev gate during feature buildout — deferred until Windows Vulkan feature completion
@@ -83,6 +93,8 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 v1.0 and v1.1 are shipped and archived. v1.1 closed long-tail migration and validation gates across phases 6-9, including final boundary documentation and parity/perf/manual verification.
 
 v1.2 pivots to a larger feature system proposal captured in `docs/feature-proposal/Sketches, Constraints, Scripting.md`: constrained sketches, solver UX, and scripting-first bidirectional workflows.
+
+v1.7 is driven by a large-file regression in the flat JSONL observer path: with `File -> Import JSONL (Flat Large Dump)` plus `Link file for refresh (optional)`, scene totals keep climbing after the initial import appears complete, visible line segments collapse to a later tail subset, some joints remain as orphaned points, and deleting the import root leaves dangling geometry. The same file imported without live refresh does not reproduce the issue.
 
 ## Current State
 
@@ -104,12 +116,13 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 - Milestone `v1.6` is shipped with Phases 36-40 complete and archived.
 - v1.6 delivered flat-large JSONL import UX, anchor-scoped ingest, observer metadata/manual transactional refresh, automatic safety loop, and repeated-refresh coherence closure.
 - Milestone audit result is `tech_debt`: no blocker gaps; follow-up traceability/Nyquist metadata cleanup is deferred.
+- Milestone `v1.7` is starting as a focused bug-fix milestone for linked flat JSONL large-file refresh/render cleanup correctness.
 ## Next Milestone Goals
 
-1. Define v1.7 requirements with explicit user-facing outcomes.
-2. Convert deferred validation/traceability metadata debt into planned closure work.
-3. Establish the next roadmap slice and begin phase planning.
-4. Preserve current native build reliability while expanding capability.
+1. Reproduce and diagnose the linked flat JSONL large-file corruption using the provided `lamp_11.jsonl` scenario.
+2. Restore deterministic scene/render-slot ownership across import, refresh, and delete lifecycle events.
+3. Add milestone validation that protects against partial geometry loss and dangling cleanup artifacts for linked flat imports.
+4. Preserve current native build reliability while closing the v1.6 regression.
 
 ## Constraints
 
@@ -138,6 +151,7 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 | Scope v1.5 around solver workflow robustness + script re-apply integrity from real user scenarios | v1.4 closed baseline reliability, but user workflows still expose convergence and remap failures under larger jumps and script replay | Completed in v1.5 |
 | Add observable JSONL-as-sketch import with optional live observer and transactional reparse safety | User workflow required persisted link/reparse UX and non-destructive recovery behavior for iterative JSONL editing | Completed in v1.5 |
 | Scope v1.6 on observable flat JSONL scene import for high-entity files | Sketch import observability path is valuable but too heavy for huge geometry dumps; flat anchor import keeps live preview practical while preserving opt-in observability | Completed in v1.6 |
+| Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | — Pending |
 
 ## Evolution
 
@@ -157,4 +171,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-28 after completing milestone v1.6*
+*Last updated: 2026-05-05 after starting milestone v1.7*

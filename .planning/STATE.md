@@ -1,43 +1,43 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Observable Flat JSONL Import for Large Geometry Dumps
-status: milestone_complete
-stopped_at: v1.6 archived
-last_updated: "2026-04-28T14:30:00.000Z"
-last_activity: 2026-04-28
+milestone: v1.7
+milestone_name: Linked Flat JSONL Large-File Refresh Stability
+status: defining_requirements
+stopped_at: requirements definition
+last_updated: "2026-05-05T13:17:29.721+01:00"
+last_activity: 2026-05-05
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-28)
+See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Planning next milestone
+**Current focus:** Define and execute v1.7 linked flat JSONL large-file refresh stability work
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: -
+Phase: Not started (defining requirements)
 Plan: -
-Status: Milestone Complete
-Last activity: 2026-04-28
+Status: Defining requirements
+Last activity: 2026-05-05 - Milestone v1.7 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
-- Milestone v1.6 shipped: observable flat JSONL scene import for high-entity files with import-anchor observability and efficient refresh behavior.
-- Next scope is pending `/gsd-new-milestone`.
+- Milestone v1.7 started: linked flat-large JSONL imports must preserve full geometry during initial load, observer-driven refresh, and deletion cleanup on large files.
+- Focus is limited to the observer-enabled large-file regression path and its render-slot/entity cleanup consequences.
 
 ## Accumulated Context
 
@@ -89,14 +89,17 @@ Recent decisions affecting current work:
 - Milestone v1.6 initialized: Observable Flat JSONL Import for Large Geometry Dumps.
 - Roadmap v1.6 created: phases 36-40 map 11/11 requirements.
 - Milestone v1.6 archived to `.planning/milestones/v1.6-{ROADMAP,REQUIREMENTS}.md`.
+- Milestone v1.7 initialized: Linked Flat JSONL Large-File Refresh Stability.
 
 ### Pending Todos
 
-- Start `/gsd-new-milestone` to define v1.7 requirements and roadmap.
+- Define v1.7 requirements for linked flat JSONL large-file refresh stability.
+- Create v1.7 roadmap and map every requirement to a phase.
+- Begin planning the first v1.7 phase.
 
 ### Blockers/Concerns
 
-- No active milestone blockers.
+- Reproduction depends on large linked flat JSONL input (`lamp_11.jsonl`) where observer-enabled refresh behavior corrupts visible geometry and cleanup state.
 
 ### Quick Tasks Completed
 
@@ -106,6 +109,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-28T14:30:00.000Z
-Stopped at: Archived milestone v1.6
-Resume file: .planning/MILESTONES.md
+Last session: 2026-05-05T13:17:29.721+01:00
+Stopped at: Started milestone v1.7
+Resume file: .planning/PROJECT.md
