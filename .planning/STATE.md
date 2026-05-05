@@ -4,16 +4,16 @@ milestone: v1.7
 milestone_name: Linked Flat JSONL Large-File Refresh Stability
 current_phase: 42
 current_phase_name: Refresh & Teardown Stability
-status: planning
-stopped_at: Phase 41 complete; ready for Phase 42 planning
-last_updated: "2026-05-05T14:30:30.569Z"
-last_activity: 2026-05-05 - Phase 41 complete
-progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+ status: planning
+ stopped_at: Phase 42 planned; ready for execution
+ last_updated: "2026-05-05T15:30:00.000Z"
+ last_activity: 2026-05-05 - Phase 42 planned
+ progress:
+   total_phases: 2
+   completed_phases: 1
+   total_plans: 5
+   completed_plans: 2
+   percent: 50
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 42 (Refresh & Teardown Stability)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-05 - Phase 41 complete
+Plan: 42-01..42-03 ready
+Status: Planned; ready to execute
+Last activity: 2026-05-05 - Phase 42 planned
 
 Progress: [█████░░░░░] 50%
 
@@ -66,7 +66,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Discuss and plan Phase 42: Refresh & Teardown Stability.
+- Execute Phase 42 plans 42-01 through 42-03.
 - Fix the observed reload and `Re-import now` slot-growth behavior from the Phase 41 manual pass.
 - Close the remaining linked refresh/delete cleanup issues in v1.7.
 
@@ -83,5 +83,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-05T13:01:46.774Z
-Stopped at: Phase 41 complete; ready for Phase 42 planning
+Stopped at: Phase 42 planned; ready for execution
 Resume file: .planning/ROADMAP.md
