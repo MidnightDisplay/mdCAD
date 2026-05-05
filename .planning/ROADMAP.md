@@ -13,7 +13,7 @@
 
 ## Phases
 
-- [ ] **Phase 41: Linked Import Convergence** - Users can complete a linked large flat JSONL import and keep the full rendered geometry after import settles.
+- [x] **Phase 41: Linked Import Convergence** - Users can complete a linked large flat JSONL import and keep the full rendered geometry after import settles. (completed 2026-05-05)
 - [ ] **Phase 42: Refresh & Teardown Stability** - Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state.
 
 ## Phase Details
@@ -30,7 +30,7 @@
 
 Plans:
 - [x] 41-01-PLAN.md — Arm linked-import observer baseline at commit time and lock deterministic no-self-refresh regressions.
-- [ ] 41-02-PLAN.md — Record the exact lamp_11 manual convergence checklist and run the blocking acceptance pass.
+- [x] 41-02-PLAN.md — Record the exact lamp_11 manual convergence checklist and run the blocking acceptance pass.
 
 ### Phase 42: Refresh & Teardown Stability
 **Goal**: Users can refresh and delete linked large flat imports without geometry collapse, late churn, or orphaned render state.  
@@ -47,5 +47,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 41. Linked Import Convergence | 1/2 | In Progress|  |
+| 41. Linked Import Convergence | 2/2 | Complete | 2026-05-05 |
 | 42. Refresh & Teardown Stability | 0/0 | Pending | - |

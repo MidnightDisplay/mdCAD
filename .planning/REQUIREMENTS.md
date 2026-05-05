@@ -7,8 +7,8 @@
 
 ### Flat Import Steady State
 
-- [ ] **FIMP-05**: User can import a large flat JSONL file with `Link file for refresh (optional)` enabled and keep the full imported line/point geometry visible after the import settles.
-- [ ] **FIMP-06**: User can rely on Scene Hierarchy totals for a linked large flat import converging to the committed final entity counts instead of continuing to drift after geometry first appears in the viewport.
+- [x] **FIMP-05**: User can import a large flat JSONL file with `Link file for refresh (optional)` enabled and keep the full imported line/point geometry visible after the import settles.
+- [x] **FIMP-06**: User can rely on Scene Hierarchy totals for a linked large flat import converging to the committed final entity counts instead of continuing to drift after geometry first appears in the viewport.
 
 ### Anchor Observer Refresh
 
@@ -40,8 +40,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIMP-05 | Phase 41 | Pending |
-| FIMP-06 | Phase 41 | Pending |
+| FIMP-05 | Phase 41 | Complete |
+| FIMP-06 | Phase 41 | Complete |
 | OBSF-07 | Phase 42 | Pending |
 | OBSF-08 | Phase 42 | Pending |
 | PERF-04 | Phase 42 | Pending |
@@ -54,4 +54,4 @@
 
 ---
 *Requirements defined: 2026-05-05*
-*Last updated: 2026-05-05 after roadmap creation*
+*Last updated: 2026-05-05 after Phase 41 completion*

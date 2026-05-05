@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Linked Flat JSONL Large-File Refresh Stability
-current_phase: 41
-current_phase_name: Linked Import Convergence
-status: executing
-stopped_at: Completed 41-01-PLAN.md
-last_updated: "2026-05-05T13:01:46.777Z"
-last_activity: 2026-05-05 - Completed 41-01-PLAN.md
+current_phase: 42
+current_phase_name: Refresh & Teardown Stability
+status: planning
+stopped_at: Phase 41 complete; ready for Phase 42 planning
+last_updated: "2026-05-05T14:30:30.569Z"
+last_activity: 2026-05-05 - Phase 41 complete
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 50
 ---
 
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 41 — Linked Import Convergence (41-02 manual acceptance pending)
+**Current focus:** Phase 42 — Refresh & Teardown Stability
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 41 (Linked Import Convergence) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-05-05 - Completed 41-01-PLAN.md
+Phase: 42 (Refresh & Teardown Stability)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-05 - Phase 41 complete
 
 Progress: [█████░░░░░] 50%
 
@@ -66,9 +66,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Plan 41-02: write the `lamp_11.jsonl` manual convergence checklist and collect acceptance evidence.
-- Complete the manual linked-import verification pass against `lamp_11.jsonl`.
-- Carry remaining linked refresh/delete closure into Phase 42.
+- Discuss and plan Phase 42: Refresh & Teardown Stability.
+- Fix the observed reload and `Re-import now` slot-growth behavior from the Phase 41 manual pass.
+- Close the remaining linked refresh/delete cleanup issues in v1.7.
 
 ### Blockers/Concerns
 
@@ -83,5 +83,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-05T13:01:46.774Z
-Stopped at: Completed 41-01-PLAN.md
-Resume file: .planning/phases/41-linked-import-convergence/41-02-PLAN.md
+Stopped at: Phase 41 complete; ready for Phase 42 planning
+Resume file: .planning/ROADMAP.md
