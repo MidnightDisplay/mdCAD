@@ -45,7 +45,7 @@ Plans:
 
 Plans:
 - [x] 42-01-PLAN.md — Lock exact settled refresh occupancy, no-late-churn behavior, and cleanup-anomaly safety fallback.
-- [ ] 42-02-PLAN.md — Cancel active refresh work on delete and prove teardown plus undo restore only committed content.
+- [x] 42-02-PLAN.md — Cancel active refresh work on delete and prove teardown plus undo restore only committed content.
 - [ ] 42-03-PLAN.md — Capture the four-scenario `lamp_11.jsonl` lifecycle checklist and blocking manual closeout pass.
 
 ## Progress
@@ -53,4 +53,4 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 41. Linked Import Convergence | 2/2 | Complete | 2026-05-05 |
-| 42. Refresh & Teardown Stability | 1/3 | Executing | - |
+| 42. Refresh & Teardown Stability | 2/3 | Executing | - |

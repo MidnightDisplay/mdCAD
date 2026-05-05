@@ -5,15 +5,15 @@ milestone_name: Linked Flat JSONL Large-File Refresh Stability
 current_phase: 42
 current_phase_name: Refresh & Teardown Stability
 status: executing
-stopped_at: Phase 42 plan 01 complete; plan 02 next
-last_updated: "2026-05-05T16:12:00.000Z"
-last_activity: 2026-05-05 -- Phase 42 plan 01 completed
+stopped_at: Phase 42 plan 02 complete; plan 03 next
+last_updated: "2026-05-05T16:32:00.000Z"
+last_activity: 2026-05-05 -- Phase 42 plan 02 completed
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 42 (refresh-teardown-stability) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Executing Phase 42
-Last activity: 2026-05-05 -- Phase 42 plan 01 completed
+Last activity: 2026-05-05 -- Phase 42 plan 02 completed
 
-Progress: [██████░░░░] 60%
+Progress: [████████░░] 80%
 
 ## Milestone Scope
 
@@ -66,9 +66,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 42 plans 42-02 and 42-03.
-- Cancel active refresh work cleanly when linked flat import roots are deleted.
-- Run the four-scenario `lamp_11.jsonl` acceptance pass once teardown work lands.
+- Execute Phase 42 plan 42-03.
+- Create the blocking four-scenario `lamp_11.jsonl` manual checklist.
+- Run the manual lifecycle pass and capture viewport, hierarchy, and slot-buffer evidence.
 
 ### Blockers/Concerns
 
