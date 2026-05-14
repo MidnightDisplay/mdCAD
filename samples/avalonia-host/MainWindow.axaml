@@ -8,15 +8,19 @@
         MinHeight="480"
         Title="mdCAD Avalonia Host">
   <Grid RowDefinitions="Auto,*" Margin="12">
-    <StackPanel Spacing="4">
-      <TextBlock x:Name="StatusTextBlock"
-                 FontSize="18"
-                 FontWeight="SemiBold"
-                 Text="launching" />
-      <TextBlock x:Name="ModeTextBlock" />
-      <TextBlock x:Name="FailureTextBlock"
-                 TextWrapping="Wrap" />
-    </StackPanel>
+    <Border x:Name="HostChrome"
+            Focusable="True"
+            PointerPressed="OnHostChromePointerPressed">
+      <StackPanel Spacing="4">
+        <TextBlock x:Name="StatusTextBlock"
+                   FontSize="18"
+                   FontWeight="SemiBold"
+                   Text="launching" />
+        <TextBlock x:Name="ModeTextBlock" />
+        <TextBlock x:Name="FailureTextBlock"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
 
     <Border Grid.Row="1"
             Margin="0,12,0,0"

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -764,6 +765,18 @@ public partial class MainWindow : Window
     private void OnEmbedSurfaceSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         SyncAttachedChildBounds();
+    }
+
+    private void OnHostChromePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Control control)
+        {
+            control.Focus();
+            e.Handled = true;
+            return;
+        }
+
+        Focus();
     }
 
     private void SyncAttachedChildBounds()
