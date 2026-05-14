@@ -343,13 +343,16 @@ static bool mdcad_embedded_shortcuts_allowed(const ImGuiIO* io) {
     return embed_input_state_allows_shortcuts(&state.embed_input);
 }
 
-static bool mdcad_embedded_shortcut_pressed(ImGuiKeyChord key_chord) {
+static bool mdcad_embedded_shortcut_pressed(ImGuiKeyChord key_chord, ImGuiID owner_id) {
     if (!state.launch.embedded) {
         return false;
     }
-    // This shortcut block runs outside any specific ImGui window, so use a global route
-    // and let active text widgets keep ownership of their own shortcuts.
-    return igShortcut_Nil(key_chord, ImGuiInputFlags_RouteGlobal);
+    // This shortcut block runs outside any specific ImGui window, so bind routing to the
+    // persistent dockspace owner instead of inheriting an empty focus scope from the frame.
+    return igShortcut_ID(
+        key_chord,
+        ImGuiInputFlags_RouteGlobal | ImGuiInputFlags_RouteOverFocused,
+        owner_id);
 }
 
 static bool mdcad_handle_embedded_runtime_guards(void) {
@@ -2095,29 +2098,29 @@ static void frame(void) {
     if (mdcad_embedded_shortcuts_allowed(io)) {
         if (state.launch.embedded) {
             // Undo: Ctrl/Cmd+Z
-            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
+            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Z, dockspace_id)) {
                 if (undo_redo_undo(&state.undo_redo)) {
                     ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
                 }
             }
 
             // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
-            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z) ||
-                mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Y)) {
+            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, dockspace_id) ||
+                mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Y, dockspace_id)) {
                 if (undo_redo_redo(&state.undo_redo)) {
                     ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
                 }
             }
 
             // Tab: toggle gizmo edit mode (Transform <-> Geometry)
-            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Tab)) {
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Tab, dockspace_id)) {
                 gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
                     ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
                 gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
             }
 
             // C: open context-aware constraint authoring menu at cursor
-            if (mdcad_embedded_shortcut_pressed(ImGuiKey_C)) {
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_C, dockspace_id)) {
                 ecs_entity_t sketch = 0;
                 constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
                 uint32_t participant_count = 0;
@@ -2137,8 +2140,8 @@ static void frame(void) {
             }
 
             // Delete: Delete or Backspace (macOS) deletes selected entities
-            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Delete) ||
-                mdcad_embedded_shortcut_pressed(ImGuiKey_Backspace)) {
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Delete, dockspace_id) ||
+                mdcad_embedded_shortcut_pressed(ImGuiKey_Backspace, dockspace_id)) {
                 int count = state.selection.count;
                 if (count > 0) {
                     ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));

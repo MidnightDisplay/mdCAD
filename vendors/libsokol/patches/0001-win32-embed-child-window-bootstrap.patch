@@ -48,12 +48,16 @@ index b7a1ce1..dcb1758 100644
 +            case WM_CAPTURECHANGED:
 +            case WM_CANCELMODE:
 +                _sapp_win32_clear_mouse_capture();
-+                mdcad_win32_embed_note_runtime_cancel();
 +                break;
 +            case WM_MOUSEACTIVATE:
 +                if (mdcad_win32_embed_is_enabled() && mdcad_win32_embed_parent_chain_valid(hWnd)) {
 +                    _sapp_win32_maybe_focus_embedded_window(hWnd);
 +                    return MA_ACTIVATE;
++                }
++                break;
++            case WM_GETDLGCODE:
++                if (mdcad_win32_embed_is_enabled() && mdcad_win32_embed_parent_chain_valid(hWnd)) {
++                    return DLGC_WANTALLKEYS | DLGC_WANTCHARS | DLGC_WANTTAB | DLGC_WANTARROWS;
 +                }
 +                break;
              case WM_SETCURSOR:
