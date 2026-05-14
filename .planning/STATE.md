@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
-status: executing
-stopped_at: Completed 44-01-PLAN.md
-last_updated: "2026-05-14T17:28:07.557Z"
-last_activity: 2026-05-14 -- Completed 44-01 validation scaffolding
+status: ready_for_next_phase
+stopped_at: Completed Phase 44 execution
+last_updated: "2026-05-14T18:50:45.3434084+01:00"
+last_activity: 2026-05-14 -- Completed Phase 44 embedded lifecycle and layout execution
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 44 — Embedded Resize, Focus & Viewer Layout
+**Current focus:** Phase 45 — Startup JSONL Auto-Import (ready to plan)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 44 (Embedded Resize, Focus & Viewer Layout) — EXECUTING
-Plan: 2 of 4
-Status: Executing Wave 2 after completing 44-01
-Last activity: 2026-05-14 -- Completed 44-01 validation scaffolding
+Phase: 44 (Embedded Resize, Focus & Viewer Layout) — COMPLETE
+Plan: 4 of 4 complete
+Status: Ready for Phase 45 planning after Phase 44 manual verification
+Last activity: 2026-05-14 -- Completed Phase 44 embedded lifecycle and layout execution
 
-Progress: [█████░░░░░] 57%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -56,6 +56,8 @@ Recent decisions affecting current work:
 - [Milestone v1.7]: Scope is limited to observer-enabled large flat JSONL regression closure across import, refresh, and delete lifecycle behavior.
 - [Milestone v1.8]: Scope is limited to Windows child-HWND embedding, CLI launch-time JSONL viewing, and a minimal Avalonia host with no new IPC layer.
 - [Phase 44]: Front-load pure embedded input/layout reducers and a manual checklist before the runtime focus/layout changes land.
+- [Phase 44]: Embedded mode now persists a dedicated `imgui.embedded.ini` store and seeds a one-time DockBuilder viewer layout on first run.
+- [Phase 44]: The Avalonia host now distinguishes the mdCAD-side destroyed-parent quit path from the host-side `destroy-after-attach` fallback cleanup.
 
 ### Roadmap Evolution
 
@@ -71,12 +73,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute `44-02` and `44-03` to wire the runtime focus/capture fixes and the host-side resize/orphan proof.
+- Run the Phase 44 manual checklist rows for resize, focus, teardown, and embedded layout isolation.
+- Plan and execute Phase 45 to add startup JSONL auto-import on top of the completed Phase 44 embedding foundation.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
+- Manual live verification is still needed for the Phase 44 checklist rows that cannot be automated in CTest.
 
 ### Quick Tasks Completed
 
@@ -87,6 +91,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T17:28:07.554Z
-Stopped at: Completed 44-01-PLAN.md
-Resume file: .planning/phases/44-embedded-resize-focus-viewer-layout/44-02-PLAN.md
+Last session: 2026-05-14T18:50:45.3434084+01:00
+Stopped at: Completed Phase 44 execution
+Resume file: .planning/ROADMAP.md
