@@ -21,6 +21,12 @@ index b7a1ce1..dcb1758 100644
 +    }
 +}
 +
++_SOKOL_PRIVATE void _sapp_win32_maybe_focus_embedded_window(HWND hWnd) {
++    if (mdcad_win32_embed_is_enabled() && hWnd && mdcad_win32_embed_parent_chain_valid(hWnd) && (GetFocus() != hWnd)) {
++        SetFocus(hWnd);
++    }
++}
++
  _SOKOL_PRIVATE void _sapp_win32_release_mouse(uint8_t btn_mask) {
      if (0 != _sapp.win32.mouse.capture_mask) {
          _sapp.win32.mouse.capture_mask &= ~btn_mask;
@@ -44,9 +50,42 @@ index b7a1ce1..dcb1758 100644
 +                _sapp_win32_clear_mouse_capture();
 +                mdcad_win32_embed_note_runtime_cancel();
 +                break;
++            case WM_MOUSEACTIVATE:
++                if (mdcad_win32_embed_is_enabled() && mdcad_win32_embed_parent_chain_valid(hWnd)) {
++                    _sapp_win32_maybe_focus_embedded_window(hWnd);
++                    return MA_ACTIVATE;
++                }
++                break;
              case WM_SETCURSOR:
                  if (LOWORD(lParam) == HTCLIENT) {
                      _sapp_win32_update_cursor(_sapp.mouse.current_cursor, _sapp.mouse.shown, true);
+@@ -9578,15 +9604,18 @@ _SOKOL_PRIVATE LRESULT CALLBACK _sapp_win32_wndproc(HWND hWnd, UINT uMsg, WPARAM
+             case WM_DPICHANGED:
+             {
+                 /* Update window's DPI and size if its moved to another monitor with a different DPI
+                    Only sent if DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is used.
+                 */
+                 _sapp_win32_dpi_changed(hWnd, (LPRECT)lParam);
+                 break;
+             }
+             case WM_LBUTTONDOWN:
++                _sapp_win32_maybe_focus_embedded_window(hWnd);
+                 _sapp_win32_mouse_update(lParam);
+                 _sapp_win32_mouse_event(SAPP_EVENTTYPE_MOUSE_DOWN, SAPP_MOUSEBUTTON_LEFT);
+                 _sapp_win32_capture_mouse(1<<SAPP_MOUSEBUTTON_LEFT);
+                 break;
+             case WM_RBUTTONDOWN:
++                _sapp_win32_maybe_focus_embedded_window(hWnd);
+                 _sapp_win32_mouse_update(lParam);
+                 _sapp_win32_mouse_event(SAPP_EVENTTYPE_MOUSE_DOWN, SAPP_MOUSEBUTTON_RIGHT);
+                 _sapp_win32_capture_mouse(1<<SAPP_MOUSEBUTTON_RIGHT);
+                 break;
+             case WM_MBUTTONDOWN:
++                _sapp_win32_maybe_focus_embedded_window(hWnd);
+                 _sapp_win32_mouse_update(lParam);
+                 _sapp_win32_mouse_event(SAPP_EVENTTYPE_MOUSE_DOWN, SAPP_MOUSEBUTTON_MIDDLE);
+                 _sapp_win32_capture_mouse(1<<SAPP_MOUSEBUTTON_MIDDLE);
+                 break;
 @@ -9734,11 +9755,37 @@ _SOKOL_PRIVATE void _sapp_win32_create_window(void) {
         windowed-mode window will always be created first (however in hidden
         mode, so that no windowed-mode window pops up before the fullscreen window)
