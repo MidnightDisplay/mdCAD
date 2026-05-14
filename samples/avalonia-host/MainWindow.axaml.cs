@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -150,7 +152,7 @@ public partial class MainWindow : Window
     private const string StatusAttached = "attached";
     private const string StatusTeardownCleanup = "teardown/cleanup";
     private const string StatusTimeoutFailure = "timeout/failure";
-    private static readonly TimeSpan DestroyedParentSelfExitGrace = TimeSpan.FromMilliseconds(750);
+    private static readonly TimeSpan GracefulEmbeddedExitWait = TimeSpan.FromSeconds(3);
 
     private readonly HostLaunchOptions _options;
     private readonly EmbedNativeControlHost _embedSurface;
@@ -168,9 +170,9 @@ public partial class MainWindow : Window
     private bool _launchStarted;
     private string? _capturedFailureLine;
     private string? _teardownReason;
-    private DateTimeOffset? _selfExitGraceDeadline;
     private bool _destroyAfterAttachTriggered;
     private bool _fallbackKillIssued;
+    private bool _teardownAwaitingProcessExit;
 
     public MainWindow()
         : this(HostLaunchOptions.Parse(Array.Empty<string>()))
@@ -465,9 +467,6 @@ public partial class MainWindow : Window
         _teardownReason = _options.TestMode == EmbedTestMode.DestroyedParent
             ? "Destroyed-parent mode destroyed the placeholder after attach and is waiting for the mdCAD invalid-parent quit path."
             : "Destroy-after-attach mode destroyed the placeholder after attach and armed host fallback cleanup.";
-        _selfExitGraceDeadline = _options.TestMode == EmbedTestMode.DestroyedParent
-            ? DateTimeOffset.UtcNow + DestroyedParentSelfExitGrace
-            : null;
         _statusTextBlock.Text = StatusTeardownCleanup;
         _failureTextBlock.Text = _teardownReason;
 
@@ -511,15 +510,14 @@ public partial class MainWindow : Window
             return true;
         }
 
-        if (_options.TestMode == EmbedTestMode.DestroyedParent &&
-            !_fallbackKillIssued &&
-            _selfExitGraceDeadline.HasValue &&
-            DateTimeOffset.UtcNow < _selfExitGraceDeadline.Value &&
-            _mdcadProcess is { HasExited: false })
+        if (_teardownAwaitingProcessExit)
         {
-            _statusTextBlock.Text = StatusTeardownCleanup;
-            _failureTextBlock.Text = $"{_teardownReason}{Environment.NewLine}{teardownDetail}{Environment.NewLine}"
-                                   + "Waiting for mdCAD self-exit before host fallback cleanup.";
+            return false;
+        }
+
+        if (_options.TestMode == EmbedTestMode.DestroyedParent && !_fallbackKillIssued)
+        {
+            BeginGracefulTeardownWait(teardownDetail, "Waiting for mdCAD self-exit before host fallback cleanup.");
             return false;
         }
 
@@ -527,11 +525,123 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private void BeginGracefulTeardownWait(string detail, string waitingMessage)
+    {
+        _attachTimer.Stop();
+        _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
+        _teardownReason ??= detail;
+        _statusTextBlock.Text = StatusTeardownCleanup;
+
+        if (_mdcadProcess == null || _mdcadProcess.HasExited)
+        {
+            FinalizeTeardownStatus(_mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : 0);
+            return;
+        }
+
+        if (_teardownAwaitingProcessExit)
+        {
+            return;
+        }
+
+        _teardownAwaitingProcessExit = true;
+        _failureTextBlock.Text = $"{_teardownReason}{Environment.NewLine}{waitingMessage}";
+        Process process = _mdcadProcess;
+        _ = ObserveGracefulExitAsync(process, GracefulEmbeddedExitWait);
+    }
+
+    private async Task ObserveGracefulExitAsync(Process process, TimeSpan timeout)
+    {
+        bool exitedGracefully = await WaitForExitAsync(process, timeout);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (!_teardownAwaitingProcessExit)
+            {
+                return;
+            }
+
+            _teardownAwaitingProcessExit = false;
+            if (_mdcadProcess == null)
+            {
+                return;
+            }
+
+            if (exitedGracefully || _mdcadProcess.HasExited)
+            {
+                FinalizeTeardownStatus(_mdcadProcess.ExitCode);
+                return;
+            }
+
+            EnsureAttachedProcessTeardown($"{_teardownReason}{Environment.NewLine}mdCAD did not self-exit within the graceful wait window.");
+        });
+    }
+
+    private static async Task<bool> WaitForExitAsync(Process process, TimeSpan timeout)
+    {
+        try
+        {
+            using CancellationTokenSource cts = new(timeout);
+            await process.WaitForExitAsync(cts.Token);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return process.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            return process.HasExited;
+        }
+    }
+
+    private void WaitForGracefulExitOnClose(string detail)
+    {
+        _attachTimer.Stop();
+        _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
+        _teardownAwaitingProcessExit = false;
+        _teardownReason ??= detail;
+        _statusTextBlock.Text = StatusTeardownCleanup;
+
+        if (_mdcadProcess == null)
+        {
+            return;
+        }
+
+        if (_mdcadProcess.HasExited)
+        {
+            FinalizeTeardownStatus(_mdcadProcess.ExitCode);
+            return;
+        }
+
+        _failureTextBlock.Text = $"{_teardownReason}{Environment.NewLine}"
+            + "Waiting for mdCAD to exit so the embedded layout can flush before fallback cleanup.";
+
+        bool exitedGracefully;
+        try
+        {
+            exitedGracefully = _mdcadProcess.WaitForExit((int)GracefulEmbeddedExitWait.TotalMilliseconds);
+        }
+        catch (InvalidOperationException)
+        {
+            exitedGracefully = _mdcadProcess.HasExited;
+        }
+
+        if (exitedGracefully || _mdcadProcess.HasExited)
+        {
+            FinalizeTeardownStatus(_mdcadProcess.ExitCode);
+            return;
+        }
+
+        EnsureAttachedProcessTeardown($"{_teardownReason}{Environment.NewLine}mdCAD did not exit before the host-close timeout.");
+    }
+
     private void EnsureAttachedProcessTeardown(string detail)
     {
         _attachTimer.Stop();
         _launchRetryTimer.Stop();
         _resizeSyncTimer.Stop();
+        _teardownAwaitingProcessExit = false;
         _teardownReason ??= detail;
         _statusTextBlock.Text = StatusTeardownCleanup;
 
@@ -557,6 +667,7 @@ public partial class MainWindow : Window
         _attachTimer.Stop();
         _launchRetryTimer.Stop();
         _resizeSyncTimer.Stop();
+        _teardownAwaitingProcessExit = false;
         _attachedChildHwnd = IntPtr.Zero;
         _statusTextBlock.Text = StatusTeardownCleanup;
 
@@ -698,7 +809,7 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
-        EnsureAttachedProcessTeardown("Host window closed; embedded mdCAD must not remain orphaned.");
+        WaitForGracefulExitOnClose("Host window closed; embedded mdCAD must not remain orphaned.");
 
         if (_mdcadProcess != null)
         {

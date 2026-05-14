@@ -212,20 +212,86 @@ EMSCRIPTEN_KEEPALIVE void imgui_storage_mark_should_save(void) {
 // Native desktop file persistence
 //------------------------------------------------------------------------------
 #if !defined(PLATFORM_IOS) && !defined(PLATFORM_ANDROID) && !defined(PLATFORM_WEB)
+#if defined(_WIN32)
+#include <direct.h>
+#endif
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
+
 static embed_layout_policy_t g_imgui_native_layout_policy = {0};
 static bool g_imgui_native_should_save = false;
+static char g_imgui_native_manual_store_path[1024] = {0};
+
+static inline bool imgui_storage_native_path_is_absolute(const char* path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
+#if defined(_WIN32)
+    return ((strlen(path) > 2u) && path[1] == ':' && (path[2] == '\\' || path[2] == '/')) ||
+           (path[0] == '\\' && path[1] == '\\');
+#else
+    return path[0] == '/';
+#endif
+}
+
+static inline void imgui_storage_native_resolve_store_path(const char* path, char* buffer, size_t buffer_size) {
+    if (!buffer || buffer_size == 0u) {
+        return;
+    }
+
+    buffer[0] = '\0';
+    if (!path || path[0] == '\0') {
+        return;
+    }
+
+    if (imgui_storage_native_path_is_absolute(path)) {
+        snprintf(buffer, buffer_size, "%s", path);
+        return;
+    }
+
+#if defined(_WIN32)
+    if (_fullpath(buffer, path, buffer_size) != NULL) {
+        return;
+    }
+#else
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        snprintf(buffer, buffer_size, "%s/%s", cwd, path);
+        return;
+    }
+#endif
+
+    snprintf(buffer, buffer_size, "%s", path);
+}
+
+static inline const char* imgui_storage_native_manual_store_path(void) {
+    return g_imgui_native_layout_policy.use_manual_persistence
+        ? g_imgui_native_layout_policy.manual_store_filename
+        : NULL;
+}
 
 static inline void imgui_storage_configure(const embed_layout_policy_t* policy) {
     g_imgui_native_layout_policy = policy ? *policy : (embed_layout_policy_t){0};
     g_imgui_native_should_save = false;
+    g_imgui_native_manual_store_path[0] = '\0';
+    if (g_imgui_native_layout_policy.use_manual_persistence) {
+        imgui_storage_native_resolve_store_path(
+            g_imgui_native_layout_policy.manual_store_filename,
+            g_imgui_native_manual_store_path,
+            sizeof(g_imgui_native_manual_store_path));
+        g_imgui_native_layout_policy.manual_store_filename = g_imgui_native_manual_store_path;
+    }
 }
 
 static inline bool imgui_storage_native_store_exists(const char* path) {
-    if (!path || path[0] == '\0') {
+    char resolved_path[1024];
+    imgui_storage_native_resolve_store_path(path, resolved_path, sizeof(resolved_path));
+    if (resolved_path[0] == '\0') {
         return false;
     }
 
-    FILE* f = fopen(path, "rb");
+    FILE* f = fopen(resolved_path, "rb");
     if (!f) {
         return false;
     }
@@ -241,11 +307,13 @@ static inline bool imgui_storage_native_store_exists(const char* path) {
 }
 
 static inline char* imgui_storage_native_load(const char* path) {
-    if (!imgui_storage_native_store_exists(path)) {
+    char resolved_path[1024];
+    imgui_storage_native_resolve_store_path(path, resolved_path, sizeof(resolved_path));
+    if (!imgui_storage_native_store_exists(resolved_path)) {
         return NULL;
     }
 
-    FILE* f = fopen(path, "rb");
+    FILE* f = fopen(resolved_path, "rb");
     if (!f) {
         return NULL;
     }
@@ -274,11 +342,13 @@ static inline char* imgui_storage_native_load(const char* path) {
 }
 
 static inline void imgui_storage_native_save(const char* path, const char* ini_data) {
-    if (!path || path[0] == '\0' || !ini_data) {
+    char resolved_path[1024];
+    imgui_storage_native_resolve_store_path(path, resolved_path, sizeof(resolved_path));
+    if (resolved_path[0] == '\0' || !ini_data) {
         return;
     }
 
-    FILE* f = fopen(path, "wb");
+    FILE* f = fopen(resolved_path, "wb");
     if (!f) {
         return;
     }
@@ -295,6 +365,10 @@ static inline void imgui_storage_configure(const embed_layout_policy_t* policy) 
 static inline bool imgui_storage_native_store_exists(const char* path) {
     (void)path;
     return false;
+}
+
+static inline const char* imgui_storage_native_manual_store_path(void) {
+    return NULL;
 }
 #endif
 
