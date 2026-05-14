@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-47
-**Total Plans:** 12
+**Total Plans:** 13
 
 ## Overview
 
@@ -40,9 +40,9 @@ Plans:
 
 **Goal**: Users can interact with the embedded viewer correctly inside the host lifecycle.  
 **Depends on**: Phase 43  
-**Plans**: 9/9 plans complete  
+**Plans**: 10/10 plans complete  
 **Requirements**: EMBD-04, INPT-01, INPT-02, INPT-03, INPT-04
-**Status**: Execution complete; final Scenario 2 human UAT rerun pending
+**Status**: Complete (verified 2026-05-14)
 
 **Success Criteria:**
 1. Resizing the host control resizes the embedded mdCAD render surface without clipped, stale, or incorrect viewport behavior.
@@ -54,6 +54,7 @@ Plans:
 - Keep the existing input/render pipeline authoritative while adding embedded focus and lifecycle glue.
 - Add embedded-layout policy so the hosted viewer fills the region cleanly.
 - Harden close/orphan behavior before any startup import work begins.
+- Final closure keeps normal embedded mouse release out of the host-deactivation path and has the child HWND explicitly claim dialog keys such as Tab.
 
 Plans:
 - [x] 44-01-PLAN.md — Front-load Wave 0 input/layout validation seams and the Phase 44 manual checklist.
@@ -65,6 +66,7 @@ Plans:
 - [x] 44-07-PLAN.md — Acquire deliberate-click keyboard focus through mdCAD's native child-window activation path and add host chrome focus return.
 - [x] 44-08-PLAN.md — Invalidate the placeholder on normal host close before waiting so embedded layout flushes before fallback cleanup.
 - [x] 44-09-PLAN.md — Route embedded global shortcuts through ImGui's shortcut API so non-text `Tab` and undo/redo work after focus is acquired.
+- [x] 44-10-PLAN.md — Keep embedded keyboard ownership alive across normal mouse release and claim dialog keys from the child HWND seam.
 
 ### Phase 45: Startup JSONL Auto-Import
 

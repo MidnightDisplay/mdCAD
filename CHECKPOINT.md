@@ -207,6 +207,35 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
+## Most Recent Changes (2026-05-14)
+
+### Phase 44 Embedded Release-Path Closure (IMPLEMENTED, 2026-05-14)
+
+- Closed the final Phase 44 embedded-input gap and completed the manual host verification loop.
+- Final root cause:
+  - the embedded child treated normal `WM_CAPTURECHANGED` / `WM_CANCELMODE` on mouse release as host deactivation
+  - that cleared reducer-owned embedded keyboard ownership on every normal release
+  - the same false cancel caused global shortcuts to die after click, gizmo drags to snap back on release, and camera inertia to stop immediately
+- Delivered the native closure in the embedded Win32 child seam:
+  - `vendors/libsokol/patches/0001-win32-embed-child-window-bootstrap.patch` now clears capture on `WM_CAPTURECHANGED` / `WM_CANCELMODE` without requesting runtime cancel
+  - the embedded child now responds to `WM_GETDLGCODE` with dialog-key ownership so Tab-class keys stay with mdCAD
+- Kept the embedded routed shortcut helper in `src/app.c` bound to the dockspace owner for the final passing build.
+- Final user validation passed:
+  - embedded `Delete`, `C`, `Tab`, and `Ctrl+Z` all work
+  - gizmo drops persist after release
+  - camera inertia matches standalone behavior again
+  - Scenarios 2, 5, and 7 all pass
+- Added/updated Phase 44 closure artifacts:
+  - `.planning/phases/44-embedded-resize-focus-viewer-layout/44-10-PLAN.md`
+  - `.planning/phases/44-embedded-resize-focus-viewer-layout/44-10-SUMMARY.md`
+  - `.planning/phases/44-embedded-resize-focus-viewer-layout/44-HUMAN-UAT.md`
+  - `.planning/ROADMAP.md`
+  - `.planning/STATE.md`
+  - `.planning/REQUIREMENTS.md`
+- Lifecycle continuity advanced:
+  - Phase 44 is now verified complete
+  - current focus moves to Phase 45 planning for startup JSONL auto-import
+
 ## Most Recent Changes (2026-04-10)
 
 ### Phase 31 Script Reapply Fidelity Foundation (IMPLEMENTED, 2026-04-10)

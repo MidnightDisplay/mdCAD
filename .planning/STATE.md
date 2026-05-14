@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
-status: verifying
-stopped_at: Completed 44-09-PLAN.md
-last_updated: "2026-05-14T22:09:47.520Z"
+status: active
+stopped_at: Completed 44-10-PLAN.md
+last_updated: "2026-05-14T23:42:47.2166361+01:00"
 last_activity: 2026-05-14
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 44 — embedded-resize-focus-viewer-layout
+**Current focus:** Phase 45 — startup-jsonl-auto-import
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 44 (embedded-resize-focus-viewer-layout) — VERIFYING
-Plan: 9 of 9 complete
-Status: Final Scenario 2 human UAT rerun pending
+Phase: 45 (startup-jsonl-auto-import) — READY FOR PLANNING
+Plan: 0 of 0 complete
+Status: Phase 44 verified complete; next step is Phase 45 planning
 Last activity: 2026-05-14
 
 Progress: [██████████] 100%
@@ -64,6 +64,8 @@ Recent decisions affecting current work:
 - [Phase 44]: The host-close path no longer performs an extra unconditional kill after the graceful wait path runs. — Keeping fallback cleanup inside the wait helper preserves a real chance for mdCAD to self-exit and flush embedded layout state before host cleanup intervenes.
 - [Phase 44]: Embedded mode now routes mdCAD-global shortcuts through ImGui's Shortcut API because the shortcut block runs outside a specific window and raw key polling missed routed non-text shortcuts. — The final human UAT showed Win32 focus was fixed and only app-level global shortcuts remained broken, so the fix moved into ImGui's routing layer.
 - [Phase 44]: Standalone mdCAD keeps the previous raw key polling path so the embedded shortcut fix does not change non-embedded behavior. — The remaining gap was embedded-only, so keeping the standalone path unchanged minimized regression risk.
+- [Phase 44]: Normal WM_CAPTURECHANGED and WM_CANCELMODE no longer count as embedded host deactivation. — A normal mouse release also changes capture, so treating capture-change as runtime cancel cleared keyboard ownership, reverted gizmo drops, and stopped camera inertia even though focus never left mdCAD.
+- [Phase 44]: The embedded child HWND now advertises WM_GETDLGCODE ownership for keyboard/dialog keys. — Claiming dialog keys from the native child-window seam keeps Tab-class input with mdCAD instead of leaving it available to the host message pump.
 
 ### Roadmap Evolution
 
@@ -79,14 +81,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Run the Phase 44 manual checklist rows for resize, focus, teardown, and embedded layout isolation.
 - Plan and execute Phase 45 to add startup JSONL auto-import on top of the completed Phase 44 embedding foundation.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Manual live verification is still needed for the Phase 44 checklist rows that cannot be automated in CTest.
+- Phase 44 manual verification is now complete.
 
 ### Quick Tasks Completed
 
@@ -97,6 +98,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T22:09:47.516Z
-Stopped at: Completed 44-09-PLAN.md
+Last session: 2026-05-14T23:42:47.2166361+01:00
+Stopped at: Completed 44-10-PLAN.md
 Resume file: None

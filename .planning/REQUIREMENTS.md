@@ -14,9 +14,9 @@
 
 ### Embedded Interaction
 
-- [ ] **INPT-01**: User can resize the host control and mdCAD resizes its hosted render surface without clipped, stale, or incorrect viewport behavior.
-- [ ] **INPT-02**: User can click into the embedded viewer and immediately use mdCAD keyboard and mouse interactions without host interference.
-- [ ] **INPT-03**: User can move focus between host UI and mdCAD without stuck capture, stuck drag, or broken input state.
+- [x] **INPT-01**: User can resize the host control and mdCAD resizes its hosted render surface without clipped, stale, or incorrect viewport behavior.
+- [x] **INPT-02**: User can click into the embedded viewer and immediately use mdCAD keyboard and mouse interactions without host interference.
+- [x] **INPT-03**: User can move focus between host UI and mdCAD without stuck capture, stuck drag, or broken input state.
 - [x] **INPT-04**: User sees mdCAD in a viewer-first embedded layout that fits the hosted region.
 
 ### Startup JSONL
@@ -64,9 +64,9 @@
 | EMBD-02 | Phase 43 | Complete |
 | EMBD-03 | Phase 43 | Complete |
 | EMBD-04 | Phase 44 | Complete |
-| INPT-01 | Phase 44 | Pending |
-| INPT-02 | Phase 44 | Pending |
-| INPT-03 | Phase 44 | Pending |
+| INPT-01 | Phase 44 | Complete |
+| INPT-02 | Phase 44 | Complete |
+| INPT-03 | Phase 44 | Complete |
 | INPT-04 | Phase 44 | Complete |
 | JSON-01 | Phase 45 | Pending |
 | JSON-02 | Phase 46 | Pending |
@@ -84,4 +84,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-14 after Phase 43 verification*
+*Last updated: 2026-05-14 after Phase 44 verification*
