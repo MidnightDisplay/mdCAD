@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: milestone
-status: planning
-stopped_at: Phase 44 context gathered
-last_updated: "2026-05-14T16:28:19.154Z"
-last_activity: 2026-05-14 -- Phase 43 verified and marked complete
+milestone_name: Embeddable Windows JSONL Viewer
+status: executing
+stopped_at: Completed 44-01-PLAN.md
+last_updated: "2026-05-14T17:28:07.557Z"
+last_activity: 2026-05-14 -- Completed 44-01 validation scaffolding
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 7
+  completed_plans: 4
+  percent: 57
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 44 (Embedded Resize, Focus & Viewer Layout) — READY TO PLAN
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-14 -- Phase 43 verified and marked complete
+Phase: 44 (Embedded Resize, Focus & Viewer Layout) — EXECUTING
+Plan: 2 of 4
+Status: Executing Wave 2 after completing 44-01
+Last activity: 2026-05-14 -- Completed 44-01 validation scaffolding
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 57%
 
 ## Milestone Scope
 
@@ -55,6 +55,7 @@ Recent decisions affecting current work:
 - [Phase 40]: Large repeated flat refreshes must preserve hierarchy, selection, and interaction coherence.
 - [Milestone v1.7]: Scope is limited to observer-enabled large flat JSONL regression closure across import, refresh, and delete lifecycle behavior.
 - [Milestone v1.8]: Scope is limited to Windows child-HWND embedding, CLI launch-time JSONL viewing, and a minimal Avalonia host with no new IPC layer.
+- [Phase 44]: Front-load pure embedded input/layout reducers and a manual checklist before the runtime focus/layout changes land.
 
 ### Roadmap Evolution
 
@@ -70,12 +71,12 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Discuss and plan Phase 44: Embedded Resize, Focus & Viewer Layout.
+- Execute `44-02` and `44-03` to wire the runtime focus/capture fixes and the host-side resize/orphan proof.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
-- No blocking issues. Remaining debt is non-blocking and documented in the archived v1.7 audit.
+- No blocking issues.
 
 ### Quick Tasks Completed
 
@@ -86,6 +87,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T16:28:19.151Z
-Stopped at: Phase 44 context gathered
-Resume file: .planning/phases/44-embedded-resize-focus-viewer-layout/44-CONTEXT.md
+Last session: 2026-05-14T17:28:07.554Z
+Stopped at: Completed 44-01-PLAN.md
+Resume file: .planning/phases/44-embedded-resize-focus-viewer-layout/44-02-PLAN.md

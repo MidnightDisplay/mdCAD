@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-47
-**Total Plans:** 3
+**Total Plans:** 7
 
 ## Overview
 
@@ -40,8 +40,9 @@ Plans:
 
 **Goal**: Users can interact with the embedded viewer correctly inside the host lifecycle.  
 **Depends on**: Phase 43  
-**Plans**: 4 plans  
+**Plans**: 1/4 plans complete  
 **Requirements**: EMBD-04, INPT-01, INPT-02, INPT-03, INPT-04
+**Status**: In Progress
 
 **Success Criteria:**
 1. Resizing the host control resizes the embedded mdCAD render surface without clipped, stale, or incorrect viewport behavior.
@@ -55,7 +56,7 @@ Plans:
 - Harden close/orphan behavior before any startup import work begins.
 
 Plans:
-- [ ] 44-01-PLAN.md — Front-load Wave 0 input/layout validation seams and the Phase 44 manual checklist.
+- [x] 44-01-PLAN.md — Front-load Wave 0 input/layout validation seams and the Phase 44 manual checklist.
 - [ ] 44-02-PLAN.md — Harden native embedded focus, capture-loss, and drag-cancel behavior inside mdCAD.
 - [ ] 44-03-PLAN.md — Extend the Avalonia host for deterministic resize/orphan teardown proof.
 - [ ] 44-04-PLAN.md — Separate embedded layout persistence and seed the approved viewer-first dock recipe.
