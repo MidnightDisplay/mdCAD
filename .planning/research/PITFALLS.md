@@ -1,151 +1,163 @@
-# Domain Pitfalls: v1.6 Observable Flat JSONL Import for Large Geometry Dumps
+# Domain Pitfalls
 
-**Domain:** Flat observable JSONL import for large, frequently refreshed geometry dumps in mdCAD (C + ECS + GPU app)  
-**Researched:** 2026-04-27  
-**Confidence:** HIGH (repo-code anchored)
+**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
+**Domain:** Windows child-HWND embedding, launch-time JSONL viewing, and mixed host/viewer input ownership  
+**Researched:** 2026-05-14  
+**Confidence:** HIGH for Win32 lifecycle and process concerns; MEDIUM for host-specific polish
 
-## Critical Pitfalls
+## Critical Launch Blockers
 
-### 1) Accidentally reusing sketch import/reparse path for flat mode
-**What goes wrong:** Flat import inherits sketch/script overhead and loses the expected performance win.  
-**Why it happens:** Existing observable path is sketch-centric (`jsonl_sketch_import_job.h`, script re-emit, sketch metadata).  
-**Consequences:** Slow imports/reloads, unnecessary script churn, user sees no benefit vs v1.5 flow.  
-**Prevention:** Define flat import as a separate contract: non-sketch entities under one anchor, no sketch/script participation.  
-**Detection:** Perf test: same large dump imported as sketch vs flat; flat must be materially faster and lower memory.
+### 1. Reparenting a top-level window instead of creating a true child window
+**Risk:** Launching mdCAD normally and calling `SetParent` later can leave styles, activation, clipping, and DPI behavior inconsistent.
 
-**Handle in:** Requirements + Planning + Implementation + Testing
+**Prevention:**
+- Make embedding a dedicated startup mode
+- Create the mdCAD window as a child from the start
+- Fail fast on invalid parent HWND or incompatible DPI assumptions
+
+**Phase to absorb:** Phase 1
+
+### 2. Treating process spawn as "viewer ready"
+**Risk:** The host reports success before the child surface actually exists and is usable.
+
+**Prevention:**
+- Separate statuses for:
+  1. process launched
+  2. child surface attached
+  3. first non-zero resize applied
+  4. optional JSONL import complete
+- Use bounded startup timeouts and explicit failure reporting
+
+**Phase to absorb:** Phase 1
+
+### 3. No explicit focus/input ownership contract
+**Risk:** Mouse enters the viewer, but keyboard stays with the host; first click only focuses; shortcuts go to the wrong process.
+
+**Prevention:**
+- Define click-to-focus behavior
+- Define what happens on focus loss and host re-focus
+- Make focus-loss cleanup mandatory for transient interaction state
+
+**Phase to absorb:** Phase 2
+
+### 4. Mouse capture / drag state leaks across host boundaries
+**Risk:** Orbit/gizmo drag stays stuck after focus loss, host resize, or mouse-up outside the child region.
+
+**Prevention:**
+- Cancel drags on focus loss, capture loss, parent destroy, and hide/minimize
+- Explicitly test mouse-down inside / mouse-up outside scenarios
+
+**Phase to absorb:** Phase 2
+
+### 5. Whole-window size assumptions break in embedded mode
+**Risk:** Zero-size transitions, rapid resize bursts, or layout churn break the viewport, pick math, or render targets.
+
+**Prevention:**
+- Treat zero-size as a valid transient state
+- Gate heavy resize work behind actual size changes
+- Verify repeated resize with active content
+
+**Phase to absorb:** Phase 2
+
+### 6. Startup JSONL import runs too early
+**Risk:** Large import begins before the embed path is stable, producing blank startup or race conditions.
+
+**Prevention:**
+- Parse CLI immediately, but delay actual import until:
+  - embed mode is validated
+  - child surface exists
+  - first non-zero size has been observed
+- Keep the viewer alive on import failure and surface the error clearly
+
+**Phase to absorb:** Phase 3
+
+### 7. Windows path and quoting bugs
+**Risk:** Spaces, backslashes, UNC paths, or quotes break launch-time import.
+
+**Prevention:**
+- Accept absolute paths only
+- Prefer wide-character argument parsing on the viewer side
+- Avoid hand-rolled quoting on the host side
+- Log the resolved path and embed HWND
+
+**Phase to absorb:** Phase 3
+
+### 8. Host/control destruction leaves orphan process or invalid child state
+**Risk:** Host closes or recreates the control while mdCAD keeps running or renders into a dead parent.
+
+**Prevention:**
+- Define ownership clearly
+- Treat control destruction/recreation as a first-class lifecycle path
+- Test repeated launch/close/reopen cycles
+
+**Phase to absorb:** Phases 1 and 4
+
+### 9. Launch-time live refresh accidentally changes established observer semantics
+**Risk:** v1.8 reopens previously fixed large-file observer regressions by changing defaults or bypassing commit-on-success behavior.
+
+**Prevention:**
+- Keep live refresh opt-in only
+- Reuse the same observer metadata and commit-on-success semantics as the current linked flat import flow
+- Validate launch matrix:
+  - embed only
+  - embed + import
+  - embed + import + live refresh
+  - invalid/missing/locked file
+
+**Phase to absorb:** Phase 3
 
 ---
-
-### 2) Full-file parse/load in memory on every refresh
-**What goes wrong:** Refresh stalls or OOM on large files.  
-**Why it happens:** Current loader stores full parsed model (`jsonl_loader.h` entry arrays) and sketch import is synchronous.  
-**Consequences:** Frame hitching, memory spikes, crashes for very large dumps.  
-**Prevention:** Stream/chunk parse + chunk entity apply for flat mode; avoid full in-memory scene model for refresh path.  
-**Detection:** Stress test with very large JSONL; track frame time and peak RSS during refresh.
-
-**Handle in:** Requirements + Planning + Implementation + Testing
-
----
-
-### 3) Double I/O tax and blocking first-pass line counting
-**What goes wrong:** Import time scales poorly before real parsing starts.  
-**Why it happens:** `jsonl_open` does line-count pass then parse pass.  
-**Consequences:** 2x disk/network read cost, especially painful for huge/remote files.  
-**Prevention:** Flat path should use single-pass progress estimation (bytes consumed) or optional sampling, not mandatory pre-count.  
-**Detection:** Profiling shows disproportionate time before first entities appear.
-
-**Handle in:** Planning + Implementation + Testing
-
----
-
-### 4) Expensive change detection for observed large files
-**What goes wrong:** Observer tick burns CPU on hashing/metadata checks under frequent updates.  
-**Why it happens:** FNV hash of full file and per-frame tick integration (`app.c` calls observer tick each frame).  
-**Consequences:** Constant background load, UI jitter, battery drain.  
-**Prevention:** Rate-limit checks, defer heavy hash to worker/chunk pass, use staged "size/mtime quick gate then async verify".  
-**Detection:** Idle-with-observer profiling shows high CPU when file churns.
-
-**Handle in:** Requirements + Planning + Implementation + Testing
-
----
-
-### 5) Non-transactional refresh that leaves partial world state
-**What goes wrong:** Failed refresh leaves half-updated entities/orphans.  
-**Why it happens:** Flat mode may skip transactional discipline while optimizing for speed.  
-**Consequences:** Corrupted scene tree, stale references, hard-to-recover UX.  
-**Prevention:** Keep authoritative commit model: stage new set, commit swap only on success, rollback on failure.  
-**Detection:** Fault-injection tests (truncated JSONL, locked file, OOM) must preserve last-good anchor contents.
-
-**Handle in:** Requirements + Implementation + Testing
-
----
-
-### 6) Entity ID churn breaks selection/gizmo/inspector continuity
-**What goes wrong:** User selection or tooling points to dead entities after refresh.  
-**Why it happens:** Authoritative replace recreates entities each cycle.  
-**Consequences:** Interaction glitches, stale handles, perceived instability.  
-**Prevention:** Explicit post-refresh invalidation/remap policy for selection/highlight/gizmo caches at anchor scope.  
-**Detection:** Repeated refresh tests while entities are selected/dragged/open in inspector.
-
-**Handle in:** Planning + Implementation + Testing
-
----
-
-### 7) Undo/redo explosion from high-entity refreshes
-**What goes wrong:** Massive undo snapshots or unusable history during auto-refresh.  
-**Why it happens:** Treating observed refreshes like normal user edits.  
-**Consequences:** Memory bloat, long pauses, confusing undo semantics.  
-**Prevention:** Define refresh undo policy up front (typically non-undoable observer updates, with explicit user-triggered import checkpoints).  
-**Detection:** Soak test with frequent file updates; inspect undo stack growth and latency.
-
-**Handle in:** Requirements + Planning + Implementation + Testing
-
----
-
-### 8) Hierarchy/UI rebuild cost dominates at scale
-**What goes wrong:** Every refresh triggers expensive cache rebuild and tree redraw over huge entity sets.  
-**Why it happens:** Scene hierarchy cache rebuild scans geometry + anchors globally.  
-**Consequences:** UI lag even if parse/apply is optimized.  
-**Prevention:** Anchor-scoped dirtying, incremental hierarchy updates, collapsed-by-default import anchors, virtualized listing if needed.  
-**Detection:** Profiling around hierarchy rebuild with 100k+ imported entities and frequent refresh.
-
-**Handle in:** Planning + Implementation + Testing
-
----
-
-### 9) Refresh thrash on partial file writes
-**What goes wrong:** Import repeatedly fails while producer is still writing; observer disables too aggressively or spams warnings.  
-**Why it happens:** Polling sees intermediate file states; parser reads incomplete JSONL.  
-**Consequences:** User confusion, missed updates, noisy error loop.  
-**Prevention:** Introduce "file-stable window" (no size/mtime changes for N ms) before parse; keep retry semantics explicit.  
-**Detection:** Simulated writer that appends in bursts; verify stable apply behavior and clear messaging.
-
-**Handle in:** Planning + Implementation + Testing
-
----
-
-### 10) Integer/counter overflow on very large dumps
-**What goes wrong:** Wrong progress/counting/allocation behavior for extreme element counts.  
-**Why it happens:** Many counters are `int`/32-bit style in current import structures.  
-**Consequences:** Corrupted progress, out-of-bounds, crashes.  
-**Prevention:** Audit large-count paths; move counts/capacities to `size_t`/64-bit where needed and guard conversions.  
-**Detection:** Synthetic max-scale tests near boundary values.
-
-**Handle in:** Requirements + Implementation + Testing
 
 ## Moderate Pitfalls
 
-### A) Ambiguous ownership between manual import and observer refresh
-**What goes wrong:** "Import once" and "live observed" paths diverge in behavior over time.  
-**Prevention:** Single shared flat refresh engine used by both manual refresh and observer tick.
+### Embedded changes leak into normal standalone mode
+**Prevention:** Keep embedded mode as an explicit branch and run standalone smoke verification after each embedding phase.
 
-### B) Weak observability/diagnostics for operator trust
-**What goes wrong:** Hard to know if refresh is current, failed, or stale.  
-**Prevention:** Show last success time, source fingerprint, replaced count, last error.
+### Sample host becomes demo-only instead of the conformance harness
+**Prevention:** Make the sample host validate resize, focus switching, close/relaunch, good/bad JSONL paths, and optional live refresh.
 
-### C) Path/link brittleness (rename/move/case differences)
-**What goes wrong:** Anchor silently points to stale/missing source.  
-**Prevention:** Normalize path handling and provide explicit relink affordance with clear status.
+### Poor error surfacing
+**Prevention:** Distinguish embed-contract failure from import failure and avoid silent blank-host failure modes.
 
-## Phase-Specific Warnings
+---
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|---|---|---|
-| Requirements | "Flat" not explicitly excluding sketch/script semantics | Add hard non-sketch contract + perf targets |
-| Planning | Reuse old sketch observer internals "for speed" | Split flat pipeline and list forbidden dependencies |
-| Implementation | Synchronous parse/apply in UI path | Mandatory chunked job + cancellation/progress |
-| Implementation | Non-atomic anchor replace | Stage/commit/rollback invariant tests |
-| Testing | Only correctness tests, no scale tests | Add large-dump perf/soak/fault-injection gates |
+## Phase-Specific Warning Map
 
-## Sources (repo-internal)
+| Phase | Main risk | Mitigation |
+|-------|-----------|------------|
+| 1 — Embed contract + lifecycle | `SetParent`-style shortcut instead of true child-window startup | Dedicated embed mode, parent validation, child-style creation |
+| 1 — Startup coordination | Process exists but viewer is not ready | Separate readiness states |
+| 2 — Focus/input | First click eaten, keyboard remains with host | Explicit focus policy and cleanup |
+| 2 — Resize | Zero-size / resize storms break viewport | Guard size changes and verify repeated resize |
+| 3 — CLI import | Quoting/path bugs | Absolute paths, wide-char parsing, clear logging |
+| 3 — Live refresh | Semantics drift from v1.7 | Keep opt-in default OFF and reuse existing observer contract |
+| 4 — Sample hardening | Host only proves happy path | Make sample the actual validation harness |
 
-- `src/jsonl_loader.h` (full-model parse behavior, line counting, counters)
-- `src/jsonl_sketch_import_job.h` (sync parse + transactional sketch reparse model)
-- `src/jsonl_observer_system.h` (observer tick/retry semantics)
-- `src/app.c` (observer tick called each frame)
-- `src/ui/ui_scene_hierarchy.h` (import UI flow and sync sketch import callsite)
-- `src/tests/jsonl_reparse_transaction_test.c`
-- `src/tests/jsonl_observer_state_test.c`
-- `.planning/PROJECT.md` (v1.6 scope and intent)
-- `.planning/phases/35-observable-jsonl-as-sketch-import-with-optional-live-file-observer/35-03-SUMMARY.md`
+---
+
+## Recommended Risk Absorption Order
+
+1. Embed contract, child-window creation, startup/teardown rules
+2. Focus, input, resize, and interaction-state correctness
+3. Startup import and live refresh wiring
+4. Sample host hardening and regression closure
+
+---
+
+## Sources
+
+- `.planning/PROJECT.md`
+- `src/app.c`
+- `src/ui/ui_viewport.h`
+- `src/jsonl_import_job.h`
+- `src/jsonl_observer_system.h`
+- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent
+- Microsoft `WM_MOUSEACTIVATE`: https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-mouseactivate
+- Microsoft `SetFocus`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setfocus
+- Microsoft `SetCapture`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setcapture
+- Microsoft `GetClientRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclientrect
+- Microsoft `WM_SIZE`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-size
+- Microsoft `CreateProcessW`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
+- Microsoft `WaitForInputIdle`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-waitforinputidle
+- Microsoft `CommandLineToArgvW`: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
+- Avalonia `NativeControlHost`: https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_NativeControlHost

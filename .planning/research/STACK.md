@@ -1,102 +1,182 @@
 # Technology Stack
 
-**Project:** mdCAD milestone v1.6 — Observable Flat JSONL Import for Large Geometry Dumps  
-**Researched:** 2026-04-27  
-**Scope:** Stack changes only for flat (non-sketch) JSONL import + large-file observer refresh
+**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
+**Domain:** Windows child-HWND embedding, CLI startup import, and Avalonia sample hosting  
+**Researched:** 2026-05-14  
+**Confidence:** HIGH on stack direction, MEDIUM on backend-specific embedding quirks
 
-## Recommended Stack
+## Recommendation in One Line
 
-### Core Framework
+Keep mdCAD as a native C/Sokol/Dear ImGui application, add a Windows-only embedded child-window path at the Win32 window-creation seam, and put all Avalonia/.NET work in a separate sample host project.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| C (C11), header-inline modules | Keep current | Implement flat import + refresh pipeline | Matches current architecture; zero stack churn |
-| Flecs | 4.1.4 (vendored) | Entity graph + import anchor parenting | Already central; flat mode fits existing `scene_add_anchor` + `EcsChildOf` model |
-| cJSON | 1.7.19 (vendored) | JSONL line parse | Already integrated in `jsonl_loader.h`; avoid parser migration risk |
-| Existing math/import helpers (`math_import.h`) | Keep current | Unit scale / rotation / shift transforms | Reuse proven transform path from current JSONL import |
+---
 
-### Infrastructure / Runtime Behavior
+## Recommended Stack Changes
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Existing polling observer (metadata + optional hash) | Keep, but optimize policy | File change detection for flat import anchor | Cross-platform, dependency-free, already integrated (`jsonl_observer_system.h`) |
-| OS file metadata APIs (`GetFileAttributesExA` / `stat`) | Existing | Fast change pre-check | Already implemented and stable on Windows/macOS path |
+| Area | Recommendation | Why |
+|------|----------------|-----|
+| mdCAD core | Add a small launch-config parser for `--embedded`, `--parent-hwnd`, `--jsonl`, and `--jsonl-live-refresh` | No new dependency is needed; `sokol_main(int argc, char* argv[])` already receives args |
+| mdCAD windowing | Add a Windows-only embedded mode that creates a real `WS_CHILD` window from startup | Child-window creation is the core platform requirement |
+| Startup import | Reuse the existing large flat JSONL import path | Milestone scope is launch-time wiring, not a new import system |
+| Sample host | Use a separate Avalonia desktop project with `NativeControlHost` | Keeps .NET/Avalonia out of mdCAD core |
+| Host-side Win32 glue | Use minimal P/Invoke for HWND discovery/lifetime (`EnumChildWindows`, `GetWindowThreadProcessId`, `SetFocus`, `IsWindow`) | Enough to host and manage the child process without IPC |
+| Build/test infra | Pin the vendored Sokol revision for this milestone and add Windows embedding smoke coverage | Avoids tracking `master` while locally extending Win32 creation behavior |
 
-### Required Internal Additions (no new external deps)
+---
 
-| Module | Purpose | Recommendation |
-|--------|---------|----------------|
-| `jsonl_flat_import_job.h` (new) | Large-file flat import path | Add streaming/chunked **flat** importer that creates geometry under one import anchor (no per-entry anchors) |
-| `jsonl_flat_observer_system.h` (new or merged) | Flat refresh semantics | Add transactional "replace children under one anchor" semantics similar to sketch reparse contract, but without script/constraint work |
-| `jsonl_loader.h` extension | Reduce huge-file overhead | Add parse mode that avoids full in-memory `jsonl_data_t` accumulation for flat import (line->apply pipeline) |
-| Observer component split or mode flag | Link metadata for flat anchors | Add either `JsonlFlatObserverComp` or `import_mode` field to existing observer component |
+## mdCAD Core
 
-## Concrete Stack Changes for v1.6
+### Keep unchanged
+- C application/runtime
+- Sokol + Dear ImGui stack
+- Existing Windows backend selection (`D3D11` / `Vulkan`)
+- Existing JSONL import and linked refresh code
 
-1. **Do not add new third-party libraries.**
-   - Keep parser as cJSON for this milestone.
-   - Keep observer as polling-based.
-2. **Add a flat import execution path optimized for size:**
-   - Avoid current multi-pass overhead (`quick_scan_mesh` + `count_lines` + full parse accumulation).
-   - Prefer: lightweight pre-scan optional, then streaming create in chunks.
-3. **Use single-anchor hierarchy for flat mode:**
-   - Root anchor only (`scene_add_anchor`), geometry children directly parented to root.
-   - Skip entry-anchor allocations to reduce entity count and parenting cost.
-4. **Observer semantics for flat mode:**
-   - Reuse current transactional pattern (stage new, commit swap, rollback on failure).
-   - Keep interval/retry controls; preserve metadata stamping logic.
+### Add
+- Windows-only embedded startup mode
+- Project-local CLI parsing
+- Launch-time JSONL auto-import hook
 
-## Explicit "Do NOT Add" Notes
+### Important conclusion
+This milestone is primarily a **windowing/bootstrap problem**, not a renderer rewrite and not a JSONL parser problem.
 
-| Do NOT add | Why | Use instead |
-|------------|-----|-------------|
-| libuv/fswatch/FSEvents wrapper deps | Extra complexity + platform matrix risk | Existing polling observer + metadata debounce |
-| New JSON parser (RapidJSON/simdjson/etc.) for v1.6 | Integration + memory model churn; not required for milestone | Optimize current cJSON pipeline and passes first |
-| Background threaded importer in this milestone | ECS/thread-safety risk and larger test surface | Keep main-thread chunked job state machine |
-| Per-entry anchor tree in flat mode | Increases entity/parenting overhead on huge logs | Single import anchor + direct children |
+---
 
-## Integration Touchpoints in Current Codebase
+## Windowing Recommendation
 
-- `src/jsonl_import_job.h`
-  - Add flat mode branch or extract new `jsonl_flat_import_job.h`.
-  - Remove dependency on entry anchor arrays for flat path.
-- `src/jsonl_loader.h`
-  - Add streaming/low-retention parse APIs for huge files.
-  - Avoid mandatory full line-count pass for flat import progress.
-- `src/jsonl_observer_system.h` + `src/components/jsonl_observer_comp.h`
-  - Add flat-anchor observer support (or mode flag).
-- `src/ui/ui_scene_hierarchy.h`
-  - Add "Import JSONL (Flat Large)" option or mode toggle in JSONL import dialog.
-  - Add observer opt-in + refresh controls for flat anchor.
-- `src/ui/ui_entity_inspector.h`
-  - Observer controls for flat import anchor entities (not only sketch entities).
-- `src/scene_serializer.h`
-  - Persist new flat observer/link metadata.
-- `src/ecs/ecs_world.h`
-  - Register any new flat observer component (if split approach used).
-- `src/app.c`
-  - Tick flat observer system each frame alongside existing observer tick.
+### Prefer a narrow local Sokol Win32 patch/extension
 
-## Alternatives Considered
+mdCAD already depends on Sokol for:
+- frame loop
+- native window lifecycle
+- event delivery
+- graphics setup
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| File change detection | Polling observer | Native watcher APIs per OS | Higher platform complexity; unnecessary for v1.6 |
-| Parsing strategy | cJSON line parse + streaming apply | Replace parser library | Too risky for milestone scope |
-| Import hierarchy | Single anchor flat tree | Entry-per-line subtree | Too heavy for large dumps |
+The recommended path is a **small Windows-only project-owned extension** at the Win32 creation seam so embedded mode can create a child window from birth.
 
-## Installation
+### Why not late `SetParent` as the main design?
+- Win32 child/top-level styles are easy to get wrong after creation
+- Focus/activation tends to be less reliable
+- It risks a visible standalone-window flash during launch
+- Microsoft explicitly documents `SetParent` caveats around styles and DPI
+
+### Minimal embedded-mode shape
+- `embedded = true`
+- `parent_hwnd = <HWND>`
+- child window styles such as `WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN`
+- initial size from the parent client rect
+- no standalone-only decorations/fullscreen behaviors in embedded mode
+
+---
+
+## CLI Contract Recommendation
+
+Use a small, explicit flag surface:
 
 ```bash
-# No new external packages required for v1.6 stack
-# Keep current CMake + vendored deps
+mdCAD.exe --embedded --parent-hwnd 0x12345678
+mdCAD.exe --embedded --parent-hwnd 0x12345678 --jsonl "C:\abs\path\dump.jsonl"
+mdCAD.exe --embedded --parent-hwnd 0x12345678 --jsonl "C:\abs\path\dump.jsonl" --jsonl-live-refresh
 ```
+
+Rules:
+- `--embedded` enables the Windows-only child-host path
+- `--parent-hwnd` is required when embedded mode is used
+- `--jsonl` accepts absolute paths only
+- `--jsonl-live-refresh` is an explicit boolean opt-in
+- bad HWND / missing parent / relative path should fail clearly, not silently
+
+---
+
+## Sample Host Stack
+
+### Recommended sample project
+- .NET 8
+- Avalonia.Desktop 11.3.x
+- `NativeControlHost`
+- minimal Win32 P/Invoke helpers
+
+### Keep out of mdCAD core
+Do **not** pull these into mdCAD itself:
+- C#
+- .NET runtime requirements
+- Avalonia packages
+- managed/native bridge code
+
+### Recommended host flow
+1. `NativeControlHost` obtains a native parent HWND
+2. Host launches `mdCAD.exe --embedded --parent-hwnd <HWND> ...`
+3. Host enumerates child HWNDs under the placeholder and filters by mdCAD process ID
+4. Host attaches the discovered child window to the native control handle
+5. Host owns process lifetime, bounds, and status messaging
+
+This keeps the milestone CLI-driven only while still making the sample credible.
+
+---
+
+## Backend Impact
+
+The new risk is the Win32 hosting seam, not the existing graphics backend selection.
+
+Recommendation:
+- Do **not** switch renderers for v1.8
+- Keep current backend selection logic intact
+- Make embedded mode work with the same backend the current build already uses
+
+Only revisit backend-specific differences if child-window rendering proves materially different during implementation.
+
+---
+
+## Build and Verification
+
+### mdCAD
+- Keep existing CMake build
+- Add no new native runtime/language dependency
+- Pin Sokol during the milestone if the Win32 path is patched locally
+
+### Sample host
+- Build separately with `dotnet build`
+- Do not fold Avalonia into the native CMake build
+- Keep sample-host build instructions explicit and local to the sample
+
+### Verification
+Add Windows-focused validation for:
+- embedded launch
+- child-window attach
+- resize
+- focus
+- keyboard
+- mouse capture/release
+- startup JSONL import
+- optional live refresh
+- host close / child shutdown
+
+---
+
+## Explicit Non-Goals
+
+- No IPC layer
+- No in-process embedding
+- No DLL/SDK packaging
+- No renderer rewrite
+- No new CLI parsing library
+- No WPF/WinUI alternative sample
+- No cross-platform sample host in this milestone
+
+---
 
 ## Sources
 
-- `src/jsonl_import_job.h` (current multi-phase import, entry anchors, parent batching)
-- `src/jsonl_loader.h` (line counting + full parse accumulation + quick scan mesh)
-- `src/jsonl_sketch_import_job.h` (transactional reparse semantics pattern)
-- `src/jsonl_observer_system.h` and `src/components/jsonl_observer_comp.h` (observer policy and metadata model)
-- `src/ui/ui_scene_hierarchy.h` and `src/ui/ui_entity_inspector.h` (current JSONL import/observer UX integration)
-- `src/ecs/ecs_scene.h`, `src/ecs/ecs_world.h`, `src/scene_serializer.h`, `src/app.c` (anchor creation, component registration, serialization, tick loop)
+- `src/app.c`
+- `src/platform.h`
+- `vendors/libsokol/CMakeLists.txt`
+- `vendors/libsokol/sokol.c`
+- Sokol `sokol_app.h`: https://raw.githubusercontent.com/floooh/sokol/master/sokol_app.h
+- Avalonia `NativeControlHost`: https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Controls/NativeControlHost.cs
+- Avalonia Win32 host implementation: https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Windows/Avalonia.Win32/Win32NativeControlHost.cs
+- Avalonia.Desktop package metadata: https://api.nuget.org/v3-flatcontainer/avalonia.desktop/11.3.15/avalonia.desktop.nuspec
+- Microsoft `CreateWindowExW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexw
+- Microsoft `EnumChildWindows`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumchildwindows
+- Microsoft `GetWindowThreadProcessId`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
+- Microsoft `SetFocus`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setfocus
+- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent

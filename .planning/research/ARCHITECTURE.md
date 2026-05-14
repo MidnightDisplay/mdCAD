@@ -1,129 +1,210 @@
 # Architecture Patterns
 
-**Domain:** mdCAD v1.6 — Observable Flat JSONL Import for Large Geometry Dumps  
-**Researched:** 2026-04-27  
-**Confidence:** HIGH (repo-code verified)
+**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
+**Domain:** Windows-hosted embeddable viewer for an existing native CAD app  
+**Researched:** 2026-05-14  
+**Confidence:** MEDIUM-HIGH
 
 ## Recommended Architecture
 
-Add **optional observer-driven refresh** to the existing flat JSONL import path **without changing default import behavior**.
+Treat v1.8 as a **launch/windowing integration layer** around the existing mdCAD runtime, not as a renderer rewrite or a host API redesign.
 
-### Entry Points
+Reuse these existing systems as much as possible:
+- app lifecycle in `src/app.c` (`init -> frame -> event -> sokol_main`)
+- ECS scene/update/render flow
+- existing viewport/picking/gizmo/input pipeline
+- existing large flat JSONL import job
+- existing linked JSONL observer/refresh system
 
-- Existing menu/flow stays primary:
-  - `src/ui/ui_scene_hierarchy.h`
-    - `Import JSONL Geometry Log...`
-    - `jsonl_import_job_start(...)`
-- Add one option in the existing JSONL import popup:
-  - `Attach observer link for refresh` (default **OFF** to preserve behavior)
+Add only three new runtime seams:
+1. Launch config parser
+2. Windows embedding adapter
+3. Startup flat-JSONL import controller
 
-### Existing Modules/Files Involved (Integration Points)
+The highest-risk area is **Win32 child-window creation under Sokol**, not JSONL import.
 
-1. **Import pipeline**
-   - `src/jsonl_loader.h` (parse, quick scan)
-   - `src/jsonl_import_job.h` (chunked parse/create/parent)
-   - `src/ui/ui_scene_hierarchy.h` (import options + progress)
-2. **Scene/runtime**
-   - `src/ecs/ecs_scene.h` (`scene_add_anchor`, batch parenting, `ImportPending` behavior)
-   - `src/app.c` (per-frame tick location, currently ticks sketch observer)
-3. **Observer patterns to reuse**
-   - `src/components/jsonl_observer_comp.h`
-   - `src/jsonl_observer_system.h`
-   - `src/jsonl_sketch_import_job.h` (transactional reparse pattern)
-4. **Persistence**
-   - `src/ecs/ecs_world.h` (component registration/get/set)
-   - `src/scene_serializer.h` (component save/load)
+---
 
-## New Components/State vs Existing Flow Changes
+## Existing Integration Points
 
-## New (recommended)
+| Area | Current role | Why it matters for v1.8 |
+|------|--------------|-------------------------|
+| `src/app.c` | Single app entry/lifecycle owner | Best place to own launch mode and startup orchestration |
+| `src/ui/ui_scene_hierarchy.h` | Current flat JSONL import UI flow | Good reference for existing behavior, but wrong owner for launch-time import |
+| `src/jsonl_import_job.h` | Chunked flat JSONL import job | Reuse directly for startup auto-import |
+| `src/jsonl_observer_system.h` | Linked refresh/manual refresh observer logic | Reuse after launch-time import succeeds |
+| `src/ui/ui_viewport.h` | Viewport sizing and input math | Resize/input behavior should stay authoritative here |
+| `vendors/libsokol/sokol.c` / `sokol_app.h` | Native window creation boundary | Likely where the Windows embedding seam must live |
 
-### 1) New component for flat imports
-Use a **new component** (e.g. `JsonlFlatObserverComp`) attached to the imported flat root anchor entity, not `SketchComp`.
+---
 
-Store:
-- source path
-- observe toggle / interval / retry state
-- transform/import settings needed for replay (scale/rotation/shift, color mode)
-- source stamp (size/mtime/hash)
-- minimal message history
+## New / Modified Components
 
-Why new component: keeps sketch observer untouched and avoids regressions in Phase 35 behavior.
+### 1. Launch config parser
+Recommended component: `src/app_launch_config.h` (or equivalent)
 
-### 2) New flat observer system
-Add `jsonl_flat_observer_system.h`:
-- query: entities with flat observer component
-- source change detection + retry/debounce policy
-- schedule/drive refresh pipeline
+Suggested responsibility:
+- parse `--embedded`
+- parse/validate `--parent-hwnd`
+- parse `--jsonl`
+- parse `--jsonl-live-refresh`
+- make launch mode available to `app.c` before init begins
 
-### 3) New transactional flat refresh pipeline
-Add a refresh path that preserves root entity identity:
-- parse changed JSONL
-- stage new subtree (entry anchors + geometry)
-- commit only on success:
-  - delete old subtree
-  - reparent staged subtree under same root
-- rollback on failure:
-  - delete staged subtree only
-  - keep last-good live subtree
+This should be a single source of truth for startup behavior.
 
-This mirrors sketch transactional reparse semantics but for flat ECS trees.
+### 2. Windows embedding adapter
+Recommended component: `src/platform/win32_embed.h/.c` (or equivalent thin Win32-only layer)
 
-## Modify existing flow (minimal, safe)
+Suggested responsibility:
+- validate `parent_hwnd`
+- expose embedded vs standalone state
+- own parent-liveness/orphan detection
+- own Win32-specific sizing/focus glue
 
-- `ui_scene_hierarchy.h`:
-  - add observer opt-in checkbox in existing JSONL popup
-  - on successful import, attach flat observer component to `job->root_entity`
-- `app.c`:
-  - call `jsonl_flat_observer_system_tick(...)` near existing `jsonl_observer_system_tick(...)`
-- `scene_serializer.h` + `ecs_world.h`:
-  - register/persist new flat observer component (new JSON key; do not alter existing `jsonl_observer` contract)
+Keep Win32 child-window logic out of general app code as much as possible.
 
-## Data Flow (Flat Import + Optional Observer Refresh)
+### 3. Sokol Win32 creation seam
+Recommended approach: a **narrow local Sokol Win32 extension/patch** so embedded mode can create a child window from birth.
 
-1. User imports JSONL (existing flat flow).
-2. `jsonl_import_job` creates root + entries + geometry as today.
-3. If observer opt-in:
-   - attach flat observer component to root entity.
-4. Frame tick:
-   - observer system checks source stamp.
-   - unchanged -> no-op.
-   - changed -> run transactional flat refresh job.
-5. Refresh success:
-   - subtree atomically replaced under same root.
-6. Refresh failure:
-   - last-good subtree preserved, message pushed, retry policy applied.
+Why:
+- mdCAD window creation happens before `init()`
+- Sokol exposes `sapp_win32_get_hwnd()` but not a documented parent-HWND creation field
+- `SetParent` is not a sufficient final architecture for correct child-window semantics
 
-## Anti-Patterns to Avoid
+### 4. Embedded layout mode
+Recommended change: add an embedded viewer layout mode that:
+- skips normal dockspace/panel-heavy standalone layout
+- lets the viewport fill the child client area (or nearly so)
+- keeps the same viewport coordinate/input math
 
-- Reusing sketch observer component/system directly for non-sketch roots.
-- In-place mutation of old flat subtree during parse (non-transactional partial corruption risk).
-- Changing current JSONL import defaults (must remain unchanged when observer not enabled).
-- Coupling observer runtime state to UI-only structs.
+This is a UI policy change, not a renderer fork.
 
-## Suggested Build Order (Low-Risk)
+### 5. Startup flat JSONL import controller
+Recommended component: `src/startup_flat_import.h/.c` or equivalent `app.c`-owned helper state
 
-1. **Phase A — Persistence scaffolding + component only**
-   - Add `JsonlFlatObserverComp` registration + serializer read/write.
-   - No runtime behavior yet.
-2. **Phase B — Hook import completion metadata**
-   - Wire optional checkbox in existing JSONL popup.
-   - Attach new component to imported root on success.
-   - Keep default OFF.
-3. **Phase C — Transactional refresh engine (manual only)**
-   - Implement flat refresh transaction API:
-     - `jsonl_flat_reparse_transactional(scene, root, observer)`
-   - Trigger via manual button in inspector for selected root.
-4. **Phase D — Automatic observer tick**
-   - Add `jsonl_flat_observer_system_tick` in `app.c`.
-   - Enable debounce/retry/auto-disable policy.
-5. **Phase E — Scale/perf hardening + tests**
-   - Large fixture tests for high entity counts.
-   - Validate stable totals/no leaks/no duplicate accumulation.
-   - Keep existing sketch observer and plain import tests green.
+Do **not** drive startup import from `ui_scene_hierarchy_state_t`.
 
-## Maintainability/Compatibility Contract
+Instead, create a non-UI wrapper that can:
+- start a flat import from an absolute path
+- request live refresh opt-in when asked
+- tick import progress from `frame()`
+- reuse existing success/error/reset semantics
 
-- Existing `Import JSONL Geometry Log...` behavior remains identical unless observer opt-in is enabled.
-- Existing sketch observer (`JsonlObserverComp` + `jsonl_observer_system_tick`) remains isolated and unchanged.
-- New flat observer architecture is additive and root-scoped, minimizing regression surface.
+---
+
+## Runtime vs Host Boundaries
+
+| Concern | mdCAD runtime | Avalonia sample host |
+|---------|---------------|----------------------|
+| Parse embedded-mode CLI | Yes | No |
+| Own scene/render/input loop | Yes | No |
+| Create/attach child-window semantics | Yes | Supplies parent HWND only |
+| Auto-import JSONL | Yes | Passes CLI only |
+| Enable live refresh | Yes | Passes CLI only |
+| Tick linked refresh | Yes | No |
+| Resize child HWND | Accepts it | Yes |
+| Focus child HWND on host interaction | Must handle it | Yes |
+| Process launch/termination | No | Yes |
+| Status UI for launch/attach | Minimal/debug only | Yes |
+| Example JSONL bundling | No | Yes |
+
+The host should own HWND/process lifecycle only. mdCAD should continue owning rendering, input, scene state, import, refresh, and shutdown behavior.
+
+---
+
+## Recommended Control Flow
+
+### Standalone mode
+`Process start -> sokol_main -> init -> frame -> event`
+
+No material change.
+
+### Embedded mode
+1. Host creates a native placeholder HWND
+2. Host launches `mdCAD.exe --embedded --parent-hwnd <HWND> --jsonl <abs-path> [--jsonl-live-refresh]`
+3. mdCAD parses CLI into launch config
+4. Sokol/Win32 layer creates mdCAD as a child HWND
+5. `init()` initializes normal runtime systems
+6. Embedded layout mode is selected
+7. Startup import controller begins flat JSONL import if requested
+8. `frame()` ticks import, observer systems, and normal viewport rendering
+9. Host resizes the placeholder; mdCAD receives native resize and adapts through existing viewport/render-target paths
+10. If the parent HWND disappears, mdCAD requests shutdown
+
+---
+
+## What Should Not Change
+
+- ECS scene ownership
+- Rendering backend selection logic
+- Pick buffer / gizmo / selection architecture
+- Linked JSONL observer semantics
+- Existing large flat import implementation
+- Manual Scene Hierarchy import workflow for standalone mode
+
+v1.8 should add a **new launch path**, not a separate scene/import stack.
+
+---
+
+## Low-Risk Build Order
+
+### Phase 1 — Launch config and child-window bootstrap
+Deliver:
+- CLI parser
+- embedded mode flag
+- parent HWND contract
+- minimal child-window creation path
+- simple host sample that launches and displays mdCAD
+
+### Phase 2 — Resize, focus, and input correctness
+Deliver:
+- host-driven resize
+- focus acquisition
+- keyboard/mouse sanity
+- parent-close/orphan shutdown behavior
+- embedded viewer layout mode
+
+### Phase 3 — Startup flat JSONL auto-import
+Deliver:
+- non-UI startup import controller
+- absolute-path startup import
+- launch-time success/error path
+
+### Phase 4 — Live refresh opt-in
+Deliver:
+- `--jsonl-live-refresh`
+- observer contract wiring
+- embedded-mode refresh proof
+
+### Phase 5 — Sample host polish and docs
+Deliver:
+- bundled example JSONL
+- status messaging
+- build/run instructions
+- cleanup behavior
+- integration validation notes
+
+---
+
+## Anti-Patterns
+
+- Putting embedded startup import logic inside `ui_scene_hierarchy`
+- Treating embedding as "the host controls mdCAD"
+- Relying on late `SetParent` as the final design
+- Mixing the Avalonia sample into the core native build/test flow
+
+---
+
+## Sources
+
+- `src/app.c`
+- `src/ui/ui_scene_hierarchy.h`
+- `src/jsonl_import_job.h`
+- `src/jsonl_observer_system.h`
+- `src/ui/ui_viewport.h`
+- `src/CMakeLists.txt`
+- `docs/VULKAN_WINDOWS.md`
+- Sokol `sokol_app.h`: https://github.com/floooh/sokol
+- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent
+- Microsoft child-window docs: https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features
+- Avalonia `NativeControlHost`: https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_NativeControlHost

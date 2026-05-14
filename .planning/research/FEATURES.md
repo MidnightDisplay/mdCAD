@@ -1,89 +1,122 @@
 # Feature Landscape
 
-**Domain:** CAD-style large geometry log workflows (v1.6 Observable Flat JSONL Import)  
-**Researched:** 2026-04-27  
-**Confidence:** HIGH (repo context + shipped v1.5 observer/import behavior)
+**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
+**Domain:** Windows-hosted, process-launched child-HWND viewer workflow  
+**Researched:** 2026-05-14  
+**Confidence:** MEDIUM
+
+## Scope Anchor
+
+v1.8 is a first **Windows-only, process-launched, child-HWND embedding** milestone for an Avalonia host using `NativeControlHost`.
+
+The goal is not "embedding mdCAD everywhere." The goal is a credible first workflow where a Windows host launches mdCAD into a native child surface, optionally auto-opens a JSONL large dump, and keeps resize/focus/input behavior predictable without adding IPC.
+
+---
 
 ## Table Stakes
 
-Features users expect for this milestone. Missing any of these makes the feature feel incomplete.
+These are the expected must-haves for a first embedded viewer release.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Separate menu path: `File -> Import JSONL (Flat / Large)` | Users need explicit intent: "fast large dump import," not sketch workflow | Low | Must not replace existing JSONL Geometry Log or JSONL as Sketch entries |
-| Dedicated flat import dialog | Users expect to confirm scale/rotation/center/color behavior before heavy import | Medium | Reuse proven JSONL options shape; keep terminology clear that output is non-sketch entities |
-| Import into one anchor entity | Large dump workflows expect one controllable root for selection, hide/show, delete, and refresh | Medium | No per-entry sketch conversion; plain scene entities only |
-| Optional observer link at import time | Users need live-update option without forcing it for huge files | Medium | Opt-in toggle in dialog; link metadata attaches to anchor |
-| Manual refresh (`Re-import now`) | CAD operators expect deterministic "pull latest file now" control | Medium | Must work even when auto-observe is off/disabled |
-| Transactional refresh semantics | Users expect "all-or-nothing" replacement, never partial corruption on parse/read failure | High | Keep last good anchor content on failure |
-| Stable behavior on huge files (hundreds of thousands of geometries) | Core reason for milestone | High | Prioritize responsiveness and no UI lock/crash during import/refresh |
+| Feature | Why it matters | Notes |
+|---------|----------------|-------|
+| Child-window embedding by CLI-provided parent HWND | This is the core promise of the milestone | Invalid/missing parent handle must fail clearly |
+| No fallback to an orphan top-level window | Silent fallback would hide integration bugs | Embedded mode should be explicit and strict |
+| Launch-time JSONL auto-open from an absolute path | Matches the requested host workflow | Reuse the existing large flat dump import path |
+| Optional live refresh flag | Supports the host "watch this dump" scenario | Keep default OFF unless explicitly requested |
+| Resize follows the host control cleanly | Embedded viewer must feel native inside the host | No stale backbuffer, clipped viewport, or delayed resize behavior |
+| Click-to-focus keyboard ownership | Viewer shortcuts must work when the user interacts with the viewer | Host should retain shortcuts when viewer is not focused |
+| Mouse ownership stays local to the viewer | Orbit/pan/select/zoom must not leak into host scrolling/gestures | Capture/release behavior matters |
+| Clean focus loss/gain behavior | Switching between host UI and viewer must feel normal | No stuck drag or broken keyboard state |
+| Minimal host status messaging | The sample host should prove the workflow | Launching, embedded, JSONL path, live refresh, failure states |
+| Clean teardown with host close | No zombie mdCAD process or detached window | Parent/control destruction is part of the feature contract |
 
-## Differentiators
+## Expected v1.8 Behavior
 
-Features that make this especially strong for large-geometry log workflows.
+### Launch and embedding
+- Host launches `mdCAD.exe` as a separate process.
+- Host passes a parent HWND on the command line.
+- mdCAD creates/attaches a real child window beneath that parent.
+- Embedded startup failure is surfaced as a failure, not a hidden standalone fallback.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Flat refresh replaces only anchor subtree (not sketch/script pipeline) | Much faster and lower overhead for huge logs | High | Primary performance differentiator vs sketch-observer flow |
-| Observer defaults tuned for safety on huge logs | Avoid runaway retries and UI spam during file-lock churn | Medium | Reuse retry/debounce/auto-disable pattern already proven in observer flow |
-| Import mode explicitly branded for "Large Geometry Dumps" | Reduces wrong-path usage and support confusion | Low | UX clarity is a practical differentiator |
-| Clear status + recent observer messages on anchor | Operators can diagnose refresh failures quickly | Medium | Reuse "latest-two messages" style behavior |
+### Startup JSONL behavior
+- If a JSONL path is supplied, mdCAD auto-imports it on startup.
+- If live refresh is also requested, it enables linked refresh for that imported file only.
+- If no JSONL path is supplied, mdCAD still starts as an empty embedded viewer.
+
+### Input behavior
+- Clicking inside the embedded viewer gives mdCAD focus.
+- Keyboard input belongs to mdCAD only while its surface is focused.
+- Mouse drag/capture must remain coherent during viewport interaction.
+- Mouse wheel over the viewer should affect the viewer, not the outer host surface.
+
+### Resize behavior
+- Resizing the Avalonia `NativeControlHost` should resize the mdCAD child surface immediately.
+- Viewport rendering, picking, and interaction math should remain correct after repeated resizes.
+
+---
+
+## Defer to Later Milestones
+
+These are useful later, but should not block v1.8:
+
+| Deferred item | Why defer |
+|---------------|-----------|
+| Rich host-to-viewer commands (reload, fit-to-view, frame selection) | Requires an IPC/control surface the milestone explicitly excludes |
+| Structured machine-readable status channel | Helpful later, but not required for a first CLI-only workflow |
+| Multiple embedded mdCAD instances per host | Extra lifetime/focus complexity before the single-view story is stable |
+| Embed-specific chrome trimming or read-only viewer UX | Nice polish, but not necessary to prove correctness |
+| Drag-and-drop JSONL onto the embedded viewer | Outside the requested launch contract |
+| Rich sample-host controls (path picker, reload button, live toggle) | Risks turning the sample into a product rather than a conformance harness |
+
+---
 
 ## Anti-Features
 
-Explicitly avoid these in v1.6.
+These should stay explicitly out of scope for v1.8:
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|--------------------|
-| Auto-convert flat import into sketch entities | Reintroduces heavy sketch/script overhead; defeats milestone purpose | Keep flat mode strictly plain scene entities |
-| Silent partial refresh on parse errors | Causes mixed old/new geometry and trust loss | Keep transactional replace-or-rollback |
-| Forced observer ON by default for flat mode | Dangerous on giant files; can surprise users with heavy background reparses | Make observer opt-in in flat import dialog |
-| Per-entry anchor hierarchy in flat mode | Adds hierarchy bloat and slows large-scene operations | Single anchor with flat children only |
-| Adding constraint inference/authoring in this milestone | Scope creep; unrelated to large dump refresh performance | Keep import unconstrained and non-sketch |
+| Anti-feature | Why avoid it |
+|--------------|--------------|
+| In-process / DLL / SDK-style embedding | Major architecture expansion with much higher lifetime and ABI risk |
+| Rich IPC between host and viewer | Expands the contract before the basic embedding story is stable |
+| Cross-platform embedding parity | Multiplies platform complexity too early |
+| Refresh architecture redesign | Existing linked flat JSONL refresh behavior is already the stable base to reuse |
+| Full host/viewer state synchronization | Scope explosion far beyond "embedded viewer" |
+| Automatic fallback to standalone mode on bad embed args | Hides bugs and makes the host workflow unreliable |
 
-## Feature Dependencies
+---
 
-```text
-Separate menu entry
-  -> Dedicated flat import dialog
-    -> Import options capture (units/transform/color + observe opt-in)
-      -> Flat import job (plain entities under one anchor)
-        -> Anchor metadata/link persistence
-          -> Manual refresh
-            -> Auto-observe refresh loop
-              -> Transactional replacement + retry/debounce/auto-disable messaging
-```
+## MVP Recommendation
 
-## MVP Recommendation (v1.6)
+Build in this order:
 
-Prioritize:
-1. Separate flat import menu + dialog (explicit mode separation)
-2. One-anchor flat entity import with large-file-safe execution
-3. Optional observer link with manual refresh and transactional re-import
-4. Reuse observer retry/debounce/auto-disable + recent-message UX on anchor
+1. Valid embedded child-window launch
+2. Resize/focus/input correctness
+3. Launch-time JSONL auto-import
+4. Optional live refresh wiring
+5. Minimal Avalonia sample host with bundled example JSONL
 
-Defer:
-- Any sketch/script integration for flat mode
-- Smart diff/patch refresh (full anchor replace is acceptable for v1.6)
-- New geometry semantics beyond existing JSONL type handling
+---
 
-## Scoping Notes for /gsd-new-milestone
+## "Done Means"
 
-Use requirement slices like:
-- **FIMP-01**: User can launch flat JSONL import from dedicated File menu action.
-- **FIMP-02**: Import creates one anchor with plain scene-entity geometry (non-sketch).
-- **FIMP-03**: Import dialog supports transform/color options and observer opt-in.
-- **FIMP-04**: Manual refresh re-imports source into same anchor transactionally.
-- **FIMP-05**: Auto-observe refresh uses retry/debounce/auto-disable safety semantics.
-- **FIMP-06**: Huge-file workflow remains responsive and stable under repeated refresh.
+v1.8 should feel done when all of these are true:
+
+- A Windows Avalonia host can launch mdCAD and host it inside `NativeControlHost`
+- mdCAD remains visually confined to the host region as a child window
+- An absolute JSONL path auto-loads on startup
+- A separate flag can opt into live refresh for that file
+- Resize/focus/keyboard/mouse behavior feels normal during real viewport interaction
+- The sample host clearly communicates launch/attach/import state and demonstrates the full workflow end-to-end
+
+---
 
 ## Sources
 
-- `.planning/PROJECT.md` (v1.6 scope and goals)
-- `.planning/STATE.md` (milestone focus and constraints)
-- `.planning/phases/35-.../35-CONTEXT.md` (observer semantics baseline)
-- `.planning/phases/35-.../35-UAT.md` (observer UX/behavior validation baseline)
-- `src/ui/ui_scene_hierarchy.h` (existing import menu/dialog patterns)
-- `src/jsonl_import_job.h` (current JSONL geometry-log import behavior)
-- `src/components/jsonl_observer_comp.h` (observer state model)
-- `src/jsonl_observer_system.h` (manual/auto reparse, retry/debounce behavior)
+- `.planning/PROJECT.md`
+- `.planning/STATE.md`
+- `.planning/milestones/v1.6-REQUIREMENTS.md`
+- `.planning/milestones/v1.7-REQUIREMENTS.md`
+- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent
+- Microsoft child-window docs: https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features
+- Microsoft `WM_SETFOCUS`: https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-setfocus
+- Avalonia `NativeControlHost`: https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_NativeControlHost
