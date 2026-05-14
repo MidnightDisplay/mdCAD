@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Embeddable Windows JSONL Viewer
+milestone_name: milestone
 status: planning
-stopped_at: Phase 43 complete
-last_updated: "2026-05-14T15:55:50.251Z"
+stopped_at: Phase 44 context gathered
+last_updated: "2026-05-14T16:28:19.154Z"
 last_activity: 2026-05-14 -- Phase 43 verified and marked complete
 progress:
   total_phases: 5
@@ -86,6 +86,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T15:55:50.251Z
-Stopped at: Phase 43 complete
-Resume file: None
+Last session: 2026-05-14T16:28:19.151Z
+Stopped at: Phase 44 context gathered
+Resume file: .planning/phases/44-embedded-resize-focus-viewer-layout/44-CONTEXT.md
