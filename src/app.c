@@ -15,6 +15,7 @@
 #include "sokol_imgui.h"
 
 // Project modules
+#include "app_launch_config.h"
 #include "math3d.h"
 #include "math/cglm_entry.h"
 #include "math/math_interaction.h"
@@ -49,6 +50,8 @@
 
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 //------------------------------------------------------------------------------
 // Application state
@@ -2499,8 +2502,12 @@ static void event(const sapp_event* ev) {
 // Main entry point
 //------------------------------------------------------------------------------
 sapp_desc sokol_main(int argc, char* argv[]) {
-    (void)argc;
-    (void)argv;
+    mdcad_launch_config_t launch_config = {0};
+    char launch_error[256] = {0};
+    if (!mdcad_launch_config_parse(argc, argv, &launch_config, launch_error, sizeof(launch_error))) {
+        fprintf(stderr, "Embedded startup failed: %s\n", launch_error[0] ? launch_error : "Invalid embedded launch configuration");
+        exit(2);
+    }
     return (sapp_desc){
         .init_cb = init,
         .frame_cb = frame,

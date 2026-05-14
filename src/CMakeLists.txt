@@ -322,6 +322,13 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     target_link_libraries(jsonl_flat_observer_auto_safety_test PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME jsonl_flat_observer_auto_safety_test COMMAND jsonl_flat_observer_auto_safety_test)
+
+    add_executable(embed_launch_config_test tests/embed_launch_config_test.c)
+    target_compile_features(embed_launch_config_test PRIVATE c_std_11)
+    target_include_directories(embed_launch_config_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME embed_launch_config_test COMMAND embed_launch_config_test)
 endif()
 
 # Emscripten-specific linker options
