@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: milestone
-status: executing
-stopped_at: Completed 44-07-PLAN.md
-last_updated: "2026-05-14T21:33:37.339Z"
+milestone_name: Embeddable Windows JSONL Viewer
+status: verifying
+stopped_at: Completed 44-08-PLAN.md
+last_updated: "2026-05-14T21:37:41.873Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 100
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 44 (embedded-resize-focus-viewer-layout) — EXECUTING
+Phase: 44 (embedded-resize-focus-viewer-layout) — VERIFYING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Ready for final human UAT re-check
 Last activity: 2026-05-14
 
 Progress: [██████████] 100%
@@ -60,6 +60,8 @@ Recent decisions affecting current work:
 - [Phase 44]: The Avalonia host now distinguishes the mdCAD-side destroyed-parent quit path from the host-side `destroy-after-attach` fallback cleanup.
 - [Phase 44]: Embedded keyboard ownership is now claimed from mdCAD's own Win32 child-window message path instead of from the Avalonia host. — Host-side SetFocus into the external child HWND is unreliable; the child now claims focus from its own first-click native path.
 - [Phase 44]: Host chrome regains focus through Avalonia focus APIs only; the host never calls SetFocus or SetActiveWindow on the external mdCAD child HWND. — Separating host focus return from child focus acquisition preserves the CLI host boundary and avoids cross-process focus forcing.
+- [Phase 44]: Normal host close now reuses the same placeholder invalidation seam that destroyed-parent mode already proved. — The missing normal-close flush behavior came from close ordering in the host, so the fix reuses the proven parent-invalid signal before waiting for process exit.
+- [Phase 44]: The host-close path no longer performs an extra unconditional kill after the graceful wait path runs. — Keeping fallback cleanup inside the wait helper preserves a real chance for mdCAD to self-exit and flush embedded layout state before host cleanup intervenes.
 
 ### Roadmap Evolution
 
@@ -93,6 +95,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T21:33:37.336Z
-Stopped at: Completed 44-07-PLAN.md
+Last session: 2026-05-14T21:37:41.870Z
+Stopped at: Completed 44-08-PLAN.md
 Resume file: None

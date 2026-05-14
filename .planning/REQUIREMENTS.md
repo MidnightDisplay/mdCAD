@@ -10,14 +10,14 @@
 - [x] **EMBD-01**: Developer can launch mdCAD in Windows embedded mode by passing a parent HWND on the command line. — Validated in Phase 43
 - [x] **EMBD-02**: Embedded mdCAD creates and remains inside a true child window under the supplied parent HWND instead of silently falling back to a standalone top-level window. — Validated in Phase 43
 - [x] **EMBD-03**: Developer gets a clear startup failure when embedded-mode arguments are missing, invalid, or incompatible. — Validated in Phase 43
-- [ ] **EMBD-04**: Embedded mdCAD shuts down cleanly when the host/control lifecycle ends or the parent HWND becomes invalid.
+- [x] **EMBD-04**: Embedded mdCAD shuts down cleanly when the host/control lifecycle ends or the parent HWND becomes invalid.
 
 ### Embedded Interaction
 
 - [ ] **INPT-01**: User can resize the host control and mdCAD resizes its hosted render surface without clipped, stale, or incorrect viewport behavior.
 - [x] **INPT-02**: User can click into the embedded viewer and immediately use mdCAD keyboard and mouse interactions without host interference.
 - [ ] **INPT-03**: User can move focus between host UI and mdCAD without stuck capture, stuck drag, or broken input state.
-- [ ] **INPT-04**: User sees mdCAD in a viewer-first embedded layout that fits the hosted region.
+- [x] **INPT-04**: User sees mdCAD in a viewer-first embedded layout that fits the hosted region.
 
 ### Startup JSONL
 
@@ -63,11 +63,11 @@
 | EMBD-01 | Phase 43 | Complete |
 | EMBD-02 | Phase 43 | Complete |
 | EMBD-03 | Phase 43 | Complete |
-| EMBD-04 | Phase 44 | Pending |
+| EMBD-04 | Phase 44 | Complete |
 | INPT-01 | Phase 44 | Pending |
 | INPT-02 | Phase 44 | Complete |
 | INPT-03 | Phase 44 | Pending |
-| INPT-04 | Phase 44 | Pending |
+| INPT-04 | Phase 44 | Complete |
 | JSON-01 | Phase 45 | Pending |
 | JSON-02 | Phase 46 | Pending |
 | JSON-03 | Phase 45 | Pending |
