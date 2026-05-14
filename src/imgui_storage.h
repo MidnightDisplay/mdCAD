@@ -5,9 +5,15 @@
 #define IMGUI_STORAGE_H
 
 #include "platform.h"
+#include "embed_layout_state.h"
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 //------------------------------------------------------------------------------
 // iOS NSUserDefaults persistence
@@ -203,6 +209,96 @@ EMSCRIPTEN_KEEPALIVE void imgui_storage_mark_should_save(void) {
 #endif // PLATFORM_WEB
 
 //------------------------------------------------------------------------------
+// Native desktop file persistence
+//------------------------------------------------------------------------------
+#if !defined(PLATFORM_IOS) && !defined(PLATFORM_ANDROID) && !defined(PLATFORM_WEB)
+static embed_layout_policy_t g_imgui_native_layout_policy = {0};
+static bool g_imgui_native_should_save = false;
+
+static inline void imgui_storage_configure(const embed_layout_policy_t* policy) {
+    g_imgui_native_layout_policy = policy ? *policy : (embed_layout_policy_t){0};
+    g_imgui_native_should_save = false;
+}
+
+static inline bool imgui_storage_native_store_exists(const char* path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
+
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        return false;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return false;
+    }
+
+    long size = ftell(f);
+    fclose(f);
+    return size > 0;
+}
+
+static inline char* imgui_storage_native_load(const char* path) {
+    if (!imgui_storage_native_store_exists(path)) {
+        return NULL;
+    }
+
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        return NULL;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    long size = ftell(f);
+    if (size <= 0 || fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    char* buf = (char*)malloc((size_t)size + 1u);
+    if (!buf) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read = fread(buf, 1, (size_t)size, f);
+    fclose(f);
+    buf[read] = '\0';
+    return buf;
+}
+
+static inline void imgui_storage_native_save(const char* path, const char* ini_data) {
+    if (!path || path[0] == '\0' || !ini_data) {
+        return;
+    }
+
+    FILE* f = fopen(path, "wb");
+    if (!f) {
+        return;
+    }
+
+    size_t len = strlen(ini_data);
+    (void)fwrite(ini_data, 1, len, f);
+    fclose(f);
+}
+#else
+static inline void imgui_storage_configure(const embed_layout_policy_t* policy) {
+    (void)policy;
+}
+
+static inline bool imgui_storage_native_store_exists(const char* path) {
+    (void)path;
+    return false;
+}
+#endif
+
+//------------------------------------------------------------------------------
 // Unified API
 //------------------------------------------------------------------------------
 
@@ -229,6 +325,14 @@ static inline void imgui_storage_init(void) {
         free(ini_data);
     }
     imgui_storage_setup_handlers_js();
+#elif !defined(PLATFORM_IOS) && !defined(PLATFORM_ANDROID) && !defined(PLATFORM_WEB)
+    if (g_imgui_native_layout_policy.use_manual_persistence) {
+        char* ini_data = imgui_storage_native_load(g_imgui_native_layout_policy.manual_store_filename);
+        if (ini_data) {
+            igLoadIniSettingsFromMemory(ini_data, 0);
+            free(ini_data);
+        }
+    }
 #endif
     // Native macOS/Linux/Windows: simgui_setup() handles ini_filename automatically
 }
@@ -260,6 +364,14 @@ static inline void imgui_storage_frame(void) {
             imgui_storage_save_js(ini_data);
         }
     }
+#elif !defined(PLATFORM_IOS) && !defined(PLATFORM_ANDROID) && !defined(PLATFORM_WEB)
+    if (g_imgui_native_layout_policy.use_manual_persistence && g_imgui_native_should_save) {
+        g_imgui_native_should_save = false;
+        const char* ini_data = igSaveIniSettingsToMemory(NULL);
+        if (ini_data) {
+            imgui_storage_native_save(g_imgui_native_layout_policy.manual_store_filename, ini_data);
+        }
+    }
 #endif
 }
 
@@ -282,6 +394,13 @@ static inline void imgui_storage_shutdown(void) {
     if (ini_data) {
         imgui_storage_save_js(ini_data);
     }
+#elif !defined(PLATFORM_IOS) && !defined(PLATFORM_ANDROID) && !defined(PLATFORM_WEB)
+    if (g_imgui_native_layout_policy.use_manual_persistence) {
+        const char* ini_data = igSaveIniSettingsToMemory(NULL);
+        if (ini_data) {
+            imgui_storage_native_save(g_imgui_native_layout_policy.manual_store_filename, ini_data);
+        }
+    }
 #endif
     // Native macOS/Linux/Windows: simgui_shutdown() handles saving automatically
 }
@@ -295,6 +414,10 @@ static inline void imgui_storage_mark_should_save(void) {
     imgui_storage_ios_mark_should_save();
 #elif defined(PLATFORM_ANDROID)
     imgui_storage_android_mark_should_save();
+#elif !defined(PLATFORM_WEB)
+    if (g_imgui_native_layout_policy.use_manual_persistence) {
+        g_imgui_native_should_save = true;
+    }
 #endif
     // Native platforms save automatically via ini file
 }

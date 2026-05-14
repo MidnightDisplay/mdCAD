@@ -17,6 +17,7 @@
 // Project modules
 #include "app_launch_config.h"
 #include "embed_input_state.h"
+#include "embed_layout_state.h"
 #include "math3d.h"
 #include "math/cglm_entry.h"
 #include "math/math_interaction.h"
@@ -73,6 +74,8 @@ static struct {
     embed_input_state_t embed_input;
     uint32_t embed_runtime_cancel_serial;
     bool embed_quit_requested;
+    embed_layout_policy_t embed_layout;
+    bool embed_layout_seed_pending;
 
     // UI state
     ui_controls_state_t controls;
@@ -359,6 +362,41 @@ static bool mdcad_handle_embedded_runtime_guards(void) {
 #endif
 
     return false;
+}
+
+static void mdcad_seed_embedded_dock_layout(ImGuiID dockspace_id) {
+    if (!state.launch.embedded || !state.embed_layout_seed_pending || dockspace_id == 0) {
+        return;
+    }
+
+    const ImGuiViewport* viewport = igGetMainViewport();
+    if (!viewport) {
+        return;
+    }
+
+    igDockBuilderRemoveNode(dockspace_id);
+    igDockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+    igDockBuilderSetNodePos(dockspace_id, viewport->WorkPos);
+    igDockBuilderSetNodeSize(dockspace_id, viewport->WorkSize);
+
+    ImGuiID dock_center_id = dockspace_id;
+    ImGuiID dock_bottom_id = 0;
+    igDockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.34f, &dock_bottom_id, &dock_center_id);
+
+    ImGuiID dock_bottom_left_id = 0;
+    ImGuiID dock_bottom_right_id = dock_bottom_id;
+    igDockBuilderSplitNode(dock_bottom_id, ImGuiDir_Left, 0.38f, &dock_bottom_left_id, &dock_bottom_right_id);
+
+    igDockBuilderDockWindow("3D Viewport", dock_center_id);
+    igDockBuilderDockWindow("Scene Hierarchy", dock_bottom_left_id);
+    igDockBuilderDockWindow("Entity Inspector", dock_bottom_right_id);
+    igDockBuilderDockWindow("Controls", dock_bottom_right_id);
+    igDockBuilderDockWindow("Visibility", dock_bottom_right_id);
+    igDockBuilderDockWindow("Camera Debug", dock_bottom_right_id);
+    igDockBuilderFinish(dockspace_id);
+
+    state.embed_layout_seed_pending = false;
+    imgui_storage_mark_should_save();
 }
 
 static size_t mdcad_script_editor_estimate_capacity(ecs_entity_t sketch) {
@@ -1689,6 +1727,13 @@ static void init(void) {
     state.last_time = stm_now();
     mdcad_cglm_compile_anchor();
 
+    embed_layout_state_t embed_layout_state = embed_layout_state_make(
+        state.launch.embedded,
+        state.launch.embedded && imgui_storage_native_store_exists(embed_layout_state_embedded_store_filename()));
+    state.embed_layout = embed_layout_state_resolve(&embed_layout_state);
+    state.embed_layout_seed_pending = state.embed_layout.should_seed_default_layout;
+    imgui_storage_configure(&state.embed_layout);
+
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
         .logger.func = slog_func,
@@ -1702,12 +1747,13 @@ static void init(void) {
     });
 
     // Setup ImGui with docking enabled
-    simgui_setup(&(simgui_desc_t){
-#ifndef PLATFORM_WEB
-        .ini_filename = "imgui.ini",
-#endif
+    simgui_desc_t simgui_desc = {
         .logger.func = slog_func,
-    });
+    };
+#ifndef PLATFORM_WEB
+    simgui_desc.ini_filename = state.embed_layout.automatic_ini_filename;
+#endif
+    simgui_setup(&simgui_desc);
 
     // Enable docking
     ImGuiIO* io = igGetIO_Nil();
@@ -2012,7 +2058,8 @@ static void frame(void) {
     });
 
     //=== UI ===
-    igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
+    ImGuiID dockspace_id = igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
+    mdcad_seed_embedded_dock_layout(dockspace_id);
 
     // Draw UI panels if visible
     if (state.ui_visible) {
@@ -2709,6 +2756,7 @@ static void event(const sapp_event* ev) {
                 mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_VIEWER_FOCUSED, false);
                 break;
             case SAPP_EVENTTYPE_UNFOCUSED:
+                imgui_storage_mark_should_save();
                 mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_HOST_FOCUS_GAINED, true);
                 break;
             case SAPP_EVENTTYPE_MOUSE_DOWN:
