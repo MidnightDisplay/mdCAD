@@ -31,7 +31,7 @@ The roadmap follows the research risk order: prove strict child-window startup f
 
 Plans:
 - [x] 43-01-PLAN.md — Pin Sokol and lock the strict embed launch parser contract.
-- [ ] 43-02-PLAN.md — Create the true child-window bootstrap path and embedded viewer defaults.
+- [x] 43-02-PLAN.md — Create the true child-window bootstrap path and embedded viewer defaults.
 - [ ] 43-03-PLAN.md — Build the minimal Avalonia host and capture attach/failure smoke evidence.
 
 ### Phase 44: Embedded Resize, Focus & Viewer Layout
