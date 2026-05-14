@@ -465,9 +465,14 @@ public partial class MainWindow : Window
         }
 
         _destroyAfterAttachTriggered = true;
-        _teardownReason = _options.TestMode == EmbedTestMode.DestroyedParent
+        InvalidatePlaceholderForTeardown(_options.TestMode == EmbedTestMode.DestroyedParent
             ? "Destroyed-parent mode destroyed the placeholder after attach and is waiting for the mdCAD invalid-parent quit path."
-            : "Destroy-after-attach mode destroyed the placeholder after attach and armed host fallback cleanup.";
+            : "Destroy-after-attach mode destroyed the placeholder after attach and armed host fallback cleanup.");
+    }
+
+    private void InvalidatePlaceholderForTeardown(string detail)
+    {
+        _teardownReason ??= detail;
         _statusTextBlock.Text = StatusTeardownCleanup;
         _failureTextBlock.Text = _teardownReason;
 
@@ -822,21 +827,13 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        // Reuse the ClearPlaceholderHandle/DestroyWindow teardown seam before waiting for exit.
+        InvalidatePlaceholderForTeardown(
+            "Host window closed; invalidated the embedded placeholder so mdCAD can observe the destroyed parent chain.");
         WaitForGracefulExitOnClose("Host window closed; embedded mdCAD must not remain orphaned.");
 
         if (_mdcadProcess != null)
         {
-            try
-            {
-                if (!_mdcadProcess.HasExited)
-                {
-                    _mdcadProcess.Kill(true);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
             _mdcadProcess.Dispose();
             _mdcadProcess = null;
         }
