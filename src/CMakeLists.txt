@@ -329,6 +329,20 @@ if(MDCAD_NATIVE_DESKTOP)
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_test(NAME embed_launch_config_test COMMAND embed_launch_config_test)
+
+    add_executable(embed_input_state_test tests/embed_input_state_test.c)
+    target_compile_features(embed_input_state_test PRIVATE c_std_11)
+    target_include_directories(embed_input_state_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME embed_input_state_test COMMAND embed_input_state_test)
+
+    add_executable(embed_layout_state_test tests/embed_layout_state_test.c)
+    target_compile_features(embed_layout_state_test PRIVATE c_std_11)
+    target_include_directories(embed_layout_state_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME embed_layout_state_test COMMAND embed_layout_state_test)
 endif()
 
 # Emscripten-specific linker options
