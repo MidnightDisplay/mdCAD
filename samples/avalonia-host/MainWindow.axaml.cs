@@ -146,6 +146,7 @@ public partial class MainWindow : Window
     private readonly TextBlock _failureTextBlock;
     private readonly DispatcherTimer _attachTimer;
     private readonly DispatcherTimer _launchRetryTimer;
+    private readonly DispatcherTimer _resizeSyncTimer;
     private Process? _mdcadProcess;
     private IntPtr _placeholderHwnd;
     private IntPtr _launchParentHwnd;
@@ -174,11 +175,13 @@ public partial class MainWindow : Window
             ?? throw new InvalidOperationException("Missing FailureTextBlock.");
         _attachTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _launchRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _resizeSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
 
         _embedSurface.PlaceholderHandleReady += OnPlaceholderHandleReady;
         _embedSurface.SizeChanged += OnEmbedSurfaceSizeChanged;
         _attachTimer.Tick += OnAttachTimerTick;
         _launchRetryTimer.Tick += OnLaunchRetryTick;
+        _resizeSyncTimer.Tick += OnResizeSyncTick;
         Closed += OnWindowClosed;
 
         _statusTextBlock.Text = StatusLaunching;
@@ -403,6 +406,7 @@ public partial class MainWindow : Window
             _attachedChildHwnd = childHwnd;
             _attachTimer.Stop();
             SyncAttachedChildBounds();
+            _resizeSyncTimer.Start();
             _statusTextBlock.Text = StatusAttached;
             _failureTextBlock.Text =
                 $"Attached child HWND: 0x{childHwnd.ToInt64():X}{Environment.NewLine}" +
@@ -537,10 +541,22 @@ public partial class MainWindow : Window
         Win32NativeMethods.MoveWindow(_attachedChildHwnd, 0, 0, width, height, true);
     }
 
+    private void OnResizeSyncTick(object? sender, EventArgs e)
+    {
+        if (_attachedChildHwnd == IntPtr.Zero || !Win32NativeMethods.IsWindow(_attachedChildHwnd))
+        {
+            _resizeSyncTimer.Stop();
+            return;
+        }
+
+        SyncAttachedChildBounds();
+    }
+
     private void OnWindowClosed(object? sender, EventArgs e)
     {
         _attachTimer.Stop();
         _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
 
         if (_mdcadProcess != null)
         {
