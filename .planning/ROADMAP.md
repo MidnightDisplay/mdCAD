@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-47
-**Total Plans:** 0
+**Total Plans:** 3
 
 ## Overview
 
@@ -16,7 +16,7 @@ The roadmap follows the research risk order: prove strict child-window startup f
 
 **Goal**: Developer can launch mdCAD as a strict embedded child window from a Windows host.  
 **Depends on**: Phase 42  
-**Plans**: 0 plans  
+**Plans**: 3 plans  
 **Requirements**: EMBD-01, EMBD-02, EMBD-03, HOST-01
 
 **Success Criteria:**
@@ -28,6 +28,11 @@ The roadmap follows the research risk order: prove strict child-window startup f
 - Add the launch-config contract for `--embedded` and `--parent-hwnd`.
 - Create the Win32 child-window path at the native window-creation seam instead of relying on late `SetParent`.
 - Prove the sample host can build and launch the embedded viewer surface.
+
+Plans:
+- [ ] 43-01-PLAN.md — Pin Sokol and lock the strict embed launch parser contract.
+- [ ] 43-02-PLAN.md — Create the true child-window bootstrap path and embedded viewer defaults.
+- [ ] 43-03-PLAN.md — Build the minimal Avalonia host and capture attach/failure smoke evidence.
 
 ### Phase 44: Embedded Resize, Focus & Viewer Layout
 
