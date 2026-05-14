@@ -4,10 +4,10 @@ milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 current_phase: 43
 current_phase_name: Embed Contract & Child-Window Bootstrap
-status: roadmap_created
-stopped_at: Roadmap approved; ready to discuss or plan Phase 43
+status: ready_for_planning
+stopped_at: Phase 43 context gathered
 last_updated: "2026-05-14T13:00:45.766+01:00"
-last_activity: 2026-05-14 -- Roadmap v1.8 created
+last_activity: 2026-05-14 -- Phase 43 context gathered
 progress:
   total_phases: 5
   completed_phases: 0
@@ -23,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 43 ready for discussion/planning — Embed Contract & Child-Window Bootstrap
+**Current focus:** Phase 43 ready for planning — Embed Contract & Child-Window Bootstrap
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 Phase: 43 — Embed Contract & Child-Window Bootstrap (not started)
 Plan: —
-Status: Roadmap created; ready for phase discussion
-Last activity: 2026-05-14 -- Roadmap v1.8 created
+Status: Phase 43 context gathered; ready for planning
+Last activity: 2026-05-14 -- Phase 43 context gathered
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -72,7 +72,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Discuss or plan Phase 43: Embed Contract & Child-Window Bootstrap.
+- Plan Phase 43: Embed Contract & Child-Window Bootstrap.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
@@ -89,5 +89,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-14T13:00:45.766+01:00
-Stopped at: Roadmap approved; ready to discuss or plan Phase 43
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 43 context gathered
+Resume file: .planning/phases/43-embed-contract-child-window-bootstrap/43-CONTEXT.md
