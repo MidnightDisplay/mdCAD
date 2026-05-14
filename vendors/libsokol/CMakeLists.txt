@@ -1,15 +1,51 @@
 include(FetchContent)
+find_package(Git REQUIRED)
 
 FetchContent_Declare(
     libsokol
     GIT_REPOSITORY https://github.com/floooh/sokol.git
-    GIT_TAG master
+    GIT_TAG 2356d22badb8b02b5b4fc745216023a2a699d840
     GIT_PROGRESS TRUE
 )
 
 FetchContent_MakeAvailable(libsokol)
 
 FetchContent_GetProperties(libcimgui)
+
+set(MDCAD_SOKOL_EMBED_PATCH
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/0001-win32-embed-child-window-bootstrap.patch)
+
+if(EXISTS "${MDCAD_SOKOL_EMBED_PATCH}")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" apply --check --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+        WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
+        RESULT_VARIABLE MDCAD_SOKOL_PATCH_CAN_APPLY
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+
+    if(MDCAD_SOKOL_PATCH_CAN_APPLY EQUAL 0)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" apply --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+            WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
+            RESULT_VARIABLE MDCAD_SOKOL_PATCH_RESULT
+        )
+        if(NOT MDCAD_SOKOL_PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to apply mdCAD Sokol embed patch")
+        endif()
+    else()
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" apply --reverse --check --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+            WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
+            RESULT_VARIABLE MDCAD_SOKOL_PATCH_ALREADY_APPLIED
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        if(NOT MDCAD_SOKOL_PATCH_ALREADY_APPLIED EQUAL 0)
+            message(FATAL_ERROR "mdCAD Sokol embed patch does not match the pinned Sokol revision")
+        endif()
+    endif()
+endif()
 
 set(SOKOL_HEADERS
     ${libsokol_SOURCE_DIR}/sokol_gfx.h
@@ -92,6 +128,7 @@ else()
 endif()
 
 target_include_directories(libsokol PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
     ${libsokol_SOURCE_DIR}
     ${libsokol_SOURCE_DIR}/util
     ${libcimgui_SOURCE_DIR}  # Path to cimgui.h
