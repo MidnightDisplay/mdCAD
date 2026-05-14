@@ -176,6 +176,7 @@ public partial class MainWindow : Window
         _launchRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
 
         _embedSurface.PlaceholderHandleReady += OnPlaceholderHandleReady;
+        _embedSurface.SizeChanged += OnEmbedSurfaceSizeChanged;
         _attachTimer.Tick += OnAttachTimerTick;
         _launchRetryTimer.Tick += OnLaunchRetryTick;
         Closed += OnWindowClosed;
@@ -401,6 +402,7 @@ public partial class MainWindow : Window
         {
             _attachedChildHwnd = childHwnd;
             _attachTimer.Stop();
+            SyncAttachedChildBounds();
             _statusTextBlock.Text = StatusAttached;
             _failureTextBlock.Text =
                 $"Attached child HWND: 0x{childHwnd.ToInt64():X}{Environment.NewLine}" +
@@ -503,6 +505,36 @@ public partial class MainWindow : Window
         }, IntPtr.Zero);
 
         return matchedChild;
+    }
+
+    private void OnEmbedSurfaceSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        SyncAttachedChildBounds();
+    }
+
+    private void SyncAttachedChildBounds()
+    {
+        if (_placeholderHwnd == IntPtr.Zero || _attachedChildHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (!Win32NativeMethods.IsWindow(_placeholderHwnd) || !Win32NativeMethods.IsWindow(_attachedChildHwnd))
+        {
+            return;
+        }
+
+        if (!Win32NativeMethods.TryGetClientSize(_placeholderHwnd, out int width, out int height))
+        {
+            return;
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        Win32NativeMethods.MoveWindow(_attachedChildHwnd, 0, 0, width, height, true);
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
@@ -622,6 +654,10 @@ internal static class Win32NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, [MarshalAs(UnmanagedType.Bool)] bool bRepaint);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT

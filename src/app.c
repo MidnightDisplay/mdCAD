@@ -1528,7 +1528,7 @@ static void init(void) {
 
     // Initialize camera
     orbit_camera_init(&state.camera);
-    state.ui_visible = !state.launch.embedded;
+    state.ui_visible = true;
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
