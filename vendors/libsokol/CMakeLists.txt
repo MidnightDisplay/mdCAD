@@ -17,7 +17,7 @@ set(MDCAD_SOKOL_EMBED_PATCH
 
 if(EXISTS "${MDCAD_SOKOL_EMBED_PATCH}")
     execute_process(
-        COMMAND "${GIT_EXECUTABLE}" apply --check --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+        COMMAND "${GIT_EXECUTABLE}" apply --check --recount --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
         WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
         RESULT_VARIABLE MDCAD_SOKOL_PATCH_CAN_APPLY
         OUTPUT_QUIET
@@ -26,7 +26,7 @@ if(EXISTS "${MDCAD_SOKOL_EMBED_PATCH}")
 
     if(MDCAD_SOKOL_PATCH_CAN_APPLY EQUAL 0)
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" apply --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+            COMMAND "${GIT_EXECUTABLE}" apply --recount --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
             WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
             RESULT_VARIABLE MDCAD_SOKOL_PATCH_RESULT
         )
@@ -35,7 +35,7 @@ if(EXISTS "${MDCAD_SOKOL_EMBED_PATCH}")
         endif()
     else()
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" apply --reverse --check --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
+            COMMAND "${GIT_EXECUTABLE}" apply --reverse --check --recount --ignore-space-change --ignore-whitespace "${MDCAD_SOKOL_EMBED_PATCH}"
             WORKING_DIRECTORY "${libsokol_SOURCE_DIR}"
             RESULT_VARIABLE MDCAD_SOKOL_PATCH_ALREADY_APPLIED
             OUTPUT_QUIET

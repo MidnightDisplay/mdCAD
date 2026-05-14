@@ -19,6 +19,7 @@
 #include "math3d.h"
 #include "math/cglm_entry.h"
 #include "math/math_interaction.h"
+#include "platform/win32_embed.h"
 #include "imgui_storage.h"
 #include "render_target.h"
 #include "orbit_camera.h"
@@ -67,6 +68,7 @@ static struct {
     uint64_t last_time;
     float elapsed_time;
     bool ui_visible;
+    mdcad_launch_config_t launch;
 
     // UI state
     ui_controls_state_t controls;
@@ -155,6 +157,10 @@ static struct {
     char *script_io_slider_drag_before_script;
     size_t script_io_slider_drag_before_capacity;
 } state;
+
+#if defined(_WIN32)
+mdcad_win32_embed_state_t g_mdcad_win32_embed_state = {0};
+#endif
 
 #define MDCAD_SCRIPT_EDITOR_MIN_CAPACITY 16384u
 #define MDCAD_SCRIPT_EDITOR_MAX_CAPACITY (4u * 1024u * 1024u)
@@ -1522,7 +1528,7 @@ static void init(void) {
 
     // Initialize camera
     orbit_camera_init(&state.camera);
-    state.ui_visible = true;
+    state.ui_visible = !state.launch.embedded;
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
@@ -1540,6 +1546,9 @@ static void init(void) {
     // Initialize GPU picking
     pick_buffer_init(&state.pick_buffer);
     ui_pick_debug_init(&state.pick_debug, &state.pick_buffer);
+    if (state.launch.embedded) {
+        state.pick_debug.window_open = false;
+    }
 
     // Wire up pick debug window toggle to visibility controls
     ui_visibility_set_pick_debug_ptr(&state.visibility, &state.pick_debug.window_open);
@@ -1564,12 +1573,18 @@ static void init(void) {
 
     // Initialize slot buffer debug viewer
     ui_slot_buffer_debug_init(&state.slot_buffer_debug, &state.ecs_scene);
+    if (state.launch.embedded) {
+        state.slot_buffer_debug.window_open = false;
+    }
 
     // Wire up slot buffer debug window toggle to visibility controls
     ui_visibility_set_slot_buffer_debug_ptr(&state.visibility, &state.slot_buffer_debug.window_open);
 
     // Initialize FPS debug viewer
     ui_fps_debug_init(&state.fps_debug);
+    if (state.launch.embedded) {
+        state.fps_debug.window_open = false;
+    }
 
     // Wire up FPS debug window toggle to visibility controls
     ui_visibility_set_fps_debug_ptr(&state.visibility, &state.fps_debug.window_open);
@@ -2508,6 +2523,8 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         fprintf(stderr, "Embedded startup failed: %s\n", launch_error[0] ? launch_error : "Invalid embedded launch configuration");
         exit(2);
     }
+    state.launch = launch_config;
+    mdcad_win32_embed_set_config(&launch_config);
     return (sapp_desc){
         .init_cb = init,
         .frame_cb = frame,
