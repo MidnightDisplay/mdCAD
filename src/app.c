@@ -334,11 +334,11 @@ static void mdcad_sync_embedded_interaction_state(void) {
 }
 
 static bool mdcad_embedded_shortcuts_allowed(const ImGuiIO* io) {
-    if (!io || io->WantCaptureKeyboard) {
+    if (!io) {
         return false;
     }
     if (!state.launch.embedded) {
-        return true;
+        return !io->WantCaptureKeyboard;
     }
     return embed_input_state_allows_shortcuts(&state.embed_input);
 }
