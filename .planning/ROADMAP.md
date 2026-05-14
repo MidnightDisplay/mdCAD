@@ -40,9 +40,9 @@ Plans:
 
 **Goal**: Users can interact with the embedded viewer correctly inside the host lifecycle.  
 **Depends on**: Phase 43  
-**Plans**: 8/9 plans complete  
+**Plans**: 9/9 plans complete  
 **Requirements**: EMBD-04, INPT-01, INPT-02, INPT-03, INPT-04
-**Status**: Final human UAT found 1 remaining global-shortcut gap; targeted fix planned
+**Status**: Execution complete; final Scenario 2 human UAT rerun pending
 
 **Success Criteria:**
 1. Resizing the host control resizes the embedded mdCAD render surface without clipped, stale, or incorrect viewport behavior.
@@ -64,7 +64,7 @@ Plans:
 - [x] 44-06-PLAN.md — Prefer graceful embedded self-exit and bind Scenario 7 to the runtime embedded ini path.
 - [x] 44-07-PLAN.md — Acquire deliberate-click keyboard focus through mdCAD's native child-window activation path and add host chrome focus return.
 - [x] 44-08-PLAN.md — Invalidate the placeholder on normal host close before waiting so embedded layout flushes before fallback cleanup.
-- [ ] 44-09-PLAN.md — Route embedded global shortcuts through ImGui's shortcut API so non-text `Tab` and undo/redo work after focus is acquired.
+- [x] 44-09-PLAN.md — Route embedded global shortcuts through ImGui's shortcut API so non-text `Tab` and undo/redo work after focus is acquired.
 
 ### Phase 45: Startup JSONL Auto-Import
 

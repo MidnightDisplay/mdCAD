@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
-status: ready_for_execution
-stopped_at: Diagnosed remaining Phase 44 shortcut-routing gap
-last_updated: "2026-05-14T21:45:00Z"
+status: verifying
+stopped_at: Completed 44-09-PLAN.md
+last_updated: "2026-05-14T22:09:47.520Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 100
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 44 (embedded-resize-focus-viewer-layout) — READY FOR EXECUTION
-Plan: 1 of 1
-Status: Final human UAT isolated one remaining global-shortcut gap; ready to execute 44-09
+Phase: 44 (embedded-resize-focus-viewer-layout) — VERIFYING
+Plan: 9 of 9 complete
+Status: Final Scenario 2 human UAT rerun pending
 Last activity: 2026-05-14
 
 Progress: [██████████] 100%
@@ -62,6 +62,8 @@ Recent decisions affecting current work:
 - [Phase 44]: Host chrome regains focus through Avalonia focus APIs only; the host never calls SetFocus or SetActiveWindow on the external mdCAD child HWND. — Separating host focus return from child focus acquisition preserves the CLI host boundary and avoids cross-process focus forcing.
 - [Phase 44]: Normal host close now reuses the same placeholder invalidation seam that destroyed-parent mode already proved. — The missing normal-close flush behavior came from close ordering in the host, so the fix reuses the proven parent-invalid signal before waiting for process exit.
 - [Phase 44]: The host-close path no longer performs an extra unconditional kill after the graceful wait path runs. — Keeping fallback cleanup inside the wait helper preserves a real chance for mdCAD to self-exit and flush embedded layout state before host cleanup intervenes.
+- [Phase 44]: Embedded mode now routes mdCAD-global shortcuts through ImGui's Shortcut API because the shortcut block runs outside a specific window and raw key polling missed routed non-text shortcuts. — The final human UAT showed Win32 focus was fixed and only app-level global shortcuts remained broken, so the fix moved into ImGui's routing layer.
+- [Phase 44]: Standalone mdCAD keeps the previous raw key polling path so the embedded shortcut fix does not change non-embedded behavior. — The remaining gap was embedded-only, so keeping the standalone path unchanged minimized regression risk.
 
 ### Roadmap Evolution
 
@@ -95,6 +97,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T21:45:00Z
-Stopped at: Diagnosed remaining Phase 44 shortcut-routing gap
-Resume file: .planning/phases/44-embedded-resize-focus-viewer-layout/44-09-PLAN.md
+Last session: 2026-05-14T22:09:47.516Z
+Stopped at: Completed 44-09-PLAN.md
+Resume file: None
