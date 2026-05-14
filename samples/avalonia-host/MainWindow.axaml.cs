@@ -145,7 +145,9 @@ public partial class MainWindow : Window
     private readonly TextBlock _modeTextBlock;
     private readonly TextBlock _failureTextBlock;
     private readonly DispatcherTimer _attachTimer;
+    private readonly DispatcherTimer _launchRetryTimer;
     private Process? _mdcadProcess;
+    private IntPtr _placeholderHwnd;
     private IntPtr _launchParentHwnd;
     private IntPtr _attachedChildHwnd;
     private DateTimeOffset _launchStartedAt;
@@ -171,9 +173,11 @@ public partial class MainWindow : Window
         _failureTextBlock = this.FindControl<TextBlock>("FailureTextBlock")
             ?? throw new InvalidOperationException("Missing FailureTextBlock.");
         _attachTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _launchRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
 
         _embedSurface.PlaceholderHandleReady += OnPlaceholderHandleReady;
         _attachTimer.Tick += OnAttachTimerTick;
+        _launchRetryTimer.Tick += OnLaunchRetryTick;
         Closed += OnWindowClosed;
 
         _statusTextBlock.Text = StatusLaunching;
@@ -205,10 +209,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        _launchStarted = true;
-        _launchParentHwnd = PrepareLaunchParentHwnd(hwnd);
+        _placeholderHwnd = hwnd;
         _failureTextBlock.Text = BuildScaffoldMessage(hwnd);
-        LaunchEmbeddedViewer();
+        TryLaunchWhenSurfaceReady();
     }
 
     private string BuildScaffoldMessage(IntPtr hwnd)
@@ -242,6 +245,34 @@ public partial class MainWindow : Window
         }
 
         return placeholderHwnd;
+    }
+
+    private void OnLaunchRetryTick(object? sender, EventArgs e)
+    {
+        TryLaunchWhenSurfaceReady();
+    }
+
+    private void TryLaunchWhenSurfaceReady()
+    {
+        if (_launchStarted || _placeholderHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (!Win32NativeMethods.TryGetClientSize(_placeholderHwnd, out int width, out int height) || width <= 4 || height <= 4)
+        {
+            _statusTextBlock.Text = StatusLaunching;
+            _failureTextBlock.Text =
+                $"Waiting for host surface size...{Environment.NewLine}" +
+                $"Current placeholder HWND: 0x{_placeholderHwnd.ToInt64():X}";
+            _launchRetryTimer.Start();
+            return;
+        }
+
+        _launchRetryTimer.Stop();
+        _launchStarted = true;
+        _launchParentHwnd = PrepareLaunchParentHwnd(_placeholderHwnd);
+        LaunchEmbeddedViewer();
     }
 
     private void LaunchEmbeddedViewer()
@@ -477,6 +508,7 @@ public partial class MainWindow : Window
     private void OnWindowClosed(object? sender, EventArgs e)
     {
         _attachTimer.Stop();
+        _launchRetryTimer.Stop();
 
         if (_mdcadProcess != null)
         {
@@ -506,6 +538,16 @@ internal static class Win32NativeMethods
 
     public static IntPtr CreatePlaceholderWindow(IntPtr parentHwnd)
     {
+        TryGetClientSize(parentHwnd, out int width, out int height);
+        if (width <= 0)
+        {
+            width = 640;
+        }
+        if (height <= 0)
+        {
+            height = 480;
+        }
+
         IntPtr hwnd = CreateWindowExW(
             0,
             "STATIC",
@@ -513,8 +555,8 @@ internal static class Win32NativeMethods
             WsChild | WsVisible | WsClipSiblings | WsClipChildren,
             0,
             0,
-            1,
-            1,
+            width,
+            height,
             parentHwnd,
             IntPtr.Zero,
             IntPtr.Zero,
@@ -526,6 +568,25 @@ internal static class Win32NativeMethods
         }
 
         return hwnd;
+    }
+
+    public static bool TryGetClientSize(IntPtr hwnd, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (!GetClientRect(hwnd, out RECT rect))
+        {
+            return false;
+        }
+
+        width = rect.Right - rect.Left;
+        height = rect.Bottom - rect.Top;
+        return true;
     }
 
     public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
@@ -549,6 +610,10 @@ internal static class Win32NativeMethods
     public static extern bool DestroyWindow(IntPtr hWnd);
 
     [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -557,4 +622,13 @@ internal static class Win32NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindow(IntPtr hWnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 }
