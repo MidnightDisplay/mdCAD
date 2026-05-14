@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
-status: verifying
-stopped_at: Completed 43-03-PLAN.md
-last_updated: "2026-05-14T15:47:41.117Z"
-last_activity: 2026-05-14 -- Completed 43-03-PLAN.md
+status: planning
+stopped_at: Phase 43 complete
+last_updated: "2026-05-14T15:55:50.251Z"
+last_activity: 2026-05-14 -- Phase 43 verified and marked complete
 progress:
   total_phases: 5
   completed_phases: 1
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 43 — embed-contract-child-window-bootstrap
+**Current focus:** Phase 44 — Embedded Resize, Focus & Viewer Layout
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 43 (embed-contract-child-window-bootstrap) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-05-14 -- Completed 43-03-PLAN.md
+Phase: 44 (Embedded Resize, Focus & Viewer Layout) — READY TO PLAN
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-14 -- Phase 43 verified and marked complete
 
 Progress: [██████████] 100%
 
@@ -70,7 +70,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan Phase 43: Embed Contract & Child-Window Bootstrap.
+- Discuss and plan Phase 44: Embedded Resize, Focus & Viewer Layout.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
@@ -86,6 +86,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T15:47:41.113Z
-Stopped at: Completed 43-03-PLAN.md
+Last session: 2026-05-14T15:55:50.251Z
+Stopped at: Phase 43 complete
 Resume file: None

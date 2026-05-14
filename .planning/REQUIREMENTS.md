@@ -7,9 +7,9 @@
 
 ### Embedding Contract
 
-- [ ] **EMBD-01**: Developer can launch mdCAD in Windows embedded mode by passing a parent HWND on the command line.
-- [ ] **EMBD-02**: Embedded mdCAD creates and remains inside a true child window under the supplied parent HWND instead of silently falling back to a standalone top-level window.
-- [ ] **EMBD-03**: Developer gets a clear startup failure when embedded-mode arguments are missing, invalid, or incompatible.
+- [x] **EMBD-01**: Developer can launch mdCAD in Windows embedded mode by passing a parent HWND on the command line. — Validated in Phase 43
+- [x] **EMBD-02**: Embedded mdCAD creates and remains inside a true child window under the supplied parent HWND instead of silently falling back to a standalone top-level window. — Validated in Phase 43
+- [x] **EMBD-03**: Developer gets a clear startup failure when embedded-mode arguments are missing, invalid, or incompatible. — Validated in Phase 43
 - [ ] **EMBD-04**: Embedded mdCAD shuts down cleanly when the host/control lifecycle ends or the parent HWND becomes invalid.
 
 ### Embedded Interaction
@@ -28,7 +28,7 @@
 
 ### Sample Host
 
-- [ ] **HOST-01**: Developer can build and run a minimal Avalonia sample that embeds mdCAD inside a `NativeControlHost`.
+- [x] **HOST-01**: Developer can build and run a minimal Avalonia sample that embeds mdCAD inside a `NativeControlHost`. — Validated in Phase 43
 - [ ] **HOST-02**: Sample host resolves a bundled example JSONL from a relative `resources/examples` folder and launches mdCAD with its absolute path.
 - [ ] **HOST-03**: Sample host shows launch, attach, JSONL, and live-refresh status text for the embedded session.
 - [ ] **HOST-04**: Sample host can repeatedly launch, resize, focus, and close the embedded mdCAD session without leaving orphaned processes.
@@ -60,9 +60,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMBD-01 | Phase 43 | Pending |
-| EMBD-02 | Phase 43 | Pending |
-| EMBD-03 | Phase 43 | Pending |
+| EMBD-01 | Phase 43 | Complete |
+| EMBD-02 | Phase 43 | Complete |
+| EMBD-03 | Phase 43 | Complete |
 | EMBD-04 | Phase 44 | Pending |
 | INPT-01 | Phase 44 | Pending |
 | INPT-02 | Phase 44 | Pending |
@@ -72,7 +72,7 @@
 | JSON-02 | Phase 46 | Pending |
 | JSON-03 | Phase 45 | Pending |
 | JSON-04 | Phase 46 | Pending |
-| HOST-01 | Phase 43 | Pending |
+| HOST-01 | Phase 43 | Complete |
 | HOST-02 | Phase 47 | Pending |
 | HOST-03 | Phase 47 | Pending |
 | HOST-04 | Phase 47 | Pending |
@@ -84,4 +84,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-14 after roadmap creation*
+*Last updated: 2026-05-14 after Phase 43 verification*

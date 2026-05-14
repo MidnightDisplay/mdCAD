@@ -16,8 +16,9 @@ The roadmap follows the research risk order: prove strict child-window startup f
 
 **Goal**: Developer can launch mdCAD as a strict embedded child window from a Windows host.  
 **Depends on**: Phase 42  
-**Plans**: 3 plans  
-**Requirements**: EMBD-01, EMBD-02, EMBD-03, HOST-01
+**Plans**: 3/3 plans complete  
+**Requirements**: EMBD-01, EMBD-02, EMBD-03, HOST-01  
+**Status**: Complete (verified 2026-05-14)
 
 **Success Criteria:**
 1. Developer can launch mdCAD in embedded mode by passing a parent HWND from the sample Avalonia host.
@@ -28,6 +29,7 @@ The roadmap follows the research risk order: prove strict child-window startup f
 - Add the launch-config contract for `--embedded` and `--parent-hwnd`.
 - Create the Win32 child-window path at the native window-creation seam instead of relying on late `SetParent`.
 - Prove the sample host can build and launch the embedded viewer surface.
+- Verification passed in `.planning/phases/43-embed-contract-child-window-bootstrap/43-VERIFICATION.md` with all 6 must-haves satisfied.
 
 Plans:
 - [x] 43-01-PLAN.md — Pin Sokol and lock the strict embed launch parser contract.
@@ -104,9 +106,9 @@ Plans:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMBD-01 | Phase 43 | Pending |
-| EMBD-02 | Phase 43 | Pending |
-| EMBD-03 | Phase 43 | Pending |
+| EMBD-01 | Phase 43 | Complete |
+| EMBD-02 | Phase 43 | Complete |
+| EMBD-03 | Phase 43 | Complete |
 | EMBD-04 | Phase 44 | Pending |
 | INPT-01 | Phase 44 | Pending |
 | INPT-02 | Phase 44 | Pending |
@@ -116,7 +118,7 @@ Plans:
 | JSON-02 | Phase 46 | Pending |
 | JSON-03 | Phase 45 | Pending |
 | JSON-04 | Phase 46 | Pending |
-| HOST-01 | Phase 43 | Pending |
+| HOST-01 | Phase 43 | Complete |
 | HOST-02 | Phase 47 | Pending |
 | HOST-03 | Phase 47 | Pending |
 | HOST-04 | Phase 47 | Pending |
