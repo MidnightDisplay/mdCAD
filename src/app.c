@@ -16,6 +16,7 @@
 
 // Project modules
 #include "app_launch_config.h"
+#include "embed_input_state.h"
 #include "math3d.h"
 #include "math/cglm_entry.h"
 #include "math/math_interaction.h"
@@ -69,6 +70,9 @@ static struct {
     float elapsed_time;
     bool ui_visible;
     mdcad_launch_config_t launch;
+    embed_input_state_t embed_input;
+    uint32_t embed_runtime_cancel_serial;
+    bool embed_quit_requested;
 
     // UI state
     ui_controls_state_t controls;
@@ -164,6 +168,198 @@ mdcad_win32_embed_state_t g_mdcad_win32_embed_state = {0};
 
 #define MDCAD_SCRIPT_EDITOR_MIN_CAPACITY 16384u
 #define MDCAD_SCRIPT_EDITOR_MAX_CAPACITY (4u * 1024u * 1024u)
+
+static inline void mdcad_refresh_sketch_after_restore(ecs_entity_t sketch) {
+    if (!scene_is_sketch(&state.ecs_scene, sketch)) return;
+    (void)scene_solver_clear_drag_anchor(&state.ecs_scene, sketch);
+    scene_solver_request_auto(&state.ecs_scene, sketch);
+    scene_script_reemit_for_sketch(&state.ecs_scene, sketch);
+}
+
+static inline void mdcad_free_gizmo_drag_buffers(void) {
+    free(state.gizmo_drag_entities);
+    state.gizmo_drag_entities = NULL;
+    free(state.gizmo_drag_start_positions);
+    state.gizmo_drag_start_positions = NULL;
+    free(state.gizmo_drag_active_sketch_line_eligible);
+    state.gizmo_drag_active_sketch_line_eligible = NULL;
+    free(state.gizmo_drag_start_line_a);
+    state.gizmo_drag_start_line_a = NULL;
+    free(state.gizmo_drag_start_line_b);
+    state.gizmo_drag_start_line_b = NULL;
+    state.gizmo_drag_entity_count = 0;
+    state.gizmo_drag_direct_point_mode = false;
+    free(state.gizmo_drag_vertex_indices);
+    state.gizmo_drag_vertex_indices = NULL;
+    free(state.gizmo_drag_start_vertices);
+    state.gizmo_drag_start_vertices = NULL;
+    state.gizmo_drag_vertex_count = 0;
+}
+
+static void mdcad_restore_gizmo_entity_drag_snapshot(void) {
+    for (int i = 0; i < state.gizmo_drag_entity_count; i++) {
+        ecs_entity_t entity = state.gizmo_drag_entities[i];
+        if (entity == 0 || !ecs_is_alive(state.ecs_world.world, entity)) {
+            continue;
+        }
+
+        if (state.gizmo_drag_direct_point_mode) {
+            GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+            if (geom && geom->type == GEOM_POINT) {
+                geom->data.point.point = state.gizmo_drag_start_positions[i];
+                RenderableComp *renderable = ecs_world_get_renderable(state.ecs_scene.world, entity);
+                if (renderable) renderable->instance_dirty = true;
+                mdcad_refresh_sketch_after_restore(scene_find_parent_sketch(&state.ecs_scene, entity));
+            }
+            continue;
+        }
+
+        bool eligible_line = state.gizmo_drag_active_sketch_line_eligible &&
+                             state.gizmo_drag_active_sketch_line_eligible[i];
+        if (eligible_line) {
+            GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+            if (geom && geom->type == GEOM_LINE) {
+                geom->data.line.a = state.gizmo_drag_start_line_a[i];
+                geom->data.line.b = state.gizmo_drag_start_line_b[i];
+                RenderableComp *renderable = ecs_world_get_renderable(state.ecs_scene.world, entity);
+                if (renderable) renderable->instance_dirty = true;
+                scene_sync_endpoint_entities_for_owner(&state.ecs_scene, entity);
+                mdcad_refresh_sketch_after_restore(scene_find_parent_sketch(&state.ecs_scene, entity));
+            }
+            continue;
+        }
+
+        EndPointsComp *endpoint_meta = ecs_world_get_endpoints(state.ecs_scene.world, entity);
+        GeometryComp *endpoint_geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+        if (endpoint_meta && endpoint_meta->is_endpoint_point &&
+            endpoint_geom && endpoint_geom->type == GEOM_POINT) {
+            endpoint_geom->data.point.point = state.gizmo_drag_start_positions[i];
+            RenderableComp *endpoint_renderable = ecs_world_get_renderable(state.ecs_scene.world, entity);
+            if (endpoint_renderable) endpoint_renderable->instance_dirty = true;
+
+            ecs_entity_t owner = (ecs_entity_t)endpoint_meta->owner_entity;
+            GeometryComp *owner_geom = ecs_world_get_geometry(state.ecs_scene.world, owner);
+            if (owner_geom &&
+                scene_apply_local_point_to_participant(owner_geom,
+                                                      endpoint_meta->role,
+                                                      state.gizmo_drag_start_positions[i])) {
+                RenderableComp *owner_renderable = ecs_world_get_renderable(state.ecs_scene.world, owner);
+                if (owner_renderable) owner_renderable->instance_dirty = true;
+                scene_sync_endpoint_entities_for_owner(&state.ecs_scene, owner);
+                mdcad_refresh_sketch_after_restore(scene_find_parent_sketch(&state.ecs_scene, owner));
+            }
+            continue;
+        }
+
+        scene_set_position(&state.ecs_scene, entity, state.gizmo_drag_start_positions[i]);
+        mdcad_refresh_sketch_after_restore(scene_find_parent_sketch(&state.ecs_scene, entity));
+    }
+}
+
+static void mdcad_restore_gizmo_vertex_drag_snapshot(void) {
+    ecs_entity_t entity = (ecs_entity_t)state.gizmo.vertex_mode.target_entity;
+    if (entity == 0 || !ecs_is_alive(state.ecs_world.world, entity)) {
+        return;
+    }
+
+    GeometryComp *geom = ecs_world_get_geometry(state.ecs_scene.world, entity);
+    if (!geom) {
+        return;
+    }
+
+    for (int i = 0; i < state.gizmo_drag_vertex_count; i++) {
+        gizmo_vertex_mode_set_local_pos(geom,
+                                        state.gizmo_drag_vertex_indices[i],
+                                        state.gizmo_drag_start_vertices[i]);
+    }
+
+    RenderableComp *renderable = ecs_world_get_renderable(state.ecs_scene.world, entity);
+    if (renderable) renderable->instance_dirty = true;
+    scene_sync_endpoint_entities_for_owner(&state.ecs_scene, entity);
+    mdcad_refresh_sketch_after_restore(scene_find_parent_sketch(&state.ecs_scene, entity));
+}
+
+static void mdcad_cancel_gizmo_drag(bool rollback) {
+    if (!state.gizmo_drag_active) {
+        return;
+    }
+
+    if (rollback) {
+        if (state.gizmo.edit_mode == GIZMO_GEOMETRY_MODE && state.gizmo.vertex_mode.active) {
+            mdcad_restore_gizmo_vertex_drag_snapshot();
+        } else {
+            mdcad_restore_gizmo_entity_drag_snapshot();
+        }
+        pick_buffer_invalidate(&state.pick_buffer);
+        ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+    }
+
+    (void)gizmo_end_drag(&state.gizmo);
+    state.gizmo_drag_active = false;
+    mdcad_free_gizmo_drag_buffers();
+}
+
+static void mdcad_cancel_active_interactions(void) {
+    orbit_camera_cancel_interaction(&state.camera);
+    mdcad_cancel_gizmo_drag(true);
+    if (state.launch.embedded) {
+        (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_INTERACTION_ENDED);
+    }
+}
+
+static void mdcad_handle_embedded_input_trigger(embed_input_trigger_t trigger, bool cancel_interactions) {
+    if (!state.launch.embedded) {
+        return;
+    }
+    (void)embed_input_state_apply(&state.embed_input, trigger);
+    if (cancel_interactions) {
+        mdcad_cancel_active_interactions();
+    }
+}
+
+static void mdcad_sync_embedded_interaction_state(void) {
+    if (!state.launch.embedded) {
+        return;
+    }
+
+    bool interaction_active = state.gizmo_drag_active || (state.camera.current_action != ORBIT_CAM_ACTION_NONE);
+    if (interaction_active && !state.embed_input.interaction_active) {
+        (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_INTERACTION_BEGAN);
+    } else if (!interaction_active && state.embed_input.interaction_active) {
+        (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_INTERACTION_ENDED);
+    }
+}
+
+static bool mdcad_embedded_shortcuts_allowed(const ImGuiIO* io) {
+    if (!io || io->WantCaptureKeyboard) {
+        return false;
+    }
+    if (!state.launch.embedded) {
+        return true;
+    }
+    return embed_input_state_allows_shortcuts(&state.embed_input);
+}
+
+static bool mdcad_handle_embedded_runtime_guards(void) {
+    if (!state.launch.embedded || state.embed_quit_requested) {
+        return state.embed_quit_requested;
+    }
+
+#if defined(_WIN32)
+    if (mdcad_win32_embed_consume_runtime_cancel(&state.embed_runtime_cancel_serial)) {
+        mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_HOST_DEACTIVATED, true);
+    }
+
+    HWND child_hwnd = (HWND)sapp_win32_get_hwnd();
+    if (!mdcad_win32_embed_parent_chain_valid(child_hwnd)) {
+        state.embed_quit_requested = true;
+        sapp_quit();
+        return true;
+    }
+#endif
+
+    return false;
+}
 
 static size_t mdcad_script_editor_estimate_capacity(ecs_entity_t sketch) {
     int geom_count = 0;
@@ -1528,6 +1724,12 @@ static void init(void) {
 
     // Initialize camera
     orbit_camera_init(&state.camera);
+    state.embed_input = embed_input_state_make(state.launch.embedded);
+    state.embed_runtime_cancel_serial = 0u;
+    state.embed_quit_requested = false;
+    if (state.launch.embedded) {
+        (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_ATTACH);
+    }
     state.ui_visible = true;
 
     // Initialize UI modules
@@ -1793,6 +1995,10 @@ static void frame(void) {
     const int width = sapp_width();
     const int height = sapp_height();
 
+    if (mdcad_handle_embedded_runtime_guards()) {
+        return;
+    }
+
     // Update camera begin frame (check if mouse buttons released)
     ImGuiIO* io = igGetIO_Nil();
     bool any_mouse_down = io->MouseDown[0] || io->MouseDown[1] || io->MouseDown[2];
@@ -1829,8 +2035,8 @@ static void frame(void) {
     mdcad_draw_constraint_dimension_popup();
     mdcad_draw_solver_drag_block_toast();
 
-    // Handle keyboard shortcuts when no text input has focus
-    if (!io->WantCaptureKeyboard) {
+    // Handle keyboard shortcuts only when mdCAD currently owns embedded keyboard focus.
+    if (mdcad_embedded_shortcuts_allowed(io)) {
         bool shortcut_mod = io->KeyCtrl || io->KeySuper;
 
         // Undo: Ctrl/Cmd+Z
@@ -1897,6 +2103,7 @@ static void frame(void) {
 
     // Viewport is always drawn (contains the 3D content)
     ui_viewport_draw(&state.viewport);
+    mdcad_sync_embedded_interaction_state();
 
     // Update camera (apply inertia after UI has processed input)
     orbit_camera_update(&state.camera, dt);
@@ -2418,17 +2625,7 @@ static void frame(void) {
                         ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
                     }
 
-                    // Free drag arrays
-                    free(state.gizmo_drag_entities); state.gizmo_drag_entities = NULL;
-                    free(state.gizmo_drag_start_positions); state.gizmo_drag_start_positions = NULL;
-                    free(state.gizmo_drag_active_sketch_line_eligible); state.gizmo_drag_active_sketch_line_eligible = NULL;
-                    free(state.gizmo_drag_start_line_a); state.gizmo_drag_start_line_a = NULL;
-                    free(state.gizmo_drag_start_line_b); state.gizmo_drag_start_line_b = NULL;
-                    state.gizmo_drag_entity_count = 0;
-                    state.gizmo_drag_direct_point_mode = false;
-                    free(state.gizmo_drag_vertex_indices); state.gizmo_drag_vertex_indices = NULL;
-                    free(state.gizmo_drag_start_vertices); state.gizmo_drag_start_vertices = NULL;
-                    state.gizmo_drag_vertex_count = 0;
+                    mdcad_free_gizmo_drag_buffers();
                 }
             }
         }
@@ -2457,13 +2654,7 @@ static void cleanup(void) {
 
     // Shutdown gizmo system
     gizmo_shutdown(&state.gizmo);
-    free(state.gizmo_drag_entities);
-    free(state.gizmo_drag_start_positions);
-    free(state.gizmo_drag_active_sketch_line_eligible);
-    free(state.gizmo_drag_start_line_a);
-    free(state.gizmo_drag_start_line_b);
-    free(state.gizmo_drag_vertex_indices);
-    free(state.gizmo_drag_start_vertices);
+    mdcad_free_gizmo_drag_buffers();
 
     // Shutdown undo/redo system
     undo_redo_shutdown(&state.undo_redo);
@@ -2507,6 +2698,25 @@ static void event(const sapp_event* ev) {
     // Handle app suspend (Android/iOS) - save ImGui settings
     if (ev->type == SAPP_EVENTTYPE_SUSPENDED) {
         imgui_storage_mark_should_save();
+        if (state.launch.embedded) {
+            mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_HOST_DEACTIVATED, true);
+        }
+    }
+
+    if (state.launch.embedded) {
+        switch (ev->type) {
+            case SAPP_EVENTTYPE_FOCUSED:
+                mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_VIEWER_FOCUSED, false);
+                break;
+            case SAPP_EVENTTYPE_UNFOCUSED:
+                mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_HOST_FOCUS_GAINED, true);
+                break;
+            case SAPP_EVENTTYPE_MOUSE_DOWN:
+                mdcad_handle_embedded_input_trigger(EMBED_INPUT_TRIGGER_VIEWER_MOUSE_DOWN, false);
+                break;
+            default:
+                break;
+        }
     }
 
     // Forward to ImGui

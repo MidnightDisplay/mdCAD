@@ -83,6 +83,15 @@ static inline void orbit_camera_reset(orbit_camera_t* cam) {
     cam->drag_started_in_viewport = false;
 }
 
+static inline void orbit_camera_cancel_interaction(orbit_camera_t* cam) {
+    if (!cam) return;
+    cam->current_action = ORBIT_CAM_ACTION_NONE;
+    cam->drag_started_in_viewport = false;
+    cam->was_dragging = false;
+    cam->velocity_azimuth = 0.0f;
+    cam->velocity_elevation = 0.0f;
+}
+
 // Calculate eye position from spherical coordinates
 static inline vec3s orbit_camera_get_eye_position_cglm(const orbit_camera_t* cam) {
     return (vec3s){ {
