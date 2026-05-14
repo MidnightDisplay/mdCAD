@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
-current_phase: null
-current_phase_name: null
-status: defining_requirements
-stopped_at: Milestone v1.8 started; requirements and roadmap pending
+current_phase: 43
+current_phase_name: Embed Contract & Child-Window Bootstrap
+status: roadmap_created
+stopped_at: Roadmap approved; ready to discuss or plan Phase 43
 last_updated: "2026-05-14T13:00:45.766+01:00"
-last_activity: 2026-05-14 -- Milestone v1.8 started
+last_activity: 2026-05-14 -- Roadmap v1.8 created
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.8 — defining requirements for Windows embedding and launch-time JSONL viewing
+**Current focus:** Phase 43 ready for discussion/planning — Embed Contract & Child-Window Bootstrap
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 43 — Embed Contract & Child-Window Bootstrap (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-14 -- Milestone v1.8 started
+Status: Roadmap created; ready for phase discussion
+Last activity: 2026-05-14 -- Roadmap v1.8 created
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -40,6 +40,7 @@ Progress: [░░░░░░░░░░] 0%
 
 - Milestone v1.8 goal: let a Windows host launch mdCAD as an embeddable child viewer that can auto-open a large flat JSONL file and optionally live-refresh it from the command line.
 - Scope includes a minimal Avalonia host example, Win32 child HWND integration contract, and embedded resize/focus/input behavior.
+- Roadmap v1.8 spans phases 43-47 across embedding bootstrap, embedded interaction, startup JSONL import, live refresh, and sample-host proof.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -55,6 +56,7 @@ Recent decisions affecting current work:
 - [Phases 38-39]: Flat import refresh uses same-anchor transactional replacement plus debounce/retry/auto-disable safety behavior.
 - [Phase 40]: Large repeated flat refreshes must preserve hierarchy, selection, and interaction coherence.
 - [Milestone v1.7]: Scope is limited to observer-enabled large flat JSONL regression closure across import, refresh, and delete lifecycle behavior.
+- [Milestone v1.8]: Scope is limited to Windows child-HWND embedding, CLI launch-time JSONL viewing, and a minimal Avalonia host with no new IPC layer.
 
 ### Roadmap Evolution
 
@@ -66,11 +68,12 @@ Recent decisions affecting current work:
 - Roadmap v1.7 created: phases 41-42 map 6/6 requirements.
 - Milestone v1.7 archived to `.planning/milestones/v1.7-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md`.
 - Milestone v1.8 initialized: Embeddable Windows JSONL Viewer.
+- Roadmap v1.8 created: phases 43-47 map 16/16 requirements.
 
 ### Pending Todos
 
-- Define milestone v1.8 requirements and roadmap.
-- Decide whether milestone research is needed before requirements are finalized.
+- Discuss or plan Phase 43: Embed Contract & Child-Window Bootstrap.
+- Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
@@ -86,5 +89,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-14T13:00:45.766+01:00
-Stopped at: Milestone v1.8 started; define requirements and roadmap
-Resume file: .planning/PROJECT.md
+Stopped at: Roadmap approved; ready to discuss or plan Phase 43
+Resume file: .planning/ROADMAP.md

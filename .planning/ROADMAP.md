@@ -1,18 +1,142 @@
-# Roadmap: mdCAD
+# Milestone v1.8: Embeddable Windows JSONL Viewer
 
-## Milestones
+**Status:** ACTIVE
+**Phases:** 43-47
+**Total Plans:** 0
 
-- ✅ **v1.0 Math Migration** — Phases 1-5 shipped 2026-03-26 ([archive](milestones/v1.0-ROADMAP.md))
-- ✅ **v1.1 Long-Tail Migration** — Phases 6-9 shipped 2026-03-30 ([archive](milestones/v1.1-ROADMAP.md))
-- ✅ **v1.2 Sketches, Constraints, Scripting** — Phases 10-21 shipped 2026-04-07 ([archive](milestones/v1.2-ROADMAP.md))
-- ✅ **v1.3 Sketch Solver Audit + Constraint Expansion** — Phases 22-25 shipped 2026-04-08 ([archive](milestones/v1.3-ROADMAP.md))
-- ✅ **v1.4 Solver Robustness + Sketch Gizmo Corrections** — Phases 26-30 shipped 2026-04-09 ([archive](milestones/v1.4-ROADMAP.md))
-- ✅ **v1.5 Solver Workflow Robustness + Script Reapply Integrity** — Phases 31-35 shipped 2026-04-13 ([archive](milestones/v1.5-ROADMAP.md))
-- ✅ **v1.6 Observable Flat JSONL Import for Large Geometry Dumps** — Phases 36-40 shipped 2026-04-27 ([archive](milestones/v1.6-ROADMAP.md))
-- ✅ **v1.7 Linked Flat JSONL Large-File Refresh Stability** — Phases 41-42 shipped 2026-05-05 ([archive](milestones/v1.7-ROADMAP.md))
+## Overview
 
-## Active Milestone
+v1.8 adds a Windows-only embedding workflow where an external host launches mdCAD as a true child window, can optionally auto-open a large flat JSONL file at startup, and can opt into existing linked refresh behavior without expanding into IPC, in-process embedding, or cross-platform hosting.
 
-No active milestone roadmap is open. Start the next milestone with `/gsd-new-milestone`.
+The roadmap follows the research risk order: prove strict child-window startup first, close resize/focus/input correctness second, then add startup JSONL import, then launch-time live refresh, and finish with a minimal Avalonia sample host that acts as the end-to-end proof harness.
 
-Next phase number: **43**
+## Phases
+
+### Phase 43: Embed Contract & Child-Window Bootstrap
+
+**Goal**: Developer can launch mdCAD as a strict embedded child window from a Windows host.  
+**Depends on**: Phase 42  
+**Plans**: 0 plans  
+**Requirements**: EMBD-01, EMBD-02, EMBD-03, HOST-01
+
+**Success Criteria:**
+1. Developer can launch mdCAD in embedded mode by passing a parent HWND from the sample Avalonia host.
+2. mdCAD appears inside the host's native control region as a true child window, not as a separate standalone top-level window.
+3. Missing, invalid, or incompatible embedded-mode arguments fail fast with a clear startup error and no silent fallback.
+
+**Details:**
+- Add the launch-config contract for `--embedded` and `--parent-hwnd`.
+- Create the Win32 child-window path at the native window-creation seam instead of relying on late `SetParent`.
+- Prove the sample host can build and launch the embedded viewer surface.
+
+### Phase 44: Embedded Resize, Focus & Viewer Layout
+
+**Goal**: Users can interact with the embedded viewer correctly inside the host lifecycle.  
+**Depends on**: Phase 43  
+**Plans**: 0 plans  
+**Requirements**: EMBD-04, INPT-01, INPT-02, INPT-03, INPT-04
+
+**Success Criteria:**
+1. Resizing the host control resizes the embedded mdCAD render surface without clipped, stale, or incorrect viewport behavior.
+2. Clicking into the embedded viewer immediately gives mdCAD keyboard and mouse control without host interference.
+3. Moving focus between host UI and mdCAD does not leave stuck capture, stuck drags, or broken input state.
+4. The embedded viewer uses a viewer-first layout that fits the hosted region, and closing the host/control shuts mdCAD down cleanly.
+
+**Details:**
+- Keep the existing input/render pipeline authoritative while adding embedded focus and lifecycle glue.
+- Add embedded-layout policy so the hosted viewer fills the region cleanly.
+- Harden close/orphan behavior before any startup import work begins.
+
+### Phase 45: Startup JSONL Auto-Import
+
+**Goal**: Developer can launch directly into a large flat JSONL view without breaking the embedded session.  
+**Depends on**: Phase 44  
+**Plans**: 0 plans  
+**Requirements**: JSON-01, JSON-03
+
+**Success Criteria:**
+1. Launching mdCAD with an absolute JSONL path auto-imports the file at startup through the large flat dump workflow.
+2. If startup JSONL import fails, the user keeps a usable embedded viewer and sees a clear error state instead of a crash or silent blank failure.
+
+**Details:**
+- Reuse the existing large flat JSONL import job rather than creating a separate embedded importer.
+- Add a non-UI startup import controller so embedded launch does not depend on Scene Hierarchy UI state.
+
+### Phase 46: Launch-Time Live Refresh
+
+**Goal**: Developer can opt into startup-linked refresh without changing existing default refresh behavior.  
+**Depends on**: Phase 45  
+**Plans**: 0 plans  
+**Requirements**: JSON-02, JSON-04
+
+**Success Criteria:**
+1. When launched with the explicit live-refresh flag, the embedded viewer updates from changes to the startup JSONL using the existing linked refresh behavior.
+2. Without that explicit flag, startup import does not enable live refresh by default and other existing refresh workflows keep their current behavior.
+
+**Details:**
+- Keep launch-time live refresh an explicit opt-in.
+- Reuse existing observer metadata and commit-on-success semantics.
+
+### Phase 47: Sample Host Workflow Proof
+
+**Goal**: Developer can use the sample host as the end-to-end proof harness for embedded launch workflows.  
+**Depends on**: Phase 46  
+**Plans**: 0 plans  
+**Requirements**: HOST-02, HOST-03, HOST-04
+
+**Success Criteria:**
+1. The sample host resolves a bundled example JSONL from `resources/examples`, converts it to an absolute path, and launches mdCAD with it.
+2. The sample host shows clear session status text for launch, attach, JSONL import, and live-refresh state.
+3. Developer can repeatedly launch, resize, focus, and close the embedded mdCAD session from the sample host without leaving orphaned processes.
+
+**Details:**
+- Keep the Avalonia host minimal and workflow-focused.
+- Use the sample as the conformance harness for lifecycle and failure-path validation, not as a productized shell.
+
+---
+
+## Coverage Map
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| EMBD-01 | Phase 43 | Pending |
+| EMBD-02 | Phase 43 | Pending |
+| EMBD-03 | Phase 43 | Pending |
+| EMBD-04 | Phase 44 | Pending |
+| INPT-01 | Phase 44 | Pending |
+| INPT-02 | Phase 44 | Pending |
+| INPT-03 | Phase 44 | Pending |
+| INPT-04 | Phase 44 | Pending |
+| JSON-01 | Phase 45 | Pending |
+| JSON-02 | Phase 46 | Pending |
+| JSON-03 | Phase 45 | Pending |
+| JSON-04 | Phase 46 | Pending |
+| HOST-01 | Phase 43 | Pending |
+| HOST-02 | Phase 47 | Pending |
+| HOST-03 | Phase 47 | Pending |
+| HOST-04 | Phase 47 | Pending |
+
+**Coverage:**
+- v1 requirements: 16 total
+- Mapped to phases: 16
+- Unmapped: 0
+
+---
+
+## Milestone Summary
+
+**Key Decisions:**
+- Build embedding as a strict Windows child-HWND launch path instead of a reparented standalone window hack.
+- Keep the host/viewer boundary CLI-driven with mdCAD remaining a separate process and no new IPC surface.
+- Reuse the existing large flat JSONL import and linked refresh semantics instead of redesigning refresh behavior.
+
+**Deferred Scope:**
+- In-process / DLL / SDK embedding
+- Rich host-to-viewer IPC
+- Cross-platform host parity
+- Renderer rewrites or backend swaps
+- Refresh architecture redesign
+
+---
+
+_For current project status, see .planning/STATE.md_

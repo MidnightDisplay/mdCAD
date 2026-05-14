@@ -60,28 +60,28 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMBD-01 | — | Pending |
-| EMBD-02 | — | Pending |
-| EMBD-03 | — | Pending |
-| EMBD-04 | — | Pending |
-| INPT-01 | — | Pending |
-| INPT-02 | — | Pending |
-| INPT-03 | — | Pending |
-| INPT-04 | — | Pending |
-| JSON-01 | — | Pending |
-| JSON-02 | — | Pending |
-| JSON-03 | — | Pending |
-| JSON-04 | — | Pending |
-| HOST-01 | — | Pending |
-| HOST-02 | — | Pending |
-| HOST-03 | — | Pending |
-| HOST-04 | — | Pending |
+| EMBD-01 | Phase 43 | Pending |
+| EMBD-02 | Phase 43 | Pending |
+| EMBD-03 | Phase 43 | Pending |
+| EMBD-04 | Phase 44 | Pending |
+| INPT-01 | Phase 44 | Pending |
+| INPT-02 | Phase 44 | Pending |
+| INPT-03 | Phase 44 | Pending |
+| INPT-04 | Phase 44 | Pending |
+| JSON-01 | Phase 45 | Pending |
+| JSON-02 | Phase 46 | Pending |
+| JSON-03 | Phase 45 | Pending |
+| JSON-04 | Phase 46 | Pending |
+| HOST-01 | Phase 43 | Pending |
+| HOST-02 | Phase 47 | Pending |
+| HOST-03 | Phase 47 | Pending |
+| HOST-04 | Phase 47 | Pending |
 
 **Coverage:**
 - v1 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-14 after initial definition*
+*Last updated: 2026-05-14 after roadmap creation*
