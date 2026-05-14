@@ -1,6 +1,6 @@
 # mdCAD
 
-A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; recent milestones shipped deterministic sketch-solver robustness, script re-apply fidelity, and observable JSONL-as-sketch import with transactional live reparse workflows.
+A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; recent work adds a Windows child-HWND embedding bootstrap with an Avalonia sample host alongside deterministic sketch-solver and observable JSONL workflows.
 
 ![image](mdCAD.png)
 
@@ -13,6 +13,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Interactive UI**: Dear ImGui interface with scene hierarchy, property inspector, search/filter
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
+- **Windows embedding bootstrap**: Strict `--embedded --parent-hwnd` child-window launch path plus a minimal Avalonia `NativeControlHost` sample host
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
 ## Quick Start

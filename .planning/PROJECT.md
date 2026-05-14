@@ -14,7 +14,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Current milestone:** `v1.8` — Embeddable Windows JSONL Viewer
 
-**Current focus:** Define requirements and roadmap for Windows child-HWND embedding, launch-time JSONL viewing, and an Avalonia sample host while keeping v1.7 debt explicitly deferred.
+**Current focus:** Phase 43 is verified complete; next work is Phase 44 interaction/layout planning for the embedded viewer while startup JSONL and milestone-complete host workflow work remain queued.
 
 ## Current Milestone: v1.8 Embeddable Windows JSONL Viewer
 
@@ -90,13 +90,14 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Large-dump refresh stability/coherence now satisfies bounded coalescing, no-lockup stress gate, and repeated-refresh interaction invariants (`PERF-01..03`) — Validated in Phase 40
 - ✓ Linked flat JSONL initial import now arms its baseline at commit time, stays visually complete after settle, and records converged Scene Hierarchy totals under live linking (`FIMP-05`, `FIMP-06`) — Validated in Phase 41: linked-import-convergence
 - ✓ Linked flat JSONL refresh/delete lifecycle now preserves exact settled footprint, transactional replacement, delete cleanup, and manual large-file closure evidence (`OBSF-07`, `OBSF-08`, `PERF-04`, `PERF-05`) — Validated in Phase 42: refresh-teardown-stability
+- ✓ Windows host can now launch mdCAD in an embeddable child-window mode via CLI-specified parent HWND with strict true-child bootstrap and fail-fast startup semantics (`EMBD-01`, `EMBD-02`, `EMBD-03`) — Validated in Phase 43: embed-contract-child-window-bootstrap
+- ✓ Minimal Avalonia `NativeControlHost` sample now builds, launches mdCAD as a child window, and surfaces bootstrap attach/failure status (`HOST-01`) — Validated in Phase 43: embed-contract-child-window-bootstrap
 
 ### Active
 
-- [ ] Windows host can launch mdCAD in an embeddable child-window mode via CLI-specified parent HWND.
 - [ ] Embedded launch can auto-import an absolute-path JSONL through the large flat dump workflow with optional live refresh enabled from the command line.
 - [ ] Embedded viewer preserves resize, focus, keyboard, and mouse correctness inside a resizable Avalonia `NativeControlHost`.
-- [ ] Repository includes a minimal Avalonia sample host with launch/window/JSONL status messaging and a local example JSONL resource.
+- [ ] Repository includes a milestone-complete Avalonia sample host with bundled example JSONL plus launch, attach, JSONL, and live-refresh status messaging.
 
 ### Out of Scope
 
@@ -138,7 +139,7 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 - Milestone `v1.7` is shipped with Phases 41-42 complete and archived.
 - v1.7 delivers stable linked flat JSONL convergence across initial load, observer refresh, repeated manual refresh, and linked-root deletion on the real `lamp_11.jsonl` dataset.
 - Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
-- Milestone `v1.8` is now active for Windows embedding and host-launched JSONL viewing requirements definition.
+- Milestone `v1.8` is active: Phase 43 verified the strict child-HWND bootstrap, fail-fast startup contract, buildable Avalonia host proof, and baseline embedded resize syncing; Phase 44 now targets broader focus/input/layout closure.
 ## Next Milestone Goals
 
 1. Add a Windows embedding contract so an external host can launch mdCAD into a child HWND with predictable lifecycle and resize behavior.
@@ -176,7 +177,9 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 | Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | Completed in v1.7 |
 | Arm linked flat import observer baseline at import commit time | Prevent immediate self-refresh drift on the first linked import settle | Completed in v1.7 |
 | Use exact-footprint refresh compaction plus cancel-before-delete teardown ordering | The large-file regression was a lifecycle correctness problem, not a signal to redesign the entire slot-buffer architecture | Completed in v1.7 |
-| Scope v1.8 on Windows-only process-hosted embedding with CLI launch arguments | The immediate need is an Avalonia host integration path without committing mdCAD to a new SDK or IPC surface yet | — Pending |
+| Scope v1.8 on Windows-only process-hosted embedding with CLI launch arguments | The immediate need is an Avalonia host integration path without committing mdCAD to a new SDK or IPC surface yet | Validated in Phase 43 |
+| Pull embedded child resize syncing into Phase 43 instead of deferring it | Manual attach approval depended on drag/snap/fullscreen resize behavior working in the sample host, so the bootstrap proof had to include host-side bounds synchronization | Confirmed in Phase 43 |
+| Keep requested mdCAD panels visible during the embedded bootstrap proof and defer chrome trimming polish | Manual acceptance required the hierarchy/inspector/debug/visibility/controls panels to remain visible in the hosted viewer; embedded chrome trimming can follow later polish work | Confirmed in Phase 43 |
 
 ## Evolution
 
@@ -196,4 +199,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 after v1.8 milestone initialization*
+*Last updated: 2026-05-14 after Phase 43 completion*
