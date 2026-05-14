@@ -16,6 +16,7 @@ public enum EmbedTestMode
     Valid,
     InvalidParent,
     DestroyedParent,
+    DestroyAfterAttach,
 }
 
 public sealed class EmbedNativeControlHost : NativeControlHost
@@ -23,6 +24,11 @@ public sealed class EmbedNativeControlHost : NativeControlHost
     public event Action<IntPtr>? PlaceholderHandleReady;
 
     public IntPtr PlaceholderHandle { get; private set; }
+
+    public void ClearPlaceholderHandle()
+    {
+        PlaceholderHandle = IntPtr.Zero;
+    }
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
@@ -69,6 +75,7 @@ public sealed class HostLaunchOptions
         EmbedTestMode.Valid => "valid",
         EmbedTestMode.InvalidParent => "invalid-parent",
         EmbedTestMode.DestroyedParent => "destroyed-parent",
+        EmbedTestMode.DestroyAfterAttach => "destroy-after-attach",
         _ => "valid",
     };
 
@@ -120,6 +127,10 @@ public sealed class HostLaunchOptions
                 {
                     testMode = EmbedTestMode.DestroyedParent;
                 }
+                else if (string.Equals(modeToken, "destroy-after-attach", StringComparison.Ordinal))
+                {
+                    testMode = EmbedTestMode.DestroyAfterAttach;
+                }
                 else
                 {
                     parseError = $"Unsupported --embed-test-mode value: {modeToken}";
@@ -137,7 +148,9 @@ public partial class MainWindow : Window
     private const string StatusLaunching = "launching";
     private const string StatusWaitingForChildAttach = "waiting for child attach";
     private const string StatusAttached = "attached";
+    private const string StatusTeardownCleanup = "teardown/cleanup";
     private const string StatusTimeoutFailure = "timeout/failure";
+    private static readonly TimeSpan DestroyedParentSelfExitGrace = TimeSpan.FromMilliseconds(750);
 
     private readonly HostLaunchOptions _options;
     private readonly EmbedNativeControlHost _embedSurface;
@@ -154,6 +167,10 @@ public partial class MainWindow : Window
     private DateTimeOffset _launchStartedAt;
     private bool _launchStarted;
     private string? _capturedFailureLine;
+    private string? _teardownReason;
+    private DateTimeOffset? _selfExitGraceDeadline;
+    private bool _destroyAfterAttachTriggered;
+    private bool _fallbackKillIssued;
 
     public MainWindow()
         : this(HostLaunchOptions.Parse(Array.Empty<string>()))
@@ -228,8 +245,8 @@ public partial class MainWindow : Window
             : $"Host HWND: 0x{hwnd.ToInt64():X}";
 
         return $"{pathText}{Environment.NewLine}{hwndText}{Environment.NewLine}"
-             + "Wave 0 scaffold reserves --mdcad-exe, --embed-test-mode valid|invalid-parent|destroyed-parent, "
-             + "and the staged statuses launching, waiting for child attach, attached, timeout/failure.";
+             + "Wave 0 scaffold reserves --mdcad-exe, --embed-test-mode valid|invalid-parent|destroyed-parent|destroy-after-attach, "
+             + "and the staged statuses launching, waiting for child attach, attached, teardown/cleanup, timeout/failure.";
     }
 
     private IntPtr PrepareLaunchParentHwnd(IntPtr placeholderHwnd)
@@ -237,15 +254,6 @@ public partial class MainWindow : Window
         if (_options.TestMode == EmbedTestMode.InvalidParent)
         {
             return new IntPtr(0x1);
-        }
-
-        if (_options.TestMode == EmbedTestMode.DestroyedParent)
-        {
-            if (placeholderHwnd != IntPtr.Zero)
-            {
-                Win32NativeMethods.DestroyWindow(placeholderHwnd);
-            }
-            return placeholderHwnd;
         }
 
         return placeholderHwnd;
@@ -365,12 +373,21 @@ public partial class MainWindow : Window
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (_attachedChildHwnd != IntPtr.Zero)
+            int exitCode = _mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : -1;
+            if (!string.IsNullOrWhiteSpace(_teardownReason) || _fallbackKillIssued)
             {
+                FinalizeTeardownStatus(exitCode);
                 return;
             }
 
-            int exitCode = _mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : -1;
+            if (_attachedChildHwnd != IntPtr.Zero)
+            {
+                _resizeSyncTimer.Stop();
+                _attachedChildHwnd = IntPtr.Zero;
+                SetFailureStatus($"mdCAD exited after attach (exit code {exitCode}).");
+                return;
+            }
+
             string detail = _capturedFailureLine
                 ?? $"mdCAD exited before child attach (exit code {exitCode}).";
             SetFailureStatus(detail);
@@ -411,6 +428,12 @@ public partial class MainWindow : Window
             _failureTextBlock.Text =
                 $"Attached child HWND: 0x{childHwnd.ToInt64():X}{Environment.NewLine}" +
                 $"Parent HWND: 0x{_launchParentHwnd.ToInt64():X}";
+            if ((_options.TestMode == EmbedTestMode.DestroyedParent ||
+                 _options.TestMode == EmbedTestMode.DestroyAfterAttach) &&
+                !_destroyAfterAttachTriggered)
+            {
+                Dispatcher.UIThread.Post(BeginPostAttachTeardown, DispatcherPriority.Background);
+            }
             return;
         }
 
@@ -423,10 +446,126 @@ public partial class MainWindow : Window
     private void SetFailureStatus(string detail)
     {
         _attachTimer.Stop();
+        _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
         _statusTextBlock.Text = StatusTimeoutFailure;
         _failureTextBlock.Text = string.IsNullOrWhiteSpace(_capturedFailureLine)
             ? detail
             : $"{_capturedFailureLine}{Environment.NewLine}{detail}";
+    }
+
+    private void BeginPostAttachTeardown()
+    {
+        if (_destroyAfterAttachTriggered || _attachedChildHwnd == IntPtr.Zero || _placeholderHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _destroyAfterAttachTriggered = true;
+        _teardownReason = _options.TestMode == EmbedTestMode.DestroyedParent
+            ? "Destroyed-parent mode destroyed the placeholder after attach and is waiting for the mdCAD invalid-parent quit path."
+            : "Destroy-after-attach mode destroyed the placeholder after attach and armed host fallback cleanup.";
+        _selfExitGraceDeadline = _options.TestMode == EmbedTestMode.DestroyedParent
+            ? DateTimeOffset.UtcNow + DestroyedParentSelfExitGrace
+            : null;
+        _statusTextBlock.Text = StatusTeardownCleanup;
+        _failureTextBlock.Text = _teardownReason;
+
+        IntPtr placeholderToDestroy = _placeholderHwnd;
+        _placeholderHwnd = IntPtr.Zero;
+        _embedSurface.ClearPlaceholderHandle();
+
+        if (placeholderToDestroy != IntPtr.Zero && Win32NativeMethods.IsWindow(placeholderToDestroy))
+        {
+            Win32NativeMethods.DestroyWindow(placeholderToDestroy);
+        }
+    }
+
+    private bool EnsureAttachedLifecycleIsHealthy(string origin)
+    {
+        if (_attachedChildHwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        string? teardownDetail = null;
+        if (_placeholderHwnd == IntPtr.Zero)
+        {
+            teardownDetail = $"{origin}: placeholder HWND no longer exists.";
+        }
+        else if (!Win32NativeMethods.IsWindow(_placeholderHwnd))
+        {
+            teardownDetail = $"{origin}: placeholder HWND is invalid.";
+        }
+        else if (!Win32NativeMethods.IsWindow(_attachedChildHwnd))
+        {
+            teardownDetail = $"{origin}: attached child HWND is invalid.";
+        }
+        else if (Win32NativeMethods.GetParent(_attachedChildHwnd) != _placeholderHwnd)
+        {
+            teardownDetail = $"{origin}: attached child HWND is no longer parented to the placeholder.";
+        }
+
+        if (teardownDetail == null)
+        {
+            return true;
+        }
+
+        if (_options.TestMode == EmbedTestMode.DestroyedParent &&
+            !_fallbackKillIssued &&
+            _selfExitGraceDeadline.HasValue &&
+            DateTimeOffset.UtcNow < _selfExitGraceDeadline.Value &&
+            _mdcadProcess is { HasExited: false })
+        {
+            _statusTextBlock.Text = StatusTeardownCleanup;
+            _failureTextBlock.Text = $"{_teardownReason}{Environment.NewLine}{teardownDetail}{Environment.NewLine}"
+                                   + "Waiting for mdCAD self-exit before host fallback cleanup.";
+            return false;
+        }
+
+        EnsureAttachedProcessTeardown(teardownDetail);
+        return false;
+    }
+
+    private void EnsureAttachedProcessTeardown(string detail)
+    {
+        _attachTimer.Stop();
+        _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
+        _teardownReason ??= detail;
+        _statusTextBlock.Text = StatusTeardownCleanup;
+
+        if (_mdcadProcess == null || _mdcadProcess.HasExited)
+        {
+            FinalizeTeardownStatus(_mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : 0);
+            return;
+        }
+
+        try
+        {
+            _fallbackKillIssued = true;
+            _mdcadProcess.Kill(true);
+        }
+        catch (InvalidOperationException)
+        {
+            FinalizeTeardownStatus(_mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : -1);
+        }
+    }
+
+    private void FinalizeTeardownStatus(int exitCode)
+    {
+        _attachTimer.Stop();
+        _launchRetryTimer.Stop();
+        _resizeSyncTimer.Stop();
+        _attachedChildHwnd = IntPtr.Zero;
+        _statusTextBlock.Text = StatusTeardownCleanup;
+
+        string exitSummary = _fallbackKillIssued
+            ? $"Host fallback cleanup completed (exit code {exitCode}); no surviving mdCAD.exe."
+            : $"mdCAD self-exit observed (exit code {exitCode}); no surviving mdCAD.exe.";
+        _failureTextBlock.Text = string.IsNullOrWhiteSpace(_teardownReason)
+            ? exitSummary
+            : $"{_teardownReason}{Environment.NewLine}{exitSummary}";
     }
 
     private bool TryResolveMdcadExecutable(out string? mdCadExePath, out string failureMessage)
@@ -518,12 +657,12 @@ public partial class MainWindow : Window
 
     private void SyncAttachedChildBounds()
     {
-        if (_placeholderHwnd == IntPtr.Zero || _attachedChildHwnd == IntPtr.Zero)
+        if (_attachedChildHwnd == IntPtr.Zero)
         {
             return;
         }
 
-        if (!Win32NativeMethods.IsWindow(_placeholderHwnd) || !Win32NativeMethods.IsWindow(_attachedChildHwnd))
+        if (!EnsureAttachedLifecycleIsHealthy("Resize sync"))
         {
             return;
         }
@@ -543,9 +682,14 @@ public partial class MainWindow : Window
 
     private void OnResizeSyncTick(object? sender, EventArgs e)
     {
-        if (_attachedChildHwnd == IntPtr.Zero || !Win32NativeMethods.IsWindow(_attachedChildHwnd))
+        if (_attachedChildHwnd == IntPtr.Zero)
         {
             _resizeSyncTimer.Stop();
+            return;
+        }
+
+        if (!EnsureAttachedLifecycleIsHealthy("Resize monitor"))
+        {
             return;
         }
 
@@ -554,9 +698,7 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
-        _attachTimer.Stop();
-        _launchRetryTimer.Stop();
-        _resizeSyncTimer.Stop();
+        EnsureAttachedProcessTeardown("Host window closed; embedded mdCAD must not remain orphaned.");
 
         if (_mdcadProcess != null)
         {
@@ -670,6 +812,9 @@ internal static class Win32NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetParent(IntPtr hWnd);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
