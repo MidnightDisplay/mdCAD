@@ -12,9 +12,19 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 **Shipped:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability (2026-05-05)
 
-**Current milestone:** None — run `/gsd-new-milestone` to define the next scope
+**Current milestone:** `v1.8` — Embeddable Windows JSONL Viewer
 
-**Current focus:** Decide the next milestone scope and whether to pay down v1.7 validation / `Clear Scene` lifecycle debt first.
+**Current focus:** Define requirements and roadmap for Windows child-HWND embedding, launch-time JSONL viewing, and an Avalonia sample host while keeping v1.7 debt explicitly deferred.
+
+## Current Milestone: v1.8 Embeddable Windows JSONL Viewer
+
+**Goal:** Let a Windows host application launch mdCAD as an embeddable child viewer that can auto-open a JSONL large dump and optionally live-refresh it from the command line.
+
+**Target features:**
+- Windows-only embedded launch mode using a parent HWND contract and child-window hosting semantics
+- CLI parameters for embedding and JSONL auto-import with large-flat-dump defaults and observer opt-in
+- Resize, focus, keyboard, and mouse behavior that stays correct inside a resizable Avalonia host control
+- A minimal Avalonia sample host project with status messaging and a bundled example JSONL resource
 
 ## Last Shipped Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
 
@@ -83,17 +93,17 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- [ ] Define the next milestone requirements and scope.
-- [ ] Decide whether to close `Clear Scene` lifecycle parity for linked-refresh roots before the next feature milestone.
-- [ ] Decide whether to backfill Nyquist validation artifacts for Phases 41-42 before or within the next milestone.
-- [ ] Re-evaluate deferred flat-import enhancements (`FIMP-04`, `OBSF-06`) against the next user priority.
+- [ ] Windows host can launch mdCAD in an embeddable child-window mode via CLI-specified parent HWND.
+- [ ] Embedded launch can auto-import an absolute-path JSONL through the large flat dump workflow with optional live refresh enabled from the command line.
+- [ ] Embedded viewer preserves resize, focus, keyboard, and mouse correctness inside a resizable Avalonia `NativeControlHost`.
+- [ ] Repository includes a minimal Avalonia sample host with launch/window/JSONL status messaging and a local example JSONL resource.
 
 ### Out of Scope
 
-- Broad flat-import UX expansion beyond correctness of the linked large-file import, refresh, and deletion paths — keep v1.7 focused on regression closure
-- Full repo-wide big-bang replacement in a single step — staged migration is easier to verify and safer for existing native builds
-- Adoption of a C++ math library — the codebase is intentionally C-first and the user explicitly rejected C++ for this work
-- macOS parity as an equal-time dev gate during feature buildout — deferred until Windows Vulkan feature completion
+- Host-to-viewer IPC beyond the CLI launch contract — keep the first embedding milestone process-launched and integration-light
+- In-process or SDK-style embedding — mdCAD remains a separate process hosted through a Win32 child HWND
+- Cross-platform embedding parity beyond the Windows/Avalonia workflow — target the immediate Windows desktop host need first
+- Broader flat-import UX expansion unrelated to launch-time JSONL viewing — keep scope on embeddable viewer reliability
 
 ## Context
 
@@ -102,6 +112,8 @@ v1.0 and v1.1 are shipped and archived. v1.1 closed long-tail migration and vali
 v1.2 pivots to a larger feature system proposal captured in `docs/feature-proposal/Sketches, Constraints, Scripting.md`: constrained sketches, solver UX, and scripting-first bidirectional workflows.
 
 v1.7 is driven by a large-file regression in the flat JSONL observer path: with `File -> Import JSONL (Flat Large Dump)` plus `Link file for refresh (optional)`, scene totals keep climbing after the initial import appears complete, visible line segments collapse to a later tail subset, some joints remain as orphaned points, and deleting the import root leaves dangling geometry. The same file imported without live refresh does not reproduce the issue.
+
+v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop application needs to launch mdCAD as a child-window viewer process, pass a parent HWND plus launch-time JSONL parameters, and rely on the already-stabilized flat JSONL observer path without introducing a richer IPC layer yet.
 
 ## Current State
 
@@ -126,12 +138,13 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 - Milestone `v1.7` is shipped with Phases 41-42 complete and archived.
 - v1.7 delivers stable linked flat JSONL convergence across initial load, observer refresh, repeated manual refresh, and linked-root deletion on the real `lamp_11.jsonl` dataset.
 - Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
+- Milestone `v1.8` is now active for Windows embedding and host-launched JSONL viewing requirements definition.
 ## Next Milestone Goals
 
-1. Decide whether to spend the next milestone on `Clear Scene` lifecycle parity and validation metadata backfill or on new product capability.
-2. If flat-import work continues, evaluate deferred enhancements like diff/patch refresh and advanced observer scheduling controls.
-3. Preserve current native build reliability while scoping the next milestone.
-4. Start the next milestone with explicit requirements rather than carrying v1.7 debt implicitly.
+1. Add a Windows embedding contract so an external host can launch mdCAD into a child HWND with predictable lifecycle and resize behavior.
+2. Reuse the large flat JSONL import path for launch-time auto-open with optional live refresh opt-in from absolute file paths.
+3. Prove the integration end-to-end with a minimal Avalonia sample host and bundled example JSONL data.
+4. Preserve current native build reliability while keeping `Clear Scene` lifecycle parity and Nyquist backfill explicitly deferred unless the new work exposes them as blockers.
 
 ## Constraints
 
@@ -163,6 +176,7 @@ v1.7 is driven by a large-file regression in the flat JSONL observer path: with 
 | Scope v1.7 on linked flat JSONL large-file refresh stability and cleanup correctness | The regression is isolated to observer-enabled large flat imports, so a focused milestone keeps diagnosis and closure measurable | Completed in v1.7 |
 | Arm linked flat import observer baseline at import commit time | Prevent immediate self-refresh drift on the first linked import settle | Completed in v1.7 |
 | Use exact-footprint refresh compaction plus cancel-before-delete teardown ordering | The large-file regression was a lifecycle correctness problem, not a signal to redesign the entire slot-buffer architecture | Completed in v1.7 |
+| Scope v1.8 on Windows-only process-hosted embedding with CLI launch arguments | The immediate need is an Avalonia host integration path without committing mdCAD to a new SDK or IPC surface yet | — Pending |
 
 ## Evolution
 
@@ -182,4 +196,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 after v1.7 milestone completion*
+*Last updated: 2026-05-14 after v1.8 milestone initialization*

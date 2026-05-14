@@ -1,45 +1,46 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Linked Flat JSONL Large-File Refresh Stability
+milestone: v1.8
+milestone_name: Embeddable Windows JSONL Viewer
 current_phase: null
 current_phase_name: null
-status: ready_for_new_milestone
-stopped_at: v1.7 archived; next milestone definition pending
-last_updated: "2026-05-05T22:41:25.5627002+01:00"
-last_activity: 2026-05-05 -- v1.7 archived and ready for next milestone
+status: defining_requirements
+stopped_at: Milestone v1.8 started; requirements and roadmap pending
+last_updated: "2026-05-14T13:00:45.766+01:00"
+last_activity: 2026-05-14 -- Milestone v1.8 started
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-05)
+See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** No active phase — v1.7 archived; next milestone definition pending
+**Current focus:** Milestone v1.8 — defining requirements for Windows embedding and launch-time JSONL viewing
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: None — ARCHIVED
-Plan: n/a
-Status: v1.7 shipped; next milestone not started
-Last activity: 2026-05-05 -- v1.7 archived and ready for next milestone
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-14 -- Milestone v1.8 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
-- Milestone v1.7 shipped: linked flat-large JSONL imports now preserve full geometry during initial load, observer-driven refresh, repeated manual refresh, and linked-root deletion on large files.
-- Remaining non-blocking debt is captured in `.planning/milestones/v1.7-MILESTONE-AUDIT.md`.
+- Milestone v1.8 goal: let a Windows host launch mdCAD as an embeddable child viewer that can auto-open a large flat JSONL file and optionally live-refresh it from the command line.
+- Scope includes a minimal Avalonia host example, Win32 child HWND integration contract, and embedded resize/focus/input behavior.
+- Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
 
@@ -64,11 +65,12 @@ Recent decisions affecting current work:
 - Milestone v1.7 initialized: Linked Flat JSONL Large-File Refresh Stability.
 - Roadmap v1.7 created: phases 41-42 map 6/6 requirements.
 - Milestone v1.7 archived to `.planning/milestones/v1.7-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md`.
+- Milestone v1.8 initialized: Embeddable Windows JSONL Viewer.
 
 ### Pending Todos
 
-- Start the next milestone with `/gsd-new-milestone`.
-- Decide whether to schedule `Clear Scene` lifecycle parity and Phase 41/42 validation backfill as near-term debt cleanup.
+- Define milestone v1.8 requirements and roadmap.
+- Decide whether milestone research is needed before requirements are finalized.
 
 ### Blockers/Concerns
 
@@ -83,6 +85,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-05T22:41:25.5627002+01:00
-Stopped at: v1.7 archived; ready to define the next milestone
+Last session: 2026-05-14T13:00:45.766+01:00
+Stopped at: Milestone v1.8 started; define requirements and roadmap
 Resume file: .planning/PROJECT.md
