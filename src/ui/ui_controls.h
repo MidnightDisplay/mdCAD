@@ -18,7 +18,6 @@ typedef struct {
     float clear_color[3];
     orbit_camera_t* camera;               // Pointer to orbital camera
     sg_pass_action* offscreen_pass_action; // Pointer to pass action to update
-    int current_theme;                     // Currently selected theme index
 } ui_controls_state_t;
 
 //------------------------------------------------------------------------------
@@ -37,7 +36,6 @@ static inline void ui_controls_sync_clear_color(ui_controls_state_t* ctrl) {
 static inline void ui_controls_init(ui_controls_state_t* ctrl, orbit_camera_t* camera, sg_pass_action* pass_action) {
     ctrl->camera = camera;
     ctrl->offscreen_pass_action = pass_action;
-    ctrl->current_theme = UI_THEME_VISUAL_STUDIO;  // Default theme
 
     // Initialize pass action
     pass_action->colors[0].load_action = SG_LOADACTION_CLEAR;
@@ -60,9 +58,11 @@ static inline void ui_controls_draw(ui_controls_state_t* ctrl) {
     igBegin("Controls", NULL, ImGuiWindowFlags_None);
 
     // Theme selector
+    int current_theme = (int)ui_theme_get_current();
+
     igText("UI Theme");
-    if (igCombo_Str_arr("##Theme", &ctrl->current_theme, ui_theme_names, UI_THEME_COUNT, -1)) {
-        ui_theme_apply((ui_theme_t)ctrl->current_theme);
+    if (igCombo_Str_arr("##Theme", &current_theme, ui_theme_names, UI_THEME_COUNT, -1)) {
+        ui_theme_apply((ui_theme_t)current_theme);
         // Sync clear color with new theme's FrameBg
         ui_controls_sync_clear_color(ctrl);
     }

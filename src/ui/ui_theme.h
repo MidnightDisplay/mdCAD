@@ -5,6 +5,13 @@
 // - Visual Studio dark (blue-gray with rectangular styling)
 // - iOS Light (clean white/gray with rounded corners and gray accents)
 // - Catppuccin Frappé (muted pastel dark theme with lavender accent)
+// - One Dark (Atom-inspired slate theme with blue accent)
+// - Rose Moon (Rosé Pine Moon-inspired plum theme)
+// - Nord (Arctic blue-gray theme)
+// - Tokyo Storm (midnight indigo theme with neon blue accent)
+// - Tokyo Night (deeper night-sky variant of Tokyo palette)
+// - Gruvbox Material Dark (earthy warm dark theme)
+// - Cyberpunk 2077 (black terminal with red body and yellow highlights)
 //------------------------------------------------------------------------------
 #ifndef UI_THEME_H
 #define UI_THEME_H
@@ -19,15 +26,45 @@ typedef enum {
     UI_THEME_VISUAL_STUDIO,
     UI_THEME_IOS_LIGHT,
     UI_THEME_CATPPUCCIN_FRAPPE,
+    UI_THEME_ONE_DARK,
+    UI_THEME_ROSE_MOON,
+    UI_THEME_NORD,
+    UI_THEME_TOKYO_STORM,
+    UI_THEME_TOKYO_NIGHT,
+    UI_THEME_GRUVBOX_MATERIAL_DARK,
+    UI_THEME_CYBERPUNK_2077,
     UI_THEME_COUNT
 } ui_theme_t;
 
 // Theme names for UI display
-static const char* ui_theme_names[] = {
+static const char* const ui_theme_names[UI_THEME_COUNT] = {
     "Visual Studio Dark",
     "iOS Light",
-    "Catppuccin Frappe"
+    "Catppuccin Frappe",
+    "OneDark",
+    "Rose Moon",
+    "Nord",
+    "Tokyo Storm",
+    "Tokyo Night",
+    "Gruvbox Material Dark",
+    "Cyberpunk 2077"
 };
+
+static ui_theme_t g_ui_theme_current = UI_THEME_VISUAL_STUDIO;
+
+static inline ui_theme_t ui_theme_get_current(void) {
+    return g_ui_theme_current;
+}
+
+static inline void ui_theme_apply_zero_rounding(ImGuiStyle* style) {
+    style->WindowRounding = 0.0f;
+    style->FrameRounding = 0.0f;
+    style->ScrollbarRounding = 0.0f;
+    style->GrabRounding = 0.0f;
+    style->TabRounding = 0.0f;
+    style->ChildRounding = 0.0f;
+    style->PopupRounding = 0.0f;
+}
 
 //------------------------------------------------------------------------------
 // iOS Light Theme
@@ -35,6 +72,8 @@ static const char* ui_theme_names[] = {
 
 static inline void ui_theme_apply_ios_light(void) {
     ImGuiStyle* style = igGetStyle();
+
+    g_ui_theme_current = UI_THEME_IOS_LIGHT;
 
     // iOS-style rounded corners (subtle)
     style->WindowRounding = 5.0f;
@@ -160,14 +199,10 @@ static inline void ui_theme_apply_ios_light(void) {
 static inline void ui_theme_apply_catppuccin_frappe(void) {
     ImGuiStyle* style = igGetStyle();
 
+    g_ui_theme_current = UI_THEME_CATPPUCCIN_FRAPPE;
+
     // Zero rounding (rectangular styling)
-    style->WindowRounding = 0.0f;
-    style->FrameRounding = 0.0f;
-    style->ScrollbarRounding = 0.0f;
-    style->GrabRounding = 0.0f;
-    style->TabRounding = 0.0f;
-    style->ChildRounding = 0.0f;
-    style->PopupRounding = 0.0f;
+    ui_theme_apply_zero_rounding(style);
 
     // Catppuccin Frappé color palette
     // Base: #303446, Mantle: #292c3c, Crust: #232634
@@ -270,20 +305,506 @@ static inline void ui_theme_apply_catppuccin_frappe(void) {
 }
 
 //------------------------------------------------------------------------------
+// One Dark Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_one_dark(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_ONE_DARK;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.671f, 0.698f, 0.749f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.361f, 0.388f, 0.439f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.157f, 0.173f, 0.204f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.157f, 0.173f, 0.204f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.129f, 0.145f, 0.169f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.243f, 0.267f, 0.318f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.227f, 0.251f, 0.314f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.380f, 0.686f, 0.937f, 0.35f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.129f, 0.145f, 0.169f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.129f, 0.145f, 0.169f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.129f, 0.145f, 0.169f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.129f, 0.145f, 0.169f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.243f, 0.267f, 0.318f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.294f, 0.322f, 0.388f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.361f, 0.388f, 0.439f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.380f, 0.686f, 0.937f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.380f, 0.686f, 0.937f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.596f, 0.765f, 0.475f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.243f, 0.267f, 0.318f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.380f, 0.686f, 0.937f, 0.55f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.380f, 0.686f, 0.937f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.380f, 0.686f, 0.937f, 0.50f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.380f, 0.686f, 0.937f, 0.80f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.243f, 0.267f, 0.318f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.380f, 0.686f, 0.937f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.380f, 0.686f, 0.937f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.243f, 0.267f, 0.318f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.380f, 0.686f, 0.937f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.380f, 0.686f, 0.937f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.129f, 0.145f, 0.169f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.380f, 0.686f, 0.937f, 0.55f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.380f, 0.686f, 0.937f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.106f, 0.114f, 0.137f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.157f, 0.173f, 0.204f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.361f, 0.388f, 0.439f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.380f, 0.686f, 0.937f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.118f, 0.129f, 0.153f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.380f, 0.686f, 0.937f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.820f, 0.604f, 0.400f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.596f, 0.765f, 0.475f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.898f, 0.753f, 0.482f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.243f, 0.267f, 0.318f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.173f, 0.192f, 0.227f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.671f, 0.698f, 0.749f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.380f, 0.686f, 0.937f, 0.35f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.380f, 0.686f, 0.937f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.380f, 0.686f, 0.937f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.671f, 0.698f, 0.749f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.118f, 0.129f, 0.153f, 0.20f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.118f, 0.129f, 0.153f, 0.40f};
+}
+
+//------------------------------------------------------------------------------
+// Rose Moon Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_rose_moon(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_ROSE_MOON;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.878f, 0.871f, 0.957f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.565f, 0.549f, 0.667f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.137f, 0.129f, 0.212f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.137f, 0.129f, 0.212f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.165f, 0.153f, 0.247f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.267f, 0.255f, 0.353f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.165f, 0.153f, 0.247f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.224f, 0.208f, 0.322f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.769f, 0.655f, 0.906f, 0.32f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.122f, 0.114f, 0.180f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.165f, 0.153f, 0.247f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.122f, 0.114f, 0.180f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.122f, 0.114f, 0.180f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.122f, 0.114f, 0.180f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.267f, 0.255f, 0.353f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.431f, 0.416f, 0.525f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.565f, 0.549f, 0.667f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.769f, 0.655f, 0.906f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.769f, 0.655f, 0.906f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.965f, 0.757f, 0.467f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.224f, 0.208f, 0.322f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.769f, 0.655f, 0.906f, 0.55f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.769f, 0.655f, 0.906f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.224f, 0.208f, 0.322f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.769f, 0.655f, 0.906f, 0.45f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.769f, 0.655f, 0.906f, 0.75f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.267f, 0.255f, 0.353f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.769f, 0.655f, 0.906f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.965f, 0.757f, 0.467f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.267f, 0.255f, 0.353f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.769f, 0.655f, 0.906f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.965f, 0.757f, 0.467f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.122f, 0.114f, 0.180f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.769f, 0.655f, 0.906f, 0.55f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.224f, 0.208f, 0.322f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.965f, 0.757f, 0.467f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.102f, 0.094f, 0.145f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.165f, 0.153f, 0.247f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.431f, 0.416f, 0.525f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.769f, 0.655f, 0.906f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.122f, 0.114f, 0.180f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.243f, 0.561f, 0.690f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.922f, 0.435f, 0.573f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.965f, 0.757f, 0.467f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.612f, 0.812f, 0.847f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.165f, 0.153f, 0.247f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.267f, 0.255f, 0.353f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.224f, 0.208f, 0.322f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.878f, 0.871f, 0.957f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.769f, 0.655f, 0.906f, 0.35f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.965f, 0.757f, 0.467f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.769f, 0.655f, 0.906f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.878f, 0.871f, 0.957f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.122f, 0.114f, 0.180f, 0.45f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.122f, 0.114f, 0.180f, 0.55f};
+}
+
+//------------------------------------------------------------------------------
+// Nord Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_nord(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_NORD;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.925f, 0.937f, 0.957f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.655f, 0.694f, 0.761f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.180f, 0.204f, 0.251f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.180f, 0.204f, 0.251f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.231f, 0.259f, 0.322f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.298f, 0.337f, 0.416f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.231f, 0.259f, 0.322f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.263f, 0.298f, 0.369f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.506f, 0.631f, 0.757f, 0.35f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.169f, 0.188f, 0.231f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.231f, 0.259f, 0.322f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.169f, 0.188f, 0.231f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.169f, 0.188f, 0.231f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.169f, 0.188f, 0.231f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.298f, 0.337f, 0.416f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.369f, 0.506f, 0.675f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.506f, 0.631f, 0.757f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.263f, 0.298f, 0.369f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.369f, 0.506f, 0.675f, 0.65f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.533f, 0.753f, 0.816f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.263f, 0.298f, 0.369f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.369f, 0.506f, 0.675f, 0.60f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.506f, 0.631f, 0.757f, 0.80f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.298f, 0.337f, 0.416f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.533f, 0.753f, 0.816f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.533f, 0.753f, 0.816f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.298f, 0.337f, 0.416f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.533f, 0.753f, 0.816f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.533f, 0.753f, 0.816f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.169f, 0.188f, 0.231f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.369f, 0.506f, 0.675f, 0.70f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.263f, 0.298f, 0.369f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.141f, 0.161f, 0.200f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.231f, 0.259f, 0.322f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.298f, 0.337f, 0.416f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.533f, 0.753f, 0.816f, 0.40f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.141f, 0.161f, 0.200f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.749f, 0.380f, 0.416f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.639f, 0.745f, 0.549f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.922f, 0.796f, 0.545f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.231f, 0.259f, 0.322f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.298f, 0.337f, 0.416f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.263f, 0.298f, 0.369f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.925f, 0.937f, 0.957f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.533f, 0.753f, 0.816f, 0.35f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.533f, 0.753f, 0.816f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.533f, 0.753f, 0.816f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.925f, 0.937f, 0.957f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.141f, 0.161f, 0.200f, 0.45f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.141f, 0.161f, 0.200f, 0.55f};
+}
+
+//------------------------------------------------------------------------------
+// Tokyo Storm Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_tokyo_storm(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_TOKYO_STORM;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.753f, 0.792f, 0.961f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.337f, 0.373f, 0.537f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.141f, 0.157f, 0.231f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.141f, 0.157f, 0.231f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.122f, 0.137f, 0.208f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.184f, 0.208f, 0.310f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.478f, 0.635f, 0.969f, 0.35f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.122f, 0.137f, 0.208f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.122f, 0.137f, 0.208f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.478f, 0.635f, 0.969f, 0.80f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.451f, 0.855f, 0.792f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.478f, 0.635f, 0.969f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.478f, 0.635f, 0.969f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.451f, 0.855f, 0.792f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.184f, 0.208f, 0.310f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.478f, 0.635f, 0.969f, 0.60f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.478f, 0.635f, 0.969f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.184f, 0.208f, 0.310f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.733f, 0.604f, 0.969f, 0.45f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.478f, 0.635f, 0.969f, 0.80f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.451f, 0.855f, 0.792f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.255f, 0.282f, 0.408f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.451f, 0.855f, 0.792f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.451f, 0.855f, 0.792f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.094f, 0.106f, 0.161f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.141f, 0.157f, 0.231f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.478f, 0.635f, 0.969f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.094f, 0.106f, 0.161f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.451f, 0.855f, 0.792f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){1.000f, 0.620f, 0.392f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.620f, 0.808f, 0.416f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.878f, 0.686f, 0.408f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.184f, 0.208f, 0.310f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.753f, 0.792f, 0.961f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.478f, 0.635f, 0.969f, 0.35f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.451f, 0.855f, 0.792f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.478f, 0.635f, 0.969f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.753f, 0.792f, 0.961f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.094f, 0.106f, 0.161f, 0.45f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.094f, 0.106f, 0.161f, 0.55f};
+}
+
+//------------------------------------------------------------------------------
+// Tokyo Night Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_tokyo_night(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_TOKYO_NIGHT;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.753f, 0.792f, 0.961f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.337f, 0.373f, 0.537f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.102f, 0.106f, 0.149f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.102f, 0.106f, 0.149f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.086f, 0.086f, 0.118f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.478f, 0.635f, 0.969f, 0.35f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.067f, 0.071f, 0.106f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.067f, 0.071f, 0.106f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.067f, 0.071f, 0.106f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.067f, 0.071f, 0.106f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.478f, 0.635f, 0.969f, 0.80f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.733f, 0.604f, 0.969f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.490f, 0.812f, 1.000f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.478f, 0.635f, 0.969f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.733f, 0.604f, 0.969f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.478f, 0.635f, 0.969f, 0.60f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.478f, 0.635f, 0.969f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.478f, 0.635f, 0.969f, 0.45f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.733f, 0.604f, 0.969f, 0.70f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.490f, 0.812f, 1.000f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.255f, 0.282f, 0.408f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.490f, 0.812f, 1.000f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.067f, 0.071f, 0.106f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.478f, 0.635f, 0.969f, 0.55f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.733f, 0.604f, 0.969f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.059f, 0.063f, 0.090f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.102f, 0.106f, 0.149f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.733f, 0.604f, 0.969f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.059f, 0.063f, 0.090f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.490f, 0.812f, 1.000f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){1.000f, 0.620f, 0.392f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.620f, 0.808f, 0.416f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.878f, 0.686f, 0.408f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.122f, 0.137f, 0.208f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.255f, 0.282f, 0.408f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.161f, 0.180f, 0.259f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.753f, 0.792f, 0.961f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.733f, 0.604f, 0.969f, 0.35f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.490f, 0.812f, 1.000f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.478f, 0.635f, 0.969f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.753f, 0.792f, 0.961f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.059f, 0.063f, 0.090f, 0.45f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.059f, 0.063f, 0.090f, 0.55f};
+}
+
+//------------------------------------------------------------------------------
+// Gruvbox Material Dark Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_gruvbox_material_dark(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_GRUVBOX_MATERIAL_DARK;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.831f, 0.745f, 0.596f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.573f, 0.514f, 0.455f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.157f, 0.157f, 0.157f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.157f, 0.157f, 0.157f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.114f, 0.125f, 0.129f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.314f, 0.286f, 0.271f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.196f, 0.188f, 0.184f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.235f, 0.219f, 0.212f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.847f, 0.651f, 0.341f, 0.35f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.114f, 0.125f, 0.129f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.196f, 0.188f, 0.184f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.114f, 0.125f, 0.129f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.114f, 0.125f, 0.129f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.114f, 0.125f, 0.129f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.314f, 0.286f, 0.271f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){0.490f, 0.682f, 0.639f, 0.80f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){0.663f, 0.714f, 0.396f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){0.847f, 0.651f, 0.341f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){0.490f, 0.682f, 0.639f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){0.663f, 0.714f, 0.396f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.235f, 0.219f, 0.212f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){0.906f, 0.541f, 0.306f, 0.60f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){0.847f, 0.651f, 0.341f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.235f, 0.219f, 0.212f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){0.490f, 0.682f, 0.639f, 0.45f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){0.847f, 0.651f, 0.341f, 0.70f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.314f, 0.286f, 0.271f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){0.906f, 0.541f, 0.306f, 0.55f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){0.847f, 0.651f, 0.341f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.314f, 0.286f, 0.271f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){0.906f, 0.541f, 0.306f, 0.55f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){0.847f, 0.651f, 0.341f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.114f, 0.125f, 0.129f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){0.906f, 0.541f, 0.306f, 0.55f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.196f, 0.188f, 0.184f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){0.847f, 0.651f, 0.341f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.078f, 0.086f, 0.090f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.157f, 0.157f, 0.157f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.314f, 0.286f, 0.271f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){0.847f, 0.651f, 0.341f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.078f, 0.086f, 0.090f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.490f, 0.682f, 0.639f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){0.918f, 0.412f, 0.384f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){0.663f, 0.714f, 0.396f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){0.847f, 0.651f, 0.341f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.196f, 0.188f, 0.184f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.314f, 0.286f, 0.271f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.235f, 0.219f, 0.212f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.831f, 0.745f, 0.596f, 0.03f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){0.847f, 0.651f, 0.341f, 0.30f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){0.847f, 0.651f, 0.341f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){0.490f, 0.682f, 0.639f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.831f, 0.745f, 0.596f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.078f, 0.086f, 0.090f, 0.45f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.078f, 0.086f, 0.090f, 0.55f};
+}
+
+//------------------------------------------------------------------------------
+// Cyberpunk 2077 Theme
+//------------------------------------------------------------------------------
+
+static inline void ui_theme_apply_cyberpunk_2077(void) {
+    ImGuiStyle* style = igGetStyle();
+    ImVec4* colors = style->Colors;
+
+    g_ui_theme_current = UI_THEME_CYBERPUNK_2077;
+    ui_theme_apply_zero_rounding(style);
+
+    colors[ImGuiCol_Text]                   = (ImVec4){0.957f, 0.357f, 0.412f, 1.00f};
+    colors[ImGuiCol_TextDisabled]           = (ImVec4){0.549f, 0.176f, 0.239f, 1.00f};
+    colors[ImGuiCol_WindowBg]               = (ImVec4){0.031f, 0.031f, 0.031f, 1.00f};
+    colors[ImGuiCol_ChildBg]                = (ImVec4){0.047f, 0.047f, 0.047f, 1.00f};
+    colors[ImGuiCol_PopupBg]                = (ImVec4){0.059f, 0.059f, 0.059f, 0.98f};
+    colors[ImGuiCol_Border]                 = (ImVec4){0.549f, 0.063f, 0.125f, 1.00f};
+    colors[ImGuiCol_BorderShadow]           = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_FrameBg]                = (ImVec4){0.075f, 0.075f, 0.075f, 1.00f};
+    colors[ImGuiCol_FrameBgHovered]         = (ImVec4){0.106f, 0.063f, 0.071f, 1.00f};
+    colors[ImGuiCol_FrameBgActive]          = (ImVec4){0.957f, 0.357f, 0.412f, 0.30f};
+    colors[ImGuiCol_TitleBg]                = (ImVec4){0.043f, 0.043f, 0.043f, 1.00f};
+    colors[ImGuiCol_TitleBgActive]          = (ImVec4){0.102f, 0.051f, 0.063f, 1.00f};
+    colors[ImGuiCol_TitleBgCollapsed]       = (ImVec4){0.043f, 0.043f, 0.043f, 0.75f};
+    colors[ImGuiCol_MenuBarBg]              = (ImVec4){0.043f, 0.043f, 0.043f, 1.00f};
+    colors[ImGuiCol_ScrollbarBg]            = (ImVec4){0.043f, 0.043f, 0.043f, 0.50f};
+    colors[ImGuiCol_ScrollbarGrab]          = (ImVec4){0.549f, 0.063f, 0.125f, 1.00f};
+    colors[ImGuiCol_ScrollbarGrabHovered]   = (ImVec4){1.000f, 0.831f, 0.000f, 0.80f};
+    colors[ImGuiCol_ScrollbarGrabActive]    = (ImVec4){1.000f, 0.239f, 0.353f, 1.00f};
+    colors[ImGuiCol_CheckMark]              = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_SliderGrab]             = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_SliderGrabActive]       = (ImVec4){1.000f, 0.239f, 0.353f, 1.00f};
+    colors[ImGuiCol_Button]                 = (ImVec4){0.086f, 0.043f, 0.051f, 1.00f};
+    colors[ImGuiCol_ButtonHovered]          = (ImVec4){1.000f, 0.831f, 0.000f, 0.55f};
+    colors[ImGuiCol_ButtonActive]           = (ImVec4){1.000f, 0.239f, 0.353f, 0.80f};
+    colors[ImGuiCol_Header]                 = (ImVec4){0.102f, 0.051f, 0.063f, 1.00f};
+    colors[ImGuiCol_HeaderHovered]          = (ImVec4){1.000f, 0.831f, 0.000f, 0.35f};
+    colors[ImGuiCol_HeaderActive]           = (ImVec4){1.000f, 0.239f, 0.353f, 0.75f};
+    colors[ImGuiCol_Separator]              = (ImVec4){0.549f, 0.063f, 0.125f, 1.00f};
+    colors[ImGuiCol_SeparatorHovered]       = (ImVec4){1.000f, 0.831f, 0.000f, 0.60f};
+    colors[ImGuiCol_SeparatorActive]        = (ImVec4){1.000f, 0.239f, 0.353f, 0.90f};
+    colors[ImGuiCol_ResizeGrip]             = (ImVec4){0.549f, 0.063f, 0.125f, 0.60f};
+    colors[ImGuiCol_ResizeGripHovered]      = (ImVec4){1.000f, 0.831f, 0.000f, 0.60f};
+    colors[ImGuiCol_ResizeGripActive]       = (ImVec4){1.000f, 0.239f, 0.353f, 0.90f};
+    colors[ImGuiCol_Tab]                    = (ImVec4){0.043f, 0.043f, 0.043f, 1.00f};
+    colors[ImGuiCol_TabHovered]             = (ImVec4){1.000f, 0.831f, 0.000f, 0.45f};
+    colors[ImGuiCol_TabSelected]            = (ImVec4){0.086f, 0.043f, 0.051f, 1.00f};
+    colors[ImGuiCol_TabSelectedOverline]    = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_TabDimmed]              = (ImVec4){0.027f, 0.027f, 0.027f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelected]      = (ImVec4){0.075f, 0.075f, 0.075f, 1.00f};
+    colors[ImGuiCol_TabDimmedSelectedOverline] = (ImVec4){0.549f, 0.063f, 0.125f, 1.00f};
+    colors[ImGuiCol_DockingPreview]         = (ImVec4){1.000f, 0.831f, 0.000f, 0.45f};
+    colors[ImGuiCol_DockingEmptyBg]         = (ImVec4){0.020f, 0.020f, 0.020f, 1.00f};
+    colors[ImGuiCol_PlotLines]              = (ImVec4){0.957f, 0.357f, 0.412f, 1.00f};
+    colors[ImGuiCol_PlotLinesHovered]       = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_PlotHistogram]          = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_PlotHistogramHovered]   = (ImVec4){1.000f, 0.925f, 0.200f, 1.00f};
+    colors[ImGuiCol_TableHeaderBg]          = (ImVec4){0.075f, 0.075f, 0.075f, 1.00f};
+    colors[ImGuiCol_TableBorderStrong]      = (ImVec4){0.549f, 0.063f, 0.125f, 1.00f};
+    colors[ImGuiCol_TableBorderLight]       = (ImVec4){0.102f, 0.051f, 0.063f, 1.00f};
+    colors[ImGuiCol_TableRowBg]             = (ImVec4){0.00f, 0.00f, 0.00f, 0.00f};
+    colors[ImGuiCol_TableRowBgAlt]          = (ImVec4){0.957f, 0.357f, 0.412f, 0.02f};
+    colors[ImGuiCol_TextSelectedBg]         = (ImVec4){1.000f, 0.831f, 0.000f, 0.25f};
+    colors[ImGuiCol_DragDropTarget]         = (ImVec4){1.000f, 0.831f, 0.000f, 0.90f};
+    colors[ImGuiCol_NavCursor]              = (ImVec4){1.000f, 0.831f, 0.000f, 1.00f};
+    colors[ImGuiCol_NavWindowingHighlight]  = (ImVec4){0.957f, 0.357f, 0.412f, 0.70f};
+    colors[ImGuiCol_NavWindowingDimBg]      = (ImVec4){0.020f, 0.020f, 0.020f, 0.55f};
+    colors[ImGuiCol_ModalWindowDimBg]       = (ImVec4){0.020f, 0.020f, 0.020f, 0.65f};
+}
+
+//------------------------------------------------------------------------------
 // Visual Studio Dark Theme
 //------------------------------------------------------------------------------
 
 static inline void ui_theme_apply_visual_studio(void) {
     ImGuiStyle* style = igGetStyle();
 
+    g_ui_theme_current = UI_THEME_VISUAL_STUDIO;
+
     // Style settings (rectangular, no rounding)
-    style->WindowRounding = 0.0f;
-    style->FrameRounding = 0.0f;
-    style->ScrollbarRounding = 0.0f;
-    style->GrabRounding = 0.0f;
-    style->TabRounding = 0.0f;
-    style->ChildRounding = 0.0f;
-    style->PopupRounding = 0.0f;
+    ui_theme_apply_zero_rounding(style);
 
     // Visual Studio dark color scheme
     ImVec4* colors = style->Colors;
@@ -352,6 +873,10 @@ static inline void ui_theme_apply_visual_studio(void) {
 //------------------------------------------------------------------------------
 
 static inline void ui_theme_apply(ui_theme_t theme) {
+    if ((theme < 0) || (theme >= UI_THEME_COUNT)) {
+        theme = UI_THEME_VISUAL_STUDIO;
+    }
+
     switch (theme) {
         case UI_THEME_VISUAL_STUDIO:
             ui_theme_apply_visual_studio();
@@ -362,8 +887,29 @@ static inline void ui_theme_apply(ui_theme_t theme) {
         case UI_THEME_CATPPUCCIN_FRAPPE:
             ui_theme_apply_catppuccin_frappe();
             break;
+        case UI_THEME_ONE_DARK:
+            ui_theme_apply_one_dark();
+            break;
+        case UI_THEME_ROSE_MOON:
+            ui_theme_apply_rose_moon();
+            break;
+        case UI_THEME_NORD:
+            ui_theme_apply_nord();
+            break;
+        case UI_THEME_TOKYO_STORM:
+            ui_theme_apply_tokyo_storm();
+            break;
+        case UI_THEME_TOKYO_NIGHT:
+            ui_theme_apply_tokyo_night();
+            break;
+        case UI_THEME_GRUVBOX_MATERIAL_DARK:
+            ui_theme_apply_gruvbox_material_dark();
+            break;
+        case UI_THEME_CYBERPUNK_2077:
+            ui_theme_apply_cyberpunk_2077();
+            break;
         default:
-            ui_theme_apply_catppuccin_frappe();
+            ui_theme_apply_visual_studio();
             break;
     }
 }

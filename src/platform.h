@@ -44,7 +44,7 @@
 // MSAA for the main viewport offscreen pass only.
 // Pick buffer remains single-sampled (sample_count = 1).
 #ifndef MDCAD_VIEWPORT_MSAA_SAMPLES
-#define MDCAD_VIEWPORT_MSAA_SAMPLES 4
+#define MDCAD_VIEWPORT_MSAA_SAMPLES 8
 #endif
 
 #endif // PLATFORM_H
