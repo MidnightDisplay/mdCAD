@@ -343,6 +343,15 @@ static bool mdcad_embedded_shortcuts_allowed(const ImGuiIO* io) {
     return embed_input_state_allows_shortcuts(&state.embed_input);
 }
 
+static bool mdcad_embedded_shortcut_pressed(ImGuiKeyChord key_chord) {
+    if (!state.launch.embedded) {
+        return false;
+    }
+    // This shortcut block runs outside any specific ImGui window, so use a global route
+    // and let active text widgets keep ownership of their own shortcuts.
+    return igShortcut_Nil(key_chord, ImGuiInputFlags_RouteGlobal);
+}
+
 static bool mdcad_handle_embedded_runtime_guards(void) {
     if (!state.launch.embedded || state.embed_quit_requested) {
         return state.embed_quit_requested;
@@ -2084,60 +2093,116 @@ static void frame(void) {
 
     // Handle keyboard shortcuts only when mdCAD currently owns embedded keyboard focus.
     if (mdcad_embedded_shortcuts_allowed(io)) {
-        bool shortcut_mod = io->KeyCtrl || io->KeySuper;
-
-        // Undo: Ctrl/Cmd+Z
-        if (shortcut_mod && !io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) {
-            if (undo_redo_undo(&state.undo_redo)) {
-                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+        if (state.launch.embedded) {
+            // Undo: Ctrl/Cmd+Z
+            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
+                if (undo_redo_undo(&state.undo_redo)) {
+                    ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                }
             }
-        }
 
-        // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
-        if ((shortcut_mod && io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) ||
-            (shortcut_mod && igIsKeyPressed_Bool(ImGuiKey_Y, false))) {
-            if (undo_redo_redo(&state.undo_redo)) {
-                ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+            // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+            if (mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z) ||
+                mdcad_embedded_shortcut_pressed(ImGuiMod_Ctrl | ImGuiKey_Y)) {
+                if (undo_redo_redo(&state.undo_redo)) {
+                    ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                }
             }
-        }
 
-        // Tab: toggle gizmo edit mode (Transform <-> Geometry)
-        if (igIsKeyPressed_Bool(ImGuiKey_Tab, false)) {
-            gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
-                ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
-            gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
-        }
-
-        // C: open context-aware constraint authoring menu at cursor
-        if (igIsKeyPressed_Bool(ImGuiKey_C, false)) {
-            ecs_entity_t sketch = 0;
-            constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
-            uint32_t participant_count = 0;
-            constraint_selection_signature_t signature;
-
-            if (mdcad_collect_constraint_context(
-                    &state.ecs_scene, &state.selection,
-                    &sketch, participants, &participant_count, &signature)) {
-                state.constraint_menu_sketch = sketch;
-                state.constraint_menu_participant_count = participant_count;
-                memcpy(state.constraint_menu_participants, participants, sizeof(participants));
-                state.constraint_menu_signature = signature;
-                state.constraint_menu_anchor = io->MousePos;
-                state.constraint_menu_open_request = true;
-                state.constraint_menu_open = false;
+            // Tab: toggle gizmo edit mode (Transform <-> Geometry)
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Tab)) {
+                gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
+                    ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
+                gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
             }
-        }
 
-        // Delete: Delete or Backspace (macOS) deletes selected entities
-        if (igIsKeyPressed_Bool(ImGuiKey_Delete, false) ||
-            igIsKeyPressed_Bool(ImGuiKey_Backspace, false)) {
-            // Copy selection to temp array since we'll be modifying it
-            int count = state.selection.count;
-            if (count > 0) {
-                ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
-                selection_copy_entities(&state.selection, to_delete, count);
-                ui_scene_hierarchy_delete_entities(&state.scene_hierarchy, to_delete, count);
-                free(to_delete);
+            // C: open context-aware constraint authoring menu at cursor
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_C)) {
+                ecs_entity_t sketch = 0;
+                constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+                uint32_t participant_count = 0;
+                constraint_selection_signature_t signature;
+
+                if (mdcad_collect_constraint_context(
+                        &state.ecs_scene, &state.selection,
+                        &sketch, participants, &participant_count, &signature)) {
+                    state.constraint_menu_sketch = sketch;
+                    state.constraint_menu_participant_count = participant_count;
+                    memcpy(state.constraint_menu_participants, participants, sizeof(participants));
+                    state.constraint_menu_signature = signature;
+                    state.constraint_menu_anchor = io->MousePos;
+                    state.constraint_menu_open_request = true;
+                    state.constraint_menu_open = false;
+                }
+            }
+
+            // Delete: Delete or Backspace (macOS) deletes selected entities
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_Delete) ||
+                mdcad_embedded_shortcut_pressed(ImGuiKey_Backspace)) {
+                int count = state.selection.count;
+                if (count > 0) {
+                    ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
+                    selection_copy_entities(&state.selection, to_delete, count);
+                    ui_scene_hierarchy_delete_entities(&state.scene_hierarchy, to_delete, count);
+                    free(to_delete);
+                }
+            }
+        } else {
+            bool shortcut_mod = io->KeyCtrl || io->KeySuper;
+
+            // Undo: Ctrl/Cmd+Z
+            if (shortcut_mod && !io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) {
+                if (undo_redo_undo(&state.undo_redo)) {
+                    ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                }
+            }
+
+            // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+            if ((shortcut_mod && io->KeyShift && igIsKeyPressed_Bool(ImGuiKey_Z, false)) ||
+                (shortcut_mod && igIsKeyPressed_Bool(ImGuiKey_Y, false))) {
+                if (undo_redo_redo(&state.undo_redo)) {
+                    ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+                }
+            }
+
+            // Tab: toggle gizmo edit mode (Transform <-> Geometry)
+            if (igIsKeyPressed_Bool(ImGuiKey_Tab, false)) {
+                gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
+                    ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
+                gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
+            }
+
+            // C: open context-aware constraint authoring menu at cursor
+            if (igIsKeyPressed_Bool(ImGuiKey_C, false)) {
+                ecs_entity_t sketch = 0;
+                constraint_participant_descriptor_t participants[CONSTRAINT_MAX_PARTICIPANTS] = {0};
+                uint32_t participant_count = 0;
+                constraint_selection_signature_t signature;
+
+                if (mdcad_collect_constraint_context(
+                        &state.ecs_scene, &state.selection,
+                        &sketch, participants, &participant_count, &signature)) {
+                    state.constraint_menu_sketch = sketch;
+                    state.constraint_menu_participant_count = participant_count;
+                    memcpy(state.constraint_menu_participants, participants, sizeof(participants));
+                    state.constraint_menu_signature = signature;
+                    state.constraint_menu_anchor = io->MousePos;
+                    state.constraint_menu_open_request = true;
+                    state.constraint_menu_open = false;
+                }
+            }
+
+            // Delete: Delete or Backspace (macOS) deletes selected entities
+            if (igIsKeyPressed_Bool(ImGuiKey_Delete, false) ||
+                igIsKeyPressed_Bool(ImGuiKey_Backspace, false)) {
+                // Copy selection to temp array since we'll be modifying it
+                int count = state.selection.count;
+                if (count > 0) {
+                    ecs_entity_t *to_delete = (ecs_entity_t*)malloc(count * sizeof(ecs_entity_t));
+                    selection_copy_entities(&state.selection, to_delete, count);
+                    ui_scene_hierarchy_delete_entities(&state.scene_hierarchy, to_delete, count);
+                    free(to_delete);
+                }
             }
         }
     }
