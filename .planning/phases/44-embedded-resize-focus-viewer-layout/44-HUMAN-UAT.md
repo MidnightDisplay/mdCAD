@@ -44,12 +44,15 @@ blocked: 0
   reason: "User reported: no keyboard ownership after click, no text entry fields can be typed in, ctrl+c ctrl+v does not work, ctrl+z for undo does not work, basically everything I tried. Only mouse events get captured by embedded mdCAD"
   severity: major
   test: 1
-  root_cause: "The Avalonia host never transfers Win32 keyboard focus into the attached mdCAD child HWND after the first click. `samples/avalonia-host/MainWindow.axaml.cs` launches and resizes the child window, but there is no `SetFocus(...)` or equivalent first-click activation path, so mouse input reaches mdCAD while keyboard remains on the Avalonia host."
+  root_cause: "The current embedded click path never causes the mdCAD child HWND to become the Win32 focus window. Mouse input reaches mdCAD, but the child does not claim keyboard focus from its own native message path on the first deliberate click, and the host has no separate chrome-focus return helper. The fix belongs in mdCAD's embedded Win32 seam, not in host-side keyboard proxying."
   artifacts:
     - path: "samples/avalonia-host/MainWindow.axaml.cs"
-      issue: "Attach and resize lifecycle code exists, but no child-HWND focus handoff is performed after a deliberate click."
+      issue: "Attach and resize lifecycle code exists, but the host cannot solve child keyboard ownership on its own."
+    - path: "vendors/libsokol/patches/0001-win32-embed-child-window-bootstrap.patch"
+      issue: "The embedded Win32 child-window patch creates and manages the child HWND, but it does not yet make the child claim focus from its own first-click native path."
   missing:
-    - "Add a deliberate-click keyboard focus handoff to the attached mdCAD child HWND without auto-focusing on attach."
+    - "Add an embedded-only first-click focus acquisition path inside mdCAD's native Win32 child-window seam without auto-focusing on attach."
+    - "If needed, add a host-chrome focus-return helper on the Avalonia side so clicking away from mdCAD reliably returns focus to the host."
     - "Re-test text entry, clipboard shortcuts, and undo after focus is explicitly transferred to the embedded child."
   debug_session: ""
 

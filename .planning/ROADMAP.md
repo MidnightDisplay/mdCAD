@@ -40,9 +40,9 @@ Plans:
 
 **Goal**: Users can interact with the embedded viewer correctly inside the host lifecycle.  
 **Depends on**: Phase 43  
-**Plans**: 6/8 plans complete  
+**Plans**: 7/8 plans complete  
 **Requirements**: EMBD-04, INPT-01, INPT-02, INPT-03, INPT-04
-**Status**: Gap closure in progress (2 human UAT gaps diagnosed 2026-05-14)
+**Status**: Gap closure in progress (1 execution plan remaining; manual UAT rerun pending)
 
 **Success Criteria:**
 1. Resizing the host control resizes the embedded mdCAD render surface without clipped, stale, or incorrect viewport behavior.
@@ -62,7 +62,7 @@ Plans:
 - [x] 44-04-PLAN.md — Separate embedded layout persistence and seed the approved viewer-first dock recipe.
 - [x] 44-05-PLAN.md — Unblock reducer-owned embedded keyboard shortcuts after first-click ownership.
 - [x] 44-06-PLAN.md — Prefer graceful embedded self-exit and bind Scenario 7 to the runtime embedded ini path.
-- [ ] 44-07-PLAN.md — Transfer deliberate-click keyboard focus from the Avalonia host into the attached mdCAD child HWND.
+- [x] 44-07-PLAN.md — Acquire deliberate-click keyboard focus through mdCAD's native child-window activation path and add host chrome focus return.
 - [ ] 44-08-PLAN.md — Invalidate the placeholder on normal host close before waiting so embedded layout flushes before fallback cleanup.
 
 ### Phase 45: Startup JSONL Auto-Import

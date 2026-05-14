@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Embeddable Windows JSONL Viewer
-status: ready_for_next_phase
-stopped_at: Completed Phase 44 execution
-last_updated: "2026-05-14T18:50:45.3434084+01:00"
-last_activity: 2026-05-14 -- Completed Phase 44 embedded lifecycle and layout execution
+milestone_name: milestone
+status: executing
+stopped_at: Completed 44-07-PLAN.md
+last_updated: "2026-05-14T21:33:37.339Z"
+last_activity: 2026-05-14
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 1
+  total_plans: 11
+  completed_plans: 10
   percent: 100
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 45 — Startup JSONL Auto-Import (ready to plan)
+**Current focus:** Phase 44 — embedded-resize-focus-viewer-layout
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 44 (Embedded Resize, Focus & Viewer Layout) — COMPLETE
-Plan: 4 of 4 complete
-Status: Ready for Phase 45 planning after Phase 44 manual verification
-Last activity: 2026-05-14 -- Completed Phase 44 embedded lifecycle and layout execution
+Phase: 44 (embedded-resize-focus-viewer-layout) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-05-14
 
 Progress: [██████████] 100%
 
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - [Phase 44]: Front-load pure embedded input/layout reducers and a manual checklist before the runtime focus/layout changes land.
 - [Phase 44]: Embedded mode now persists a dedicated `imgui.embedded.ini` store and seeds a one-time DockBuilder viewer layout on first run.
 - [Phase 44]: The Avalonia host now distinguishes the mdCAD-side destroyed-parent quit path from the host-side `destroy-after-attach` fallback cleanup.
+- [Phase 44]: Embedded keyboard ownership is now claimed from mdCAD's own Win32 child-window message path instead of from the Avalonia host. — Host-side SetFocus into the external child HWND is unreliable; the child now claims focus from its own first-click native path.
+- [Phase 44]: Host chrome regains focus through Avalonia focus APIs only; the host never calls SetFocus or SetActiveWindow on the external mdCAD child HWND. — Separating host focus return from child focus acquisition preserves the CLI host boundary and avoids cross-process focus forcing.
 
 ### Roadmap Evolution
 
@@ -91,6 +93,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T18:50:45.3434084+01:00
-Stopped at: Completed Phase 44 execution
-Resume file: .planning/ROADMAP.md
+Last session: 2026-05-14T21:33:37.336Z
+Stopped at: Completed 44-07-PLAN.md
+Resume file: None
