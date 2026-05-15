@@ -14,6 +14,7 @@
 typedef struct {
     bool embedded;
     uintptr_t parent_hwnd_value;
+    bool startup_jsonl_live_refresh;
     char startup_jsonl_path[MDCAD_STARTUP_JSONL_PATH_MAX];
 } mdcad_launch_config_t;
 
@@ -87,6 +88,7 @@ static inline bool mdcad_launch_config_parse(int argc,
     bool embedded_seen = false;
     bool parent_seen = false;
     bool jsonl_seen = false;
+    bool jsonl_live_refresh_seen = false;
 
     if (error_buffer && (error_buffer_size > 0)) {
         error_buffer[0] = '\0';
@@ -140,6 +142,15 @@ static inline bool mdcad_launch_config_parse(int argc,
             }
             jsonl_seen = true;
             ++i;
+            continue;
+        }
+
+        if (strcmp(arg, "--jsonl-live-refresh") == 0) {
+            if (jsonl_live_refresh_seen) {
+                return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "Duplicate --jsonl-live-refresh flag");
+            }
+            cfg.startup_jsonl_live_refresh = true;
+            jsonl_live_refresh_seen = true;
         }
     }
 
@@ -148,6 +159,9 @@ static inline bool mdcad_launch_config_parse(int argc,
     }
     if (!cfg.embedded && parent_seen) {
         return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "--parent-hwnd requires --embedded");
+    }
+    if (cfg.startup_jsonl_live_refresh && !jsonl_seen) {
+        return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "--jsonl-live-refresh requires --jsonl");
     }
 
     *out_cfg = cfg;

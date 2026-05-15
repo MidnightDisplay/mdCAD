@@ -1871,7 +1871,8 @@ static void init(void) {
     startup_jsonl_import_controller_init(&state.startup_jsonl_import_controller);
     if (state.launch.startup_jsonl_path[0] != '\0') {
         (void)startup_jsonl_import_controller_arm(&state.startup_jsonl_import_controller,
-                                                  state.launch.startup_jsonl_path);
+                                                  state.launch.startup_jsonl_path,
+                                                  state.launch.startup_jsonl_live_refresh);
     }
     ui_entity_inspector_set_sketch_geometry_mutation_callback(
         &state.entity_inspector,

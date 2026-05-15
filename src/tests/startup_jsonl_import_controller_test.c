@@ -63,11 +63,12 @@ static int test_startup_jsonl_controller_uses_flat_import_defaults(void) {
     startup_jsonl_import_controller_init(&controller);
     int failed = 0;
 
-    if (!startup_jsonl_import_controller_arm(&controller, absolute_fixture)) failed = 1;
+    if (!startup_jsonl_import_controller_arm(&controller, absolute_fixture, false)) failed = 1;
     if (!failed) {
         bool scene_dirty = startup_jsonl_import_controller_tick(&controller, &scene);
         if (!scene_dirty) failed = 1;
         if (controller.state != STARTUP_JSONL_IMPORT_COMPLETE) failed = 1;
+        if (controller.live_refresh_enabled) failed = 1;
         if (controller.job.scale != 1.0f) failed = 1;
         if (!controller.job.use_jsonl_colours) failed = 1;
         if (controller.job.default_colour.x != 1.0f || controller.job.default_colour.y != 1.0f ||
@@ -77,6 +78,42 @@ static int test_startup_jsonl_controller_uses_flat_import_defaults(void) {
         if (controller.job.mesh_import_mode != 0) failed = 1;
         if (!controller.job.observer_contract.captured) failed = 1;
         if (controller.job.observer_contract.link_enabled) failed = 1;
+        if (strcmp(controller.job.observer_contract.source_path, absolute_fixture) != 0) failed = 1;
+    }
+
+    startup_jsonl_import_controller_reset(&controller, &scene);
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(relative_fixture);
+    return failed;
+}
+
+static int test_startup_jsonl_controller_enables_observer_link_when_requested(void) {
+    const char *relative_fixture = "startup_jsonl_controller_live_refresh.jsonl";
+    char absolute_fixture[MDCAD_STARTUP_JSONL_PATH_MAX] = {0};
+    if (!write_jsonl_fixture_lines(relative_fixture, 1)) return 1;
+    if (!make_absolute_path(relative_fixture, absolute_fixture, sizeof(absolute_fixture))) {
+        remove(relative_fixture);
+        return 1;
+    }
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    startup_jsonl_import_controller_t controller;
+    startup_jsonl_import_controller_init(&controller);
+    int failed = 0;
+
+    if (!startup_jsonl_import_controller_arm(&controller, absolute_fixture, true)) failed = 1;
+    if (!failed) {
+        bool scene_dirty = startup_jsonl_import_controller_tick(&controller, &scene);
+        if (!scene_dirty) failed = 1;
+        if (controller.state != STARTUP_JSONL_IMPORT_COMPLETE) failed = 1;
+        if (!controller.live_refresh_enabled) failed = 1;
+        if (!controller.job.observer_contract.captured) failed = 1;
+        if (!controller.job.observer_contract.link_enabled) failed = 1;
         if (strcmp(controller.job.observer_contract.source_path, absolute_fixture) != 0) failed = 1;
     }
 
@@ -103,7 +140,7 @@ static int test_startup_jsonl_controller_latches_runtime_error_for_missing_file(
     startup_jsonl_import_controller_init(&controller);
 
     int failed = 0;
-    if (!startup_jsonl_import_controller_arm(&controller, absolute_missing)) failed = 1;
+    if (!startup_jsonl_import_controller_arm(&controller, absolute_missing, false)) failed = 1;
     if (!failed) {
         bool scene_dirty = startup_jsonl_import_controller_tick(&controller, &scene);
         if (scene_dirty) failed = 1;
@@ -133,7 +170,7 @@ static int test_startup_jsonl_controller_reset_clears_latched_error(void) {
     startup_jsonl_import_controller_init(&controller);
 
     int failed = 0;
-    if (!startup_jsonl_import_controller_arm(&controller, absolute_missing)) failed = 1;
+    if (!startup_jsonl_import_controller_arm(&controller, absolute_missing, false)) failed = 1;
     if (!failed) {
         (void)startup_jsonl_import_controller_tick(&controller, &scene);
         startup_jsonl_import_controller_reset(&controller, &scene);
@@ -157,6 +194,7 @@ typedef struct {
 int main(void) {
     static const test_case_t tests[] = {
         { "test_startup_jsonl_controller_uses_flat_import_defaults", test_startup_jsonl_controller_uses_flat_import_defaults },
+        { "test_startup_jsonl_controller_enables_observer_link_when_requested", test_startup_jsonl_controller_enables_observer_link_when_requested },
         { "test_startup_jsonl_controller_latches_runtime_error_for_missing_file", test_startup_jsonl_controller_latches_runtime_error_for_missing_file },
         { "test_startup_jsonl_controller_reset_clears_latched_error", test_startup_jsonl_controller_reset_clears_latched_error },
     };

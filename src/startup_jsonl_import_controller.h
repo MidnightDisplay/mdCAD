@@ -20,6 +20,7 @@ typedef enum {
 typedef struct {
     startup_jsonl_import_state_t state;
     jsonl_import_job_t job;
+    bool live_refresh_enabled;
     char requested_path[MDCAD_STARTUP_JSONL_PATH_MAX];
     char status_text[128];
     char error_text[128];
@@ -36,10 +37,12 @@ static inline void startup_jsonl_import_controller_init(startup_jsonl_import_con
 }
 
 static inline bool startup_jsonl_import_controller_arm(startup_jsonl_import_controller_t *controller,
-                                                       const char *path) {
+                                                       const char *path,
+                                                       bool live_refresh_enabled) {
     if (!controller || !path || path[0] == '\0') {
         return false;
     }
+    controller->live_refresh_enabled = live_refresh_enabled;
     snprintf(controller->requested_path, sizeof(controller->requested_path), "%s", path);
     controller->state = STARTUP_JSONL_IMPORT_ARMED;
     snprintf(controller->status_text, sizeof(controller->status_text), "Pending startup import");
@@ -75,7 +78,9 @@ static inline bool startup_jsonl_import_controller_tick(startup_jsonl_import_con
             return false;
         }
         jsonl_import_job_set_mesh_mode(&controller->job, 0);
-        jsonl_import_job_set_observer_contract(&controller->job, false, controller->requested_path);
+        jsonl_import_job_set_observer_contract(&controller->job,
+                                               controller->live_refresh_enabled,
+                                               controller->requested_path);
         controller->state = STARTUP_JSONL_IMPORT_RUNNING;
         snprintf(controller->status_text, sizeof(controller->status_text), "%s", controller->job.status_message);
         if (jsonl_import_job_should_sync(&controller->job)) {
@@ -122,6 +127,7 @@ static inline void startup_jsonl_import_controller_reset(startup_jsonl_import_co
         jsonl_import_job_reset(&controller->job);
     }
     controller->state = STARTUP_JSONL_IMPORT_IDLE;
+    controller->live_refresh_enabled = false;
     controller->requested_path[0] = '\0';
     controller->status_text[0] = '\0';
     controller->error_text[0] = '\0';
