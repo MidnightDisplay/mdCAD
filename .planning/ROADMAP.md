@@ -72,7 +72,7 @@ Plans:
 
 **Goal**: Developer can launch directly into a large flat JSONL view without breaking the embedded session.  
 **Depends on**: Phase 44  
-**Plans**: 0 plans  
+**Plans**: 2 plans  
 **Requirements**: JSON-01, JSON-03
 
 **Success Criteria:**
@@ -82,6 +82,10 @@ Plans:
 **Details:**
 - Reuse the existing large flat JSONL import job rather than creating a separate embedded importer.
 - Add a non-UI startup import controller so embedded launch does not depend on Scene Hierarchy UI state.
+
+Plans:
+- [ ] 45-01-PLAN.md — Lock the absolute `--jsonl` launch contract and create the non-UI startup import controller.
+- [ ] 45-02-PLAN.md — Wire the startup controller into `app.c` and add an embedded-safe startup status/error overlay.
 
 ### Phase 46: Launch-Time Live Refresh
 
