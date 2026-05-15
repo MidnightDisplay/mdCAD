@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 status: active
-stopped_at: Completed Phase 46; ready for Phase 47 planning
-last_updated: "2026-05-15T11:06:35.8699974+01:00"
+stopped_at: Phase 47 planned; ready for execution
+last_updated: "2026-05-15T11:39:58.2355004+01:00"
 last_activity: 2026-05-15
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 18
+  total_plans: 20
   completed_plans: 18
-  percent: 100
+  percent: 90
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 47 (sample-host-workflow-proof) — READY FOR PLANNING
-Plan: 0 planned
-Status: Phase 46 completed with full `build-vulkan` validation green; next step is to plan Phase 47
+Phase: 47 (sample-host-workflow-proof) — PLANNED
+Plan: 2 planned
+Status: Phase 47 plans are written; next step is to execute 47-01 then 47-02 on the MSVC Vulkan `build-vulkan` path
 Last activity: 2026-05-15
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Milestone Scope
 
@@ -87,8 +87,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan Phase 47 to turn the Avalonia sample into the end-to-end proof harness for bundled JSONL launch and host-visible status.
-- Keep the current `build-vulkan` loop on this machine pointed at the working MinGW Vulkan generator unless the Visual Studio C/C++ toolchain is restored.
+- Execute Phase 47 to turn the Avalonia sample into the end-to-end proof harness for bundled JSONL launch, host-visible status, and repeated lifecycle validation.
+- Keep Phase 47 validation on the working MSVC Vulkan `build-vulkan` path and avoid reintroducing the temporary MinGW fallback from Phase 46.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
@@ -105,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-15T11:06:35.8699974+01:00
-Stopped at: Completed Phase 46; ready for Phase 47 planning
+Last session: 2026-05-15T11:39:58.2355004+01:00
+Stopped at: Phase 47 planned; ready for execution
 Resume file: None

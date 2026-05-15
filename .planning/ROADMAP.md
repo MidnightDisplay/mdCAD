@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-47
-**Total Plans:** 18
+**Total Plans:** 20
 
 ## Overview
 
@@ -116,8 +116,9 @@ Plans:
 
 **Goal**: Developer can use the sample host as the end-to-end proof harness for embedded launch workflows.  
 **Depends on**: Phase 46  
-**Plans**: 0 plans  
+**Plans**: 2 plans  
 **Requirements**: HOST-02, HOST-03, HOST-04
+**Status**: Planned (ready for execution)
 
 **Success Criteria:**
 1. The sample host resolves a bundled example JSONL from `resources/examples`, converts it to an absolute path, and launches mdCAD with it.
@@ -127,6 +128,10 @@ Plans:
 **Details:**
 - Keep the Avalonia host minimal and workflow-focused.
 - Use the sample as the conformance harness for lifecycle and failure-path validation, not as a productized shell.
+
+Plans:
+- [ ] 47-01-PLAN.md — Add the bundled example resource and wire the absolute `--jsonl` launch contract into the host.
+- [ ] 47-02-PLAN.md — Add repeatable session controls/status plus the Phase 47 manual lifecycle proof checklist.
 
 ---
 
