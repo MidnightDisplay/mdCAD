@@ -343,6 +343,106 @@ static int test_flat_linked_import_stamps_baseline_and_stays_idle(void) {
     return failed;
 }
 
+static int test_flat_startup_import_without_live_refresh_stays_idle_on_change(void) {
+    const char *fixture = "jsonl_flat_startup_unlinked_idle.jsonl";
+    const char *first_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}}]}"
+    };
+    const char *second_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}}]}"
+    };
+
+    if (!write_jsonl_fixture_lines(fixture, first_lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, false, &job)) {
+        fprintf(stderr, "  fail: initial startup-style import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    int initial_geometry_count = 0;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer metadata on startup import root\n");
+            failed = 1;
+        }
+    }
+    if (!failed) {
+        initial_geometry_count = count_geometry_under_root(&scene, root);
+        if (initial_geometry_count != 1) {
+            fprintf(stderr, "  fail: expected 1 geometry after startup import, got %d\n", initial_geometry_count);
+            failed = 1;
+        }
+    }
+    if (!failed && observer->linked) {
+        fprintf(stderr, "  fail: startup import without live refresh should not link observer\n");
+        failed = 1;
+    }
+    if (!failed && observer->source_state_valid) {
+        fprintf(stderr, "  fail: startup import without live refresh should not stamp a baseline\n");
+        failed = 1;
+    }
+    if (!failed && observer_contains_message(observer, "baseline armed")) {
+        fprintf(stderr, "  fail: startup import without live refresh should not report a baseline\n");
+        failed = 1;
+    }
+    if (!failed && count_active_refresh_slots(&scene) != 0) {
+        fprintf(stderr, "  fail: startup import without live refresh should not start refresh slots\n");
+        failed = 1;
+    }
+
+    if (!failed && !write_jsonl_fixture_lines(fixture, second_lines, 1)) {
+        fprintf(stderr, "  fail: changed source fixture write failed\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        uint64_t base_ms = scene_solver_now_ms();
+        for (int i = 0; i < 4; i++) {
+            uint64_t tick_ms = base_ms + (uint64_t)(i * 1100u);
+            jsonl_observer_system_tick(&scene, tick_ms, NULL);
+            if (jsonl_observer_is_flat_refresh_running(&scene, root)) {
+                fprintf(stderr, "  fail: unlinked startup root started refresh on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+            if (count_active_refresh_slots(&scene) != 0) {
+                fprintf(stderr, "  fail: active refresh slot count drifted on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+            if (count_geometry_under_root(&scene, root) != initial_geometry_count) {
+                fprintf(stderr, "  fail: geometry count changed on tick %d\n", i);
+                failed = 1;
+                break;
+            }
+        }
+    }
+
+    if (!failed && observer->retry_count != 0u) {
+        fprintf(stderr, "  fail: default-off startup import should not spend retry budget\n");
+        failed = 1;
+    }
+    if (!failed && observer->source_state_valid) {
+        fprintf(stderr, "  fail: default-off startup import should stay without a baseline after source edits\n");
+        failed = 1;
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_observe_missing_path_warns_without_retry_budget(void) {
     const char *fixture = "jsonl_flat_observer_auto_missing_path.jsonl";
     const char *lines[] = {
@@ -735,6 +835,151 @@ static int test_flat_observe_auto_refresh_settles_to_exact_live_footprint(void) 
     return failed;
 }
 
+static int test_flat_startup_linked_import_reuses_auto_refresh_pipeline(void) {
+    const char *fixture = "jsonl_flat_startup_linked_pipeline.jsonl";
+    if (!write_jsonl_point_fixture(fixture, 8)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, &job)) {
+        fprintf(stderr, "  fail: startup-linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (!observer) {
+            fprintf(stderr, "  fail: missing observer on startup-linked root\n");
+            failed = 1;
+        }
+    }
+    if (!failed && !observer->linked) {
+        fprintf(stderr, "  fail: startup-linked import should keep observer linked\n");
+        failed = 1;
+    }
+    if (!failed && !observer->observe_enabled) {
+        fprintf(stderr, "  fail: startup-linked import should keep observe enabled\n");
+        failed = 1;
+    }
+    if (!failed && !observer->source_state_valid) {
+        fprintf(stderr, "  fail: startup-linked import should stamp an initial baseline\n");
+        failed = 1;
+    }
+    if (!failed && !observer_contains_message(observer, "baseline armed")) {
+        fprintf(stderr, "  fail: startup-linked import missing baseline message\n");
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 8) {
+        fprintf(stderr, "  fail: expected 8 geometry after startup-linked import\n");
+        failed = 1;
+    }
+    if (!failed && count_active_refresh_slots(&scene) != 0) {
+        fprintf(stderr, "  fail: startup-linked import should start idle\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        observer->interval_ms = 1u;
+        observer->max_retries = 2u;
+        observer->retry_count = 0u;
+        observer->next_retry_at_ms = 0u;
+    }
+
+    uint64_t now_ms = 0u;
+    if (!failed) {
+        now_ms = scene_solver_now_ms();
+        jsonl_observer_system_tick(&scene, now_ms, NULL);
+        if (jsonl_observer_is_flat_refresh_running(&scene, root)) {
+            fprintf(stderr, "  fail: unchanged startup-linked root started refresh before file mutation\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_point_fixture(fixture, 16)) {
+        fprintf(stderr, "  fail: write 16-point fixture failed\n");
+        failed = 1;
+    }
+    if (!failed) {
+        jsonl_observer_system_tick(&scene, now_ms + 1u, NULL);
+        if (!jsonl_observer_is_flat_refresh_running(&scene, root)) {
+            fprintf(stderr, "  fail: changed startup-linked source did not start refresh\n");
+            failed = 1;
+        }
+        if (count_active_refresh_slots(&scene) != 1) {
+            fprintf(stderr, "  fail: expected exactly 1 active refresh slot after startup-linked change\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_point_fixture(fixture, 24)) {
+        fprintf(stderr, "  fail: write 24-point fixture failed\n");
+        failed = 1;
+    }
+    if (!failed) {
+        jsonl_observer_system_tick(&scene, now_ms + 2u, NULL);
+        jsonl_flat_refresh_slot_t *slot = jsonl_observer_find_flat_refresh_slot(&scene, root);
+        if (!slot || !slot->pending_rerun) {
+            fprintf(stderr, "  fail: startup-linked burst change did not queue a pending rerun\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !tick_refresh_until_idle(&scene, root, 40000)) {
+        fprintf(stderr, "  fail: startup-linked refresh did not drain to idle\n");
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 24) {
+        fprintf(stderr, "  fail: startup-linked refresh did not commit the coalesced live footprint\n");
+        failed = 1;
+    }
+    if (!failed && count_active_refresh_slots(&scene) != 0) {
+        fprintf(stderr, "  fail: startup-linked refresh left active slots behind\n");
+        failed = 1;
+    }
+    if (!failed && observer->retry_count != 0u) {
+        fprintf(stderr, "  fail: successful startup-linked refresh should reset retry budget\n");
+        failed = 1;
+    }
+    if (!failed && !observer->observe_enabled) {
+        fprintf(stderr, "  fail: startup-linked refresh should keep observe enabled after success\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        remove(fixture);
+        jsonl_observer_system_tick(&scene, now_ms + 3u, NULL);
+        jsonl_observer_system_tick(&scene, now_ms + 4u, NULL);
+        if (observer->retry_count != 2u) {
+            fprintf(stderr, "  fail: startup-linked retry budget expected 2 got %u\n", observer->retry_count);
+            failed = 1;
+        }
+        if (observer->observe_enabled) {
+            fprintf(stderr, "  fail: startup-linked observer should auto-disable after retries exhaust\n");
+            failed = 1;
+        }
+        if (!observer_contains_message(observer, "Observe auto-disabled after max retries.")) {
+            fprintf(stderr, "  fail: startup-linked observer missing auto-disable message\n");
+            failed = 1;
+        }
+        if (count_geometry_under_root(&scene, root) != 24) {
+            fprintf(stderr, "  fail: startup-linked auto-disable should preserve last-good geometry\n");
+            failed = 1;
+        }
+    }
+
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
 static int test_flat_observe_tiered_fixtures_stay_operational(void) {
     static const int tiers[] = { 24, 240, 1200 };
     int failed = 0;
@@ -853,6 +1098,8 @@ int main(void) {
     static const test_case_t tests[] = {
         { "test_flat_linked_import_stamps_baseline_and_stays_idle",
           test_flat_linked_import_stamps_baseline_and_stays_idle },
+        { "test_flat_startup_import_without_live_refresh_stays_idle_on_change",
+          test_flat_startup_import_without_live_refresh_stays_idle_on_change },
         { "test_flat_observe_missing_path_warns_without_retry_budget",
           test_flat_observe_missing_path_warns_without_retry_budget },
         { "test_flat_observe_auto_disables_after_retries_exhausted",
@@ -861,6 +1108,8 @@ int main(void) {
           test_flat_observe_changed_source_runs_one_refresh_and_stamps_state },
         { "test_flat_observe_burst_coalesces_one_pending_rerun",
           test_flat_observe_burst_coalesces_one_pending_rerun },
+        { "test_flat_startup_linked_import_reuses_auto_refresh_pipeline",
+          test_flat_startup_linked_import_reuses_auto_refresh_pipeline },
         { "test_flat_observe_tiered_fixtures_stay_operational",
           test_flat_observe_tiered_fixtures_stay_operational },
         { "test_flat_observe_auto_refresh_settles_to_exact_live_footprint",

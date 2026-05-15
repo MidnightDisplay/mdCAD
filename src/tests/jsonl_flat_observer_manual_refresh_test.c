@@ -288,6 +288,16 @@ static bool tick_refresh_until_idle(ecs_scene_t *scene, ecs_entity_t root_entity
     return !jsonl_observer_is_flat_refresh_running(scene, root_entity);
 }
 
+static int count_active_refresh_slots(ecs_scene_t *scene) {
+    if (!scene) return 0;
+    int count = 0;
+    jsonl_flat_refresh_slot_t *slots = jsonl_observer_flat_refresh_slots();
+    for (int i = 0; i < JSONL_OBSERVER_MAX_FLAT_REFRESHES; i++) {
+        if (slots[i].active && slots[i].world == scene->world) count++;
+    }
+    return count;
+}
+
 static bool tick_refresh_until_stage_work_started(ecs_scene_t *scene,
                                                   ecs_entity_t root_entity,
                                                   int max_ticks,
@@ -788,6 +798,171 @@ static int test_flat_manual_refresh_works_after_auto_disable(void) {
     if (!failed && count_geometry_under_root(&scene, root) != 2) failed = 1;
     if (!failed && observer->observe_enabled) failed = 1;
 
+    ecs_scene_shutdown(&scene);
+    ecs_world_shutdown(&world);
+    remove(fixture);
+    return failed;
+}
+
+static int test_flat_startup_linked_manual_refresh_matches_commit_and_recovery_semantics(void) {
+    const char *fixture = "jsonl_flat_startup_manual_refresh.jsonl";
+    const char *first_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}}]}"
+    };
+    const char *second_lines[] = {
+        "{\"Name\":\"Entry\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}}]}",
+        "{\"Name\":\"Entry2\",\"Elements\":[{\"Name\":\"L1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Line3D\",\"StartPoint\":{\"X\":0,\"Y\":0,\"Z\":0},\"EndPoint\":{\"X\":3,\"Y\":0,\"Z\":0}}}]}"
+    };
+    const char *recovery_lines[] = {
+        "{\"Name\":\"Recovery\",\"Elements\":[{\"Name\":\"P1\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":1,\"Y\":0,\"Z\":0}},{\"Name\":\"P2\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":2,\"Y\":0,\"Z\":0}},{\"Name\":\"P3\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":3,\"Y\":0,\"Z\":0}},{\"Name\":\"P4\",\"Description\":\"\",\"Colour\":\"White\",\"Element\":{\"$type\":\"Geo.Point3D\",\"X\":4,\"Y\":0,\"Z\":0}}]}"
+    };
+
+    if (!write_jsonl_fixture_lines(fixture, first_lines, 1)) return 1;
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    selection_buffer_t selection = {0};
+    ecs_world_init(&world);
+    ecs_scene_init(&scene, &world);
+    selection_init(&selection, &world);
+
+    int failed = 0;
+    jsonl_import_job_t job = {0};
+    if (!run_flat_import_to_completion(&scene, fixture, true, 1.0f, true, false, 0.0f, 0.0f, 0.0f, 0, &job)) {
+        fprintf(stderr, "  fail: startup-linked import failed\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = job.root_entity;
+    ecs_entity_t old_geometry = 0;
+    JsonlObserverComp *observer = NULL;
+    if (!failed) {
+        old_geometry = find_first_geometry_under_root(&scene, root);
+        observer = ecs_world_get_jsonl_observer(&world, root);
+        if (old_geometry == 0 || !observer) {
+            fprintf(stderr, "  fail: missing initial geometry or observer metadata\n");
+            failed = 1;
+        }
+    }
+    if (!failed && !observer->linked) {
+        fprintf(stderr, "  fail: startup-linked root should keep observer linked\n");
+        failed = 1;
+    }
+    if (!failed) {
+        selection_set_single(&selection, old_geometry);
+        if (selection_count(&selection) != 1 || selection_get(&selection, 0) != old_geometry) {
+            fprintf(stderr, "  fail: initial selection did not target imported geometry\n");
+            failed = 1;
+        }
+    }
+
+    if (!failed && !write_jsonl_fixture_lines(fixture, second_lines, 2)) {
+        fprintf(stderr, "  fail: write updated startup-linked source failed\n");
+        failed = 1;
+    }
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, &selection)) {
+        fprintf(stderr, "  fail: startup-linked manual refresh did not start\n");
+        failed = 1;
+    }
+    if (!failed && jsonl_observer_request_flat_refresh(&scene, root, &selection)) {
+        fprintf(stderr, "  fail: duplicate startup-linked manual refresh should stay rejected\n");
+        failed = 1;
+    }
+    if (!failed && !tick_refresh_until_idle(&scene, root, 10000)) {
+        fprintf(stderr, "  fail: startup-linked manual refresh did not settle\n");
+        failed = 1;
+    }
+
+    ecs_entity_t committed_geometry = 0;
+    if (!failed) {
+        committed_geometry = find_first_geometry_under_root(&scene, root);
+        if (committed_geometry == 0 || committed_geometry == old_geometry) {
+            fprintf(stderr, "  fail: startup-linked manual refresh did not replace the subtree\n");
+            failed = 1;
+        }
+    }
+    if (!failed && !ecs_is_alive(world.world, root)) {
+        fprintf(stderr, "  fail: startup-linked root died after successful refresh\n");
+        failed = 1;
+    }
+    if (!failed && ecs_is_alive(world.world, old_geometry)) {
+        fprintf(stderr, "  fail: old geometry should be replaced after startup-linked refresh\n");
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 3) {
+        fprintf(stderr, "  fail: startup-linked refresh expected 3 geometry after commit-on-success\n");
+        failed = 1;
+    }
+    if (!failed && (selection_count(&selection) != 1 || selection_get(&selection, 0) != root)) {
+        fprintf(stderr, "  fail: startup-linked refresh should fall selection back to the root\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        remove(fixture);
+        bool requested = jsonl_observer_request_flat_refresh(&scene, root, NULL);
+        if (requested && !tick_refresh_until_idle(&scene, root, 10000)) {
+            fprintf(stderr, "  fail: failed startup-linked refresh did not settle\n");
+            failed = 1;
+        }
+    }
+    if (!failed && !ecs_is_alive(world.world, committed_geometry)) {
+        fprintf(stderr, "  fail: last-good geometry should remain after failed startup-linked refresh\n");
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 3) {
+        fprintf(stderr, "  fail: failed startup-linked refresh should preserve last-good geometry count\n");
+        failed = 1;
+    }
+    if (!failed && count_active_refresh_slots(&scene) != 0) {
+        fprintf(stderr, "  fail: failed startup-linked refresh should not leave active slots behind\n");
+        failed = 1;
+    }
+
+    if (!failed) {
+        observer->observe_enabled = false;
+        observer->max_retries = 2u;
+        observer->retry_count = observer->max_retries;
+    }
+    if (!failed && !write_jsonl_fixture_lines(fixture, recovery_lines, 1)) {
+        fprintf(stderr, "  fail: write startup-linked recovery source failed\n");
+        failed = 1;
+    }
+    if (!failed && !jsonl_observer_request_flat_refresh(&scene, root, NULL)) {
+        fprintf(stderr, "  fail: startup-linked manual recovery did not start after auto-disable\n");
+        failed = 1;
+    }
+    if (!failed && !tick_refresh_until_idle(&scene, root, 10000)) {
+        fprintf(stderr, "  fail: startup-linked manual recovery did not settle\n");
+        failed = 1;
+    }
+
+    ecs_entity_t recovered_geometry = 0;
+    if (!failed) {
+        recovered_geometry = find_first_geometry_under_root(&scene, root);
+        if (recovered_geometry == 0 || recovered_geometry == committed_geometry) {
+            fprintf(stderr, "  fail: startup-linked manual recovery did not replace the committed subtree\n");
+            failed = 1;
+        }
+    }
+    if (!failed && ecs_is_alive(world.world, committed_geometry)) {
+        fprintf(stderr, "  fail: recovered startup-linked subtree should replace previous committed geometry\n");
+        failed = 1;
+    }
+    if (!failed && count_geometry_under_root(&scene, root) != 4) {
+        fprintf(stderr, "  fail: startup-linked manual recovery expected 4 geometry after commit\n");
+        failed = 1;
+    }
+    if (!failed && observer->observe_enabled) {
+        fprintf(stderr, "  fail: manual recovery should not re-enable observe automatically\n");
+        failed = 1;
+    }
+    if (!failed && (selection_count(&selection) != 1 || selection_get(&selection, 0) != root)) {
+        fprintf(stderr, "  fail: startup-linked manual recovery should keep selection on the root\n");
+        failed = 1;
+    }
+
+    selection_shutdown(&selection);
     ecs_scene_shutdown(&scene);
     ecs_world_shutdown(&world);
     remove(fixture);
@@ -1310,6 +1485,8 @@ int main(void) {
           test_flat_manual_refresh_failure_preserves_last_good_and_relinks_label },
         { "test_flat_manual_refresh_works_after_auto_disable",
           test_flat_manual_refresh_works_after_auto_disable },
+        { "test_flat_startup_linked_manual_refresh_matches_commit_and_recovery_semantics",
+          test_flat_startup_linked_manual_refresh_matches_commit_and_recovery_semantics },
         { "test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint",
           test_flat_manual_refresh_repeated_cycles_return_to_exact_live_footprint },
         { "test_flat_refresh_cleanup_anomaly_keeps_last_good_and_disables_observe",
