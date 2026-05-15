@@ -9,9 +9,12 @@
 #include <string.h>
 #include <errno.h>
 
+#define MDCAD_STARTUP_JSONL_PATH_MAX 512
+
 typedef struct {
     bool embedded;
     uintptr_t parent_hwnd_value;
+    char startup_jsonl_path[MDCAD_STARTUP_JSONL_PATH_MAX];
 } mdcad_launch_config_t;
 
 static inline bool mdcad_launch_config_set_error(char* error_buffer,

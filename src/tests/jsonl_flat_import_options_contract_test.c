@@ -1,4 +1,5 @@
 #include "../jsonl_import_job.h"
+#include "win32_embed_test_stub.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
