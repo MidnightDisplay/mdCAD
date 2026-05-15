@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: milestone
-status: completed
-stopped_at: Completed 49-01-PLAN.md
-last_updated: "2026-05-15T15:35:53.537Z"
-last_activity: "2026-05-15 -- Phase 49 complete"
+status: archived
+stopped_at: Completed v1.8 milestone archive
+last_updated: "2026-05-15T15:49:28.148Z"
+last_activity: "2026-05-15 -- Archived milestone v1.8"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.8 closeout
+**Current focus:** Next milestone definition
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 49
-Plan: Not started
-Status: Milestone v1.8 complete — ready for milestone closeout
-Last activity: 2026-05-15 -- Phase 49 complete
+Phase: None
+Plan: None
+Status: v1.8 archived — ready for `/gsd-new-milestone`
+Last activity: 2026-05-15 -- Archived milestone v1.8
 
 Progress: [██████████] 100%
 
@@ -96,13 +96,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Complete milestone v1.8 and archive the finished embedding/reusable-control planning artifacts.
+- Start the next milestone when ready via `/gsd-new-milestone`.
+- Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in the next milestone.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 49 is complete; milestone closeout is next.
+- v1.8 is archived; next work begins with a fresh milestone definition.
 
 ### Quick Tasks Completed
 

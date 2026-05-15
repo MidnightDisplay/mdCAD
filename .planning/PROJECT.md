@@ -143,12 +143,13 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 - Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
 - Milestone `v1.8` is complete: Phases 43-49 shipped the child-HWND embedding contract, embedded input/layout closure, launch-time JSONL import/live refresh, sample-host proof, reusable Avalonia control package/harness, and minimal sealed onboarding sample.
 - v1.8 now delivers both a diagnostic proof harness and the smallest sealed consumer sample/quickstart while staying process-launched, CLI-configured, and free of new IPC.
+- Archived v1.8 audit result is `gaps_found` and explicitly accepted at archival; remaining debt is Phase 44 human-proof reruns, missing Phase 45-49 verification artifacts, and the minimal-host onboarding portability/docs follow-up captured in `.planning/milestones/v1.8-MILESTONE-AUDIT.md`.
 ## Next Milestone Goals
 
-1. Add a Windows embedding contract so an external host can launch mdCAD into a child HWND with predictable lifecycle and resize behavior.
-2. Reuse the large flat JSONL import path for launch-time auto-open with optional live refresh opt-in from absolute file paths.
-3. Prove the integration end-to-end with a minimal Avalonia sample host and bundled example JSONL data.
-4. Preserve current native build reliability while keeping `Clear Scene` lifecycle parity and Nyquist backfill explicitly deferred unless the new work exposes them as blockers.
+1. Define the next milestone with a fresh set of scoped requirements and a new roadmap.
+2. Decide whether the accepted v1.8 audit gaps should become explicit follow-up validation/cleanup work or remain tracked tech debt.
+3. Re-evaluate richer host-integration extensions (IPC, multi-viewer support, broader onboarding) now that the reusable control and minimal sample are shipped.
+4. Preserve current native build reliability while keeping deferred `Clear Scene` lifecycle parity and Nyquist backfill visible.
 
 ## Constraints
 

@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.8 Embeddable Windows JSONL Viewer (Shipped: 2026-05-15)
+
+**Phases completed:** 7 phases, 25 plans, 48 tasks
+
+**Key accomplishments:**
+
+- Locked the strict Windows child-HWND embed contract and proved true child-window bootstrap from the Avalonia host.
+- Closed the embedded resize/focus/input/layout path far enough to ship the hosted viewer workflow and its Win32 lifecycle boundary.
+- Added launch-time JSONL auto-import and explicit live-refresh opt-in while reusing the existing linked observer semantics.
+- Turned the sample host into a diagnostic proof harness with bundled example resolution, host-owned status text, and repeatable lifecycle controls.
+- Shipped a reusable Avalonia mdCAD control with pinned `mdcad-runtime` packaging, auto-start/start-stop/relaunch behavior, and sealed vs diagnostic presentation modes.
+- Added a minimal sealed consumer sample and a control-local `QUICKSTART.md` so external onboarding has a smallest-possible copyable path.
+
+**Known gaps accepted at archival:**
+
+- Phase 44 still needs fresh human proof for destroyed-parent self-exit, first-click keyboard ownership, and embedded-layout persistence after the later fixes.
+- Phases 45-49 are missing `VERIFICATION.md` artifacts, so their requirement closure remains recorded as verification debt in the archive audit.
+- The minimal sealed host sample still uses a developer-specific JSONL path and the quickstart needs a clearer manifest/replace-me note pass.
+
+**Audit:** [v1.8-MILESTONE-AUDIT.md](milestones/v1.8-MILESTONE-AUDIT.md) — gaps_found (accepted)
+
+**Archives:**
+
+- [v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md)
+- [v1.8-REQUIREMENTS.md](milestones/v1.8-REQUIREMENTS.md)
+
+---
+
 ## v1.7 Linked Flat JSONL Large-File Refresh Stability (Shipped: 2026-05-05)
 
 **Phases completed:** 2 phases, 5 plans, 10 tasks
