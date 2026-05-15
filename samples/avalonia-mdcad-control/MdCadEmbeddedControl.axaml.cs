@@ -1,8 +1,11 @@
+using System;
 using System.Threading.Tasks;
 
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+
+using MdCad.Avalonia.Control.Host;
 
 namespace MdCad.Avalonia.Control;
 
@@ -23,8 +26,10 @@ public partial class MdCadEmbeddedControl : UserControl
             defaultValue: MdCadPresentationMode.Sealed);
 
     private readonly ContentControl _embedSurfaceContainer;
+    private readonly EmbedNativeControlHost _embedSurfaceHost;
     private readonly Border _warningSurface;
     private readonly TextBlock _warningTextBlock;
+    private IntPtr _placeholderHandle;
 
     public MdCadEmbeddedControl()
     {
@@ -36,6 +41,9 @@ public partial class MdCadEmbeddedControl : UserControl
             ?? throw new InvalidOperationException("Missing WarningSurface.");
         _warningTextBlock = this.FindControl<TextBlock>("WarningTextBlock")
             ?? throw new InvalidOperationException("Missing WarningTextBlock.");
+        _embedSurfaceHost = new EmbedNativeControlHost();
+        _embedSurfaceHost.PlaceholderHandleReady += OnPlaceholderHandleReady;
+        _embedSurfaceContainer.Content = _embedSurfaceHost;
 
         UpdateWarningSurface(null);
     }
@@ -74,6 +82,10 @@ public partial class MdCadEmbeddedControl : UserControl
         return Task.CompletedTask;
     }
 
+    internal IntPtr PlaceholderHandle => _placeholderHandle;
+
+    internal EmbedNativeControlHost EmbedSurfaceHost => _embedSurfaceHost;
+
     internal void SetLaunchWarning(string? warningText)
     {
         UpdateWarningSurface(warningText);
@@ -82,6 +94,11 @@ public partial class MdCadEmbeddedControl : UserControl
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);
+    }
+
+    private void OnPlaceholderHandleReady(IntPtr hwnd)
+    {
+        _placeholderHandle = hwnd;
     }
 
     private void UpdateWarningSurface(string? warningText)
