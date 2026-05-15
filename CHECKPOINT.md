@@ -209,6 +209,36 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-05-15)
 
+### Phase 46 Launch-Time Live Refresh (IMPLEMENTED, 2026-05-15)
+
+- Completed Phase 46 execution and closed plans `46-01`, `46-02`, and `46-03` (3/3 plans).
+- Delivered the explicit startup-linked refresh contract:
+  - `src/app_launch_config.h` now accepts `--jsonl-live-refresh` only as a companion to `--jsonl`
+  - `src/startup_jsonl_import_controller.h` forwards the explicit live-refresh bit into the existing observer contract while plain startup imports remain unlinked/default-off
+- Delivered app-level startup refresh status in `src/app.c`:
+  - the existing `Startup JSONL Import` overlay still shows startup import progress and non-fatal dismissible errors
+  - after successful startup import, the overlay now also surfaces startup-root refresh-running state plus the latest observer warning/error message outside the hidden-panel gate
+  - no startup-specific refresh loop was introduced; the existing observer system tick and flat-refresh tick remain authoritative
+- Closed runtime regression coverage for startup-linked refresh reuse:
+  - `src/tests/jsonl_flat_observer_auto_safety_test.c` now proves startup imports without the flag stay idle on file edits, while startup-linked imports reuse baseline stamping, coalesced refresh, and auto-disable safety
+  - `src/tests/jsonl_flat_observer_manual_refresh_test.c` now proves startup-linked roots keep commit-on-success replacement, last-good preservation, and manual recovery after auto-disable
+  - `src/tests/startup_jsonl_app_contract_test.c` locks startup-root overlay observer queries and preserved frame ordering
+- Unblocked the MinGW app build path used for verification:
+  - `src/CMakeLists.txt` now adds `${CMAKE_CURRENT_SOURCE_DIR}` to the mdCAD target include path so sibling headers resolve during `build-vulkan` app builds
+- Added/updated Phase 46 closure artifacts:
+  - `.planning/phases/46-launch-time-live-refresh/46-02-SUMMARY.md`
+  - `.planning/phases/46-launch-time-live-refresh/46-03-SUMMARY.md`
+  - `.planning/ROADMAP.md`
+  - `.planning/REQUIREMENTS.md`
+  - `.planning/STATE.md`
+  - `README.md`
+- Deterministic closure evidence captured:
+  - `cmake --build build-vulkan && ctest --test-dir build-vulkan --output-on-failure` passed
+  - full suite result: **24/24 tests passed**
+- Lifecycle continuity advanced:
+  - Phase 46 is now verified complete
+  - current focus moves to Phase 47 planning for the sample-host workflow proof
+
 ### Phase 45 Startup JSONL Auto-Import (IMPLEMENTED, 2026-05-15)
 
 - Completed Phase 45 execution and closed plans `45-01` and `45-02` (2/2 plans).

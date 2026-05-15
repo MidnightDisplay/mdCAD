@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 status: active
-stopped_at: Planned Phase 46 (46-01 through 46-03)
-last_updated: "2026-05-15T10:20:54.2951860+01:00"
+stopped_at: Completed Phase 46; ready for Phase 47 planning
+last_updated: "2026-05-15T11:06:35.8699974+01:00"
 last_activity: 2026-05-15
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 46 — launch-time-live-refresh
+**Current focus:** Phase 47 — sample-host-workflow-proof
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 46 (launch-time-live-refresh) — READY FOR EXECUTION
-Plan: 0 of 3 complete
-Status: Phase 46 plans created; next step is execute 46-01 through 46-03
+Phase: 47 (sample-host-workflow-proof) — READY FOR PLANNING
+Plan: 0 planned
+Status: Phase 46 completed with full `build-vulkan` validation green; next step is to plan Phase 47
 Last activity: 2026-05-15
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -70,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 45]: Startup JSONL import must flow through a reusable non-UI controller that wraps `jsonl_import_job_t` with flat-import defaults and linked refresh disabled. — The existing importer already owns the large-flat ingest behavior, so Phase 45 should bridge launch config into that job instead of duplicating it behind Scene Hierarchy UI state.
 - [Phase 45]: Startup JSONL import now ticks from `app.c` before the Scene Hierarchy visibility gate and marks hierarchy cache dirty on completion. — Embedded viewer-first launches can hide panels entirely, so startup import ownership must live in the app frame loop instead of in panel draw code.
 - [Phase 45]: Launch-time JSONL failure now surfaces through a dismissible app-level overlay and never exits the viewer. — A missing or unreadable startup file must leave embedded and standalone sessions usable for inspection and retry.
+- [Phase 46]: Startup live refresh is enabled only by the explicit `--jsonl-live-refresh` companion flag; plain startup imports stay passive because their observer metadata remains unlinked and unbaselined. — This preserves Phase 45 default-off behavior while reusing the existing linked observer runtime unchanged.
+- [Phase 46]: Startup refresh status is surfaced from the imported root's observer component in `app.c` and never advances a second refresh loop. — The startup overlay may inspect runtime observer state, but `jsonl_observer_system_tick(...)` and `jsonl_observer_tick_flat_refreshes(...)` remain the only refresh drivers.
 
 ### Roadmap Evolution
 
@@ -85,15 +87,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 46 plan wave 1 (`46-01`) to add the explicit startup live-refresh flag and controller contract.
-- Execute Phase 46 plan wave 2 (`46-02`) to wire `app.c` startup-root status after 46-01 lands.
-- Execute Phase 46 plan wave 3 (`46-03`) to close regression and validation coverage after 46-02 lands.
+- Plan Phase 47 to turn the Avalonia sample into the end-to-end proof harness for bundled JSONL launch and host-visible status.
+- Keep the current `build-vulkan` loop on this machine pointed at the working MinGW Vulkan generator unless the Visual Studio C/C++ toolchain is restored.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 45 automated closure is complete.
+- Phase 46 automated closure is complete.
 
 ### Quick Tasks Completed
 
@@ -104,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-15T10:20:54.2951860+01:00
-Stopped at: Planned Phase 46 (46-01 through 46-03)
+Last session: 2026-05-15T11:06:35.8699974+01:00
+Stopped at: Completed Phase 46; ready for Phase 47 planning
 Resume file: None

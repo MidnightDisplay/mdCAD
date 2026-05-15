@@ -93,8 +93,9 @@ Plans:
 
 **Goal**: Developer can opt into startup-linked refresh without changing existing default refresh behavior.  
 **Depends on**: Phase 45  
-**Plans**: 3 plans  
+**Plans**: 3/3 plans complete  
 **Requirements**: JSON-02, JSON-04
+**Status**: Complete (verified 2026-05-15)
 
 **Success Criteria:**
 1. When launched with the explicit live-refresh flag, the embedded viewer updates from changes to the startup JSONL using the existing linked refresh behavior.
@@ -103,11 +104,13 @@ Plans:
 **Details:**
 - Keep launch-time live refresh an explicit opt-in.
 - Reuse existing observer metadata and commit-on-success semantics.
+- Surface startup-root refresh-running and warning/error state from `app.c` without introducing a second refresh loop.
+- Close runtime coverage with startup-style observer tests that prove default-off safety, semantic reuse, and full-suite regression stability.
 
 Plans:
-- [ ] 46-01-PLAN.md — Lock the explicit `--jsonl-live-refresh` flag and startup controller opt-in contract.
-- [ ] 46-02-PLAN.md — Wire the opt-in flag through `app.c` and surface startup-root refresh status outside hidden panels.
-- [ ] 46-03-PLAN.md — Extend observer regressions to prove default-off safety and existing-semantics reuse.
+- [x] 46-01-PLAN.md — Lock the explicit `--jsonl-live-refresh` flag and startup controller opt-in contract.
+- [x] 46-02-PLAN.md — Wire the opt-in flag through `app.c` and surface startup-root refresh status outside hidden panels.
+- [x] 46-03-PLAN.md — Extend observer regressions to prove default-off safety and existing-semantics reuse.
 
 ### Phase 47: Sample Host Workflow Proof
 
@@ -139,10 +142,10 @@ Plans:
 | INPT-02 | Phase 44 | Complete |
 | INPT-03 | Phase 44 | Complete |
 | INPT-04 | Phase 44 | Complete |
-| JSON-01 | Phase 45 | Pending |
-| JSON-02 | Phase 46 | Pending |
-| JSON-03 | Phase 45 | Pending |
-| JSON-04 | Phase 46 | Pending |
+| JSON-01 | Phase 45 | Complete |
+| JSON-02 | Phase 46 | Complete |
+| JSON-03 | Phase 45 | Complete |
+| JSON-04 | Phase 46 | Complete |
 | HOST-01 | Phase 43 | Complete |
 | HOST-02 | Phase 47 | Pending |
 | HOST-03 | Phase 47 | Pending |

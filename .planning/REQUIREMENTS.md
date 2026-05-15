@@ -21,10 +21,10 @@
 
 ### Startup JSONL
 
-- [ ] **JSON-01**: Developer can pass an absolute JSONL path and mdCAD auto-imports it at startup using the large flat dump workflow.
-- [ ] **JSON-02**: Developer can opt into live refresh for the startup JSONL import with an explicit command-line flag.
-- [ ] **JSON-03**: User keeps a usable embedded viewer and gets a clear error state when startup JSONL import fails.
-- [ ] **JSON-04**: Launch-time live refresh reuses the existing linked flat JSONL observer semantics without changing default refresh behavior for other workflows.
+- [x] **JSON-01**: Developer can pass an absolute JSONL path and mdCAD auto-imports it at startup using the large flat dump workflow.
+- [x] **JSON-02**: Developer can opt into live refresh for the startup JSONL import with an explicit command-line flag.
+- [x] **JSON-03**: User keeps a usable embedded viewer and gets a clear error state when startup JSONL import fails.
+- [x] **JSON-04**: Launch-time live refresh reuses the existing linked flat JSONL observer semantics without changing default refresh behavior for other workflows.
 
 ### Sample Host
 
@@ -69,9 +69,9 @@
 | INPT-03 | Phase 44 | Complete |
 | INPT-04 | Phase 44 | Complete |
 | JSON-01 | Phase 45 | Complete |
-| JSON-02 | Phase 46 | Pending |
+| JSON-02 | Phase 46 | Complete |
 | JSON-03 | Phase 45 | Complete |
-| JSON-04 | Phase 46 | Pending |
+| JSON-04 | Phase 46 | Complete |
 | HOST-01 | Phase 43 | Complete |
 | HOST-02 | Phase 47 | Pending |
 | HOST-03 | Phase 47 | Pending |
@@ -84,4 +84,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-15 after Phase 45 execution*
+*Last updated: 2026-05-15 after Phase 46 execution*
