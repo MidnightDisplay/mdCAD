@@ -1,5 +1,6 @@
 #include "../ecs/ecs_world.h"
 #include "../ecs/ecs_scene.h"
+#include "win32_embed_test_stub.h"
 #include "../jsonl_import_job.h"
 #include "../jsonl_observer_system.h"
 #include <stdbool.h>

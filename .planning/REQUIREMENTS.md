@@ -29,9 +29,9 @@
 ### Sample Host
 
 - [x] **HOST-01**: Developer can build and run a minimal Avalonia sample that embeds mdCAD inside a `NativeControlHost`. — Validated in Phase 43
-- [ ] **HOST-02**: Sample host resolves a bundled example JSONL from a relative `resources/examples` folder and launches mdCAD with its absolute path.
-- [ ] **HOST-03**: Sample host shows launch, attach, JSONL, and live-refresh status text for the embedded session.
-- [ ] **HOST-04**: Sample host can repeatedly launch, resize, focus, and close the embedded mdCAD session without leaving orphaned processes.
+- [x] **HOST-02**: Sample host resolves a bundled example JSONL from a relative `resources/examples` folder and launches mdCAD with its absolute path. — Validated in Phase 47
+- [x] **HOST-03**: Sample host shows launch, attach, JSONL, and live-refresh status text for the embedded session. — Validated in Phase 47
+- [x] **HOST-04**: Sample host can repeatedly launch, resize, focus, and close the embedded mdCAD session without leaving orphaned processes. — Validated in Phase 47
 
 ## v2 Requirements
 
@@ -73,9 +73,9 @@
 | JSON-03 | Phase 45 | Complete |
 | JSON-04 | Phase 46 | Complete |
 | HOST-01 | Phase 43 | Complete |
-| HOST-02 | Phase 47 | Pending |
-| HOST-03 | Phase 47 | Pending |
-| HOST-04 | Phase 47 | Pending |
+| HOST-02 | Phase 47 | Complete |
+| HOST-03 | Phase 47 | Complete |
+| HOST-04 | Phase 47 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total
@@ -84,4 +84,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-15 after Phase 46 execution*
+*Last updated: 2026-05-15 after Phase 47 execution*

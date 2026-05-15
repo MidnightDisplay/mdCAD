@@ -11,12 +11,27 @@
     <Border x:Name="HostChrome"
             Focusable="True"
             PointerPressed="OnHostChromePointerPressed">
-      <StackPanel Spacing="4">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="LaunchSessionButton"
+                  Content="Launch Session"
+                  Click="OnLaunchSessionClick" />
+          <Button x:Name="CloseSessionButton"
+                  Content="Close Session"
+                  Click="OnCloseSessionClick" />
+          <CheckBox x:Name="LiveRefreshCheckBox"
+                    Content="Live refresh"
+                    Checked="OnLiveRefreshToggleChanged"
+                    Unchecked="OnLiveRefreshToggleChanged" />
+        </StackPanel>
         <TextBlock x:Name="StatusTextBlock"
                    FontSize="18"
                    FontWeight="SemiBold"
-                   Text="launching" />
+                   Text="launch: idle" />
         <TextBlock x:Name="ModeTextBlock" />
+        <TextBlock x:Name="JsonlStatusTextBlock"
+                   TextWrapping="Wrap" />
+        <TextBlock x:Name="LiveRefreshStatusTextBlock" />
         <TextBlock x:Name="FailureTextBlock"
                    TextWrapping="Wrap" />
       </StackPanel>
@@ -27,7 +42,7 @@
             Padding="8"
             BorderThickness="1"
             BorderBrush="#3A3A3A">
-      <local:EmbedNativeControlHost x:Name="EmbedSurface" />
+      <ContentControl x:Name="EmbedSurfaceHost" />
     </Border>
   </Grid>
 </Window>

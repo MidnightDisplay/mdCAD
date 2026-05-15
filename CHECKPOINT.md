@@ -209,6 +209,33 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-05-15)
 
+### Phase 47 Sample Host Workflow Proof (IMPLEMENTED, 2026-05-15)
+
+- Completed Phase 47 execution and closed plans `47-01` and `47-02` (2/2 plans).
+- Delivered the final sample-host proof harness:
+  - `samples/avalonia-host/resources/examples/sample-host-proof.jsonl` now ships beside the built host and is resolved from the deployed `resources/examples` output path
+  - `samples/avalonia-host/MainWindow.axaml` now exposes explicit `Launch Session`, `Close Session`, and `Live refresh` controls plus separate host-owned `launch:`, `attach:`, `jsonl:`, and `live refresh:` status lines
+  - `samples/avalonia-host/MainWindow.axaml.cs` now supports repeated launch/close/relaunch from the same host window by resetting session state, reusing the graceful teardown seam, and recreating the placeholder/native host surface before the next attach
+- Preserved the host/viewer boundary:
+  - the host continues to report only what it owns
+  - pre-launch status still shows the exact resolved absolute example path
+  - post-attach JSONL/live-refresh text intentionally switches to `viewer-managed` wording instead of inventing import-status IPC
+- Added/updated Phase 47 proof artifacts:
+  - `.planning/phases/47-sample-host-workflow-proof/47-MANUAL-CHECKLIST.md`
+  - `.planning/phases/47-sample-host-workflow-proof/47-01-SUMMARY.md`
+  - `.planning/phases/47-sample-host-workflow-proof/47-02-SUMMARY.md`
+- Restored MSVC full-suite verification exposed a standalone-test link seam:
+  - standalone Windows tests that link `libsokol` without `app.c` now include `src/tests/win32_embed_test_stub.h`
+  - this keeps `g_mdcad_win32_embed_state` defined on the intended MSVC Vulkan `build-vulkan` lane
+- Deterministic closure evidence captured:
+  - `cmake --build build-vulkan --config Release` passed
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure` passed with **24/24 tests**
+  - `dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release` passed
+  - `.planning/phases/47-sample-host-workflow-proof/47-MANUAL-CHECKLIST.md` recorded **PASS** across all five scenarios, including repeated relaunch and orphan-process inspection
+- Lifecycle continuity advanced:
+  - Phase 47 is now verified complete
+  - milestone v1.8 requirements are fully satisfied and ready for milestone closeout
+
 ### Phase 46 Launch-Time Live Refresh (IMPLEMENTED, 2026-05-15)
 
 - Completed Phase 46 execution and closed plans `46-01`, `46-02`, and `46-03` (3/3 plans).

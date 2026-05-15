@@ -1,6 +1,6 @@
 # Milestone v1.8: Embeddable Windows JSONL Viewer
 
-**Status:** ACTIVE
+**Status:** ACTIVE (all phases complete; ready for milestone closeout)
 **Phases:** 43-47
 **Total Plans:** 20
 
@@ -8,7 +8,7 @@
 
 v1.8 adds a Windows-only embedding workflow where an external host launches mdCAD as a true child window, can optionally auto-open a large flat JSONL file at startup, and can opt into existing linked refresh behavior without expanding into IPC, in-process embedding, or cross-platform hosting.
 
-The roadmap follows the research risk order: prove strict child-window startup first, close resize/focus/input correctness second, then add startup JSONL import, then launch-time live refresh, and finish with a minimal Avalonia sample host that acts as the end-to-end proof harness.
+The roadmap follows the research risk order: prove strict child-window startup first, close resize/focus/input correctness second, then add startup JSONL import, then launch-time live refresh, and finish with a minimal Avalonia sample host that now serves as the end-to-end proof harness.
 
 ## Phases
 
@@ -116,9 +116,9 @@ Plans:
 
 **Goal**: Developer can use the sample host as the end-to-end proof harness for embedded launch workflows.  
 **Depends on**: Phase 46  
-**Plans**: 2 plans  
+**Plans**: 2/2 plans complete  
 **Requirements**: HOST-02, HOST-03, HOST-04
-**Status**: Planned (ready for execution)
+**Status**: Complete (verified 2026-05-15)
 
 **Success Criteria:**
 1. The sample host resolves a bundled example JSONL from `resources/examples`, converts it to an absolute path, and launches mdCAD with it.
@@ -130,8 +130,8 @@ Plans:
 - Use the sample as the conformance harness for lifecycle and failure-path validation, not as a productized shell.
 
 Plans:
-- [ ] 47-01-PLAN.md — Add the bundled example resource and wire the absolute `--jsonl` launch contract into the host.
-- [ ] 47-02-PLAN.md — Add repeatable session controls/status plus the Phase 47 manual lifecycle proof checklist.
+- [x] 47-01-PLAN.md — Add the bundled example resource and wire the absolute `--jsonl` launch contract into the host.
+- [x] 47-02-PLAN.md — Add repeatable session controls/status plus the Phase 47 manual lifecycle proof checklist.
 
 ---
 
@@ -152,9 +152,9 @@ Plans:
 | JSON-03 | Phase 45 | Complete |
 | JSON-04 | Phase 46 | Complete |
 | HOST-01 | Phase 43 | Complete |
-| HOST-02 | Phase 47 | Pending |
-| HOST-03 | Phase 47 | Pending |
-| HOST-04 | Phase 47 | Pending |
+| HOST-02 | Phase 47 | Complete |
+| HOST-03 | Phase 47 | Complete |
+| HOST-04 | Phase 47 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total
@@ -169,6 +169,7 @@ Plans:
 - Build embedding as a strict Windows child-HWND launch path instead of a reparented standalone window hack.
 - Keep the host/viewer boundary CLI-driven with mdCAD remaining a separate process and no new IPC surface.
 - Reuse the existing large flat JSONL import and linked refresh semantics instead of redesigning refresh behavior.
+- Use the sample host as an honest workflow harness with bundled example proof, host-owned status text, and repeatable lifecycle validation instead of inventing import-status IPC.
 
 **Deferred Scope:**
 - In-process / DLL / SDK embedding

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -165,9 +166,15 @@ public partial class MainWindow : Window
     private static readonly TimeSpan GracefulEmbeddedExitWait = TimeSpan.FromSeconds(3);
 
     private readonly HostLaunchOptions _options;
-    private readonly EmbedNativeControlHost _embedSurface;
+    private readonly ContentControl _embedSurfaceHost;
+    private EmbedNativeControlHost? _embedSurface;
+    private readonly Button _launchSessionButton;
+    private readonly Button _closeSessionButton;
+    private readonly CheckBox _liveRefreshCheckBox;
     private readonly TextBlock _statusTextBlock;
     private readonly TextBlock _modeTextBlock;
+    private readonly TextBlock _jsonlStatusTextBlock;
+    private readonly TextBlock _liveRefreshStatusTextBlock;
     private readonly TextBlock _failureTextBlock;
     private readonly DispatcherTimer _attachTimer;
     private readonly DispatcherTimer _launchRetryTimer;
@@ -183,6 +190,9 @@ public partial class MainWindow : Window
     private bool _destroyAfterAttachTriggered;
     private bool _fallbackKillIssued;
     private bool _teardownAwaitingProcessExit;
+    private bool _launchRequested;
+    private bool _windowClosing;
+    private string? _resolvedJsonlPath;
 
     public MainWindow()
         : this(HostLaunchOptions.Parse(Array.Empty<string>()))
@@ -194,33 +204,49 @@ public partial class MainWindow : Window
         _options = options;
         InitializeComponent();
 
-        _embedSurface = this.FindControl<EmbedNativeControlHost>("EmbedSurface")
-            ?? throw new InvalidOperationException("Missing EmbedSurface control.");
+        _embedSurfaceHost = this.FindControl<ContentControl>("EmbedSurfaceHost")
+            ?? throw new InvalidOperationException("Missing EmbedSurfaceHost.");
+        _launchSessionButton = this.FindControl<Button>("LaunchSessionButton")
+            ?? throw new InvalidOperationException("Missing LaunchSessionButton.");
+        _closeSessionButton = this.FindControl<Button>("CloseSessionButton")
+            ?? throw new InvalidOperationException("Missing CloseSessionButton.");
+        _liveRefreshCheckBox = this.FindControl<CheckBox>("LiveRefreshCheckBox")
+            ?? throw new InvalidOperationException("Missing LiveRefreshCheckBox.");
         _statusTextBlock = this.FindControl<TextBlock>("StatusTextBlock")
             ?? throw new InvalidOperationException("Missing StatusTextBlock.");
         _modeTextBlock = this.FindControl<TextBlock>("ModeTextBlock")
             ?? throw new InvalidOperationException("Missing ModeTextBlock.");
+        _jsonlStatusTextBlock = this.FindControl<TextBlock>("JsonlStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing JsonlStatusTextBlock.");
+        _liveRefreshStatusTextBlock = this.FindControl<TextBlock>("LiveRefreshStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing LiveRefreshStatusTextBlock.");
         _failureTextBlock = this.FindControl<TextBlock>("FailureTextBlock")
             ?? throw new InvalidOperationException("Missing FailureTextBlock.");
         _attachTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _launchRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _resizeSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
 
-        _embedSurface.PlaceholderHandleReady += OnPlaceholderHandleReady;
-        _embedSurface.SizeChanged += OnEmbedSurfaceSizeChanged;
         _attachTimer.Tick += OnAttachTimerTick;
         _launchRetryTimer.Tick += OnLaunchRetryTick;
         _resizeSyncTimer.Tick += OnResizeSyncTick;
         Closed += OnWindowClosed;
 
-        _statusTextBlock.Text = StatusLaunching;
-        _modeTextBlock.Text = BuildModeText("jsonl: bundled example pending resolution");
+        _liveRefreshCheckBox.IsChecked = _options.RequestLiveRefresh;
+        RecreateEmbedSurface();
+
+        SetLaunchStatus("idle");
+        SetAttachStatus("idle");
+        UpdatePreLaunchJsonlStatus();
+        UpdateLiveRefreshStatusPreLaunch();
         _failureTextBlock.Text = BuildScaffoldMessage(IntPtr.Zero);
+        UpdateControlState();
 
         if (!string.IsNullOrWhiteSpace(_options.ParseError))
         {
-            _statusTextBlock.Text = StatusTimeoutFailure;
-            _failureTextBlock.Text = _options.ParseError;
+            SetFailureStatus(_options.ParseError, "idle");
+            _launchSessionButton.IsEnabled = false;
+            _closeSessionButton.IsEnabled = false;
+            _liveRefreshCheckBox.IsEnabled = false;
         }
     }
 
@@ -233,7 +259,7 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrWhiteSpace(_options.ParseError))
         {
-            _statusTextBlock.Text = StatusTimeoutFailure;
+            SetFailureStatus(_options.ParseError, "idle");
             return;
         }
 
@@ -243,7 +269,12 @@ public partial class MainWindow : Window
         }
 
         _placeholderHwnd = hwnd;
-        _failureTextBlock.Text = BuildScaffoldMessage(hwnd);
+        if (_launchRequested ||
+            string.IsNullOrWhiteSpace(_failureTextBlock.Text) ||
+            _failureTextBlock.Text.Contains("Host HWND:", StringComparison.Ordinal))
+        {
+            _failureTextBlock.Text = BuildScaffoldMessage(hwnd);
+        }
         TryLaunchWhenSurfaceReady();
     }
 
@@ -257,16 +288,118 @@ public partial class MainWindow : Window
             : $"Host HWND: 0x{hwnd.ToInt64():X}";
 
         return $"{pathText}{Environment.NewLine}{hwndText}{Environment.NewLine}"
-             + "Wave 0 scaffold reserves --mdcad-exe, --embed-test-mode valid|invalid-parent|destroyed-parent|destroy-after-attach, "
-             + "and the staged statuses launching, waiting for child attach, attached, teardown/cleanup, timeout/failure.";
+             + "Host session controls reserve Launch Session, Close Session, --mdcad-exe, --embed-test-mode valid|invalid-parent|destroyed-parent|destroy-after-attach, "
+             + "and the staged launch/attach/jsonl/live-refresh status lines.";
     }
 
-    private string BuildModeText(string jsonlText)
+    private void SetLaunchStatus(string status)
     {
-        string liveRefreshText = _options.RequestLiveRefresh
-            ? "live refresh: requested"
-            : "live refresh: off";
-        return $"Harness mode: {_options.TestModeToken}{Environment.NewLine}{jsonlText}{Environment.NewLine}{liveRefreshText}";
+        _statusTextBlock.Text = $"launch: {status}";
+    }
+
+    private void SetAttachStatus(string status)
+    {
+        _modeTextBlock.Text = $"attach: {status}";
+    }
+
+    private void SetJsonlStatus(string status)
+    {
+        _jsonlStatusTextBlock.Text = $"jsonl: {status}";
+    }
+
+    private void SetLiveRefreshStatus(string status)
+    {
+        _liveRefreshStatusTextBlock.Text = $"live refresh: {status}";
+    }
+
+    private bool IsLiveRefreshRequested()
+    {
+        return _liveRefreshCheckBox.IsChecked == true;
+    }
+
+    private void UpdateControlState()
+    {
+        if (!string.IsNullOrWhiteSpace(_options.ParseError))
+        {
+            _launchSessionButton.IsEnabled = false;
+            _closeSessionButton.IsEnabled = false;
+            _liveRefreshCheckBox.IsEnabled = false;
+            return;
+        }
+
+        bool sessionActive = _launchRequested ||
+                             _launchStarted ||
+                             _mdcadProcess != null ||
+                             _attachedChildHwnd != IntPtr.Zero ||
+                             _teardownAwaitingProcessExit;
+        _launchSessionButton.IsEnabled = !sessionActive;
+        _closeSessionButton.IsEnabled = sessionActive;
+        _liveRefreshCheckBox.IsEnabled = !sessionActive;
+    }
+
+    private void UpdatePreLaunchJsonlStatus()
+    {
+        if (TryResolveBundledExample(out string? jsonlPath, out _))
+        {
+            _resolvedJsonlPath = jsonlPath;
+            SetJsonlStatus($"example resolved -> {_resolvedJsonlPath}");
+            return;
+        }
+
+        _resolvedJsonlPath = null;
+        SetJsonlStatus("example missing");
+    }
+
+    private void UpdateJsonlStatusAfterLaunch()
+    {
+        if (!string.IsNullOrWhiteSpace(_resolvedJsonlPath))
+        {
+            SetJsonlStatus($"viewer-managed after launch (requested: {_resolvedJsonlPath})");
+            return;
+        }
+
+        SetJsonlStatus("viewer-managed after launch");
+    }
+
+    private void UpdateLiveRefreshStatusPreLaunch()
+    {
+        SetLiveRefreshStatus(IsLiveRefreshRequested() ? "requested" : "off");
+    }
+
+    private void UpdateLiveRefreshStatusAfterLaunch()
+    {
+        SetLiveRefreshStatus(IsLiveRefreshRequested()
+            ? "viewer-managed after launch (requested)"
+            : "viewer-managed after launch (off)");
+    }
+
+    private void RecreateEmbedSurface()
+    {
+        if (_embedSurface != null)
+        {
+            _embedSurface.PlaceholderHandleReady -= OnPlaceholderHandleReady;
+            _embedSurface.SizeChanged -= OnEmbedSurfaceSizeChanged;
+        }
+
+        _placeholderHwnd = IntPtr.Zero;
+        _embedSurface = new EmbedNativeControlHost();
+        _embedSurface.PlaceholderHandleReady += OnPlaceholderHandleReady;
+        _embedSurface.SizeChanged += OnEmbedSurfaceSizeChanged;
+        _embedSurfaceHost.Content = _embedSurface;
+    }
+
+    private void DisposeCurrentProcess()
+    {
+        if (_mdcadProcess == null)
+        {
+            return;
+        }
+
+        _mdcadProcess.OutputDataReceived -= OnChildOutputDataReceived;
+        _mdcadProcess.ErrorDataReceived -= OnChildOutputDataReceived;
+        _mdcadProcess.Exited -= OnChildProcessExited;
+        _mdcadProcess.Dispose();
+        _mdcadProcess = null;
     }
 
     private bool TryResolveBundledExample(out string? jsonlPath, out string failureMessage)
@@ -300,16 +433,68 @@ public partial class MainWindow : Window
         TryLaunchWhenSurfaceReady();
     }
 
+    private void OnLaunchSessionClick(object? sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.ParseError))
+        {
+            return;
+        }
+        if (_launchRequested || _launchStarted || _mdcadProcess != null || _teardownAwaitingProcessExit)
+        {
+            return;
+        }
+
+        _capturedFailureLine = null;
+        _teardownReason = null;
+        _fallbackKillIssued = false;
+        _destroyAfterAttachTriggered = false;
+        _teardownAwaitingProcessExit = false;
+        _launchRequested = true;
+        _launchStarted = false;
+        _launchParentHwnd = IntPtr.Zero;
+        _attachedChildHwnd = IntPtr.Zero;
+
+        SetLaunchStatus(StatusLaunching);
+        SetAttachStatus("idle");
+        UpdatePreLaunchJsonlStatus();
+        UpdateLiveRefreshStatusPreLaunch();
+        _failureTextBlock.Text = BuildScaffoldMessage(_placeholderHwnd);
+        UpdateControlState();
+        TryLaunchWhenSurfaceReady();
+    }
+
+    private void OnCloseSessionClick(object? sender, RoutedEventArgs e)
+    {
+        if (!_launchRequested && !_launchStarted && _mdcadProcess == null && _attachedChildHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        InvalidatePlaceholderForTeardown("Close Session requested; invalidated the embedded placeholder before waiting for mdCAD to exit.");
+        WaitForGracefulExitOnClose("Close Session requested; embedded mdCAD must not remain orphaned.");
+    }
+
+    private void OnLiveRefreshToggleChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_launchRequested || _launchStarted || _mdcadProcess != null || _attachedChildHwnd != IntPtr.Zero)
+        {
+            return;
+        }
+
+        UpdateLiveRefreshStatusPreLaunch();
+    }
+
     private void TryLaunchWhenSurfaceReady()
     {
-        if (_launchStarted || _placeholderHwnd == IntPtr.Zero)
+        if (!_launchRequested || _launchStarted || _placeholderHwnd == IntPtr.Zero)
         {
             return;
         }
 
         if (!Win32NativeMethods.TryGetClientSize(_placeholderHwnd, out int width, out int height) || width <= 4 || height <= 4)
         {
-            _statusTextBlock.Text = StatusLaunching;
+            SetLaunchStatus(StatusLaunching);
+            SetAttachStatus("idle");
             _failureTextBlock.Text =
                 $"Waiting for host surface size...{Environment.NewLine}" +
                 $"Current placeholder HWND: 0x{_placeholderHwnd.ToInt64():X}";
@@ -319,6 +504,7 @@ public partial class MainWindow : Window
 
         _launchRetryTimer.Stop();
         _launchStarted = true;
+        _launchRequested = false;
         _launchParentHwnd = PrepareLaunchParentHwnd(_placeholderHwnd);
         LaunchEmbeddedViewer();
     }
@@ -327,19 +513,22 @@ public partial class MainWindow : Window
     {
         if (!TryResolveMdcadExecutable(out string? mdCadExePath, out string failureMessage))
         {
-            SetFailureStatus(failureMessage);
+            SetFailureStatus(failureMessage, "idle");
             return;
         }
         if (!TryResolveBundledExample(out string? jsonlPath, out failureMessage))
         {
-            _modeTextBlock.Text = BuildModeText("jsonl: example missing");
-            SetFailureStatus(failureMessage);
+            SetJsonlStatus("example missing");
+            SetFailureStatus(failureMessage, "idle");
             return;
         }
         string resolvedJsonlPath = jsonlPath!;
+        _resolvedJsonlPath = resolvedJsonlPath;
 
-        _statusTextBlock.Text = StatusLaunching;
-        _modeTextBlock.Text = BuildModeText($"jsonl: example resolved -> {resolvedJsonlPath}");
+        SetLaunchStatus(StatusLaunching);
+        SetAttachStatus(StatusWaitingForChildAttach);
+        SetJsonlStatus($"example resolved -> {resolvedJsonlPath}; --jsonl requested");
+        UpdateLiveRefreshStatusPreLaunch();
         _failureTextBlock.Text =
             $"mdCAD path: {mdCadExePath}{Environment.NewLine}" +
             $"--jsonl requested: {resolvedJsonlPath}{Environment.NewLine}" +
@@ -360,7 +549,7 @@ public partial class MainWindow : Window
         startInfo.ArgumentList.Add($"0x{_launchParentHwnd.ToInt64():X}");
         startInfo.ArgumentList.Add("--jsonl");
         startInfo.ArgumentList.Add(resolvedJsonlPath);
-        if (_options.RequestLiveRefresh)
+        if (IsLiveRefreshRequested())
         {
             startInfo.ArgumentList.Add("--jsonl-live-refresh");
         }
@@ -378,18 +567,18 @@ public partial class MainWindow : Window
 
             if (!_mdcadProcess.Start())
             {
-                SetFailureStatus("Failed to start mdCAD.");
+                SetFailureStatus("Failed to start mdCAD.", "idle");
                 return;
             }
         }
         catch (Win32Exception ex)
         {
-            SetFailureStatus($"Failed to start mdCAD: {ex.Message}");
+            SetFailureStatus($"Failed to start mdCAD: {ex.Message}", "idle");
             return;
         }
         catch (InvalidOperationException ex)
         {
-            SetFailureStatus($"Failed to start mdCAD: {ex.Message}");
+            SetFailureStatus($"Failed to start mdCAD: {ex.Message}", "idle");
             return;
         }
 
@@ -397,8 +586,9 @@ public partial class MainWindow : Window
         _mdcadProcess.BeginErrorReadLine();
 
         _launchStartedAt = DateTimeOffset.UtcNow;
-        _statusTextBlock.Text = StatusWaitingForChildAttach;
-        _modeTextBlock.Text = BuildModeText($"jsonl: example resolved -> {resolvedJsonlPath}");
+        SetLaunchStatus(StatusLaunching);
+        SetAttachStatus(StatusWaitingForChildAttach);
+        UpdateControlState();
         _attachTimer.Start();
     }
 
@@ -437,13 +627,13 @@ public partial class MainWindow : Window
             {
                 _resizeSyncTimer.Stop();
                 _attachedChildHwnd = IntPtr.Zero;
-                SetFailureStatus($"mdCAD exited after attach (exit code {exitCode}).");
+                SetFailureStatus($"mdCAD exited after attach (exit code {exitCode}).", "child lost");
                 return;
             }
 
             string detail = _capturedFailureLine
                 ?? $"mdCAD exited before child attach (exit code {exitCode}).";
-            SetFailureStatus(detail);
+            SetFailureStatus(detail, "timed out");
         });
     }
 
@@ -457,7 +647,7 @@ public partial class MainWindow : Window
 
         if (_mdcadProcess == null)
         {
-            SetFailureStatus("mdCAD process was not started.");
+            SetFailureStatus("mdCAD process was not started.", "idle");
             return;
         }
 
@@ -466,7 +656,7 @@ public partial class MainWindow : Window
             int exitCode = _mdcadProcess.ExitCode;
             string detail = _capturedFailureLine
                 ?? $"mdCAD exited before child attach (exit code {exitCode}).";
-            SetFailureStatus(detail);
+            SetFailureStatus(detail, "timed out");
             return;
         }
 
@@ -477,10 +667,14 @@ public partial class MainWindow : Window
             _attachTimer.Stop();
             SyncAttachedChildBounds();
             _resizeSyncTimer.Start();
-            _statusTextBlock.Text = StatusAttached;
+            SetLaunchStatus("active");
+            SetAttachStatus(StatusAttached);
+            UpdateJsonlStatusAfterLaunch();
+            UpdateLiveRefreshStatusAfterLaunch();
             _failureTextBlock.Text =
                 $"Attached child HWND: 0x{childHwnd.ToInt64():X}{Environment.NewLine}" +
                 $"Parent HWND: 0x{_launchParentHwnd.ToInt64():X}";
+            UpdateControlState();
             if ((_options.TestMode == EmbedTestMode.DestroyedParent ||
                  _options.TestMode == EmbedTestMode.DestroyAfterAttach) &&
                 !_destroyAfterAttachTriggered)
@@ -492,19 +686,32 @@ public partial class MainWindow : Window
 
         if ((DateTimeOffset.UtcNow - _launchStartedAt) >= TimeSpan.FromSeconds(10))
         {
-            SetFailureStatus(_capturedFailureLine ?? "Timed out waiting for child attach.");
+            SetFailureStatus(_capturedFailureLine ?? "Timed out waiting for child attach.", "timed out");
         }
     }
 
-    private void SetFailureStatus(string detail)
+    private void SetFailureStatus(string detail, string attachStatus)
     {
         _attachTimer.Stop();
         _launchRetryTimer.Stop();
         _resizeSyncTimer.Stop();
-        _statusTextBlock.Text = StatusTimeoutFailure;
+        _launchRequested = false;
+        _launchStarted = false;
+        _launchParentHwnd = IntPtr.Zero;
+        _attachedChildHwnd = IntPtr.Zero;
+        _teardownAwaitingProcessExit = false;
+        SetLaunchStatus(StatusTimeoutFailure);
+        SetAttachStatus(attachStatus);
+        UpdatePreLaunchJsonlStatus();
+        UpdateLiveRefreshStatusPreLaunch();
         _failureTextBlock.Text = string.IsNullOrWhiteSpace(_capturedFailureLine)
             ? detail
             : $"{_capturedFailureLine}{Environment.NewLine}{detail}";
+        if (_mdcadProcess?.HasExited == true)
+        {
+            DisposeCurrentProcess();
+        }
+        UpdateControlState();
     }
 
     private void BeginPostAttachTeardown()
@@ -523,17 +730,19 @@ public partial class MainWindow : Window
     private void InvalidatePlaceholderForTeardown(string detail)
     {
         _teardownReason ??= detail;
-        _statusTextBlock.Text = StatusTeardownCleanup;
+        SetLaunchStatus("close requested");
+        SetAttachStatus(_attachedChildHwnd != IntPtr.Zero ? "child lost" : "idle");
         _failureTextBlock.Text = _teardownReason;
 
         IntPtr placeholderToDestroy = _placeholderHwnd;
         _placeholderHwnd = IntPtr.Zero;
-        _embedSurface.ClearPlaceholderHandle();
+        _embedSurface?.ClearPlaceholderHandle();
 
         if (placeholderToDestroy != IntPtr.Zero && Win32NativeMethods.IsWindow(placeholderToDestroy))
         {
             Win32NativeMethods.DestroyWindow(placeholderToDestroy);
         }
+        UpdateControlState();
     }
 
     private bool EnsureAttachedLifecycleIsHealthy(string origin)
@@ -587,7 +796,8 @@ public partial class MainWindow : Window
         _launchRetryTimer.Stop();
         _resizeSyncTimer.Stop();
         _teardownReason ??= detail;
-        _statusTextBlock.Text = StatusTeardownCleanup;
+        SetLaunchStatus("close requested");
+        SetAttachStatus("child lost");
 
         if (_mdcadProcess == null || _mdcadProcess.HasExited)
         {
@@ -604,6 +814,7 @@ public partial class MainWindow : Window
         _failureTextBlock.Text = $"{_teardownReason}{Environment.NewLine}{waitingMessage}";
         Process process = _mdcadProcess;
         _ = ObserveGracefulExitAsync(process, GracefulEmbeddedExitWait);
+        UpdateControlState();
     }
 
     private async Task ObserveGracefulExitAsync(Process process, TimeSpan timeout)
@@ -657,10 +868,12 @@ public partial class MainWindow : Window
         _resizeSyncTimer.Stop();
         _teardownAwaitingProcessExit = false;
         _teardownReason ??= detail;
-        _statusTextBlock.Text = StatusTeardownCleanup;
+        SetLaunchStatus("close requested");
+        SetAttachStatus(_attachedChildHwnd != IntPtr.Zero ? "child lost" : "idle");
 
         if (_mdcadProcess == null)
         {
+            FinalizeTeardownStatus(0);
             return;
         }
 
@@ -699,7 +912,8 @@ public partial class MainWindow : Window
         _resizeSyncTimer.Stop();
         _teardownAwaitingProcessExit = false;
         _teardownReason ??= detail;
-        _statusTextBlock.Text = StatusTeardownCleanup;
+        SetLaunchStatus("close requested");
+        SetAttachStatus(_attachedChildHwnd != IntPtr.Zero ? "child lost" : "idle");
 
         if (_mdcadProcess == null || _mdcadProcess.HasExited)
         {
@@ -723,9 +937,13 @@ public partial class MainWindow : Window
         _attachTimer.Stop();
         _launchRetryTimer.Stop();
         _resizeSyncTimer.Stop();
+        _launchRequested = false;
+        _launchStarted = false;
         _teardownAwaitingProcessExit = false;
         _attachedChildHwnd = IntPtr.Zero;
-        _statusTextBlock.Text = StatusTeardownCleanup;
+        _launchParentHwnd = IntPtr.Zero;
+        SetLaunchStatus("cleanup complete");
+        SetAttachStatus("idle");
 
         string exitSummary = _fallbackKillIssued
             ? $"Host fallback cleanup completed (exit code {exitCode}); no surviving mdCAD.exe."
@@ -733,6 +951,14 @@ public partial class MainWindow : Window
         _failureTextBlock.Text = string.IsNullOrWhiteSpace(_teardownReason)
             ? exitSummary
             : $"{_teardownReason}{Environment.NewLine}{exitSummary}";
+        DisposeCurrentProcess();
+        UpdatePreLaunchJsonlStatus();
+        UpdateLiveRefreshStatusPreLaunch();
+        UpdateControlState();
+        if (!_windowClosing)
+        {
+            RecreateEmbedSurface();
+        }
     }
 
     private bool TryResolveMdcadExecutable(out string? mdCadExePath, out string failureMessage)
@@ -824,6 +1050,11 @@ public partial class MainWindow : Window
 
     private void OnHostChromePointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (e.Source is Button or CheckBox)
+        {
+            return;
+        }
+
         if (sender is Control control)
         {
             control.Focus();
@@ -877,16 +1108,12 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        _windowClosing = true;
         // Reuse the ClearPlaceholderHandle/DestroyWindow teardown seam before waiting for exit.
         InvalidatePlaceholderForTeardown(
             "Host window closed; invalidated the embedded placeholder so mdCAD can observe the destroyed parent chain.");
         WaitForGracefulExitOnClose("Host window closed; embedded mdCAD must not remain orphaned.");
-
-        if (_mdcadProcess != null)
-        {
-            _mdcadProcess.Dispose();
-            _mdcadProcess = null;
-        }
+        DisposeCurrentProcess();
     }
 }
 

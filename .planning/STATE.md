@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Embeddable Windows JSONL Viewer
-status: active
-stopped_at: Phase 47 planned; ready for execution
-last_updated: "2026-05-15T11:39:58.2355004+01:00"
-last_activity: 2026-05-15
+milestone_name: milestone
+status: ready_for_completion
+stopped_at: Phase 47 complete; ready for milestone closeout
+last_updated: "2026-05-15T12:11:18.6856201+01:00"
+last_activity: 2026-05-15 -- Phase 47 completed and manual checklist passed
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 18
-  percent: 90
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 47 — sample-host-workflow-proof
+**Current focus:** Milestone v1.8 closeout
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 47 (sample-host-workflow-proof) — PLANNED
-Plan: 2 planned
-Status: Phase 47 plans are written; next step is to execute 47-01 then 47-02 on the MSVC Vulkan `build-vulkan` path
-Last activity: 2026-05-15
+Phase: 47 (sample-host-workflow-proof) — COMPLETE
+Plan: 2 of 2
+Status: Phase 47 complete; ready for milestone closeout
+Last activity: 2026-05-15 -- Phase 47 completed and manual checklist passed
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 45]: Launch-time JSONL failure now surfaces through a dismissible app-level overlay and never exits the viewer. — A missing or unreadable startup file must leave embedded and standalone sessions usable for inspection and retry.
 - [Phase 46]: Startup live refresh is enabled only by the explicit `--jsonl-live-refresh` companion flag; plain startup imports stay passive because their observer metadata remains unlinked and unbaselined. — This preserves Phase 45 default-off behavior while reusing the existing linked observer runtime unchanged.
 - [Phase 46]: Startup refresh status is surfaced from the imported root's observer component in `app.c` and never advances a second refresh loop. — The startup overlay may inspect runtime observer state, but `jsonl_observer_system_tick(...)` and `jsonl_observer_tick_flat_refreshes(...)` remain the only refresh drivers.
+- [Phase 47]: The sample host now reports only host-owned session/request state and switches JSONL/live-refresh status lines to `viewer-managed` wording after attach. — This preserves the CLI/process boundary and avoids inventing import-confirmation IPC.
+- [Phase 47]: Repeated relaunch recreates the placeholder/native host surface after teardown before starting the next embedded session. — The close/relaunch path destroys the old attach seam, so the placeholder must be renewed for the next child HWND.
+- [Phase 47]: Restored MSVC full-suite validation reuses `win32_embed_test_stub.h` in standalone Windows tests that link `libsokol` outside `app.c`. — The shared embed-state symbol must still exist during full-suite verification even when the application entry point is absent.
 
 ### Roadmap Evolution
 
@@ -87,14 +90,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 47 to turn the Avalonia sample into the end-to-end proof harness for bundled JSONL launch, host-visible status, and repeated lifecycle validation.
-- Keep Phase 47 validation on the working MSVC Vulkan `build-vulkan` path and avoid reintroducing the temporary MinGW fallback from Phase 46.
+- Close milestone v1.8 now that all 20/20 plans and 16/16 requirements are satisfied.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 46 automated closure is complete.
+- Phase 47 automated and manual verification are complete.
 
 ### Quick Tasks Completed
 
@@ -105,6 +107,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-15T11:39:58.2355004+01:00
-Stopped at: Phase 47 planned; ready for execution
+Last session: 2026-05-15T12:11:18.6856201+01:00
+Stopped at: Phase 47 complete; ready for milestone closeout
 Resume file: None

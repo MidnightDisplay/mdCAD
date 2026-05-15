@@ -1,5 +1,6 @@
 #include "../ecs/ecs_world.h"
 #include "../ecs/ecs_scene.h"
+#include "win32_embed_test_stub.h"
 #include <stdio.h>
 
 #ifdef __cplusplus

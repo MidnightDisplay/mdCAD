@@ -1,5 +1,6 @@
 #include "../ecs/ecs_world.h"
 #include "../ecs/ecs_scene.h"
+#include "win32_embed_test_stub.h"
 #include "../scene_serializer.h"
 #include "../scripting/sketch_script_runtime.h"
 #include "../scripting/sketch_script_contract.h"

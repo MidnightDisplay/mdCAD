@@ -13,7 +13,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Interactive UI**: Dear ImGui interface with scene hierarchy, property inspector, search/filter
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
-- **Windows embedding bootstrap**: Strict `--embedded --parent-hwnd` child-window launch path plus a minimal Avalonia `NativeControlHost` sample host
+- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus an Avalonia `NativeControlHost` sample host with a bundled JSONL example, explicit host-owned status lines, and repeatable launch/close proof harness controls
 - **Startup JSONL launch**: Optional `--jsonl <absolute-path>` auto-import plus explicit `--jsonl-live-refresh` opt-in that reuses the existing linked flat refresh behavior without changing the default startup path
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
@@ -36,6 +36,14 @@ cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON; cmake --build build
 .\build-vulkan\bin\Release\mdCAD.exe --jsonl C:\absolute\path\to\data.jsonl
 .\build-vulkan\bin\Release\mdCAD.exe --jsonl C:\absolute\path\to\data.jsonl --jsonl-live-refresh
 ```
+
+**Windows sample host proof harness:**
+```powershell
+dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release
+dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release
+```
+
+The sample host resolves a bundled JSONL example from `resources/examples`, shows host-owned `launch:`, `attach:`, `jsonl:`, and `live refresh:` status lines, and supports repeated `Launch Session` / `Close Session` cycles from the same window.
 
 **Web (Emscripten):**
 ```bash

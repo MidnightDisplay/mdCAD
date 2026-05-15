@@ -1,5 +1,6 @@
 #include "../ecs/ecs_world.h"
 #include "../ecs/ecs_scene.h"
+#include "win32_embed_test_stub.h"
 #include "../jsonl_observer_system.h"
 #include "../jsonl_sketch_import_job.h"
 #include <stdio.h>
@@ -325,4 +326,3 @@ int main(void) {
     }
     return 0;
 }
-
