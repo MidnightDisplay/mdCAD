@@ -57,6 +57,8 @@ internal static class Win32NativeMethods
     private const uint WsClipSiblings = 0x04000000;
     private const uint WsClipChildren = 0x02000000;
 
+    public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
     public static IntPtr CreatePlaceholderWindow(IntPtr parentHwnd)
     {
         TryGetClientSize(parentHwnd, out int width, out int height);
@@ -132,6 +134,23 @@ internal static class Win32NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetParent(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, [MarshalAs(UnmanagedType.Bool)] bool bRepaint);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT

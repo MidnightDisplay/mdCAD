@@ -52,6 +52,8 @@ public sealed class MdCadSessionCoordinatorTests
     [Fact]
     public async Task LaunchAffectingChanges_CoalesceToOneRelaunchUsingNewestSnapshot()
     {
+        TaskCompletionSource<bool> stopStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> continueStop = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TestCoordinatorHarness harness = new()
         {
             AutoStart = true,
@@ -60,6 +62,8 @@ public sealed class MdCadSessionCoordinatorTests
             Snapshot = MdCadLaunchSnapshot.Create(
                 Path.Combine(Path.GetTempPath(), "phase48-first.jsonl"),
                 startupLiveRefreshEnabled: false),
+            StopStarted = stopStarted,
+            ContinueStop = continueStop,
         };
 
         await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
@@ -69,11 +73,13 @@ public sealed class MdCadSessionCoordinatorTests
             Path.Combine(Path.GetTempPath(), "phase48-second.jsonl"),
             startupLiveRefreshEnabled: false);
         Task firstReconcile = coordinator.RequestReconcileAsync();
+        await stopStarted.Task;
 
         harness.Snapshot = MdCadLaunchSnapshot.Create(
             Path.Combine(Path.GetTempPath(), "phase48-third.jsonl"),
             startupLiveRefreshEnabled: true);
         Task secondReconcile = coordinator.RequestReconcileAsync();
+        continueStop.SetResult(true);
 
         await Task.WhenAll(firstReconcile, secondReconcile);
 
@@ -127,6 +133,10 @@ public sealed class MdCadSessionCoordinatorTests
 
         public List<MdCadLaunchSnapshot> StartedSnapshots { get; } = [];
 
+        public TaskCompletionSource<bool>? StopStarted { get; set; }
+
+        public TaskCompletionSource<bool>? ContinueStop { get; set; }
+
         public MdCadSessionCoordinator CreateCoordinator()
         {
             return new MdCadSessionCoordinator(
@@ -144,6 +154,12 @@ public sealed class MdCadSessionCoordinatorTests
                 stopSessionAsync: _ =>
                 {
                     StopCount++;
+                    StopStarted?.TrySetResult(true);
+                    if (ContinueStop != null)
+                    {
+                        return ContinueStop.Task;
+                    }
+
                     return Task.CompletedTask;
                 },
                 recreateSurfaceAsync: _ =>
