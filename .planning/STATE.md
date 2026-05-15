@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: milestone
-status: verifying
+status: completed
 stopped_at: Completed 49-01-PLAN.md
-last_updated: "2026-05-15T15:35:08.460Z"
-last_activity: "2026-05-15 -- Completed 49-01-PLAN.md"
+last_updated: "2026-05-15T15:35:53.537Z"
+last_activity: "2026-05-15 -- Phase 49 complete"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 49 closeout
+**Current focus:** Milestone v1.8 closeout
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
 Phase: 49
-Plan: 1 of 1
-Status: Phase 49 complete — ready for phase closeout
-Last activity: 2026-05-15 -- Completed 49-01-PLAN.md
+Plan: Not started
+Status: Milestone v1.8 complete — ready for milestone closeout
+Last activity: 2026-05-15 -- Phase 49 complete
 
 Progress: [██████████] 100%
 
@@ -96,13 +96,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Mark Phase 49 complete and return the milestone to closeout mode.
+- Complete milestone v1.8 and archive the finished embedding/reusable-control planning artifacts.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 49 plan execution is complete; final phase closeout is next.
+- Phase 49 is complete; milestone closeout is next.
 
 ### Quick Tasks Completed
 
