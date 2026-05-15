@@ -11,4 +11,12 @@
     <PackageReference Include="Avalonia" Version="11.3.*" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.*" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="runtime\win-x64\**\*">
+      <Link>mdcad-runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

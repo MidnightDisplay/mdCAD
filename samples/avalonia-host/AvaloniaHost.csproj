@@ -14,6 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="resources\examples\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
