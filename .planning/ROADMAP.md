@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-48
-**Total Plans:** 20
+**Total Plans:** 24
 
 ## Overview
 
@@ -135,13 +135,23 @@ Plans:
 
 ### Phase 48: Reusable Avalonia mdCAD user control
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal**: External Windows Avalonia apps can reference a reusable mdCAD control that self-packages a pinned runtime bundle and owns embedded launch/relaunch behavior.  
+**Requirements**: P48-01, P48-02, P48-03, P48-04, P48-05, P48-06, P48-07
 **Depends on:** Phase 47
-**Plans:** 0 plans
+**Plans:** 4 plans
+**Status**: Planned (2026-05-15)
+
+**Success Criteria:**
+1. A Windows-only Avalonia control library can be referenced from another app and dropped into normal XAML layout.
+2. Building the consuming app copies a pinned `mdcad-runtime/` bundle into its output and the control launches mdCAD from that copied folder only.
+3. The control supports default auto-start, explicit start/stop, and safe relaunch when launch-affecting properties change.
+4. Sealed mode stays bare by default, diagnostic mode is opt-in, bad requested JSONL paths remain visible, and prior embedded launch contracts still regress green.
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 48 to break down)
+- [ ] 48-01-PLAN.md — Create the reusable Avalonia control library and bindable public control contract.
+- [ ] 48-02-PLAN.md — Ship the pinned runtime bundle and deterministic output-copy/runtime-resolution seam.
+- [ ] 48-03-PLAN.md — Add the bindable start/relaunch coordinator and managed pure-logic validation seam.
+- [ ] 48-04-PLAN.md — Close sealed vs diagnostic presentation plus manual/regression proof.
 
 ---
 
