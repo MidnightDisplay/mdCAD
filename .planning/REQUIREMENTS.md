@@ -40,8 +40,8 @@
 - [x] **P48-03**: A XAML-dropped control auto-starts by default once both bindings and the placeholder HWND are ready.
 - [x] **P48-04**: Host apps can opt out with `AutoStart=false` and explicitly start and stop the embedded session without orphaning mdCAD.
 - [x] **P48-05**: Changing launch-affecting properties while mdCAD is running produces one serialized relaunch using the newest requested snapshot only.
-- [ ] **P48-06**: `sealed` mode stays bare by default, `diagnostic` mode is explicit opt-in, and a bad requested JSONL path stays visibly warned without blocking a usable viewer launch.
-- [ ] **P48-07**: The reusable control preserves the existing no-IPC, separate-process, Windows-only embedding contract and prior embedded regression coverage.
+- [x] **P48-06**: `sealed` mode stays bare by default, `diagnostic` mode is explicit opt-in, and a bad requested JSONL path stays visibly warned without blocking a usable viewer launch.
+- [x] **P48-07**: The reusable control preserves the existing no-IPC, separate-process, Windows-only embedding contract and prior embedded regression coverage.
 
 ## v2 Requirements
 
@@ -91,8 +91,8 @@
 | P48-03 | Phase 48 | Complete |
 | P48-04 | Phase 48 | Complete |
 | P48-05 | Phase 48 | Complete |
-| P48-06 | Phase 48 | In Progress |
-| P48-07 | Phase 48 | In Progress |
+| P48-06 | Phase 48 | Complete |
+| P48-07 | Phase 48 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
