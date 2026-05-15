@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 status: active
-stopped_at: Completed 45-02-PLAN.md
-last_updated: "2026-05-15T09:51:15.0756771+01:00"
+stopped_at: Planned Phase 46 (46-01 through 46-03)
+last_updated: "2026-05-15T10:20:54.2951860+01:00"
 last_activity: 2026-05-15
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 15
+  total_plans: 18
   completed_plans: 15
-  percent: 100
+  percent: 83
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 46 (launch-time-live-refresh) — READY FOR PLANNING
-Plan: 0 of 0 complete
-Status: Phase 45 verified complete; next step is Phase 46 planning
+Phase: 46 (launch-time-live-refresh) — READY FOR EXECUTION
+Plan: 0 of 3 complete
+Status: Phase 46 plans created; next step is execute 46-01 through 46-03
 Last activity: 2026-05-15
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ## Milestone Scope
 
@@ -85,7 +85,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan and execute Phase 46 to add opt-in launch-time live refresh on top of the completed Phase 45 startup auto-import seam.
+- Execute Phase 46 plan wave 1 (`46-01`) to add the explicit startup live-refresh flag and controller contract.
+- Execute Phase 46 plan wave 2 (`46-02`) to wire `app.c` startup-root status after 46-01 lands.
+- Execute Phase 46 plan wave 3 (`46-03`) to close regression and validation coverage after 46-02 lands.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
@@ -102,6 +104,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-15T09:51:15.0756771+01:00
-Stopped at: Completed 45-02-PLAN.md
+Last session: 2026-05-15T10:20:54.2951860+01:00
+Stopped at: Planned Phase 46 (46-01 through 46-03)
 Resume file: None

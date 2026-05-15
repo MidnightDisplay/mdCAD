@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Phases:** 43-47
-**Total Plans:** 15
+**Total Plans:** 18
 
 ## Overview
 
@@ -93,7 +93,7 @@ Plans:
 
 **Goal**: Developer can opt into startup-linked refresh without changing existing default refresh behavior.  
 **Depends on**: Phase 45  
-**Plans**: 0 plans  
+**Plans**: 3 plans  
 **Requirements**: JSON-02, JSON-04
 
 **Success Criteria:**
@@ -103,6 +103,11 @@ Plans:
 **Details:**
 - Keep launch-time live refresh an explicit opt-in.
 - Reuse existing observer metadata and commit-on-success semantics.
+
+Plans:
+- [ ] 46-01-PLAN.md — Lock the explicit `--jsonl-live-refresh` flag and startup controller opt-in contract.
+- [ ] 46-02-PLAN.md — Wire the opt-in flag through `app.c` and surface startup-root refresh status outside hidden panels.
+- [ ] 46-03-PLAN.md — Extend observer regressions to prove default-off safety and existing-semantics reuse.
 
 ### Phase 47: Sample Host Workflow Proof
 
