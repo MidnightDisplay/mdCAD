@@ -1,14 +1,14 @@
 # Milestone v1.8: Embeddable Windows JSONL Viewer
 
-**Status:** ACTIVE (all phases complete; ready for milestone closeout)
-**Phases:** 43-47
+**Status:** ACTIVE
+**Phases:** 43-48
 **Total Plans:** 20
 
 ## Overview
 
-v1.8 adds a Windows-only embedding workflow where an external host launches mdCAD as a true child window, can optionally auto-open a large flat JSONL file at startup, and can opt into existing linked refresh behavior without expanding into IPC, in-process embedding, or cross-platform hosting.
+v1.8 adds a Windows-only embedding workflow where an external host launches mdCAD as a true child window, can optionally auto-open a large flat JSONL file at startup, can opt into existing linked refresh behavior, and now extends that integration toward a reusable Avalonia user-control packaging path for external Windows apps without expanding into IPC, in-process embedding, or cross-platform hosting.
 
-The roadmap follows the research risk order: prove strict child-window startup first, close resize/focus/input correctness second, then add startup JSONL import, then launch-time live refresh, and finish with a minimal Avalonia sample host that now serves as the end-to-end proof harness.
+The roadmap follows the research risk order: prove strict child-window startup first, close resize/focus/input correctness second, then add startup JSONL import, then launch-time live refresh, then finish the sample-host proof harness, and finally extend that proven contract into a reusable Avalonia control distribution path.
 
 ## Phases
 
@@ -132,6 +132,16 @@ Plans:
 Plans:
 - [x] 47-01-PLAN.md — Add the bundled example resource and wire the absolute `--jsonl` launch contract into the host.
 - [x] 47-02-PLAN.md — Add repeatable session controls/status plus the Phase 47 manual lifecycle proof checklist.
+
+### Phase 48: Reusable Avalonia mdCAD user control
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 47
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 48 to break down)
 
 ---
 
