@@ -40,6 +40,9 @@ imgui.ini
 *.dylib
 *.a
 *.lib
+!samples/avalonia-mdcad-control/runtime/
+!samples/avalonia-mdcad-control/runtime/win-x64/
+!samples/avalonia-mdcad-control/runtime/win-x64/**
 
 # CMake generated
 CMakeCache.txt
