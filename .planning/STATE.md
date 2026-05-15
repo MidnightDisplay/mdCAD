@@ -4,8 +4,8 @@ milestone: v1.8
 milestone_name: milestone
 status: archived
 stopped_at: Completed v1.8 milestone archive
-last_updated: "2026-05-15T15:49:28.148Z"
-last_activity: "2026-05-15 -- Archived milestone v1.8"
+last_updated: "2026-05-15T16:11:28.410Z"
+last_activity: "2026-05-15 -- Completed quick task 260515-nvk: Retarget Avalonia control and sample hosts to net10 for net10 host compatibility"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 Phase: None
 Plan: None
 Status: v1.8 archived — ready for `/gsd-new-milestone`
-Last activity: 2026-05-15 -- Archived milestone v1.8
+Last activity: 2026-05-15 - Completed quick task 260515-nvk: Retarget Avalonia control and sample hosts to net10 for net10 host compatibility
 
 Progress: [██████████] 100%
 
@@ -111,6 +111,7 @@ Recent decisions affecting current work:
 |------------|------------|------|--------|--------|
 | 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
 | 2026-05-05 | 260505-p42v | Create missing Phase 42 verification artifact | done | `e2ce8fe` |
+| 2026-05-15 | 260515-nvk | Retarget Avalonia control and sample hosts to net10 for net10 host compatibility | done | `d847033` |
 
 ## Performance Metrics
 
