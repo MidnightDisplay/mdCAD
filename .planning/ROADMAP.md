@@ -138,8 +138,8 @@ Plans:
 **Goal**: External Windows Avalonia apps can reference a reusable mdCAD control that self-packages a pinned runtime bundle and owns embedded launch/relaunch behavior.  
 **Requirements**: P48-01, P48-02, P48-03, P48-04, P48-05, P48-06, P48-07
 **Depends on:** Phase 47
-**Plans:** 1/4 plans executed
-**Status**: In Progress (1/4 plans executed)
+**Plans:** 2/4 plans executed
+**Status**: In Progress (2/4 plans executed)
 
 **Success Criteria:**
 1. A Windows-only Avalonia control library can be referenced from another app and dropped into normal XAML layout.
@@ -149,7 +149,7 @@ Plans:
 
 Plans:
 - [x] 48-01-PLAN.md — Create the reusable Avalonia control library and bindable public control contract.
-- [ ] 48-02-PLAN.md — Ship the pinned runtime bundle and deterministic output-copy/runtime-resolution seam.
+- [x] 48-02-PLAN.md — Ship the pinned runtime bundle and deterministic output-copy/runtime-resolution seam.
 - [ ] 48-03-PLAN.md — Add the bindable start/relaunch coordinator and managed pure-logic validation seam.
 - [ ] 48-04-PLAN.md — Close sealed vs diagnostic presentation plus manual/regression proof.
 
