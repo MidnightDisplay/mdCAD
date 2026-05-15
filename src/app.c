@@ -1701,11 +1701,28 @@ static void mdcad_draw_solver_drag_block_toast(void) {
 
 static void mdcad_draw_startup_jsonl_import_overlay(void) {
     startup_jsonl_import_controller_t *controller = &state.startup_jsonl_import_controller;
+    ecs_entity_t startup_root = controller->job.root_entity;
+    JsonlObserverComp *observer = NULL;
+    bool startup_refresh_running = false;
+    const char *observer_prefix = "[INFO]";
+    const char *observer_message = NULL;
     bool show_running = (controller->state == STARTUP_JSONL_IMPORT_ARMED ||
                          controller->state == STARTUP_JSONL_IMPORT_RUNNING);
     bool show_error = (controller->state == STARTUP_JSONL_IMPORT_ERROR &&
                        controller->error_text[0] != '\0');
-    if (!show_running && !show_error) {
+    if (controller->state == STARTUP_JSONL_IMPORT_COMPLETE && startup_root != 0) {
+        observer = ecs_world_get_jsonl_observer(&state.ecs_world, startup_root);
+        startup_refresh_running = jsonl_observer_is_flat_refresh_running(&state.ecs_scene, startup_root);
+        if (observer && observer->message_count > 0) {
+            uint32_t idx = observer->message_count - 1u;
+            if (observer->message_severity[idx] == JSONL_OBSERVER_MSG_WARNING) observer_prefix = "[WARN]";
+            else if (observer->message_severity[idx] == JSONL_OBSERVER_MSG_ERROR) observer_prefix = "[ERROR]";
+            if (observer->message_severity[idx] != JSONL_OBSERVER_MSG_INFO) {
+                observer_message = observer->messages[idx];
+            }
+        }
+    }
+    if (!show_running && !show_error && !startup_refresh_running && !observer_message) {
         return;
     }
 
@@ -1730,7 +1747,26 @@ static void mdcad_draw_startup_jsonl_import_overlay(void) {
                 : controller->job.progress;
             igText("%s", controller->status_text[0] ? controller->status_text : "Preparing startup import...");
             igProgressBar(progress, (ImVec2){260.0f, 0.0f}, NULL);
-        } else {
+        }
+
+        if (startup_refresh_running) {
+            if (show_running) {
+                igSeparator();
+            }
+            igTextDisabled("Refresh in progress...");
+        }
+
+        if (observer_message) {
+            if (show_running || startup_refresh_running) {
+                igSeparator();
+            }
+            igTextWrapped("%s %s", observer_prefix, observer_message);
+        }
+
+        if (show_error) {
+            if (show_running || startup_refresh_running || observer_message) {
+                igSeparator();
+            }
             igTextColored((ImVec4){1.0f, 0.35f, 0.35f, 1.0f}, "%s", controller->error_text);
             if (igButton("Dismiss##startup_jsonl_import_error", (ImVec2){0.0f, 0.0f})) {
                 startup_jsonl_import_controller_dismiss_error(&state.startup_jsonl_import_controller);

@@ -47,6 +47,18 @@ static const char *find_required(const char *haystack, const char *needle) {
     return strstr(haystack, needle);
 }
 
+static int count_occurrences(const char *haystack, const char *needle) {
+    int count = 0;
+    const char *cursor = haystack;
+    size_t needle_len = strlen(needle);
+    if (!haystack || !needle || needle_len == 0u) return 0;
+    while ((cursor = strstr(cursor, needle)) != NULL) {
+        count++;
+        cursor += needle_len;
+    }
+    return count;
+}
+
 static int test_startup_jsonl_app_state_and_init_contract(void) {
     static const char *paths[] = {
         "src\\app.c",
@@ -65,6 +77,7 @@ static int test_startup_jsonl_app_state_and_init_contract(void) {
     if (!find_required(src, "startup_jsonl_import_controller_init(&state.startup_jsonl_import_controller);")) failed = 1;
     if (!find_required(src, "if (state.launch.startup_jsonl_path[0] != '\\0') {")) failed = 1;
     if (!find_required(src, "startup_jsonl_import_controller_arm(&state.startup_jsonl_import_controller,")) failed = 1;
+    if (!find_required(src, "state.launch.startup_jsonl_live_refresh);")) failed = 1;
 
     free(src);
     return failed;
@@ -88,11 +101,16 @@ static int test_startup_jsonl_app_frame_ownership_contract(void) {
         "bool startup_jsonl_scene_dirty = startup_jsonl_import_controller_tick(&state.startup_jsonl_import_controller, &state.ecs_scene);");
     const char *mark_dirty = find_required(src, "if (startup_jsonl_scene_dirty) {");
     const char *ui_gate = find_required(src, "if (state.ui_visible) {");
-    if (!new_frame || !tick || !mark_dirty || !ui_gate) {
+    const char *observer_tick = find_required(src, "jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms(), &state.selection);");
+    const char *flat_refresh_tick = find_required(src, "jsonl_observer_tick_flat_refreshes(&state.ecs_scene);");
+    if (!new_frame || !tick || !mark_dirty || !ui_gate || !observer_tick || !flat_refresh_tick) {
         failed = 1;
-    } else if (!(new_frame < tick && tick < mark_dirty && mark_dirty < ui_gate)) {
+    } else if (!(new_frame < tick && tick < mark_dirty && mark_dirty < ui_gate &&
+                 ui_gate < observer_tick && observer_tick < flat_refresh_tick)) {
         failed = 1;
     }
+    if (count_occurrences(src, "jsonl_observer_system_tick(&state.ecs_scene, scene_solver_now_ms(), &state.selection);") != 1) failed = 1;
+    if (count_occurrences(src, "jsonl_observer_tick_flat_refreshes(&state.ecs_scene);") != 1) failed = 1;
 
     free(src);
     return failed;
@@ -114,10 +132,17 @@ static int test_startup_jsonl_app_overlay_contract(void) {
     const char *helper = find_required(src, "static void mdcad_draw_startup_jsonl_import_overlay(void) {");
     const char *title = find_required(src, "igBegin(\"Startup JSONL Import\", NULL,");
     const char *dismiss = find_required(src, "startup_jsonl_import_controller_dismiss_error(&state.startup_jsonl_import_controller);");
+    const char *observer = find_required(src, "ecs_world_get_jsonl_observer(&state.ecs_world, startup_root);");
+    const char *refresh_running = find_required(src, "jsonl_observer_is_flat_refresh_running(&state.ecs_scene, startup_root);");
+    const char *refresh_text = find_required(src, "igTextDisabled(\"Refresh in progress...\");");
+    const char *warn_prefix = find_required(src, "const char *observer_prefix = \"[INFO]\";");
+    const char *warn_label = find_required(src, "\"[WARN]\"");
+    const char *error_label = find_required(src, "\"[ERROR]\"");
     const char *fps_draw = find_required(src, "ui_fps_debug_draw(&state.fps_debug);");
     const char *overlay_call = find_required(src, "mdcad_draw_startup_jsonl_import_overlay();");
     const char *constraint_menu = find_required(src, "mdcad_draw_constraint_context_menu();");
-    if (!helper || !title || !dismiss || !fps_draw || !overlay_call || !constraint_menu) {
+    if (!helper || !title || !dismiss || !observer || !refresh_running || !refresh_text ||
+        !warn_prefix || !warn_label || !error_label || !fps_draw || !overlay_call || !constraint_menu) {
         failed = 1;
     } else if (!(fps_draw < overlay_call && overlay_call < constraint_menu)) {
         failed = 1;
