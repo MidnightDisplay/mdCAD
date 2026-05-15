@@ -1,6 +1,6 @@
 # mdCAD
 
-A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; recent work adds a Windows child-HWND embedding bootstrap with an Avalonia sample host alongside deterministic sketch-solver and observable JSONL workflows.
+A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS architecture, and GPU-accelerated rendering; recent work adds a Windows child-HWND embedding bootstrap, startup `--jsonl <absolute-path>` auto-import with a non-fatal error surface, and an Avalonia sample host alongside deterministic sketch-solver and observable JSONL workflows.
 
 ![image](mdCAD.png)
 
@@ -14,6 +14,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
 - **Windows embedding bootstrap**: Strict `--embedded --parent-hwnd` child-window launch path plus a minimal Avalonia `NativeControlHost` sample host
+- **Startup JSONL launch**: Optional `--jsonl <absolute-path>` auto-import via the flat large-dump workflow without killing the viewer on bad paths
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
 ## Quick Start
@@ -28,6 +29,11 @@ cmake -B build -G Ninja && ninja -C build
 ```powershell
 cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON; cmake --build build-vulkan --config Release
 .\build-vulkan\bin\Release\mdCAD.exe
+```
+
+**Windows startup JSONL launch:**
+```powershell
+.\build-vulkan\bin\Release\mdCAD.exe --jsonl C:\absolute\path\to\data.jsonl
 ```
 
 **Web (Emscripten):**

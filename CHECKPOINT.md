@@ -209,29 +209,36 @@ When iterating with `ecs_query_next()`:
 
 ## Most Recent Changes (2026-05-15)
 
-### Phase 45 Startup JSONL Launch Contract & Controller Foundation (IMPLEMENTED, 2026-05-15)
+### Phase 45 Startup JSONL Auto-Import (IMPLEMENTED, 2026-05-15)
 
-- Completed Phase 45 plan `45-01` and moved Phase 45 execution forward to the `app.c` integration step.
-- Added launch-contract support in `src/app_launch_config.h` for `--jsonl <absolute-path>`:
-  - accepts one absolute path
-  - rejects duplicates, missing values, relative paths, and truncated copies
-  - keeps the existing embedded `--embedded --parent-hwnd` rules and unknown-flag tolerance intact
-- Replaced the `src/startup_jsonl_import_controller.h` scaffold with a working non-UI controller:
-  - reuses `jsonl_import_job_t`
-  - starts tiny imports synchronously and larger imports one tick at a time
-  - locks Phase 45 defaults to flat-import mode, mesh mode `0`, and observer metadata captured with `link_enabled=false`
-  - latches bad startup files as runtime controller errors instead of launch-parse failures
-- Green verification slice passed:
-  - `ctest --test-dir build-vulkan -C Release --output-on-failure -R "startup_jsonl_import_controller_test|embed_launch_config_test|jsonl_flat_import_options_contract_test|jsonl_flat_anchor_scoped_ingest_test"`
-- Added/updated Phase 45 execution artifacts:
+- Completed Phase 45 execution and closed plans `45-01` and `45-02` (2/2 plans).
+- Delivered the startup launch contract:
+  - `src/app_launch_config.h` now accepts `--jsonl <absolute-path>`
+  - duplicate, missing, relative, and truncated startup JSONL arguments fail fast without changing the existing embedded launch contract
+  - bad launch paths are runtime import failures, not parse-time fatal startup failures
+- Delivered the reusable startup controller foundation:
+  - `src/startup_jsonl_import_controller.h` wraps `jsonl_import_job_t`
+  - tiny startup imports complete synchronously, larger ones advance one tick per frame
+  - Phase 45 defaults stay aligned with the flat large-dump workflow, mesh mode `0`, and observer metadata captured with `link_enabled=false`
+- Delivered app-level integration in `src/app.c`:
+  - startup import now arms during `init()`
+  - ticks immediately after `simgui_new_frame(...)` and before the `state.ui_visible` panel gate
+  - marks the Scene Hierarchy cache dirty on completion so imported content appears even in viewer-first embedded layouts
+  - shows a `Startup JSONL Import` overlay for progress and a dismissible red error surface on failure
+  - never quits the viewer because of a bad startup JSONL path
+- Added/updated automated coverage:
+  - `src/tests/startup_jsonl_import_controller_test.c`
+  - `src/tests/startup_jsonl_app_contract_test.c`
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure -R "startup_jsonl_app_contract_test|startup_jsonl_import_controller_test|embed_launch_config_test|jsonl_flat_import_options_contract_test|jsonl_flat_anchor_scoped_ingest_test"` passed
+- Added/updated Phase 45 artifacts:
   - `.planning/phases/45-startup-jsonl-auto-import/45-01-SUMMARY.md`
+  - `.planning/phases/45-startup-jsonl-auto-import/45-02-SUMMARY.md`
   - `.planning/ROADMAP.md`
+  - `.planning/REQUIREMENTS.md`
   - `.planning/STATE.md`
-- Follow-up note:
-  - the new controller test needed `stm_setup()` because `jsonl_import_job_t` records per-tick timing through Sokol time helpers
 - Lifecycle continuity advanced:
-  - Phase 45 is now 1/2 plans complete
-  - next step is `45-02` to integrate startup import into `app.c` and add the app-level overlay
+  - Phase 45 is now verified complete
+  - current focus moves to Phase 46 planning for opt-in launch-time live refresh
 
 ## Most Recent Changes (2026-05-14)
 

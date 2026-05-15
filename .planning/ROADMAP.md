@@ -72,9 +72,9 @@ Plans:
 
 **Goal**: Developer can launch directly into a large flat JSONL view without breaking the embedded session.  
 **Depends on**: Phase 44  
-**Plans**: 1/2 plans complete  
+**Plans**: 2/2 plans complete  
 **Requirements**: JSON-01, JSON-03
-**Status**: In progress (45-01 complete; 45-02 pending)
+**Status**: Complete (verified 2026-05-15)
 
 **Success Criteria:**
 1. Launching mdCAD with an absolute JSONL path auto-imports the file at startup through the large flat dump workflow.
@@ -83,10 +83,11 @@ Plans:
 **Details:**
 - Reuse the existing large flat JSONL import job rather than creating a separate embedded importer.
 - Add a non-UI startup import controller so embedded launch does not depend on Scene Hierarchy UI state.
+- Keep startup error feedback app-owned and non-fatal so embedded viewer sessions survive bad launch paths.
 
 Plans:
 - [x] 45-01-PLAN.md — Lock the absolute `--jsonl` launch contract and create the non-UI startup import controller.
-- [ ] 45-02-PLAN.md — Wire the startup controller into `app.c` and add an embedded-safe startup status/error overlay.
+- [x] 45-02-PLAN.md — Wire the startup controller into `app.c` and add an embedded-safe startup status/error overlay.
 
 ### Phase 46: Launch-Time Live Refresh
 

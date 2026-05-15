@@ -16,6 +16,7 @@
 
 // Project modules
 #include "app_launch_config.h"
+#include "startup_jsonl_import_controller.h"
 #include "embed_input_state.h"
 #include "embed_layout_state.h"
 #include "math3d.h"
@@ -97,6 +98,7 @@ static struct {
     // Entity management UI
     ui_entity_inspector_state_t entity_inspector;
     ui_scene_hierarchy_state_t scene_hierarchy;
+    startup_jsonl_import_controller_t startup_jsonl_import_controller;
 
     // Debug UI
     ui_slot_buffer_debug_state_t slot_buffer_debug;
@@ -1697,6 +1699,47 @@ static void mdcad_draw_solver_drag_block_toast(void) {
     igEnd();
 }
 
+static void mdcad_draw_startup_jsonl_import_overlay(void) {
+    startup_jsonl_import_controller_t *controller = &state.startup_jsonl_import_controller;
+    bool show_running = (controller->state == STARTUP_JSONL_IMPORT_ARMED ||
+                         controller->state == STARTUP_JSONL_IMPORT_RUNNING);
+    bool show_error = (controller->state == STARTUP_JSONL_IMPORT_ERROR &&
+                       controller->error_text[0] != '\0');
+    if (!show_running && !show_error) {
+        return;
+    }
+
+    ImVec2 viewport_pos = igGetMainViewport()->Pos;
+    ImVec2 viewport_size = igGetMainViewport()->Size;
+    igSetNextWindowPos((ImVec2){
+        viewport_pos.x + viewport_size.x - 24.0f,
+        viewport_pos.y + 48.0f
+    }, ImGuiCond_Always, (ImVec2){1.0f, 0.0f});
+    igSetNextWindowBgAlpha(show_error ? 0.96f : 0.90f);
+    if (igBegin("Startup JSONL Import", NULL,
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoDocking |
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_NoFocusOnAppearing)) {
+        if (show_running) {
+            float progress = controller->state == STARTUP_JSONL_IMPORT_ARMED
+                ? 0.0f
+                : controller->job.progress;
+            igText("%s", controller->status_text[0] ? controller->status_text : "Preparing startup import...");
+            igProgressBar(progress, (ImVec2){260.0f, 0.0f}, NULL);
+        } else {
+            igTextColored((ImVec4){1.0f, 0.35f, 0.35f, 1.0f}, "%s", controller->error_text);
+            if (igButton("Dismiss##startup_jsonl_import_error", (ImVec2){0.0f, 0.0f})) {
+                startup_jsonl_import_controller_dismiss_error(&state.startup_jsonl_import_controller);
+            }
+        }
+    }
+    igEnd();
+}
+
 static void mdcad_apply_solver_failure_feedback(ecs_entity_t sketch,
                                                 const scene_solver_drag_decision_t *decision) {
     if (!decision) return;
@@ -1825,6 +1868,11 @@ static void init(void) {
     // Initialize entity management UI
     ui_entity_inspector_init(&state.entity_inspector, &state.selection, &state.ecs_world);
     ui_scene_hierarchy_init(&state.scene_hierarchy, &state.selection, &state.ecs_scene);
+    startup_jsonl_import_controller_init(&state.startup_jsonl_import_controller);
+    if (state.launch.startup_jsonl_path[0] != '\0') {
+        (void)startup_jsonl_import_controller_arm(&state.startup_jsonl_import_controller,
+                                                  state.launch.startup_jsonl_path);
+    }
     ui_entity_inspector_set_sketch_geometry_mutation_callback(
         &state.entity_inspector,
         mdcad_handle_inspector_sketch_geometry_mutation,
@@ -2068,6 +2116,10 @@ static void frame(void) {
         .delta_time = sapp_frame_duration(),
         .dpi_scale = sapp_dpi_scale(),
     });
+    bool startup_jsonl_scene_dirty = startup_jsonl_import_controller_tick(&state.startup_jsonl_import_controller, &state.ecs_scene);
+    if (startup_jsonl_scene_dirty) {
+        ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
+    }
 
     //=== UI ===
     ImGuiID dockspace_id = igDockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_None, NULL);
@@ -2090,6 +2142,7 @@ static void frame(void) {
         ui_fps_debug_draw(&state.fps_debug);
     }
 
+    mdcad_draw_startup_jsonl_import_overlay();
     mdcad_draw_constraint_context_menu();
     mdcad_draw_constraint_dimension_popup();
     mdcad_draw_solver_drag_block_toast();
@@ -2779,6 +2832,8 @@ static void cleanup(void) {
 
     // Shutdown selection buffer
     selection_shutdown(&state.selection);
+
+    startup_jsonl_import_controller_reset(&state.startup_jsonl_import_controller, &state.ecs_scene);
 
     // Shutdown scene hierarchy (frees cache)
     ui_scene_hierarchy_shutdown(&state.scene_hierarchy);

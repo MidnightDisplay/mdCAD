@@ -68,9 +68,9 @@
 | INPT-02 | Phase 44 | Complete |
 | INPT-03 | Phase 44 | Complete |
 | INPT-04 | Phase 44 | Complete |
-| JSON-01 | Phase 45 | Pending |
+| JSON-01 | Phase 45 | Complete |
 | JSON-02 | Phase 46 | Pending |
-| JSON-03 | Phase 45 | Pending |
+| JSON-03 | Phase 45 | Complete |
 | JSON-04 | Phase 46 | Pending |
 | HOST-01 | Phase 43 | Complete |
 | HOST-02 | Phase 47 | Pending |
@@ -84,4 +84,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-14 after Phase 44 verification*
+*Last updated: 2026-05-15 after Phase 45 execution*

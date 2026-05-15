@@ -299,6 +299,13 @@ if(MDCAD_NATIVE_DESKTOP)
     target_link_libraries(startup_jsonl_import_controller_test PRIVATE libsokol libcimgui flecs_static cjson)
     add_test(NAME startup_jsonl_import_controller_test COMMAND startup_jsonl_import_controller_test)
 
+    add_executable(startup_jsonl_app_contract_test tests/startup_jsonl_app_contract_test.c)
+    target_compile_features(startup_jsonl_app_contract_test PRIVATE c_std_11)
+    target_include_directories(startup_jsonl_app_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME startup_jsonl_app_contract_test COMMAND startup_jsonl_app_contract_test)
+
     add_executable(jsonl_flat_observer_manual_refresh_test tests/jsonl_flat_observer_manual_refresh_test.c)
     target_compile_features(jsonl_flat_observer_manual_refresh_test PRIVATE c_std_11)
     target_include_directories(jsonl_flat_observer_manual_refresh_test PRIVATE

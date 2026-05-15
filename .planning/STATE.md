@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 status: active
-stopped_at: Completed 45-01-PLAN.md
-last_updated: "2026-05-15T09:44:59.1592246+01:00"
+stopped_at: Completed 45-02-PLAN.md
+last_updated: "2026-05-15T09:51:15.0756771+01:00"
 last_activity: 2026-05-15
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 15
-  completed_plans: 14
-  percent: 93
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 45 — startup-jsonl-auto-import
+**Current focus:** Phase 46 — launch-time-live-refresh
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 45 (startup-jsonl-auto-import) — EXECUTING
-Plan: 1 of 2 complete
-Status: 45-01 complete; next step is 45-02 app integration and startup overlay wiring
+Phase: 46 (launch-time-live-refresh) — READY FOR PLANNING
+Plan: 0 of 0 complete
+Status: Phase 45 verified complete; next step is Phase 46 planning
 Last activity: 2026-05-15
 
-Progress: [█████████░] 93%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -68,6 +68,8 @@ Recent decisions affecting current work:
 - [Phase 44]: The embedded child HWND now advertises WM_GETDLGCODE ownership for keyboard/dialog keys. — Claiming dialog keys from the native child-window seam keeps Tab-class input with mdCAD instead of leaving it available to the host message pump.
 - [Phase 45]: `--jsonl` is a shape-validated launch flag only; bad startup paths remain runtime import failures instead of parse-time launch failures. — Preserving a usable viewer session on bad files requires the parser to validate syntax and absoluteness without probing the filesystem.
 - [Phase 45]: Startup JSONL import must flow through a reusable non-UI controller that wraps `jsonl_import_job_t` with flat-import defaults and linked refresh disabled. — The existing importer already owns the large-flat ingest behavior, so Phase 45 should bridge launch config into that job instead of duplicating it behind Scene Hierarchy UI state.
+- [Phase 45]: Startup JSONL import now ticks from `app.c` before the Scene Hierarchy visibility gate and marks hierarchy cache dirty on completion. — Embedded viewer-first launches can hide panels entirely, so startup import ownership must live in the app frame loop instead of in panel draw code.
+- [Phase 45]: Launch-time JSONL failure now surfaces through a dismissible app-level overlay and never exits the viewer. — A missing or unreadable startup file must leave embedded and standalone sessions usable for inspection and retry.
 
 ### Roadmap Evolution
 
@@ -83,13 +85,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute 45-02 to wire the startup JSONL controller into `app.c`, mark Scene Hierarchy dirty on completion, and add an app-level status/error overlay that works in embedded viewer-first layouts.
+- Plan and execute Phase 46 to add opt-in launch-time live refresh on top of the completed Phase 45 startup auto-import seam.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 44 manual verification is now complete.
+- Phase 45 automated closure is complete.
 
 ### Quick Tasks Completed
 
@@ -100,6 +102,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-15T09:44:59.1592246+01:00
-Stopped at: Completed 45-01-PLAN.md
+Last session: 2026-05-15T09:51:15.0756771+01:00
+Stopped at: Completed 45-02-PLAN.md
 Resume file: None

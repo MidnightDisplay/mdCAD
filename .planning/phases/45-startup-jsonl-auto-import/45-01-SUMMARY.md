@@ -67,7 +67,7 @@ completed: 2026-05-15
 Each task was committed atomically where practical:
 
 1. **Task 1: RED parser/controller contract scaffold** - `dd99b2a`
-2. **Task 2: Implement parser/controller and close the plan** - pending
+2. **Task 2: Implement parser/controller and close the plan** - `e2fb543`
 
 ## Files Created/Modified
 - `src/app_launch_config.h` - Adds absolute `--jsonl` launch parsing and fixed-size startup path storage.
