@@ -92,12 +92,13 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 - ✓ Linked flat JSONL refresh/delete lifecycle now preserves exact settled footprint, transactional replacement, delete cleanup, and manual large-file closure evidence (`OBSF-07`, `OBSF-08`, `PERF-04`, `PERF-05`) — Validated in Phase 42: refresh-teardown-stability
 - ✓ Windows host can now launch mdCAD in an embeddable child-window mode via CLI-specified parent HWND with strict true-child bootstrap and fail-fast startup semantics (`EMBD-01`, `EMBD-02`, `EMBD-03`) — Validated in Phase 43: embed-contract-child-window-bootstrap
 - ✓ Minimal Avalonia `NativeControlHost` sample now builds, launches mdCAD as a child window, and surfaces bootstrap attach/failure status (`HOST-01`) — Validated in Phase 43: embed-contract-child-window-bootstrap
+- ✓ Embedded launch can auto-import an absolute-path JSONL through the large flat dump workflow with optional live refresh enabled from the command line — Validated in Phases 45-46 and preserved through Phase 48: reusable-avalonia-mdcad-user-control
+- ✓ Embedded viewer preserves resize, focus, keyboard, and mouse correctness inside a resizable Avalonia `NativeControlHost` — Validated in Phase 44: embedded-resize-focus-viewer-layout and preserved through Phase 48: reusable-avalonia-mdcad-user-control
+- ✓ Repository includes a milestone-complete Avalonia sample host with bundled example JSONL plus launch, attach, JSONL, and live-refresh status messaging, now backed by a reusable control consumer harness — Validated in Phases 47-48
 
 ### Active
 
-- [ ] Embedded launch can auto-import an absolute-path JSONL through the large flat dump workflow with optional live refresh enabled from the command line.
-- [ ] Embedded viewer preserves resize, focus, keyboard, and mouse correctness inside a resizable Avalonia `NativeControlHost`.
-- [ ] Repository includes a milestone-complete Avalonia sample host with bundled example JSONL plus launch, attach, JSONL, and live-refresh status messaging.
+- None. v1.8 embedding requirements are validated through Phase 48.
 
 ### Out of Scope
 
@@ -139,7 +140,8 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 - Milestone `v1.7` is shipped with Phases 41-42 complete and archived.
 - v1.7 delivers stable linked flat JSONL convergence across initial load, observer refresh, repeated manual refresh, and linked-root deletion on the real `lamp_11.jsonl` dataset.
 - Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
-- Milestone `v1.8` is active: Phase 43 verified the strict child-HWND bootstrap, fail-fast startup contract, buildable Avalonia host proof, and baseline embedded resize syncing; Phase 44 now targets broader focus/input/layout closure.
+- Milestone `v1.8` is complete: Phases 43-48 shipped with the child-HWND embedding contract, embedded input/layout closure, launch-time JSONL import/live refresh, sample-host proof, and the reusable Avalonia control package/harness all verified.
+- v1.8 delivered a Windows-only embeddable mdCAD workflow that remains process-launched, CLI-configured, and free of new IPC while packaging a reusable control for external Avalonia consumers.
 ## Next Milestone Goals
 
 1. Add a Windows embedding contract so an external host can launch mdCAD into a child HWND with predictable lifecycle and resize behavior.
@@ -180,6 +182,7 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 | Scope v1.8 on Windows-only process-hosted embedding with CLI launch arguments | The immediate need is an Avalonia host integration path without committing mdCAD to a new SDK or IPC surface yet | Validated in Phase 43 |
 | Pull embedded child resize syncing into Phase 43 instead of deferring it | Manual attach approval depended on drag/snap/fullscreen resize behavior working in the sample host, so the bootstrap proof had to include host-side bounds synchronization | Confirmed in Phase 43 |
 | Keep requested mdCAD panels visible during the embedded bootstrap proof and defer chrome trimming polish | Manual acceptance required the hierarchy/inspector/debug/visibility/controls panels to remain visible in the hosted viewer; embedded chrome trimming can follow later polish work | Confirmed in Phase 43 |
+| Keep the reusable control sealed-by-default and surface the old host chrome only in explicit diagnostic mode | External consumers need a minimal embeddable API, while the in-repo harness still needs truthful launch/relaunch/warning diagnostics | Confirmed in Phase 48 |
 
 ## Evolution
 
@@ -199,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 after Phase 43 completion*
+*Last updated: 2026-05-15 after Phase 48 completion*
