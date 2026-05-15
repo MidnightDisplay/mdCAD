@@ -37,9 +37,9 @@
 
 - [x] **P48-01**: External Windows Avalonia apps can reference a reusable Windows-only mdCAD control library instead of duplicating the sample host's window-owned embedding seam. — Validated in Phase 48 Plan 01
 - [x] **P48-02**: Building a consuming app copies a pinned `mdcad-runtime/` bundle into consumer output and the control resolves mdCAD from that copied runtime only.
-- [ ] **P48-03**: A XAML-dropped control auto-starts by default once both bindings and the placeholder HWND are ready.
-- [ ] **P48-04**: Host apps can opt out with `AutoStart=false` and explicitly start and stop the embedded session without orphaning mdCAD.
-- [ ] **P48-05**: Changing launch-affecting properties while mdCAD is running produces one serialized relaunch using the newest requested snapshot only.
+- [x] **P48-03**: A XAML-dropped control auto-starts by default once both bindings and the placeholder HWND are ready.
+- [x] **P48-04**: Host apps can opt out with `AutoStart=false` and explicitly start and stop the embedded session without orphaning mdCAD.
+- [x] **P48-05**: Changing launch-affecting properties while mdCAD is running produces one serialized relaunch using the newest requested snapshot only.
 - [ ] **P48-06**: `sealed` mode stays bare by default, `diagnostic` mode is explicit opt-in, and a bad requested JSONL path stays visibly warned without blocking a usable viewer launch.
 - [ ] **P48-07**: The reusable control preserves the existing no-IPC, separate-process, Windows-only embedding contract and prior embedded regression coverage.
 
@@ -88,9 +88,9 @@
 | HOST-04 | Phase 47 | Complete |
 | P48-01 | Phase 48 | Complete |
 | P48-02 | Phase 48 | Complete |
-| P48-03 | Phase 48 | In Progress |
-| P48-04 | Phase 48 | In Progress |
-| P48-05 | Phase 48 | In Progress |
+| P48-03 | Phase 48 | Complete |
+| P48-04 | Phase 48 | Complete |
+| P48-05 | Phase 48 | Complete |
 | P48-06 | Phase 48 | In Progress |
 | P48-07 | Phase 48 | In Progress |
 
