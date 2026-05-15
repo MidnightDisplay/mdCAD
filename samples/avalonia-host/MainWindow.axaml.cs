@@ -71,6 +71,7 @@ public sealed class HostLaunchOptions
 {
     public string? MdcadExePath { get; }
     public EmbedTestMode TestMode { get; }
+    public bool RequestLiveRefresh { get; }
     public string? ParseError { get; }
 
     public string TestModeToken => TestMode switch
@@ -82,10 +83,11 @@ public sealed class HostLaunchOptions
         _ => "valid",
     };
 
-    private HostLaunchOptions(string? mdcadExePath, EmbedTestMode testMode, string? parseError)
+    private HostLaunchOptions(string? mdcadExePath, EmbedTestMode testMode, bool requestLiveRefresh, string? parseError)
     {
         MdcadExePath = mdcadExePath;
         TestMode = testMode;
+        RequestLiveRefresh = requestLiveRefresh;
         ParseError = parseError;
     }
 
@@ -93,6 +95,7 @@ public sealed class HostLaunchOptions
     {
         string? mdcadExePath = null;
         EmbedTestMode testMode = EmbedTestMode.Valid;
+        bool requestLiveRefresh = false;
         string? parseError = null;
 
         for (int i = 0; i < args.Length; ++i)
@@ -140,14 +143,20 @@ public sealed class HostLaunchOptions
                     break;
                 }
             }
+
+            if (string.Equals(arg, "--jsonl-live-refresh", StringComparison.Ordinal))
+            {
+                requestLiveRefresh = true;
+            }
         }
 
-        return new HostLaunchOptions(mdcadExePath, testMode, parseError);
+        return new HostLaunchOptions(mdcadExePath, testMode, requestLiveRefresh, parseError);
     }
 }
 
 public partial class MainWindow : Window
 {
+    private const string BundledExampleFileName = "sample-host-proof.jsonl";
     private const string StatusLaunching = "launching";
     private const string StatusWaitingForChildAttach = "waiting for child attach";
     private const string StatusAttached = "attached";
@@ -205,7 +214,7 @@ public partial class MainWindow : Window
         Closed += OnWindowClosed;
 
         _statusTextBlock.Text = StatusLaunching;
-        _modeTextBlock.Text = $"Harness mode: {_options.TestModeToken}";
+        _modeTextBlock.Text = BuildModeText("jsonl: bundled example pending resolution");
         _failureTextBlock.Text = BuildScaffoldMessage(IntPtr.Zero);
 
         if (!string.IsNullOrWhiteSpace(_options.ParseError))
@@ -250,6 +259,30 @@ public partial class MainWindow : Window
         return $"{pathText}{Environment.NewLine}{hwndText}{Environment.NewLine}"
              + "Wave 0 scaffold reserves --mdcad-exe, --embed-test-mode valid|invalid-parent|destroyed-parent|destroy-after-attach, "
              + "and the staged statuses launching, waiting for child attach, attached, teardown/cleanup, timeout/failure.";
+    }
+
+    private string BuildModeText(string jsonlText)
+    {
+        string liveRefreshText = _options.RequestLiveRefresh
+            ? "live refresh: requested"
+            : "live refresh: off";
+        return $"Harness mode: {_options.TestModeToken}{Environment.NewLine}{jsonlText}{Environment.NewLine}{liveRefreshText}";
+    }
+
+    private bool TryResolveBundledExample(out string? jsonlPath, out string failureMessage)
+    {
+        string bundledPath = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "resources", "examples", BundledExampleFileName));
+        if (File.Exists(bundledPath))
+        {
+            jsonlPath = bundledPath;
+            failureMessage = string.Empty;
+            return true;
+        }
+
+        jsonlPath = null;
+        failureMessage = $"Bundled example missing: {bundledPath}";
+        return false;
     }
 
     private IntPtr PrepareLaunchParentHwnd(IntPtr placeholderHwnd)
@@ -297,23 +330,40 @@ public partial class MainWindow : Window
             SetFailureStatus(failureMessage);
             return;
         }
+        if (!TryResolveBundledExample(out string? jsonlPath, out failureMessage))
+        {
+            _modeTextBlock.Text = BuildModeText("jsonl: example missing");
+            SetFailureStatus(failureMessage);
+            return;
+        }
+        string resolvedJsonlPath = jsonlPath!;
 
         _statusTextBlock.Text = StatusLaunching;
+        _modeTextBlock.Text = BuildModeText($"jsonl: example resolved -> {resolvedJsonlPath}");
         _failureTextBlock.Text =
             $"mdCAD path: {mdCadExePath}{Environment.NewLine}" +
+            $"--jsonl requested: {resolvedJsonlPath}{Environment.NewLine}" +
             $"Parent HWND: 0x{_launchParentHwnd.ToInt64():X}{Environment.NewLine}" +
             $"Mode: {_options.TestModeToken}";
 
         ProcessStartInfo startInfo = new()
         {
             FileName = mdCadExePath,
-            Arguments = $"--embedded --parent-hwnd 0x{_launchParentHwnd.ToInt64():X}",
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = false,
             WorkingDirectory = Path.GetDirectoryName(mdCadExePath) ?? Directory.GetCurrentDirectory(),
         };
+        startInfo.ArgumentList.Add("--embedded");
+        startInfo.ArgumentList.Add("--parent-hwnd");
+        startInfo.ArgumentList.Add($"0x{_launchParentHwnd.ToInt64():X}");
+        startInfo.ArgumentList.Add("--jsonl");
+        startInfo.ArgumentList.Add(resolvedJsonlPath);
+        if (_options.RequestLiveRefresh)
+        {
+            startInfo.ArgumentList.Add("--jsonl-live-refresh");
+        }
 
         try
         {
@@ -348,7 +398,7 @@ public partial class MainWindow : Window
 
         _launchStartedAt = DateTimeOffset.UtcNow;
         _statusTextBlock.Text = StatusWaitingForChildAttach;
-        _modeTextBlock.Text = $"Harness mode: {_options.TestModeToken}";
+        _modeTextBlock.Text = BuildModeText($"jsonl: example resolved -> {resolvedJsonlPath}");
         _attachTimer.Start();
     }
 
