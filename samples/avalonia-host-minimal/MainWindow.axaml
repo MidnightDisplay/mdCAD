@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mdcad="clr-namespace:MdCad.Avalonia.Control;assembly=MdCad.Avalonia.Control"
+        x:Class="AvaloniaHostMinimal.MainWindow"
+        Width="1280"
+        Height="720"
+        MinWidth="720"
+        MinHeight="480"
+        Title="mdCAD Minimal Host">
+  <Grid Margin="12">
+    <mdcad:MdCadEmbeddedControl PresentationMode="Sealed"
+                                AutoStart="True"
+                                JsonlPath="{Binding JsonlPath}" />
+  </Grid>
+</Window>

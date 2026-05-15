@@ -98,7 +98,7 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- None. v1.8 embedding requirements are validated through Phase 48.
+- [ ] Reusable control ships with the smallest possible sealed Avalonia host sample and a step-by-step quickstart showing `JsonlPath` binding from a viewmodel.
 
 ### Out of Scope
 
@@ -140,8 +140,8 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 - Milestone `v1.7` is shipped with Phases 41-42 complete and archived.
 - v1.7 delivers stable linked flat JSONL convergence across initial load, observer refresh, repeated manual refresh, and linked-root deletion on the real `lamp_11.jsonl` dataset.
 - Milestone audit result is `tech_debt`: all requirements are satisfied; deferred debt is `Clear Scene` lifecycle parity plus Nyquist validation backfill for Phases 41-42.
-- Milestone `v1.8` is complete: Phases 43-48 shipped with the child-HWND embedding contract, embedded input/layout closure, launch-time JSONL import/live refresh, sample-host proof, and the reusable Avalonia control package/harness all verified.
-- v1.8 delivered a Windows-only embeddable mdCAD workflow that remains process-launched, CLI-configured, and free of new IPC while packaging a reusable control for external Avalonia consumers.
+- Milestone `v1.8` remains active: Phases 43-48 closed the child-HWND embedding contract, embedded input/layout closure, launch-time JSONL import/live refresh, sample-host proof, and the reusable Avalonia control package/harness.
+- Phase 49 now tops off v1.8 with the smallest sealed-mode Avalonia host sample and a step-by-step reusable-control quickstart before final milestone closeout.
 ## Next Milestone Goals
 
 1. Add a Windows embedding contract so an external host can launch mdCAD into a child HWND with predictable lifecycle and resize behavior.

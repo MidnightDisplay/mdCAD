@@ -13,7 +13,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Interactive UI**: Dear ImGui interface with scene hierarchy, property inspector, search/filter
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
-- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus an Avalonia `NativeControlHost` sample host with a bundled JSONL example, explicit host-owned status lines, and repeatable launch/close proof harness controls
+- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus a reusable Avalonia control, a minimal sealed host sample, and a diagnostic harness with explicit host-owned status lines and repeatable launch/close proof controls
 - **Startup JSONL launch**: Optional `--jsonl <absolute-path>` auto-import plus explicit `--jsonl-live-refresh` opt-in that reuses the existing linked flat refresh behavior without changing the default startup path
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
@@ -44,6 +44,14 @@ dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release
 ```
 
 The sample host resolves a bundled JSONL example from `resources/examples`, shows host-owned `launch:`, `attach:`, `jsonl:`, and `live refresh:` status lines, and supports repeated `Launch Session` / `Close Session` cycles from the same window.
+
+**Windows minimal sealed host sample:**
+```powershell
+dotnet build samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
+dotnet run --project samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
+```
+
+The minimal sample hosts a single sealed `MdCadEmbeddedControl` in a grid cell and binds its startup `JsonlPath` from a viewmodel property. See `samples/avalonia-mdcad-control/QUICKSTART.md` for step-by-step wiring.
 
 **Web (Emscripten):**
 ```bash

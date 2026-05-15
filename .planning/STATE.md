@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: milestone
-status: completed
-stopped_at: Completed 48-04-PLAN.md
+status: executing
+stopped_at: Working Phase 49 minimal host sample
 last_updated: "2026-05-15T15:13:56.769Z"
-last_activity: "2026-05-15 -- Phase 48 complete"
+last_activity: "2026-05-15 -- Phase 49 minimal host and quickstart landed"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 24
+  total_plans: 25
   completed_plans: 24
-  percent: 100
+  percent: 96
 ---
 
 # Project State
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.8 closeout
+**Current focus:** Phase 49 — minimal sealed host sample and quickstart
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 48
-Plan: Not started
-Status: Milestone v1.8 complete — ready for milestone closeout
-Last activity: 2026-05-15 -- Phase 48 complete
+Phase: 49
+Plan: 1 of 1
+Status: Implementation landed — ready for Phase 49 closeout
+Last activity: 2026-05-15 -- Phase 49 minimal host and quickstart landed
 
-Progress: [██████████] 100%
+Progress: [██████████] 96%
 
 ## Milestone Scope
 
 - Milestone v1.8 goal: let a Windows host launch mdCAD as an embeddable child viewer that can auto-open a large flat JSONL file, optionally live-refresh it from the command line, and now evolve that workflow toward a reusable Avalonia control for external Windows apps.
 - Scope includes the minimal Avalonia host example, Win32 child HWND integration contract, embedded resize/focus/input behavior, and the new reusable-control packaging phase.
-- Roadmap v1.8 spans phases 43-48 across embedding bootstrap, embedded interaction, startup JSONL import, live refresh, sample-host proof, and reusable Avalonia control planning.
+- Roadmap v1.8 spans phases 43-49 across embedding bootstrap, embedded interaction, startup JSONL import, live refresh, sample-host proof, reusable Avalonia control packaging, and minimal onboarding.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -91,16 +91,17 @@ Recent decisions affecting current work:
 - Milestone v1.8 initialized: Embeddable Windows JSONL Viewer.
 - Roadmap v1.8 created: phases 43-47 map 16/16 requirements.
 - Phase 48 added: Reusable Avalonia mdCAD user control.
+- Phase 49 added: Add minimal sealed Avalonia host sample and QUICKSTART for reusable control.
 
 ### Pending Todos
 
-- Complete milestone v1.8 and archive the finished embedding/reusable-control planning artifacts.
+- Close Phase 49 with a summary/metadata pass now that the minimal sample and quickstart are implemented.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 48 is complete; milestone closeout is next.
+- Phase 49 implementation is landed; the remaining work is formal closeout and renewed milestone completion.
 
 ### Quick Tasks Completed
 

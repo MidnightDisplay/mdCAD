@@ -43,6 +43,11 @@
 - [x] **P48-06**: `sealed` mode stays bare by default, `diagnostic` mode is explicit opt-in, and a bad requested JSONL path stays visibly warned without blocking a usable viewer launch.
 - [x] **P48-07**: The reusable control preserves the existing no-IPC, separate-process, Windows-only embedding contract and prior embedded regression coverage.
 
+### Minimal Control Onboarding
+
+- [ ] **P49-01**: Repository includes the simplest possible sealed Avalonia host sample with one `MdCadEmbeddedControl` in a grid cell and `JsonlPath` bound from a viewmodel property.
+- [ ] **P49-02**: `samples/avalonia-mdcad-control/QUICKSTART.md` documents the sealed-mode wiring path, viewmodel binding, and runtime-copy behavior step by step for external consumers.
+
 ## v2 Requirements
 
 ### Host Integration Extensions
@@ -93,10 +98,12 @@
 | P48-05 | Phase 48 | Complete |
 | P48-06 | Phase 48 | Complete |
 | P48-07 | Phase 48 | Complete |
+| P49-01 | Phase 49 | In Progress |
+| P49-02 | Phase 49 | In Progress |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
+- v1 requirements: 25 total
+- Mapped to phases: 25
 - Unmapped: 0 ✓
 
 ---
