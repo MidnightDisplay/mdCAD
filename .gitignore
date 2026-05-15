@@ -3,6 +3,8 @@ build/
 build-*/
 cmake-build-*/
 out/
+**/bin/
+**/obj/
 
 # Node.js
 node_modules/
