@@ -17,9 +17,9 @@ Expected:
 
 Observed:
 
-    PENDING
+    Approved by user; no deviations reported during the automated preflight or copied-runtime existence check.
 
-Status: PENDING
+Status: PASS
 
 ## P48-M01 - sealed auto-start with copied runtime and valid JSONL
 
@@ -53,9 +53,9 @@ Expected outcome:
 
 Observed:
 
-    PENDING
+    Approved by user; sealed mode auto-started from the copied runtime with the bundled example and no deviations were reported.
 
-Status: PENDING
+Status: PASS
 
 ## P48-M02 - `AutoStart=false` plus explicit `StartAsync` / `StopAsync` and orphan cleanup
 
@@ -91,9 +91,9 @@ Expected outcome:
 
 Observed:
 
-    PENDING
+    Approved by user; `AutoStart=false`, explicit `StartAsync` / `StopAsync`, and orphan cleanup all matched expectation with no deviations reported.
 
-Status: PENDING
+Status: PASS
 
 ## P48-M03 - launch-affecting changes coalesce to the newest snapshot only
 
@@ -124,9 +124,9 @@ Expected outcome:
 
 Observed:
 
-    PENDING
+    Approved by user; the control settled on the newest launch snapshot and no extra `mdCAD.exe` was reported after relaunch.
 
-Status: PENDING
+Status: PASS
 
 ## P48-M04 - sealed versus diagnostic presentation
 
@@ -161,9 +161,9 @@ Expected outcome:
 
 Observed:
 
-    PENDING
+    Approved by user; sealed versus diagnostic presentation matched expectation and no fallback scaffold behavior was reported.
 
-Status: PENDING
+Status: PASS
 
 ## P48-M05 - empty, missing, and unreadable `JsonlPath` requests stay honest and usable
 
@@ -194,13 +194,13 @@ Expected outcome:
 
 Observed:
 
-    PENDING
+    Approved by user; empty, missing, and unreadable startup requests stayed honest and usable with no deviations reported.
 
-Status: PENDING
+Status: PASS
 
 ## Checklist Verdict
 
-- Overall status: PENDING
+- Overall status: PASS
 - Notes:
 
-    PENDING
+    Approved by user after following the checklist exactly. No failing checklist item IDs were reported.
