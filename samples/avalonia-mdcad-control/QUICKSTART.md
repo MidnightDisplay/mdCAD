@@ -1,6 +1,10 @@
 # mdCAD Avalonia Control Quick Start
 
-1. Add a project reference to `samples\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj`.
+1. Target your Avalonia host project to `net10.0-windows10.0.19041.0`.
+
+   The reusable control stays Windows-only because the embedding seam depends on the Win32 child-HWND contract.
+
+2. Add a project reference to `samples\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj`.
 
    ```xml
    <ItemGroup>
@@ -8,13 +12,13 @@
    </ItemGroup>
    ```
 
-2. Add the control namespace to your XAML.
+3. Add the control namespace to your XAML.
 
    ```xml
    xmlns:mdcad="clr-namespace:MdCad.Avalonia.Control;assembly=MdCad.Avalonia.Control"
    ```
 
-3. Expose the startup JSONL path from a viewmodel property.
+4. Expose the startup JSONL path from a viewmodel property.
 
    ```csharp
    public sealed class MainWindowViewModel
@@ -24,7 +28,7 @@
    }
    ```
 
-4. Set the window `DataContext` to that viewmodel.
+5. Set the window `DataContext` to that viewmodel.
 
    ```csharp
    public partial class MainWindow : Window
@@ -37,7 +41,7 @@
    }
    ```
 
-5. Drop `MdCadEmbeddedControl` into your layout and bind `JsonlPath`.
+6. Drop `MdCadEmbeddedControl` into your layout and bind `JsonlPath`.
 
    ```xml
    <Grid Margin="12">
@@ -47,6 +51,6 @@
    </Grid>
    ```
 
-6. Build and run your app. The control copies its pinned `mdcad-runtime\` bundle into the app output automatically, launches mdCAD in sealed mode, and auto-loads the bound absolute JSONL path on startup.
+7. Build and run your app. The control copies its pinned `mdcad-runtime\` bundle into the app output automatically, launches mdCAD in sealed mode, and auto-loads the bound absolute JSONL path on startup.
 
-7. For a working reference, open `samples\avalonia-host-minimal\`. It is the smallest in-repo Avalonia host that binds a hardcoded viewmodel path into the control.
+8. For a working reference, open `samples\avalonia-host-minimal\`. It is the smallest in-repo net10 Windows Avalonia host that binds a hardcoded viewmodel path into the control.

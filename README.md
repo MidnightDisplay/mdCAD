@@ -13,7 +13,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Interactive UI**: Dear ImGui interface with scene hierarchy, property inspector, search/filter
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
-- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus a reusable Avalonia control, a minimal sealed host sample, and a diagnostic harness with explicit host-owned status lines and repeatable launch/close proof controls
+- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus a reusable Avalonia control for `net10.0-windows10.0.19041.0` Avalonia hosts, a minimal sealed host sample, and a diagnostic harness with explicit host-owned status lines and repeatable launch/close proof controls
 - **Startup JSONL launch**: Optional `--jsonl <absolute-path>` auto-import plus explicit `--jsonl-live-refresh` opt-in that reuses the existing linked flat refresh behavior without changing the default startup path
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
@@ -51,7 +51,7 @@ dotnet build samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
 dotnet run --project samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
 ```
 
-The minimal sample hosts a single sealed `MdCadEmbeddedControl` in a grid cell and binds its startup `JsonlPath` from a viewmodel property. See `samples/avalonia-mdcad-control/QUICKSTART.md` for step-by-step wiring.
+The minimal sample hosts a single sealed `MdCadEmbeddedControl` in a grid cell and binds its startup `JsonlPath` from a viewmodel property. Both the reusable control and the sample hosts now target `net10.0-windows10.0.19041.0`. See `samples/avalonia-mdcad-control/QUICKSTART.md` for step-by-step wiring.
 
 **Web (Emscripten):**
 ```bash
