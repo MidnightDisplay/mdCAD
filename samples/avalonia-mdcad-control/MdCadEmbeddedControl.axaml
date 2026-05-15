@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MdCad.Avalonia.Control.MdCadEmbeddedControl">
-  <Grid RowDefinitions="Auto,*">
+  <Grid RowDefinitions="Auto,Auto,*">
     <Border x:Name="WarningSurface"
             Margin="0,0,0,8"
             Padding="8"
@@ -13,7 +13,34 @@
                  TextWrapping="Wrap" />
     </Border>
 
-    <Border Grid.Row="1"
+    <Border x:Name="DiagnosticSurface"
+            Grid.Row="1"
+            Margin="0,0,0,8"
+            Padding="8"
+            IsVisible="False"
+            Background="#151515"
+            BorderBrush="#3A3A3A"
+            BorderThickness="1">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="DiagnosticStartButton"
+                  Content="Launch Session" />
+          <Button x:Name="DiagnosticStopButton"
+                  Content="Close Session" />
+        </StackPanel>
+        <TextBlock x:Name="LaunchStatusTextBlock"
+                   Text="launch: idle" />
+        <TextBlock x:Name="AttachStatusTextBlock"
+                   Text="attach: idle" />
+        <TextBlock x:Name="JsonlStatusTextBlock"
+                   TextWrapping="Wrap" />
+        <TextBlock x:Name="LiveRefreshStatusTextBlock" />
+        <TextBlock x:Name="FailureTextBlock"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="2"
             Padding="8"
             BorderThickness="1"
             BorderBrush="#3A3A3A">

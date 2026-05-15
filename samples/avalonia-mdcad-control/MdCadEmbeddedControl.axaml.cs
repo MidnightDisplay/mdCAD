@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -36,6 +37,14 @@ public partial class MdCadEmbeddedControl : UserControl
     private EmbedNativeControlHost _embedSurfaceHost;
     private readonly Border _warningSurface;
     private readonly TextBlock _warningTextBlock;
+    private readonly Border _diagnosticSurface;
+    private readonly Button _diagnosticStartButton;
+    private readonly Button _diagnosticStopButton;
+    private readonly TextBlock _launchStatusTextBlock;
+    private readonly TextBlock _attachStatusTextBlock;
+    private readonly TextBlock _jsonlStatusTextBlock;
+    private readonly TextBlock _liveRefreshStatusTextBlock;
+    private readonly TextBlock _failureTextBlock;
     private readonly DispatcherTimer _attachTimer;
     private readonly DispatcherTimer _resizeSyncTimer;
     private readonly MdCadSessionCoordinator _sessionCoordinator;
@@ -45,13 +54,16 @@ public partial class MdCadEmbeddedControl : UserControl
     private IntPtr _attachedChildHwnd;
     private DateTimeOffset _launchStartedAt;
     private string? _capturedFailureLine;
+    private string? _warningText;
     private bool _isVisualAttached;
+    private MdCadLaunchSnapshot _lastLaunchSnapshot;
 
     static MdCadEmbeddedControl()
     {
-        JsonlPathProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.QueueReconcile());
-        StartupLiveRefreshEnabledProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.QueueReconcile());
-        AutoStartProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.QueueReconcile());
+        JsonlPathProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
+        StartupLiveRefreshEnabledProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
+        AutoStartProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
+        PresentationModeProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.UpdatePresentationMode());
     }
 
     public MdCadEmbeddedControl()
@@ -64,7 +76,27 @@ public partial class MdCadEmbeddedControl : UserControl
             ?? throw new InvalidOperationException("Missing WarningSurface.");
         _warningTextBlock = this.FindControl<TextBlock>("WarningTextBlock")
             ?? throw new InvalidOperationException("Missing WarningTextBlock.");
+        _diagnosticSurface = this.FindControl<Border>("DiagnosticSurface")
+            ?? throw new InvalidOperationException("Missing DiagnosticSurface.");
+        _diagnosticStartButton = this.FindControl<Button>("DiagnosticStartButton")
+            ?? throw new InvalidOperationException("Missing DiagnosticStartButton.");
+        _diagnosticStopButton = this.FindControl<Button>("DiagnosticStopButton")
+            ?? throw new InvalidOperationException("Missing DiagnosticStopButton.");
+        _launchStatusTextBlock = this.FindControl<TextBlock>("LaunchStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing LaunchStatusTextBlock.");
+        _attachStatusTextBlock = this.FindControl<TextBlock>("AttachStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing AttachStatusTextBlock.");
+        _jsonlStatusTextBlock = this.FindControl<TextBlock>("JsonlStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing JsonlStatusTextBlock.");
+        _liveRefreshStatusTextBlock = this.FindControl<TextBlock>("LiveRefreshStatusTextBlock")
+            ?? throw new InvalidOperationException("Missing LiveRefreshStatusTextBlock.");
+        _failureTextBlock = this.FindControl<TextBlock>("FailureTextBlock")
+            ?? throw new InvalidOperationException("Missing FailureTextBlock.");
 
+        _diagnosticStartButton.Click += OnDiagnosticStartClick;
+        _diagnosticStopButton.Click += OnDiagnosticStopClick;
+
+        _lastLaunchSnapshot = MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled);
         _attachTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _resizeSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _attachTimer.Tick += OnAttachTimerTick;
@@ -83,7 +115,13 @@ public partial class MdCadEmbeddedControl : UserControl
             stopSessionAsync: StopEmbeddedSessionAsync,
             recreateSurfaceAsync: RecreateEmbedSurfaceAsync);
 
+        SetLaunchStatus("idle");
+        SetAttachStatus("idle");
+        UpdatePreLaunchStatus(_lastLaunchSnapshot);
+        SetFailureStatus("No host-owned failure.");
         UpdateWarningSurface(null);
+        UpdatePresentationMode();
+        UpdateControlState();
     }
 
     public string? JsonlPath
@@ -126,7 +164,16 @@ public partial class MdCadEmbeddedControl : UserControl
 
     internal void SetLaunchWarning(string? warningText)
     {
+        _warningText = warningText;
         UpdateWarningSurface(warningText);
+        if (!string.IsNullOrWhiteSpace(warningText))
+        {
+            SetFailureStatus(warningText);
+        }
+        else if (_mdcadProcess == null && _attachedChildHwnd == IntPtr.Zero)
+        {
+            SetFailureStatus("No host-owned failure.");
+        }
     }
 
     private void InitializeComponent()
@@ -166,6 +213,13 @@ public partial class MdCadEmbeddedControl : UserControl
         }
 
         MdCadRuntimePaths runtime = MdCadRuntimeResolver.Resolve();
+        _lastLaunchSnapshot = snapshot;
+        SetLaunchStatus("launching");
+        SetAttachStatus("waiting for child attach");
+        UpdatePreLaunchStatus(snapshot);
+        SetFailureStatus($"runtime: {runtime.ExecutablePath}; parent hwnd: 0x{placeholderHandle.ToInt64():X}");
+        UpdateControlState();
+
         ProcessStartInfo startInfo = new()
         {
             FileName = runtime.ExecutablePath,
@@ -226,12 +280,21 @@ public partial class MdCadEmbeddedControl : UserControl
         _mdcadProcess.BeginOutputReadLine();
         _mdcadProcess.BeginErrorReadLine();
         _attachTimer.Start();
+        UpdateControlState();
     }
 
     private async Task StopEmbeddedSessionAsync(CancellationToken cancellationToken)
     {
         _attachTimer.Stop();
         _resizeSyncTimer.Stop();
+
+        bool hadSession = _mdcadProcess != null || _attachedChildHwnd != IntPtr.Zero;
+        if (hadSession)
+        {
+            SetLaunchStatus("teardown/cleanup");
+            SetFailureStatus("Host requested stop/close.");
+            UpdateControlState();
+        }
 
         IntPtr placeholderToDestroy = _placeholderHandle;
         _placeholderHandle = IntPtr.Zero;
@@ -245,30 +308,36 @@ public partial class MdCadEmbeddedControl : UserControl
         _launchParentHwnd = IntPtr.Zero;
         _capturedFailureLine = null;
 
-        if (_mdcadProcess == null)
+        if (_mdcadProcess != null)
         {
-            return;
-        }
-
-        Process process = _mdcadProcess;
-        if (!process.HasExited)
-        {
-            bool exitedGracefully = await WaitForExitAsync(process, GracefulEmbeddedExitWait, cancellationToken);
-            if (!exitedGracefully && !process.HasExited)
+            Process process = _mdcadProcess;
+            if (!process.HasExited)
             {
-                try
+                bool exitedGracefully = await WaitForExitAsync(process, GracefulEmbeddedExitWait, cancellationToken);
+                if (!exitedGracefully && !process.HasExited)
                 {
-                    process.Kill(true);
-                    await WaitForExitAsync(process, GracefulEmbeddedExitWait, cancellationToken);
-                }
-                catch (InvalidOperationException)
-                {
-                    // Process already exited while fallback cleanup was starting.
+                    try
+                    {
+                        process.Kill(true);
+                        await WaitForExitAsync(process, GracefulEmbeddedExitWait, cancellationToken);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Process already exited while fallback cleanup was starting.
+                    }
                 }
             }
         }
 
         DisposeCurrentProcess();
+        SetLaunchStatus("idle");
+        SetAttachStatus("idle");
+        UpdatePreLaunchStatus(CaptureLaunchSnapshot());
+        if (string.IsNullOrWhiteSpace(_warningText))
+        {
+            SetFailureStatus("No host-owned failure.");
+        }
+        UpdateControlState();
     }
 
     private Task RecreateEmbedSurfaceAsync(CancellationToken cancellationToken)
@@ -279,24 +348,29 @@ public partial class MdCadEmbeddedControl : UserControl
         _embedSurfaceHost.SizeChanged -= OnEmbedSurfaceSizeChanged;
         _placeholderHandle = IntPtr.Zero;
         _embedSurfaceHost = CreateEmbedSurfaceHost();
+        SetAttachStatus("idle");
+        UpdateControlState();
         return Task.CompletedTask;
     }
 
     private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
         _isVisualAttached = true;
+        UpdateControlState();
         QueueReconcile();
     }
 
     private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
         _isVisualAttached = false;
+        UpdateControlState();
         QueueReconcile();
     }
 
     private void OnPlaceholderHandleReady(IntPtr hwnd)
     {
         _placeholderHandle = hwnd;
+        UpdateControlState();
         QueueReconcile();
     }
 
@@ -307,6 +381,7 @@ public partial class MdCadEmbeddedControl : UserControl
             SyncAttachedChildBounds();
         }
 
+        UpdateControlState();
         QueueReconcile();
     }
 
@@ -339,6 +414,11 @@ public partial class MdCadEmbeddedControl : UserControl
             _attachTimer.Stop();
             SyncAttachedChildBounds();
             _resizeSyncTimer.Start();
+            SetLaunchStatus("active");
+            SetAttachStatus("attached");
+            UpdatePostLaunchStatus(_lastLaunchSnapshot);
+            SetFailureStatus($"child hwnd attached: 0x{childHwnd.ToInt64():X}");
+            UpdateControlState();
             return;
         }
 
@@ -430,7 +510,11 @@ public partial class MdCadEmbeddedControl : UserControl
         _attachedChildHwnd = IntPtr.Zero;
         _launchParentHwnd = IntPtr.Zero;
         _capturedFailureLine = null;
+        SetLaunchStatus("timeout/failure");
+        SetAttachStatus("idle");
+        UpdatePreLaunchStatus(CaptureLaunchSnapshot());
         SetLaunchWarning(detail);
+        UpdateControlState();
         _ = RunCoordinatorTaskAsync(_sessionCoordinator.StopAsync(), rethrow: false);
     }
 
@@ -460,12 +544,114 @@ public partial class MdCadEmbeddedControl : UserControl
         }
         catch (Exception ex)
         {
+            SetLaunchStatus("timeout/failure");
+            SetAttachStatus("idle");
+            UpdatePreLaunchStatus(CaptureLaunchSnapshot());
             SetLaunchWarning(ex.Message);
+            UpdateControlState();
             if (rethrow)
             {
                 throw;
             }
         }
+    }
+
+    private void OnLaunchSettingsChanged()
+    {
+        _lastLaunchSnapshot = CaptureLaunchSnapshot();
+        if (_mdcadProcess == null && _attachedChildHwnd == IntPtr.Zero)
+        {
+            UpdatePreLaunchStatus(_lastLaunchSnapshot);
+        }
+
+        UpdateControlState();
+        QueueReconcile();
+    }
+
+    private void OnDiagnosticStartClick(object? sender, RoutedEventArgs e)
+    {
+        _ = RunCoordinatorTaskAsync(_sessionCoordinator.StartAsync(), rethrow: false);
+    }
+
+    private void OnDiagnosticStopClick(object? sender, RoutedEventArgs e)
+    {
+        _ = RunCoordinatorTaskAsync(_sessionCoordinator.StopAsync(), rethrow: false);
+    }
+
+    private void UpdatePresentationMode()
+    {
+        _diagnosticSurface.IsVisible = PresentationMode == MdCadPresentationMode.Diagnostic;
+    }
+
+    private void UpdateControlState()
+    {
+        bool canStart = CanStartSession() && !_sessionCoordinator.IsSessionRunning;
+        bool canStop = _sessionCoordinator.IsSessionRunning || _mdcadProcess != null;
+        _diagnosticStartButton.IsEnabled = canStart;
+        _diagnosticStopButton.IsEnabled = canStop;
+    }
+
+    private void UpdatePreLaunchStatus(MdCadLaunchSnapshot snapshot)
+    {
+        if (snapshot.ShouldPassJsonlArgument)
+        {
+            SetJsonlStatus($"requested -> {snapshot.LaunchJsonlPath}");
+        }
+        else if (!string.IsNullOrWhiteSpace(snapshot.RequestedJsonlPath))
+        {
+            SetJsonlStatus($"warning-only request omitted -> {snapshot.RequestedJsonlPath}");
+        }
+        else
+        {
+            SetJsonlStatus("no startup file requested");
+        }
+
+        SetLiveRefreshStatus(snapshot.ShouldPassLiveRefreshArgument ? "requested" : "off");
+    }
+
+    private void UpdatePostLaunchStatus(MdCadLaunchSnapshot snapshot)
+    {
+        if (snapshot.ShouldPassJsonlArgument)
+        {
+            SetJsonlStatus($"viewer-managed after launch (requested: {snapshot.LaunchJsonlPath})");
+        }
+        else if (!string.IsNullOrWhiteSpace(snapshot.RequestedJsonlPath))
+        {
+            SetJsonlStatus($"viewer-managed after launch (warning-only request omitted: {snapshot.RequestedJsonlPath})");
+        }
+        else
+        {
+            SetJsonlStatus("viewer-managed after launch (no startup file requested)");
+        }
+
+        SetLiveRefreshStatus(snapshot.ShouldPassLiveRefreshArgument
+            ? "viewer-managed after launch (requested)"
+            : "viewer-managed after launch (off)");
+    }
+
+    private void SetLaunchStatus(string status)
+    {
+        _launchStatusTextBlock.Text = $"launch: {status}";
+    }
+
+    private void SetAttachStatus(string status)
+    {
+        _attachStatusTextBlock.Text = $"attach: {status}";
+    }
+
+    private void SetJsonlStatus(string status)
+    {
+        _jsonlStatusTextBlock.Text = $"jsonl: {status}";
+    }
+
+    private void SetLiveRefreshStatus(string status)
+    {
+        _liveRefreshStatusTextBlock.Text = $"live refresh: {status}";
+    }
+
+    private void SetFailureStatus(string detail)
+    {
+        _failureTextBlock.Text = $"detail: {detail}";
     }
 
     private static async Task<bool> WaitForExitAsync(Process process, TimeSpan timeout, CancellationToken cancellationToken)
