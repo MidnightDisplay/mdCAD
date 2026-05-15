@@ -339,6 +339,7 @@ static inline int scene_solver_diagnostic_count(ecs_scene_t *scene, ecs_entity_t
 static inline const sketch_solver_diagnostic_t* scene_solver_diagnostic_at(ecs_scene_t *scene,
                                                                            ecs_entity_t sketch,
                                                                            int index);
+static inline sketch_status_t scene_derive_sketch_status(ecs_scene_t *scene, ecs_entity_t sketch);
 static inline bool scene_solver_apply_status(ecs_scene_t *scene, ecs_entity_t sketch, sketch_status_t status);
 static inline const char* scene_solver_diagnostic_level_name(sketch_solver_diagnostic_severity_t severity);
 static inline bool scene_solver_set_failure_implication(ecs_scene_t *scene,
@@ -5344,7 +5345,7 @@ static inline bool scene_solver_drag_make_rejected_diagnostic(const scene_solver
 
 // Batch-parent all children to a single parent
 static inline void scene_set_parent_batch(ecs_scene_t *scene,
-    ecs_entity_t *children, int count, ecs_entity_t parent) {
+   ecs_entity_t *children, int count, ecs_entity_t parent) {
     ecs_world_set_parent_batch(scene->world, children, count, parent);
 }
 
