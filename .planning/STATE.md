@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: milestone
-status: executing
-stopped_at: Working Phase 49 minimal host sample
-last_updated: "2026-05-15T15:13:56.769Z"
-last_activity: "2026-05-15 -- Phase 49 minimal host and quickstart landed"
+status: verifying
+stopped_at: Completed 49-01-PLAN.md
+last_updated: "2026-05-15T15:35:08.460Z"
+last_activity: "2026-05-15 -- Completed 49-01-PLAN.md"
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 25
-  completed_plans: 24
-  percent: 96
+  completed_plans: 25
+  percent: 100
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 49 — minimal sealed host sample and quickstart
+**Current focus:** Phase 49 closeout
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 Phase: 49
 Plan: 1 of 1
-Status: Implementation landed — ready for Phase 49 closeout
-Last activity: 2026-05-15 -- Phase 49 minimal host and quickstart landed
+Status: Phase 49 complete — ready for phase closeout
+Last activity: 2026-05-15 -- Completed 49-01-PLAN.md
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -78,6 +78,7 @@ Recent decisions affecting current work:
 - [Phase 48]: Phase 48 starts from a Windows-only Avalonia UserControl with StyledProperty launch configuration and an internal NativeControlHost placeholder seam — This preserves the XAML-drop consumer contract while keeping the proven Win32 child-HWND wiring library-owned for later runtime packaging and relaunch work.
 - [Phase 48]: Runtime packaging now resolves mdCAD only from AppContext.BaseDirectory\\mdcad-runtime and ships a committed curated win-x64 bundle — This removes repo-root discovery, keeps the control self-contained for ProjectReference consumers, and preserves imgui.embedded.ini persistence through a runtime-root working directory in later lifecycle work.
 - [Phase 48]: The reusable control keeps a bare sealed surface by default and exposes the Phase 47 launch/status chrome only through explicit diagnostic mode while the sample host stays the scenario harness — This preserves the minimal embeddable API while still giving the in-repo consumer a truthful proof surface for start, stop, relaunch, and warning behavior.
+- [Phase 49]: The repo now ships both a diagnostic harness and a separate minimal sealed consumer sample, with the control quickstart living beside the reusable control project — This keeps external onboarding lightweight while preserving the richer sample host as the proof and debugging surface.
 
 ### Roadmap Evolution
 
@@ -95,13 +96,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Close Phase 49 with a summary/metadata pass now that the minimal sample and quickstart are implemented.
+- Mark Phase 49 complete and return the milestone to closeout mode.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
 
 - No blocking issues.
-- Phase 49 implementation is landed; the remaining work is formal closeout and renewed milestone completion.
+- Phase 49 plan execution is complete; final phase closeout is next.
 
 ### Quick Tasks Completed
 
@@ -118,9 +119,10 @@ Recent decisions affecting current work:
 | Phase 48 P02 | 8 min | 2 tasks | 7 files |
 | Phase 48 P03 | 12 min | 2 tasks | 9 files |
 | Phase 48 P04 | 7 min | 3 tasks | 5 files |
+| Phase 49 P01 | 8 min | 1 tasks | 11 files |
 
 ## Session Continuity
 
-Last session: 2026-05-15T15:13:04.575Z
-Stopped at: Completed 48-04-PLAN.md
+Last session: 2026-05-15T15:35:08.456Z
+Stopped at: Completed 49-01-PLAN.md
 Resume file: None

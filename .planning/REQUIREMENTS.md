@@ -45,8 +45,8 @@
 
 ### Minimal Control Onboarding
 
-- [ ] **P49-01**: Repository includes the simplest possible sealed Avalonia host sample with one `MdCadEmbeddedControl` in a grid cell and `JsonlPath` bound from a viewmodel property.
-- [ ] **P49-02**: `samples/avalonia-mdcad-control/QUICKSTART.md` documents the sealed-mode wiring path, viewmodel binding, and runtime-copy behavior step by step for external consumers.
+- [x] **P49-01**: Repository includes the simplest possible sealed Avalonia host sample with one `MdCadEmbeddedControl` in a grid cell and `JsonlPath` bound from a viewmodel property.
+- [x] **P49-02**: `samples/avalonia-mdcad-control/QUICKSTART.md` documents the sealed-mode wiring path, viewmodel binding, and runtime-copy behavior step by step for external consumers.
 
 ## v2 Requirements
 
@@ -98,8 +98,8 @@
 | P48-05 | Phase 48 | Complete |
 | P48-06 | Phase 48 | Complete |
 | P48-07 | Phase 48 | Complete |
-| P49-01 | Phase 49 | In Progress |
-| P49-02 | Phase 49 | In Progress |
+| P49-01 | Phase 49 | Complete |
+| P49-02 | Phase 49 | Complete |
 
 **Coverage:**
 - v1 requirements: 25 total
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-15 after Phase 48 Plan 01*
+*Last updated: 2026-05-15 after Phase 49 Plan 01*

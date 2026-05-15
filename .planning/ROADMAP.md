@@ -203,15 +203,15 @@ Plans:
 **Goal:** External consumers get the smallest possible sealed-mode Avalonia host example plus a step-by-step control wiring guide.  
 **Requirements**: P49-01, P49-02
 **Depends on:** Phase 48
-**Plans:** 1 plan
-**Status**: In Progress (implementation landed; closeout pending)
+**Plans:** 1/1 plans complete
+**Status**: Complete (2026-05-15)
 
 **Success Criteria:**
 1. Repo includes a minimal Avalonia host with a single sealed `MdCadEmbeddedControl` in a grid cell and `JsonlPath` bound from a viewmodel property.
 2. `samples/avalonia-mdcad-control/QUICKSTART.md` shows sealed-mode setup, viewmodel binding, and runtime-copy expectations step by step.
 
 Plans:
-- [ ] 49-01-PLAN.md — Add the minimal sealed host sample, viewmodel binding, and control quickstart.
+- [x] 49-01-PLAN.md — Add the minimal sealed host sample, viewmodel binding, and control quickstart.
 
 ---
 
