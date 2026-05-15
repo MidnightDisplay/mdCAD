@@ -161,6 +161,8 @@ int main(void) {
         { "test_startup_jsonl_controller_reset_clears_latched_error", test_startup_jsonl_controller_reset_clears_latched_error },
     };
 
+    stm_setup();
+
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
         if (tests[i].fn() != 0) {
             fprintf(stderr, "FAILED: %s\n", tests[i].name);

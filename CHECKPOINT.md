@@ -207,6 +207,32 @@ When iterating with `ecs_query_next()`:
 - Only call `ecs_iter_fini()` when breaking early from the loop
 - Loop exhaustion auto-finalizes; calling `ecs_iter_fini()` again causes crash
 
+## Most Recent Changes (2026-05-15)
+
+### Phase 45 Startup JSONL Launch Contract & Controller Foundation (IMPLEMENTED, 2026-05-15)
+
+- Completed Phase 45 plan `45-01` and moved Phase 45 execution forward to the `app.c` integration step.
+- Added launch-contract support in `src/app_launch_config.h` for `--jsonl <absolute-path>`:
+  - accepts one absolute path
+  - rejects duplicates, missing values, relative paths, and truncated copies
+  - keeps the existing embedded `--embedded --parent-hwnd` rules and unknown-flag tolerance intact
+- Replaced the `src/startup_jsonl_import_controller.h` scaffold with a working non-UI controller:
+  - reuses `jsonl_import_job_t`
+  - starts tiny imports synchronously and larger imports one tick at a time
+  - locks Phase 45 defaults to flat-import mode, mesh mode `0`, and observer metadata captured with `link_enabled=false`
+  - latches bad startup files as runtime controller errors instead of launch-parse failures
+- Green verification slice passed:
+  - `ctest --test-dir build-vulkan -C Release --output-on-failure -R "startup_jsonl_import_controller_test|embed_launch_config_test|jsonl_flat_import_options_contract_test|jsonl_flat_anchor_scoped_ingest_test"`
+- Added/updated Phase 45 execution artifacts:
+  - `.planning/phases/45-startup-jsonl-auto-import/45-01-SUMMARY.md`
+  - `.planning/ROADMAP.md`
+  - `.planning/STATE.md`
+- Follow-up note:
+  - the new controller test needed `stm_setup()` because `jsonl_import_job_t` records per-tick timing through Sokol time helpers
+- Lifecycle continuity advanced:
+  - Phase 45 is now 1/2 plans complete
+  - next step is `45-02` to integrate startup import into `app.c` and add the app-level overlay
+
 ## Most Recent Changes (2026-05-14)
 
 ### Phase 44 Embedded Release-Path Closure (IMPLEMENTED, 2026-05-14)

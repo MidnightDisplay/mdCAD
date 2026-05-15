@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Embeddable Windows JSONL Viewer
 status: active
-stopped_at: Completed 44-10-PLAN.md
-last_updated: "2026-05-14T23:42:47.2166361+01:00"
-last_activity: 2026-05-14
+stopped_at: Completed 45-01-PLAN.md
+last_updated: "2026-05-15T09:44:59.1592246+01:00"
+last_activity: 2026-05-15
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_plans: 15
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Position
 
-Phase: 45 (startup-jsonl-auto-import) — READY FOR PLANNING
-Plan: 0 of 0 complete
-Status: Phase 44 verified complete; next step is Phase 45 planning
-Last activity: 2026-05-14
+Phase: 45 (startup-jsonl-auto-import) — EXECUTING
+Plan: 1 of 2 complete
+Status: 45-01 complete; next step is 45-02 app integration and startup overlay wiring
+Last activity: 2026-05-15
 
-Progress: [██████████] 100%
+Progress: [█████████░] 93%
 
 ## Milestone Scope
 
@@ -66,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 44]: Standalone mdCAD keeps the previous raw key polling path so the embedded shortcut fix does not change non-embedded behavior. — The remaining gap was embedded-only, so keeping the standalone path unchanged minimized regression risk.
 - [Phase 44]: Normal WM_CAPTURECHANGED and WM_CANCELMODE no longer count as embedded host deactivation. — A normal mouse release also changes capture, so treating capture-change as runtime cancel cleared keyboard ownership, reverted gizmo drops, and stopped camera inertia even though focus never left mdCAD.
 - [Phase 44]: The embedded child HWND now advertises WM_GETDLGCODE ownership for keyboard/dialog keys. — Claiming dialog keys from the native child-window seam keeps Tab-class input with mdCAD instead of leaving it available to the host message pump.
+- [Phase 45]: `--jsonl` is a shape-validated launch flag only; bad startup paths remain runtime import failures instead of parse-time launch failures. — Preserving a usable viewer session on bad files requires the parser to validate syntax and absoluteness without probing the filesystem.
+- [Phase 45]: Startup JSONL import must flow through a reusable non-UI controller that wraps `jsonl_import_job_t` with flat-import defaults and linked refresh disabled. — The existing importer already owns the large-flat ingest behavior, so Phase 45 should bridge launch config into that job instead of duplicating it behind Scene Hierarchy UI state.
 
 ### Roadmap Evolution
 
@@ -81,7 +83,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan and execute Phase 45 to add startup JSONL auto-import on top of the completed Phase 44 embedding foundation.
+- Execute 45-02 to wire the startup JSONL controller into `app.c`, mark Scene Hierarchy dirty on completion, and add an app-level status/error overlay that works in embedded viewer-first layouts.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
 
 ### Blockers/Concerns
@@ -98,6 +100,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-14T23:42:47.2166361+01:00
-Stopped at: Completed 44-10-PLAN.md
+Last session: 2026-05-15T09:44:59.1592246+01:00
+Stopped at: Completed 45-01-PLAN.md
 Resume file: None

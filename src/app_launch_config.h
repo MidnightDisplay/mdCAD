@@ -44,6 +44,36 @@ static inline bool mdcad_launch_config_parse_parent_hwnd(const char* value,
     return true;
 }
 
+static inline bool mdcad_launch_config_path_is_absolute(const char* path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
+#if defined(_WIN32)
+    return ((strlen(path) > 2u) && path[1] == ':' && (path[2] == '\\' || path[2] == '/')) ||
+           (path[0] == '\\' && path[1] == '\\');
+#else
+    return path[0] == '/';
+#endif
+}
+
+static inline bool mdcad_launch_config_copy_startup_jsonl_path(const char* value,
+                                                               char* out_path,
+                                                               size_t out_path_size,
+                                                               char* error_buffer,
+                                                               size_t error_buffer_size) {
+    if (!value || !out_path || (out_path_size == 0u)) {
+        return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "Invalid --jsonl");
+    }
+    if (!mdcad_launch_config_path_is_absolute(value)) {
+        return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "--jsonl requires an absolute path");
+    }
+    int written = snprintf(out_path, out_path_size, "%s", value);
+    if ((written < 0) || ((size_t)written >= out_path_size)) {
+        return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "--jsonl path is too long");
+    }
+    return true;
+}
+
 static inline bool mdcad_launch_config_parse(int argc,
                                              char** argv,
                                              mdcad_launch_config_t* out_cfg,
@@ -56,6 +86,7 @@ static inline bool mdcad_launch_config_parse(int argc,
     mdcad_launch_config_t cfg = {0};
     bool embedded_seen = false;
     bool parent_seen = false;
+    bool jsonl_seen = false;
 
     if (error_buffer && (error_buffer_size > 0)) {
         error_buffer[0] = '\0';
@@ -88,6 +119,26 @@ static inline bool mdcad_launch_config_parse(int argc,
                 return false;
             }
             parent_seen = true;
+            ++i;
+            continue;
+        }
+
+        if (strcmp(arg, "--jsonl") == 0) {
+            if (jsonl_seen) {
+                return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "Duplicate --jsonl flag");
+            }
+            if ((i + 1) >= argc || !argv[i + 1] || (argv[i + 1][0] == '\0') ||
+                ((argv[i + 1][0] == '-') && (argv[i + 1][1] == '-'))) {
+                return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "Missing value for --jsonl");
+            }
+            if (!mdcad_launch_config_copy_startup_jsonl_path(argv[i + 1],
+                                                             cfg.startup_jsonl_path,
+                                                             sizeof(cfg.startup_jsonl_path),
+                                                             error_buffer,
+                                                             error_buffer_size)) {
+                return false;
+            }
+            jsonl_seen = true;
             ++i;
         }
     }

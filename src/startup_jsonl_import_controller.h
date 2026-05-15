@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "app_launch_config.h"
@@ -49,11 +50,64 @@ static inline bool startup_jsonl_import_controller_arm(startup_jsonl_import_cont
 
 static inline bool startup_jsonl_import_controller_tick(startup_jsonl_import_controller_t *controller,
                                                         ecs_scene_t *scene) {
-    (void)scene;
     if (!controller) {
         return false;
     }
     controller->scene_dirty = false;
+    if (controller->state == STARTUP_JSONL_IMPORT_IDLE ||
+        controller->state == STARTUP_JSONL_IMPORT_COMPLETE ||
+        controller->state == STARTUP_JSONL_IMPORT_ERROR) {
+        return false;
+    }
+
+    if (controller->state == STARTUP_JSONL_IMPORT_ARMED) {
+        bool started = jsonl_import_job_start(&controller->job,
+                                              controller->requested_path,
+                                              1.0f,
+                                              true,
+                                              vec4_make(1.0f, 1.0f, 1.0f, 1.0f),
+                                              false,
+                                              0.0f, 0.0f, 0.0f);
+        if (!started) {
+            controller->state = STARTUP_JSONL_IMPORT_ERROR;
+            snprintf(controller->error_text, sizeof(controller->error_text), "%s", controller->job.status_message);
+            controller->status_text[0] = '\0';
+            return false;
+        }
+        jsonl_import_job_set_mesh_mode(&controller->job, 0);
+        jsonl_import_job_set_observer_contract(&controller->job, false, controller->requested_path);
+        controller->state = STARTUP_JSONL_IMPORT_RUNNING;
+        snprintf(controller->status_text, sizeof(controller->status_text), "%s", controller->job.status_message);
+        if (jsonl_import_job_should_sync(&controller->job)) {
+            while (!jsonl_import_job_tick(&controller->job, scene)) {
+            }
+        }
+    }
+
+    if (controller->state == STARTUP_JSONL_IMPORT_RUNNING) {
+        if (!jsonl_import_job_should_sync(&controller->job)) {
+            bool finished = jsonl_import_job_tick(&controller->job, scene);
+            if (!finished) {
+                snprintf(controller->status_text, sizeof(controller->status_text), "%s", controller->job.status_message);
+                return false;
+            }
+        }
+
+        if (controller->job.state == JSONL_JOB_COMPLETE) {
+            controller->state = STARTUP_JSONL_IMPORT_COMPLETE;
+            controller->scene_dirty = true;
+            snprintf(controller->status_text, sizeof(controller->status_text), "%s", controller->job.status_message);
+            controller->error_text[0] = '\0';
+            return true;
+        }
+        if (controller->job.state == JSONL_JOB_ERROR) {
+            controller->state = STARTUP_JSONL_IMPORT_ERROR;
+            controller->status_text[0] = '\0';
+            snprintf(controller->error_text, sizeof(controller->error_text), "%s", controller->job.status_message);
+            return false;
+        }
+    }
+
     return false;
 }
 
@@ -82,6 +136,7 @@ static inline void startup_jsonl_import_controller_dismiss_error(startup_jsonl_i
     if (controller->state == STARTUP_JSONL_IMPORT_ERROR) {
         controller->state = STARTUP_JSONL_IMPORT_IDLE;
     }
+    controller->status_text[0] = '\0';
 }
 
 #endif // STARTUP_JSONL_IMPORT_CONTROLLER_H
