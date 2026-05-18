@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj" />
+    <ProjectReference Include="..\avalonia-mdcad-control\tools\MdCad.WindowsRuntimeRefresh\MdCad.WindowsRuntimeRefresh.csproj" />
   </ItemGroup>
 
 </Project>
