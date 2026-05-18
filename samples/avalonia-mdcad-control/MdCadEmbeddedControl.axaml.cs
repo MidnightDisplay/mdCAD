@@ -8,7 +8,6 @@ using Avalonia.Markup.Xaml;
 using Avalonia.VisualTree;
 
 using MdCad.Avalonia.Control.Host;
-using MdCad.Avalonia.Control.Host.Windows;
 
 namespace MdCad.Avalonia.Control;
 
@@ -54,6 +53,11 @@ public partial class MdCadEmbeddedControl : UserControl
     }
 
     public MdCadEmbeddedControl()
+        : this(null)
+    {
+    }
+
+    internal MdCadEmbeddedControl(Func<bool>? isWindowsOverride)
     {
         InitializeComponent();
 
@@ -87,7 +91,7 @@ public partial class MdCadEmbeddedControl : UserControl
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
 
-        _backend = new WindowsMdCadEmbedBackend(
+        _backend = MdCadEmbedBackendFactory.Create(
             initialSnapshot: _lastLaunchSnapshot,
             setLaunchStatus: SetLaunchStatus,
             setAttachStatus: SetAttachStatus,
@@ -96,7 +100,8 @@ public partial class MdCadEmbeddedControl : UserControl
             setFailureStatus: SetFailureStatus,
             setLaunchWarning: SetLaunchWarning,
             updateControlState: UpdateControlState,
-            captureLaunchSnapshot: CaptureLaunchSnapshot);
+            captureLaunchSnapshot: CaptureLaunchSnapshot,
+            isWindows: isWindowsOverride);
         _backend.StateChanged += OnBackendStateChanged;
         _backend.UnexpectedSessionLoss += OnBackendUnexpectedSessionLoss;
         _embedSurfaceContainer.Content = _backend.Surface;
@@ -115,13 +120,12 @@ public partial class MdCadEmbeddedControl : UserControl
                     SetFailureStatus("No host-owned failure.");
                 }
             },
-            recreateSurfaceAsync: cancellationToken => _backend.RecreateSurfaceAsync(cancellationToken));
+            recreateSurfaceAsync: cancellationToken => _backend.RecreateSurfaceAsync(cancellationToken),
+            getStartBlockedReason: () => _backend.StartBlockedReason);
 
         SetLaunchStatus("idle");
         SetAttachStatus("idle");
-        UpdatePreLaunchStatus(_lastLaunchSnapshot);
-        SetFailureStatus("No host-owned failure.");
-        UpdateWarningSurface(null);
+        RefreshPreSessionPresentation(_lastLaunchSnapshot);
         UpdatePresentationMode();
         UpdateControlState();
     }
@@ -164,6 +168,11 @@ public partial class MdCadEmbeddedControl : UserControl
 
     internal EmbedNativeControlHost EmbedSurfaceHost => (EmbedNativeControlHost)_backend.Surface;
 
+    internal void AttachForTesting()
+    {
+        SetVisualAttachmentState(isAttached: true);
+    }
+
     internal void SetLaunchWarning(string? warningText)
     {
         _warningText = warningText;
@@ -195,16 +204,12 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        _isVisualAttached = true;
-        UpdateControlState();
-        QueueReconcile();
+        SetVisualAttachmentState(isAttached: true);
     }
 
     private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        _isVisualAttached = false;
-        UpdateControlState();
-        QueueReconcile();
+        SetVisualAttachmentState(isAttached: false);
     }
 
     private void OnBackendStateChanged()
@@ -255,7 +260,7 @@ public partial class MdCadEmbeddedControl : UserControl
         _lastLaunchSnapshot = CaptureLaunchSnapshot();
         if (!_backend.HasActiveSession)
         {
-            UpdatePreLaunchStatus(_lastLaunchSnapshot);
+            RefreshPreSessionPresentation(_lastLaunchSnapshot);
         }
 
         UpdateControlState();
@@ -279,10 +284,67 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void UpdateControlState()
     {
-        bool canStart = CanStartSession() && !_sessionCoordinator.IsSessionRunning;
+        bool canStart = !IsStartBlocked() && CanStartSession() && !_sessionCoordinator.IsSessionRunning;
         bool canStop = _sessionCoordinator.IsSessionRunning || _backend.HasActiveSession;
         _diagnosticStartButton.IsEnabled = canStart;
         _diagnosticStopButton.IsEnabled = canStop;
+    }
+
+    private void SetVisualAttachmentState(bool isAttached)
+    {
+        _isVisualAttached = isAttached;
+        RefreshPreSessionPresentation(_lastLaunchSnapshot);
+        UpdateControlState();
+        QueueReconcile();
+    }
+
+    private void RefreshPreSessionPresentation(MdCadLaunchSnapshot snapshot)
+    {
+        string? primaryWarning = GetPrimaryWarningText(snapshot);
+        SetLaunchWarning(primaryWarning);
+
+        if (_backend.HasActiveSession || _sessionCoordinator.IsSessionRunning)
+        {
+            return;
+        }
+
+        if (IsStartBlocked())
+        {
+            SetLaunchStatus(_isVisualAttached ? "unsupported" : "idle");
+            SetAttachStatus(_isVisualAttached ? "unsupported" : "idle");
+            UpdateUnsupportedPreLaunchStatus(snapshot);
+            return;
+        }
+
+        SetLaunchStatus("idle");
+        SetAttachStatus("idle");
+        UpdatePreLaunchStatus(snapshot);
+    }
+
+    private string? GetPrimaryWarningText(MdCadLaunchSnapshot snapshot)
+    {
+        return _backend.StartBlockedReason ?? snapshot.WarningText;
+    }
+
+    private bool IsStartBlocked()
+    {
+        return !string.IsNullOrWhiteSpace(_backend.StartBlockedReason);
+    }
+
+    private void UpdateUnsupportedPreLaunchStatus(MdCadLaunchSnapshot snapshot)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot.RequestedJsonlPath))
+        {
+            SetJsonlStatus($"requested (informational only) -> {snapshot.RequestedJsonlPath}");
+        }
+        else
+        {
+            SetJsonlStatus("no startup file requested");
+        }
+
+        SetLiveRefreshStatus(snapshot.StartupLiveRefreshEnabled
+            ? "requested (informational only)"
+            : "off");
     }
 
     private void UpdatePreLaunchStatus(MdCadLaunchSnapshot snapshot)
