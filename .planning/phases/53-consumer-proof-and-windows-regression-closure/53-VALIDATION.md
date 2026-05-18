@@ -1,9 +1,9 @@
 ---
 phase: 53
 slug: consumer-proof-and-windows-regression-closure
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-18
 ---
 
@@ -40,7 +40,7 @@ created: 2026-05-18
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 53-01-01 | 01 | 1 | PROOF-01 | build smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | `samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj` | ✅ green |
 | 53-02-01 | 02 | 2 | WPRS-03 | integration + unit | `dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~RuntimeRefresh|FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"` | `samples/avalonia-host/AvaloniaHost.csproj` | ✅ green |
-| 53-03-01 | 03 | 3 | WPRS-03 | manual runtime proof | `dotnet run --project .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `.planning/phases/53-consumer-proof-and-windows-regression-closure/53-MANUAL-CHECKLIST.md` | ⬜ pending |
+| 53-03-01 | 03 | 3 | WPRS-03 | manual runtime proof | `dotnet run --project .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `.planning/phases/53-consumer-proof-and-windows-regression-closure/53-MANUAL-CHECKLIST.md` | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -62,11 +62,11 @@ Existing automated infrastructure covers the phase's build/test requirements. Th
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 180s
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-05-18

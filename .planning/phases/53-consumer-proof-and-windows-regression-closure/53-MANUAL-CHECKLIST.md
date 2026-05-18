@@ -6,8 +6,8 @@ Purpose: record the authoritative Phase 53 Windows runtime proof on `samples/ava
 
 1. Complete validation row `53-02-01` first:
    `dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~RuntimeRefresh|FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"`
-   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-   - Notes:
+   - Result: [X] PASS [ ] FAIL [ ] BLOCKED
+   - Notes: Approved as green before the manual host run.
 
 ## Launch Command
 
@@ -25,8 +25,8 @@ Purpose: record the authoritative Phase 53 Windows runtime proof on `samples/ava
   `samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe`
 - Confirm the harness line starts with:
   `harness: mode=diagnostic; AutoStart=true; live refresh=off;`
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: User approved copied-runtime presence during the authoritative host proof.
 
 ### 2. First viewer start and attach
 
@@ -35,8 +35,8 @@ Purpose: record the authoritative Phase 53 Windows runtime proof on `samples/ava
   `action: StartAsync requested`
 - Confirm the embedded mdCAD window appears inside the host region.
 - Confirm the embedded control status indicates an active, attached session.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: User approved the real attach/start behavior in the diagnostic host.
 
 ### 3. Stop and no-stray-process check
 
@@ -46,8 +46,8 @@ Purpose: record the authoritative Phase 53 Windows runtime proof on `samples/ava
 - After stop, run:
   `Get-CimInstance Win32_Process -Filter "Name = 'mdCAD.exe'" | Select-Object ProcessId, ExecutablePath`
 - Expected result before relaunch: no copied-runtime `mdCAD.exe` remains running for the proof host session.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: User approved the stop path and no-stray-process check before relaunch.
 
 ### 4. Relaunch in the same host window
 
@@ -56,14 +56,14 @@ Purpose: record the authoritative Phase 53 Windows runtime proof on `samples/ava
 - Confirm the harness line ends with:
   `action: StartAsync requested`
 - Confirm the copied runtime remains the proof surface and the host returns to an attached session state.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: User approved the relaunch path in the same host window.
 
 ## Result
 
-- [ ] PASS
+- [X] PASS
 - [ ] FAIL
 - [ ] BLOCKED
 
 Notes:
-- Record the authoritative Phase 53 runtime proof outcome here after the user completes the checklist.
+- Approved by the user after running the authoritative Windows diagnostic-host proof on 2026-05-18.
