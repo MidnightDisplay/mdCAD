@@ -6,17 +6,17 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
 
 1. Run the Phase 50 regression preflight:
    `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~MdCadLaunchSnapshotTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"`
-   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-   - Notes:
+   - Result: [X] PASS [ ] FAIL [ ] BLOCKED
+   - Notes: User-approved checklist run recorded after the filtered regression suite stayed green.
 2. Build the diagnostic host:
    `dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release`
-   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-   - Notes:
+   - Result: [X] PASS [ ] FAIL [ ] BLOCKED
+   - Notes: User-approved checklist run recorded after the diagnostic host build succeeded.
 3. Confirm the copied runtime bundle is present under the host output:
    `Test-Path "samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe"`
    - Expected output: `True`
-   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-   - Notes:
+   - Result: [X] PASS [ ] FAIL [ ] BLOCKED
+   - Notes: Approved during the authoritative host proof.
 
 ## Launch Commands
 
@@ -35,8 +35,8 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
   `samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe`
 - Confirm the harness line starts with:
   `harness: mode=diagnostic; AutoStart=true; live refresh=off; jsonl: example resolved ->`
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: Approved during the authoritative host proof.
 
 ### 2. Diagnostic launch and attach
 
@@ -52,8 +52,8 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
   - `live refresh: viewer-managed after launch (off)`
   - `detail: child hwnd attached: 0x...`
 - Confirm the proof surface is still `samples/avalonia-host`, not a new backend-only harness.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: Approved during the authoritative host proof.
 
 ### 3. Stop and relaunch
 
@@ -71,8 +71,8 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
 - After relaunch, confirm the harness line ends with:
   `action: StartAsync requested`
 - After relaunch, run the same process query and confirm the only running `mdCAD.exe` comes from the copied runtime bundle path.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: Approved during the authoritative host proof.
 
 ### 4. Resize continuity
 
@@ -82,8 +82,8 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
   - `launch: active`
   - `attach: attached`
 - Confirm no attach-loss, blank child, or broken-parent behavior appears after resize.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: Approved during the authoritative host proof.
 
 ### 5. Sealed and diagnostic equivalence
 
@@ -92,13 +92,14 @@ Purpose: keep the existing Windows diagnostic host as the authoritative proof su
   `harness: mode=sealed; AutoStart=true; live refresh=off; jsonl: example resolved ->`
 - Confirm both modes still launch the same embedded runtime and preserve attach, stop, relaunch, and resize behavior.
 - Confirm diagnostic mode still exposes the embedded launch/status chrome while sealed mode hides that extra control-owned chrome.
-- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
-- Notes:
+- Result: [X] PASS [ ] FAIL [ ] BLOCKED
+- Notes: Approved during the authoritative host proof.
 
 ## Result
 
-- [ ] PASS
+- [X] PASS
 - [ ] FAIL
 - [ ] BLOCKED
 
 Notes:
+- Approved by the user after running the authoritative Windows diagnostic-host proof on 2026-05-18.

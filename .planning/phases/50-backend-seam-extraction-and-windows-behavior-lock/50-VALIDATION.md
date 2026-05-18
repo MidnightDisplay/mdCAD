@@ -1,9 +1,9 @@
 ---
 phase: 50
 slug: backend-seam-extraction-and-windows-behavior-lock
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-18
 ---
 
@@ -38,8 +38,8 @@ created: 2026-05-18
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| TBD-runtime-launch-proof | TBD | TBD | WPRS-01 | unit + manual harness | `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release` plus manual `dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release` and host run | ❌ W0 backend-specific proof | ⬜ pending |
-| TBD-relaunch-status-proof | TBD | TBD | WPRS-02 | unit + manual harness | `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadSessionCoordinatorTests"` plus manual host lifecycle check | ⚠️ partial | ⬜ pending |
+| 50-01-runtime-launch-proof | 50-01 | 1 | WPRS-01 | unit + manual harness | `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadRuntimeResolverTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests"` plus manual `dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release` and host run | ✅ backend/runtime proof plus approved host run | ✅ green |
+| 50-03-relaunch-status-proof | 50-03 | 3 | WPRS-02 | unit + manual harness | `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~MdCadLaunchSnapshotTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"` plus approved host lifecycle check | ✅ coordinator/backend proof plus approved host run | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -47,9 +47,9 @@ created: 2026-05-18
 
 ## Wave 0 Requirements
 
-- [ ] `samples/avalonia-mdcad-control.tests/WindowsMdCadEmbedBackendTests.cs` — pin preserved runtime path, working directory, and required launch args for the extracted Windows backend
-- [ ] `samples/avalonia-mdcad-control.tests/MdCadRuntimeResolverTests.cs` — pin the `AppContext.BaseDirectory\mdcad-runtime\mdCAD.exe` lookup contract explicitly
-- [ ] Manual regression checklist or artifact for `samples/avalonia-host` — verify attach, stop, relaunch, and sealed/diagnostic equivalence after extraction
+- [X] `samples/avalonia-mdcad-control.tests/WindowsMdCadEmbedBackendTests.cs` — pins preserved runtime path, working directory, required launch args, and relaunch-safe placeholder handoff for the extracted Windows backend
+- [X] `samples/avalonia-mdcad-control.tests/MdCadRuntimeResolverTests.cs` — pins the `AppContext.BaseDirectory\mdcad-runtime\mdCAD.exe` lookup contract explicitly
+- [X] Manual regression checklist or artifact for `samples/avalonia-host` — verified attach, stop, relaunch, resize, and sealed/diagnostic equivalence after extraction
 
 ---
 
@@ -64,11 +64,11 @@ created: 2026-05-18
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [X] All tasks have `<automated>` verify or Wave 0 dependencies
+- [X] Sampling continuity: no 3 consecutive tasks without automated verify
+- [X] Wave 0 covers all MISSING references
+- [X] No watch-mode flags
+- [X] Feedback latency < 120s
+- [X] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved

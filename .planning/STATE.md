@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: 50-02 complete; 50-03 next
-last_updated: "2026-05-18T11:27:57.0101018+01:00"
-last_activity: 2026-05-18 -- Completed 50-02 backend seam extraction
+status: ready
+stopped_at: Phase 50 complete; Phase 51 next
+last_updated: "2026-05-18T13:02:15.0898229+01:00"
+last_activity: 2026-05-18 -- Completed Phase 50 regression closure
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 50 — backend-seam-extraction-and-windows-behavior-lock
+**Current focus:** Phase 51 — unsupported-platform-contract
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 50 (backend-seam-extraction-and-windows-behavior-lock) — EXECUTING
-Plan: 3 of 3 (50-03 next)
-Status: Executing Phase 50
-Last activity: 2026-05-18 -- Completed 50-02 backend seam extraction
+Phase: 50 (backend-seam-extraction-and-windows-behavior-lock) — COMPLETE
+Plan: Complete
+Status: Phase 50 complete; Phase 51 next
+Last activity: 2026-05-18 -- Completed Phase 50 regression closure
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -81,6 +81,7 @@ Recent decisions affecting current work:
 - [Phase 49]: The repo now ships both a diagnostic harness and a separate minimal sealed consumer sample, with the control quickstart living beside the reusable control project — This keeps external onboarding lightweight while preserving the richer sample host as the proof and debugging surface.
 - [Phase 50]: Windows lifecycle ownership now lives behind `IMdCadEmbedBackend`, while `MdCadEmbeddedControl` keeps the public properties, warning/status UI, and presentation-mode surface. — This isolates Win32/process state without changing the consumer-facing control contract.
 - [Phase 50]: `MdCadSessionCoordinator` now starts, stops, and recreates sessions through backend delegates instead of shell-owned Win32 state. — Keeping the same generation gate and relaunch ordering preserves the existing stop/recreate/restart behavior while decoupling the coordinator from the shell implementation.
+- [Phase 50]: Relaunch-safe proof now explicitly pins the current placeholder HWND in repeated backend start-info generation, and the Windows diagnostic host checklist is approved as PASS. — This closes the backend extraction loop without introducing a new proof surface or widening platform scope.
 
 ### Roadmap Evolution
 
@@ -97,11 +98,11 @@ Recent decisions affecting current work:
 - Phase 49 added: Add minimal sealed Avalonia host sample and QUICKSTART for reusable control.
 - Phase 50 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 - Phase 52.1 inserted after Phase 52: Automate Windows runtime refresh from build-vulkan with a dotnet-managed post-build helper (URGENT)
+- Phase 50 completed: backend extraction, automated relaunch lock, and approved Windows diagnostic-host proof are recorded.
 
 ### Pending Todos
 
-- Execute Phase 50 plan `50-03`.
-- Verify the Windows diagnostic host still preserves attach, stop, relaunch, resize, and sealed/diagnostic behavior after the backend extraction.
+- Discuss and plan Phase 51.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
@@ -132,6 +133,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T11:27:57.0101018+01:00
-Stopped at: 50-02 complete; 50-03 next
-Resume file: .planning/phases/50-backend-seam-extraction-and-windows-behavior-lock/50-03-PLAN.md
+Last session: 2026-05-18T13:02:15.0898229+01:00
+Stopped at: Phase 50 complete; Phase 51 next
+Resume file: .planning/ROADMAP.md
