@@ -1,28 +1,97 @@
-# Roadmap: mdCAD
+# Milestone v1.9: Plain net10 Avalonia Host Compatibility
 
-## Milestones
+**Status:** ACTIVE  
+**Phases:** 50-54  
+**Total Plans:** 0
 
-- ✅ **v1.8 Embeddable Windows JSONL Viewer** — Phases 43-49 (shipped 2026-05-15)
-  - Archive: `.planning/milestones/v1.8-ROADMAP.md`
-  - Requirements: `.planning/milestones/v1.8-REQUIREMENTS.md`
-  - Audit: `.planning/milestones/v1.8-MILESTONE-AUDIT.md` — `gaps_found` (accepted at archival)
+## Overview
+
+v1.9 widens the **host-facing compile-time contract** for the reusable Avalonia control so a plain `net10.0` host can reference it directly, while keeping the actual mdCAD embedded viewer runtime **Windows-only**.
+
+The roadmap absorbs risk in the order the research recommended: first isolate the existing Windows runtime seam behind a backend boundary, then make non-Windows behavior explicit, then widen the public control TFM, then prove the new consumer path while re-closing the Windows harness, and finally make the docs/onboarding contract truthful.
 
 ## Phases
 
-<details>
-<summary>✅ v1.8 Embeddable Windows JSONL Viewer (Phases 43-49) — SHIPPED 2026-05-15</summary>
+### Phase 50: Backend Seam Extraction and Windows Behavior Lock
 
-See `.planning/milestones/v1.8-ROADMAP.md` for full milestone detail and `.planning/milestones/v1.8-phases/` for raw phase execution history.
+**Goal:** Isolate Windows-only placeholder, attach, resize, runtime lookup, and process-launch logic behind an internal backend seam without changing the shipped Windows runtime behavior.  
+**Depends on:** Phase 49  
+**Plans:** 0 planned  
+**Requirements:** WPRS-01, WPRS-02  
+**Status:** Pending
 
-</details>
+**Success Criteria:**
+1. Shared control shell no longer owns Win32 placeholder/runtime-launch logic directly.
+2. Windows diagnostic harness still launches, attaches, stops, and relaunches through the existing child-HWND contract.
+3. Windows runtime bundle lookup plus sealed/diagnostic behavior remain intact after the refactor.
+
+### Phase 51: Unsupported-Platform Contract
+
+**Goal:** Make non-Windows behavior intentional, visible, and safe instead of relying on Windows-only seams failing implicitly.  
+**Depends on:** Phase 50  
+**Plans:** 0 planned  
+**Requirements:** PLAT-01, PLAT-02, PLAT-03  
+**Status:** Pending
+
+**Success Criteria:**
+1. Non-Windows hosts render a clear placeholder/warning instead of a blank or broken embed surface.
+2. `AutoStart` and launch-affecting property changes never attempt mdCAD launch on unsupported platforms.
+3. `StartAsync()` / `StopAsync()` expose explicit, stable unsupported-platform behavior.
+
+### Phase 52: Plain net10 Control Compatibility
+
+**Goal:** Widen the public control contract to plain `net10.0` so cross-platform Avalonia hosts can reference and instantiate the control without the current TFM compatibility wall.  
+**Depends on:** Phase 51  
+**Plans:** 0 planned  
+**Requirements:** HOSTC-01, HOSTC-02  
+**Status:** Pending
+
+**Success Criteria:**
+1. A plain `net10.0` host can restore/build against the control without `NU1201`.
+2. The control can be instantiated from shared XAML/code in the plain-`net10.0` proof host without startup crash.
+3. The Windows diagnostic harness still builds against the widened public contract.
+
+### Phase 53: Consumer Proof and Windows Regression Closure
+
+**Goal:** Prove the new host-facing compatibility path while re-verifying that the already-shipped Windows runtime path still copies, attaches, stops, and relaunches correctly.  
+**Depends on:** Phase 52  
+**Plans:** 0 planned  
+**Requirements:** WPRS-03, PROOF-01  
+**Status:** Pending
+
+**Success Criteria:**
+1. Repository includes a plain `net10.0` consumer proof that builds successfully against the control.
+2. Windows proof harness still verifies copied-runtime presence plus attach/stop/relaunch lifecycle.
+3. Regression coverage clearly distinguishes plain-host compile proof from real Windows runtime proof.
+
+### Phase 54: Docs and Onboarding Truthfulness
+
+**Goal:** Make the compile-time vs runtime support contract explicit in docs, samples, and onboarding proof so consumers understand exactly what v1.9 delivers.  
+**Depends on:** Phase 53  
+**Plans:** 0 planned  
+**Requirements:** PROOF-02  
+**Status:** Pending
+
+**Success Criteria:**
+1. Quickstart/README clearly separate compile-time host compatibility from runtime viewer support.
+2. Sample-host wording reflects Windows-only runtime support truthfully.
+3. Final onboarding/proof checklist covers both plain-host and Windows-runtime expectations.
 
 ## Progress
 
-| Milestone | Phase Range | Plans Complete | Status | Completed |
-|-----------|-------------|----------------|--------|-----------|
-| v1.8 Embeddable Windows JSONL Viewer | 43-49 | 25/25 | Complete | 2026-05-15 |
+| Phase | Status | Plans | Progress |
+|-------|--------|-------|----------|
+| 50 | ○ | 0 planned | 0% |
+| 51 | ○ | 0 planned | 0% |
+| 52 | ○ | 0 planned | 0% |
+| 53 | ○ | 0 planned | 0% |
+| 54 | ○ | 0 planned | 0% |
+
+## Coverage
+
+- Requirements mapped: 10 / 10
+- Unmapped requirements: 0 ✓
 
 ## Next Step
 
-- No active milestone is open.
-- Start the next milestone with `/gsd-new-milestone`.
+- Start with `/gsd-discuss-phase 50`

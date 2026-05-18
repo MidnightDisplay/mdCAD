@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: Plain net10 Avalonia Host Compatibility
 status: active
-stopped_at: Defining requirements
+stopped_at: Roadmap created for Phase 50
 last_updated: "2026-05-15T17:09:08.409+01:00"
-last_activity: "2026-05-15 -- Milestone v1.9 started"
+last_activity: "2026-05-15 -- Created roadmap for milestone v1.9"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 25
-  completed_plans: 25
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.9 requirements and roadmap definition
+**Current focus:** Phase 50 discussion and planning
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-15 - Milestone v1.9 started
+Phase: 50
+Plan: Not started
+Status: Ready for `/gsd-discuss-phase 50`
+Last activity: 2026-05-15 - Created roadmap for milestone v1.9
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -38,7 +38,7 @@ Progress: [░░░░░░░░░░] 0%
 
 - Milestone v1.9 goal: let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
 - Scope includes host-facing TFM compatibility widening, a safe non-Windows placeholder contract, and preservation of the existing Windows child-HWND embedding/runtime packaging path.
-- Roadmap v1.9 is not defined yet; requirements and phase structure are next.
+- Roadmap v1.9 spans phases 50-54 across backend extraction, unsupported-platform contract, plain-net10 compatibility, consumer proof, and onboarding truthfulness.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -97,7 +97,7 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - Define requirements for plain `net10.0` host compatibility and decide how the Windows-only runtime seam is surfaced to cross-platform hosts.
-- Create the v1.9 roadmap/phase breakdown after requirements are locked.
+- Start Phase 50 by discussing and planning the backend seam extraction approach.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 

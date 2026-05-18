@@ -51,22 +51,22 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HOSTC-01 | TBD | Pending |
-| HOSTC-02 | TBD | Pending |
-| PLAT-01 | TBD | Pending |
-| PLAT-02 | TBD | Pending |
-| PLAT-03 | TBD | Pending |
-| WPRS-01 | TBD | Pending |
-| WPRS-02 | TBD | Pending |
-| WPRS-03 | TBD | Pending |
-| PROOF-01 | TBD | Pending |
-| PROOF-02 | TBD | Pending |
+| HOSTC-01 | Phase 52 | Pending |
+| HOSTC-02 | Phase 52 | Pending |
+| PLAT-01 | Phase 51 | Pending |
+| PLAT-02 | Phase 51 | Pending |
+| PLAT-03 | Phase 51 | Pending |
+| WPRS-01 | Phase 50 | Pending |
+| WPRS-02 | Phase 50 | Pending |
+| WPRS-03 | Phase 53 | Pending |
+| PROOF-01 | Phase 53 | Pending |
+| PROOF-02 | Phase 54 | Pending |
 
 **Coverage:**
 - v1 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-15*
-*Last updated: 2026-05-15 after initial definition*
+*Last updated: 2026-05-15 after roadmap creation*
