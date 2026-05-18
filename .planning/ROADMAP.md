@@ -72,7 +72,7 @@ Plans:
 **Depends on:** Phase 52  
 **Plans:** 3 plans  
 **Requirements:** WPRS-04  
-**Status:** Pending
+**Status:** Planned
 
 Plans:
 - [ ] 52.1-01-PLAN.md — Add the dotnet-managed runtime-refresh helper and lock path/copy-policy tests

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: Phase 52 complete
-last_updated: "2026-05-18T15:29:28.7188386+01:00"
-last_activity: 2026-05-18 -- Completed Phase 52 plain-net10 compatibility
+status: planned
+stopped_at: Phase 52.1 planning complete
+last_updated: "2026-05-18T16:07:25.1783931+01:00"
+last_activity: 2026-05-18 -- Planned Phase 52.1 runtime refresh automation
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 9
+  completed_phases: 3
+  total_plans: 12
   completed_plans: 9
-  percent: 100
+  percent: 75
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 52 — plain-net10-control-compatibility
+**Current focus:** Phase 52.1 — automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 52 (plain-net10-control-compatibility) — COMPLETE
-Plan: Complete
-Status: Phase 52 complete; Phase 52.1 planning next
-Last activity: 2026-05-18 -- Completed Phase 52 plain-net10 compatibility
+Phase: 52.1 (automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper) — PLANNED
+Plan: 3 plans ready
+Status: Phase 52.1 planned; execute Phase 52.1 next
+Last activity: 2026-05-18 -- Planned Phase 52.1 runtime refresh automation
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 75%
 
 ## Milestone Scope
 
@@ -112,11 +112,11 @@ Recent decisions affecting current work:
 - Phase 52 plan 01 completed: the reusable control now targets plain `net10.0` and the immediate regression bundle remains green.
 - Phase 52 plan 02 completed: the minimal proof host now targets plain `net10.0` and its startup smoke is approved.
 - Phase 52 completed: the control and minimal proof host now target plain `net10.0`, and the Windows regression lane remains green.
+- Phase 52.1 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 
 ### Pending Todos
 
-- Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
-- Plan Phase 52.1 next.
+- Execute Phase 52.1 next so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -145,6 +145,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T15:29:28.7188386+01:00
-Stopped at: Phase 52 complete
-Resume file: .planning/phases/52-plain-net10-control-compatibility/52-03-SUMMARY.md
+Last session: 2026-05-18T16:07:25.1783931+01:00
+Stopped at: Phase 52.1 planning complete
+Resume file: .planning/phases/52.1-automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper/52.1-01-PLAN.md
