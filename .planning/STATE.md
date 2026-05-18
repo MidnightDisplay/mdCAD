@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Phase 54 plan 01 complete
-last_updated: "2026-05-18T18:25:25.2437251+01:00"
-last_activity: 2026-05-18 -- Completed Phase 54 plan 01 README contract rewrite
+stopped_at: Phase 54 plan 02 complete
+last_updated: "2026-05-18T18:27:36.1741781+01:00"
+last_activity: 2026-05-18 -- Completed Phase 54 plan 02 onboarding cleanup
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 ## Current Position
 
 Phase: 54 (docs-and-onboarding-truthfulness) — EXECUTING
-Plan: 2 of 3
-Status: Phase 54 plan 01 complete; plan 02 next
-Last activity: 2026-05-18 -- Completed Phase 54 plan 01 README contract rewrite
+Plan: 3 of 3
+Status: Phase 54 plan 02 complete; plan 03 next
+Last activity: 2026-05-18 -- Completed Phase 54 plan 02 onboarding cleanup
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 94%
 
 ## Milestone Scope
 
@@ -123,10 +123,11 @@ Recent decisions affecting current work:
 - Phase 53 completed: plain net10 proof, automated Windows preflight, and approved manual lifecycle proof are all recorded.
 - Phase 54 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 - Phase 54 plan 01 completed: README now documents the plain-net10 host contract, the Windows runtime proof surface, and unsupported-platform truth.
+- Phase 54 plan 02 completed: QUICKSTART and the minimal sample now align with the plain-net10 onboarding contract.
 
 ### Pending Todos
 
-- Execute Phase 54 plan 02 next so QUICKSTART and the minimal sample align with the updated support boundary.
+- Execute Phase 54 plan 03 next so the docs truth closes against the existing proof surfaces and validation ledger.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -155,6 +156,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T18:25:25.2437251+01:00
-Stopped at: Phase 54 plan 01 complete
-Resume file: .planning/phases/54-docs-and-onboarding-truthfulness/54-02-PLAN.md
+Last session: 2026-05-18T18:27:36.1741781+01:00
+Stopped at: Phase 54 plan 02 complete
+Resume file: .planning/phases/54-docs-and-onboarding-truthfulness/54-03-PLAN.md
