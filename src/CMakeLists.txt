@@ -370,6 +370,13 @@ if(MDCAD_NATIVE_DESKTOP)
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_test(NAME viewport_only_app_contract_test COMMAND viewport_only_app_contract_test)
+
+    add_executable(camera_shortcut_app_contract_test tests/camera_shortcut_app_contract_test.c)
+    target_compile_features(camera_shortcut_app_contract_test PRIVATE c_std_11)
+    target_include_directories(camera_shortcut_app_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME camera_shortcut_app_contract_test COMMAND camera_shortcut_app_contract_test)
 endif()
 
 # Emscripten-specific linker options
