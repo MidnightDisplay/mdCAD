@@ -108,10 +108,10 @@ Plans:
 **Depends on:** Phase 53  
 **Plans:** 3 plans  
 **Requirements:** PROOF-02  
-**Status:** Planned
+**Status:** Executing
 
 Plans:
-- [ ] 54-01-PLAN.md — Rewrite README so plain-net10 host compatibility, Windows-only runtime support, and proof-surface boundaries are explicit
+- [x] 54-01-PLAN.md — Rewrite README so plain-net10 host compatibility, Windows-only runtime support, and proof-surface boundaries are explicit
 - [ ] 54-02-PLAN.md — Align control QUICKSTART and minimal-sample onboarding with the plain-net10 contract and scoped JsonlPath truth
 - [ ] 54-03-PLAN.md — Lock Phase 54 validation against the existing minimal-host build lane and Phase 53 Windows proof artifacts
 
@@ -129,7 +129,7 @@ Plans:
 | 52 | ✓ | 3/3 complete | 100% |
 | 52.1 | ✓ | 3/3 complete | 100% |
 | 53 | ✓ | 3/3 complete | 100% |
-| 54 | ○ | 0/3 complete | 0% |
+| 54 | ◐ | 1/3 complete | 33% |
 
 ## Coverage
 
