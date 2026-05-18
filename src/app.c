@@ -393,6 +393,15 @@ static void mdcad_seed_embedded_dock_layout(ImGuiID dockspace_id) {
     igDockBuilderSetNodePos(dockspace_id, viewport->WorkPos);
     igDockBuilderSetNodeSize(dockspace_id, viewport->WorkSize);
 
+    if (state.launch.viewport_only) {
+        igDockBuilderDockWindow("3D Viewport", dockspace_id);
+        igDockBuilderFinish(dockspace_id);
+
+        state.embed_layout_seed_pending = false;
+        imgui_storage_mark_should_save();
+        return;
+    }
+
     ImGuiID dock_center_id = dockspace_id;
     ImGuiID dock_bottom_id = 0;
     igDockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.34f, &dock_bottom_id, &dock_center_id);
@@ -1820,7 +1829,11 @@ static void init(void) {
 
     embed_layout_state_t embed_layout_state = embed_layout_state_make(
         state.launch.embedded,
-        state.launch.embedded && imgui_storage_native_store_exists(embed_layout_state_embedded_store_filename()));
+        state.launch.embedded && state.launch.viewport_only,
+        state.launch.embedded && imgui_storage_native_store_exists(
+            state.launch.viewport_only
+                ? embed_layout_state_viewport_only_store_filename()
+                : embed_layout_state_embedded_store_filename()));
     state.embed_layout = embed_layout_state_resolve(&embed_layout_state);
     state.embed_layout_seed_pending = state.embed_layout.should_seed_default_layout;
     imgui_storage_configure(&state.embed_layout);
@@ -1867,7 +1880,7 @@ static void init(void) {
     if (state.launch.embedded) {
         (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_ATTACH);
     }
-    state.ui_visible = true;
+    state.ui_visible = !(state.launch.embedded && state.launch.viewport_only);
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
