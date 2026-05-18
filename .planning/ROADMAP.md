@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Phases:** 50-54, plus inserted Phase 52.1  
-**Total Plans:** 9
+**Total Plans:** 12
 
 ## Overview
 
@@ -70,12 +70,14 @@ Plans:
 
 **Goal:** Add a dotnet-managed C# build helper and control-project post-build flow that rebuilds mdCAD in `build-vulkan` and refreshes the committed Windows runtime payload under `samples/avalonia-mdcad-control/runtime/win-x64` without relying on PowerShell.  
 **Depends on:** Phase 52  
-**Plans:** 0 planned  
+**Plans:** 3 plans  
 **Requirements:** WPRS-04  
 **Status:** Pending
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 52.1 to break down)
+- [ ] 52.1-01-PLAN.md — Add the dotnet-managed runtime-refresh helper and lock path/copy-policy tests
+- [ ] 52.1-02-PLAN.md — Wire opt-in control-project post-build refresh for the committed bundle plus current output
+- [ ] 52.1-03-PLAN.md — Close integration with host build and hash/path verification of the refreshed runtime chain
 
 **Success Criteria:**
 1. The repo has a .NET/C# helper flow that can rebuild mdCAD from the Windows Vulkan build path and refresh the runtime bundle without PowerShell.
@@ -115,7 +117,7 @@ Plans:
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
 | 52 | ✓ | 3/3 complete | 100% |
-| 52.1 | ○ | 0 planned | 0% |
+| 52.1 | ○ | 0/3 complete | 0% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
 
@@ -126,4 +128,4 @@ Plans:
 
 ## Next Step
 
-- Start `/gsd-plan-phase 52.1`
+- Execute `/gsd-execute-phase 52.1`
