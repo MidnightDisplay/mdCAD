@@ -72,10 +72,10 @@ Plans:
 **Depends on:** Phase 52  
 **Plans:** 3 plans  
 **Requirements:** WPRS-04  
-**Status:** Planned
+**Status:** Executing
 
 Plans:
-- [ ] 52.1-01-PLAN.md — Add the dotnet-managed runtime-refresh helper and lock path/copy-policy tests
+- [x] 52.1-01-PLAN.md — Add the dotnet-managed runtime-refresh helper and lock path/copy-policy tests
 - [ ] 52.1-02-PLAN.md — Wire opt-in control-project post-build refresh for the committed bundle plus current output
 - [ ] 52.1-03-PLAN.md — Close integration with host build and hash/path verification of the refreshed runtime chain
 
@@ -117,7 +117,7 @@ Plans:
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
 | 52 | ✓ | 3/3 complete | 100% |
-| 52.1 | ○ | 0/3 complete | 0% |
+| 52.1 | ◐ | 1/3 complete | 33% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
 

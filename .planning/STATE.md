@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: planned
-stopped_at: Phase 52.1 planning complete
-last_updated: "2026-05-18T16:07:25.1783931+01:00"
-last_activity: 2026-05-18 -- Planned Phase 52.1 runtime refresh automation
+status: executing
+stopped_at: Phase 52.1 plan 01 complete
+last_updated: "2026-05-18T16:17:42.7099139+01:00"
+last_activity: 2026-05-18 -- Completed Phase 52.1 plan 01 helper foundation
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 ## Current Position
 
-Phase: 52.1 (automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper) — PLANNED
-Plan: 3 plans ready
-Status: Phase 52.1 planned; execute Phase 52.1 next
-Last activity: 2026-05-18 -- Planned Phase 52.1 runtime refresh automation
+Phase: 52.1 (automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper) — EXECUTING
+Plan: 2 of 3
+Status: Phase 52.1 plan 01 complete; plan 02 next
+Last activity: 2026-05-18 -- Completed Phase 52.1 plan 01 helper foundation
 
-Progress: [███████░░░] 75%
+Progress: [████████░░] 83%
 
 ## Milestone Scope
 
@@ -113,10 +113,11 @@ Recent decisions affecting current work:
 - Phase 52 plan 02 completed: the minimal proof host now targets plain `net10.0` and its startup smoke is approved.
 - Phase 52 completed: the control and minimal proof host now target plain `net10.0`, and the Windows regression lane remains green.
 - Phase 52.1 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
+- Phase 52.1 plan 01 completed: the runtime refresh helper foundation, targeted tests, and green validation row 52.1-01-01 are recorded.
 
 ### Pending Todos
 
-- Execute Phase 52.1 next so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
+- Execute Phase 52.1 plan 02 next so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -145,6 +146,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T16:07:25.1783931+01:00
-Stopped at: Phase 52.1 planning complete
-Resume file: .planning/phases/52.1-automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper/52.1-01-PLAN.md
+Last session: 2026-05-18T16:17:42.7099139+01:00
+Stopped at: Phase 52.1 plan 01 complete
+Resume file: .planning/phases/52.1-automate-windows-runtime-refresh-from-build-vulkan-with-a-dotnet-managed-post-build-helper/52.1-02-PLAN.md
