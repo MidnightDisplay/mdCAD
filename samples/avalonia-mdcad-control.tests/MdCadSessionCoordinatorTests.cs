@@ -145,10 +145,9 @@ public sealed class MdCadSessionCoordinatorTests
                 getPlaceholderHandle: () => PlaceholderHandle,
                 getAutoStart: () => AutoStart,
                 applyWarning: warningText => WarningText = warningText,
-                startSessionAsync: (snapshot, placeholderHandle, _) =>
+                startSessionAsync: (snapshot, _) =>
                 {
                     StartedSnapshots.Add(snapshot);
-                    PlaceholderHandle = placeholderHandle;
                     return Task.CompletedTask;
                 },
                 stopSessionAsync: _ =>

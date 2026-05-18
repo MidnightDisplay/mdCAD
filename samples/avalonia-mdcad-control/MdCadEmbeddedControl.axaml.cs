@@ -5,7 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 using MdCad.Avalonia.Control.Host;
@@ -15,9 +14,6 @@ namespace MdCad.Avalonia.Control;
 
 public partial class MdCadEmbeddedControl : UserControl
 {
-    private static readonly TimeSpan GracefulEmbeddedExitWait = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan ChildAttachTimeout = TimeSpan.FromSeconds(10);
-
     public static readonly StyledProperty<string?> JsonlPathProperty =
         AvaloniaProperty.Register<MdCadEmbeddedControl, string?>(nameof(JsonlPath));
 
@@ -44,7 +40,7 @@ public partial class MdCadEmbeddedControl : UserControl
     private readonly TextBlock _liveRefreshStatusTextBlock;
     private readonly TextBlock _failureTextBlock;
     private readonly MdCadSessionCoordinator _sessionCoordinator;
-    private readonly WindowsMdCadEmbedBackend _windowsBackend;
+    private readonly IMdCadEmbedBackend _backend;
     private string? _warningText;
     private bool _isVisualAttached;
     private MdCadLaunchSnapshot _lastLaunchSnapshot;
@@ -91,7 +87,7 @@ public partial class MdCadEmbeddedControl : UserControl
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
 
-        _windowsBackend = new WindowsMdCadEmbedBackend(
+        _backend = new WindowsMdCadEmbedBackend(
             initialSnapshot: _lastLaunchSnapshot,
             setLaunchStatus: SetLaunchStatus,
             setAttachStatus: SetAttachStatus,
@@ -101,18 +97,25 @@ public partial class MdCadEmbeddedControl : UserControl
             setLaunchWarning: SetLaunchWarning,
             updateControlState: UpdateControlState,
             captureLaunchSnapshot: CaptureLaunchSnapshot);
-        _windowsBackend.StateChanged += OnBackendStateChanged;
-        _windowsBackend.UnexpectedSessionLoss += OnBackendUnexpectedSessionLoss;
-        _embedSurfaceContainer.Content = _windowsBackend.Surface;
+        _backend.StateChanged += OnBackendStateChanged;
+        _backend.UnexpectedSessionLoss += OnBackendUnexpectedSessionLoss;
+        _embedSurfaceContainer.Content = _backend.Surface;
         _sessionCoordinator = new MdCadSessionCoordinator(
             captureSnapshot: CaptureLaunchSnapshot,
             canStartSession: CanStartSession,
-            getPlaceholderHandle: () => _windowsBackend.PlaceholderHandle,
+            getPlaceholderHandle: () => _backend.PlaceholderHandle,
             getAutoStart: () => AutoStart,
             applyWarning: SetLaunchWarning,
-            startSessionAsync: StartEmbeddedSessionAsync,
-            stopSessionAsync: StopEmbeddedSessionAsync,
-            recreateSurfaceAsync: RecreateEmbedSurfaceAsync);
+            startSessionAsync: (snapshot, cancellationToken) => _backend.StartSessionAsync(snapshot, cancellationToken),
+            stopSessionAsync: async cancellationToken =>
+            {
+                await _backend.StopSessionAsync(cancellationToken);
+                if (string.IsNullOrWhiteSpace(_warningText))
+                {
+                    SetFailureStatus("No host-owned failure.");
+                }
+            },
+            recreateSurfaceAsync: cancellationToken => _backend.RecreateSurfaceAsync(cancellationToken));
 
         SetLaunchStatus("idle");
         SetAttachStatus("idle");
@@ -157,9 +160,9 @@ public partial class MdCadEmbeddedControl : UserControl
         return RunCoordinatorTaskAsync(_sessionCoordinator.StopAsync(), rethrow: true);
     }
 
-    internal IntPtr PlaceholderHandle => _windowsBackend.PlaceholderHandle;
+    internal IntPtr PlaceholderHandle => _backend.PlaceholderHandle;
 
-    internal EmbedNativeControlHost EmbedSurfaceHost => (EmbedNativeControlHost)_windowsBackend.Surface;
+    internal EmbedNativeControlHost EmbedSurfaceHost => (EmbedNativeControlHost)_backend.Surface;
 
     internal void SetLaunchWarning(string? warningText)
     {
@@ -169,7 +172,7 @@ public partial class MdCadEmbeddedControl : UserControl
         {
             SetFailureStatus(warningText);
         }
-        else if (!_windowsBackend.HasActiveSession)
+        else if (!_backend.HasActiveSession)
         {
             SetFailureStatus("No host-owned failure.");
         }
@@ -187,31 +190,7 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private bool CanStartSession()
     {
-        return _isVisualAttached && _windowsBackend.CanStartSession;
-    }
-
-    private Task StartEmbeddedSessionAsync(MdCadLaunchSnapshot snapshot, IntPtr placeholderHandle, CancellationToken cancellationToken)
-    {
-        if (placeholderHandle == IntPtr.Zero || placeholderHandle != _windowsBackend.PlaceholderHandle)
-        {
-            throw new InvalidOperationException("Embedded placeholder HWND changed before launch.");
-        }
-
-        return _windowsBackend.StartSessionAsync(snapshot, cancellationToken);
-    }
-
-    private async Task StopEmbeddedSessionAsync(CancellationToken cancellationToken)
-    {
-        await _windowsBackend.StopSessionAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(_warningText))
-        {
-            SetFailureStatus("No host-owned failure.");
-        }
-    }
-
-    private Task RecreateEmbedSurfaceAsync(CancellationToken cancellationToken)
-    {
-        return _windowsBackend.RecreateSurfaceAsync(cancellationToken);
+        return _isVisualAttached && _backend.CanStartSession;
     }
 
     private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
@@ -230,9 +209,9 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void OnBackendStateChanged()
     {
-        if (!ReferenceEquals(_embedSurfaceContainer.Content, _windowsBackend.Surface))
+        if (!ReferenceEquals(_embedSurfaceContainer.Content, _backend.Surface))
         {
-            _embedSurfaceContainer.Content = _windowsBackend.Surface;
+            _embedSurfaceContainer.Content = _backend.Surface;
         }
 
         UpdateControlState();
@@ -274,7 +253,7 @@ public partial class MdCadEmbeddedControl : UserControl
     private void OnLaunchSettingsChanged()
     {
         _lastLaunchSnapshot = CaptureLaunchSnapshot();
-        if (!_windowsBackend.HasActiveSession)
+        if (!_backend.HasActiveSession)
         {
             UpdatePreLaunchStatus(_lastLaunchSnapshot);
         }
@@ -301,7 +280,7 @@ public partial class MdCadEmbeddedControl : UserControl
     private void UpdateControlState()
     {
         bool canStart = CanStartSession() && !_sessionCoordinator.IsSessionRunning;
-        bool canStop = _sessionCoordinator.IsSessionRunning || _windowsBackend.HasActiveSession;
+        bool canStop = _sessionCoordinator.IsSessionRunning || _backend.HasActiveSession;
         _diagnosticStartButton.IsEnabled = canStart;
         _diagnosticStopButton.IsEnabled = canStop;
     }

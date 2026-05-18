@@ -10,7 +10,7 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
     private readonly Func<IntPtr> _getPlaceholderHandle;
     private readonly Func<bool> _getAutoStart;
     private readonly Action<string?> _applyWarning;
-    private readonly Func<MdCadLaunchSnapshot, IntPtr, CancellationToken, Task> _startSessionAsync;
+    private readonly Func<MdCadLaunchSnapshot, CancellationToken, Task> _startSessionAsync;
     private readonly Func<CancellationToken, Task> _stopSessionAsync;
     private readonly Func<CancellationToken, Task> _recreateSurfaceAsync;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
@@ -29,7 +29,7 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
         Func<IntPtr> getPlaceholderHandle,
         Func<bool> getAutoStart,
         Action<string?> applyWarning,
-        Func<MdCadLaunchSnapshot, IntPtr, CancellationToken, Task> startSessionAsync,
+        Func<MdCadLaunchSnapshot, CancellationToken, Task> startSessionAsync,
         Func<CancellationToken, Task> stopSessionAsync,
         Func<CancellationToken, Task> recreateSurfaceAsync)
     {
@@ -122,7 +122,7 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
                 return;
             }
 
-            await _startSessionAsync(snapshot, placeholderHandle, CancellationToken.None);
+            await _startSessionAsync(snapshot, CancellationToken.None);
             _isSessionRunning = true;
             _activeSnapshot = snapshot;
             _desiredRunning = true;
