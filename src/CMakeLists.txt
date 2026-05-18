@@ -363,6 +363,13 @@ if(MDCAD_NATIVE_DESKTOP)
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_test(NAME embed_layout_state_test COMMAND embed_layout_state_test)
+
+    add_executable(viewport_only_app_contract_test tests/viewport_only_app_contract_test.c)
+    target_compile_features(viewport_only_app_contract_test PRIVATE c_std_11)
+    target_include_directories(viewport_only_app_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(NAME viewport_only_app_contract_test COMMAND viewport_only_app_contract_test)
 endif()
 
 # Emscripten-specific linker options
