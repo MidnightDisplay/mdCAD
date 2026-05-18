@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Phases:** 50-54, plus inserted Phase 52.1  
-**Total Plans:** 12
+**Total Plans:** 15
 
 ## Overview
 
@@ -88,9 +88,14 @@ Plans:
 
 **Goal:** Prove the new host-facing compatibility path while re-verifying that the already-shipped Windows runtime path still copies, attaches, stops, and relaunches correctly.  
 **Depends on:** Phase 52.1  
-**Plans:** 0 planned  
+**Plans:** 3 plans  
 **Requirements:** WPRS-03, PROOF-01  
 **Status:** Pending
+
+Plans:
+- [ ] 53-01-PLAN.md — Lock `samples/avalonia-host-minimal` as the sole plain-net10 PROOF-01 build surface
+- [ ] 53-02-PLAN.md — Re-close the automated Windows regression preflight from the existing host build plus targeted tests
+- [ ] 53-03-PLAN.md — Create and complete a new Phase 53 manual lifecycle proof artifact on `samples/avalonia-host`
 
 **Success Criteria:**
 1. Repository includes a plain `net10.0` consumer proof that builds successfully against the control.
@@ -118,7 +123,7 @@ Plans:
 | 51 | ✓ | 3/3 complete | 100% |
 | 52 | ✓ | 3/3 complete | 100% |
 | 52.1 | ✓ | 3/3 complete | 100% |
-| 53 | ○ | 0 planned | 0% |
+| 53 | ○ | 0/3 complete | 0% |
 | 54 | ○ | 0 planned | 0% |
 
 ## Coverage
@@ -128,4 +133,4 @@ Plans:
 
 ## Next Step
 
-- Start `/gsd-plan-phase 53`
+- Execute `/gsd-execute-phase 53`
