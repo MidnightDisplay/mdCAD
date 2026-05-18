@@ -10,21 +10,21 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.7` — Linked Flat JSONL Large-File Refresh Stability (2026-05-05)
+**Shipped:** `v1.8` — Embeddable Windows JSONL Viewer (2026-05-15)
 
-**Current milestone:** `v1.8` — Embeddable Windows JSONL Viewer
+**Current milestone:** `v1.9` — Plain net10 Avalonia Host Compatibility
 
-**Current focus:** Phase 43 is verified complete; next work is Phase 44 interaction/layout planning for the embedded viewer while startup JSONL and milestone-complete host workflow work remain queued.
+**Current focus:** Defining requirements and roadmap for plain `net10.0` host compatibility without widening mdCAD's runtime embedding seam beyond Windows.
 
-## Current Milestone: v1.8 Embeddable Windows JSONL Viewer
+## Current Milestone: v1.9 Plain net10 Avalonia Host Compatibility
 
-**Goal:** Let a Windows host application launch mdCAD as an embeddable child viewer that can auto-open a JSONL large dump and optionally live-refresh it from the command line.
+**Goal:** Let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
 
 **Target features:**
-- Windows-only embedded launch mode using a parent HWND contract and child-window hosting semantics
-- CLI parameters for embedding and JSONL auto-import with large-flat-dump defaults and observer opt-in
-- Resize, focus, keyboard, and mouse behavior that stays correct inside a resizable Avalonia host control
-- A minimal Avalonia sample host project with status messaging and a bundled example JSONL resource
+- Plain `net10.0` host projects can reference the reusable control without hitting a TFM compatibility wall.
+- The existing Win32 child-HWND launch path remains the only runtime activation path for the embedded viewer.
+- Non-Windows hosts render a safe placeholder/warning and never attempt to launch mdCAD.
+- Windows proof harnesses, packaging, and consumer docs stay aligned with the widened host-facing contract.
 
 ## Last Shipped Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
 
@@ -99,13 +99,16 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ### Active
 
-- None. v1.8 embedding requirements are validated through Phase 49.
+- [ ] Plain `net10.0` Avalonia hosts can reference the reusable control directly without `NU1201` project compatibility failure.
+- [ ] The control preserves the existing Windows-only embedded viewer contract and does not pretend mdCAD itself is cross-platform embeddable.
+- [ ] On non-Windows hosts, the control renders a safe placeholder/warning and never tries to launch mdCAD.
+- [ ] Windows hosts preserve the existing runtime packaging, child-HWND attach path, and diagnostic/sealed behavior after the compatibility widening.
 
 ### Out of Scope
 
 - Host-to-viewer IPC beyond the CLI launch contract — keep the first embedding milestone process-launched and integration-light
 - In-process or SDK-style embedding — mdCAD remains a separate process hosted through a Win32 child HWND
-- Cross-platform embedding parity beyond the Windows/Avalonia workflow — target the immediate Windows desktop host need first
+- Cross-platform mdCAD embedding parity beyond the Windows/Avalonia workflow — widen host compile-time compatibility first, not the runtime embedding surface
 - Broader flat-import UX expansion unrelated to launch-time JSONL viewing — keep scope on embeddable viewer reliability
 
 ## Context
@@ -117,6 +120,8 @@ v1.2 pivots to a larger feature system proposal captured in `docs/feature-propos
 v1.7 is driven by a large-file regression in the flat JSONL observer path: with `File -> Import JSONL (Flat Large Dump)` plus `Link file for refresh (optional)`, scene totals keep climbing after the initial import appears complete, visible line segments collapse to a later tail subset, some joints remain as orphaned points, and deleting the import root leaves dangling geometry. The same file imported without live refresh does not reproduce the issue.
 
 v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop application needs to launch mdCAD as a child-window viewer process, pass a parent HWND plus launch-time JSONL parameters, and rely on the already-stabilized flat JSONL observer path without introducing a richer IPC layer yet.
+
+v1.9 is driven by a host-compatibility gap discovered immediately after v1.8: even after retargeting the shipped control and samples to `net10.0-windows10.0.19041.0`, a plain `net10.0` host still fails project restore with `NU1201` because the reusable control encodes a Windows-specific TFM while also owning explicit Win32 placeholder/attach seams.
 
 ## Current State
 
@@ -144,11 +149,12 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 - Milestone `v1.8` is complete: Phases 43-49 shipped the child-HWND embedding contract, embedded input/layout closure, launch-time JSONL import/live refresh, sample-host proof, reusable Avalonia control package/harness, and minimal sealed onboarding sample.
 - v1.8 now delivers both a diagnostic proof harness and the smallest sealed consumer sample/quickstart while staying process-launched, CLI-configured, and free of new IPC.
 - Archived v1.8 audit result is `gaps_found` and explicitly accepted at archival; remaining debt is Phase 44 human-proof reruns, missing Phase 45-49 verification artifacts, and the minimal-host onboarding portability/docs follow-up captured in `.planning/milestones/v1.8-MILESTONE-AUDIT.md`.
+- Quick task `260515-nvk` retargeted the live Avalonia control, hosts, and tests to `net10.0-windows10.0.19041.0`, but a scratch plain `net10.0` host still reproduced `NU1201`, confirming the next milestone must address host-facing TFM compatibility separately from the Windows runtime seam.
 ## Next Milestone Goals
 
-1. Define the next milestone with a fresh set of scoped requirements and a new roadmap.
-2. Decide whether the accepted v1.8 audit gaps should become explicit follow-up validation/cleanup work or remain tracked tech debt.
-3. Re-evaluate richer host-integration extensions (IPC, multi-viewer support, broader onboarding) now that the reusable control and minimal sample are shipped.
+1. Remove the current plain-`net10.0` project-reference blocker while preserving the proven Windows child-HWND embedding seam.
+2. Define the non-Windows runtime contract clearly enough that hosts can compile cross-platform without accidental mdCAD launch attempts.
+3. Keep the existing Windows diagnostic harness, runtime packaging, and minimal onboarding path valid after the compatibility widening.
 4. Preserve current native build reliability while keeping deferred `Clear Scene` lifecycle parity and Nyquist backfill visible.
 
 ## Constraints
@@ -186,6 +192,8 @@ v1.8 is driven by a Windows host-integration workflow: an Avalonia desktop appli
 | Keep requested mdCAD panels visible during the embedded bootstrap proof and defer chrome trimming polish | Manual acceptance required the hierarchy/inspector/debug/visibility/controls panels to remain visible in the hosted viewer; embedded chrome trimming can follow later polish work | Confirmed in Phase 43 |
 | Keep the reusable control sealed-by-default and surface the old host chrome only in explicit diagnostic mode | External consumers need a minimal embeddable API, while the in-repo harness still needs truthful launch/relaunch/warning diagnostics | Confirmed in Phase 48 |
 | Add a separate minimal sealed host sample instead of trimming the diagnostic harness further | External onboarding needs the smallest copyable consumer, while the richer harness still serves proof/debug scenarios | Confirmed in Phase 49 |
+| Widen plain `net10.0` host compatibility without widening mdCAD runtime embedding beyond Windows | The blocker is currently the control's Windows-specific TFM, not a desire to make the child-HWND viewer itself cross-platform | — Pending |
+| Non-Windows plain-net10 hosts should render a safe placeholder/warning and never attempt mdCAD launch | Consumers need predictable behavior on unsupported platforms instead of silent failure or accidental process-launch assumptions | — Pending |
 
 ## Evolution
 
@@ -205,4 +213,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-15 after Phase 49 completion*
+*Last updated: 2026-05-15 after starting milestone v1.9*

@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: milestone
-status: archived
-stopped_at: Completed v1.8 milestone archive
-last_updated: "2026-05-15T16:11:28.410Z"
-last_activity: "2026-05-15 -- Completed quick task 260515-nvk: Retarget Avalonia control and sample hosts to net10 for net10 host compatibility"
+milestone: v1.9
+milestone_name: Plain net10 Avalonia Host Compatibility
+status: active
+stopped_at: Defining requirements
+last_updated: "2026-05-15T17:09:08.409+01:00"
+last_activity: "2026-05-15 -- Milestone v1.9 started"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Next milestone definition
+**Current focus:** Milestone v1.9 requirements and roadmap definition
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: None
-Plan: None
-Status: v1.8 archived — ready for `/gsd-new-milestone`
-Last activity: 2026-05-15 - Completed quick task 260515-nvk: Retarget Avalonia control and sample hosts to net10 for net10 host compatibility
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-15 - Milestone v1.9 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
-- Milestone v1.8 goal: let a Windows host launch mdCAD as an embeddable child viewer that can auto-open a large flat JSONL file, optionally live-refresh it from the command line, and now evolve that workflow toward a reusable Avalonia control for external Windows apps.
-- Scope includes the minimal Avalonia host example, Win32 child HWND integration contract, embedded resize/focus/input behavior, and the new reusable-control packaging phase.
-- Roadmap v1.8 spans phases 43-49 across embedding bootstrap, embedded interaction, startup JSONL import, live refresh, sample-host proof, reusable Avalonia control packaging, and minimal onboarding.
+- Milestone v1.9 goal: let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
+- Scope includes host-facing TFM compatibility widening, a safe non-Windows placeholder contract, and preservation of the existing Windows child-HWND embedding/runtime packaging path.
+- Roadmap v1.9 is not defined yet; requirements and phase structure are next.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -96,14 +96,15 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Start the next milestone when ready via `/gsd-new-milestone`.
-- Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in the next milestone.
-- Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless embedding work exposes them as blockers.
+- Define requirements for plain `net10.0` host compatibility and decide how the Windows-only runtime seam is surfaced to cross-platform hosts.
+- Create the v1.9 roadmap/phase breakdown after requirements are locked.
+- Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
+- Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
 ### Blockers/Concerns
 
-- No blocking issues.
-- v1.8 is archived; next work begins with a fresh milestone definition.
+- Plain `net10.0` hosts currently fail project restore with `NU1201` against the reusable control.
+- The control owns real Win32 seams, so widening compile-time compatibility must not accidentally imply cross-platform runtime embedding support.
 
 ### Quick Tasks Completed
 
