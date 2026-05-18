@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using Avalonia.Controls;
 
 using MdCad.Avalonia.Control.Host;
@@ -63,10 +65,31 @@ public sealed class MdCadEmbeddedControlTests
         Assert.Equal("attach: unsupported", attachStatus.Text);
     }
 
+    [Fact]
+    public void ViewportOnlyStartupMode_UpdatesCapturedLaunchSnapshot()
+    {
+        MdCadEmbeddedControl control = new();
+
+        control.ViewportOnlyStartupMode = true;
+
+        MdCadLaunchSnapshot snapshot = GetLastLaunchSnapshot(control);
+        Assert.True(snapshot.ViewportOnlyStartupMode);
+    }
+
     private static TControl GetControl<TControl>(MdCadEmbeddedControl control, string name)
         where TControl : global::Avalonia.Controls.Control
     {
         return control.FindControl<TControl>(name)
             ?? throw new InvalidOperationException($"Missing control '{name}'.");
+    }
+
+    private static MdCadLaunchSnapshot GetLastLaunchSnapshot(MdCadEmbeddedControl control)
+    {
+        FieldInfo field = typeof(MdCadEmbeddedControl).GetField(
+            "_lastLaunchSnapshot",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Missing _lastLaunchSnapshot field.");
+
+        return Assert.IsType<MdCadLaunchSnapshot>(field.GetValue(control));
     }
 }

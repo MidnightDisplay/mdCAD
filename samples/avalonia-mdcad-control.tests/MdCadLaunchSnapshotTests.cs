@@ -56,4 +56,28 @@ public sealed class MdCadLaunchSnapshotTests
         Assert.True(snapshot.ShouldPassJsonlArgument);
         Assert.True(snapshot.ShouldPassLiveRefreshArgument);
     }
+
+    [Fact]
+    public void Create_DefaultViewportOnlyStartupMode_RemainsFalse()
+    {
+        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
+            null,
+            startupLiveRefreshEnabled: false,
+            viewportOnlyStartupMode: false);
+
+        Assert.False(snapshot.ViewportOnlyStartupMode);
+    }
+
+    [Fact]
+    public void Create_WhenViewportOnlyStartupModeRequested_PreservesIntent()
+    {
+        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
+            null,
+            startupLiveRefreshEnabled: false,
+            viewportOnlyStartupMode: true);
+
+        Assert.True(snapshot.ViewportOnlyStartupMode);
+        Assert.False(snapshot.ShouldPassJsonlArgument);
+        Assert.False(snapshot.ShouldPassLiveRefreshArgument);
+    }
 }
