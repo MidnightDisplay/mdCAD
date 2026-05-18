@@ -48,7 +48,7 @@ created: 2026-05-18
 
 ## Wave 0 Requirements
 
-- [ ] `.planning/phases/53-consumer-proof-and-windows-regression-closure/53-MANUAL-CHECKLIST.md` — phase-local Windows runtime proof record with current `StartAsync` / `StopAsync` wording
+Existing automated infrastructure covers the phase's build/test requirements. The manual checklist artifact is created in Plan 03 as the final Windows runtime proof record.
 
 ---
 

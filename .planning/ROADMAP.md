@@ -90,7 +90,7 @@ Plans:
 **Depends on:** Phase 52.1  
 **Plans:** 3 plans  
 **Requirements:** WPRS-03, PROOF-01  
-**Status:** Pending
+**Status:** Planned
 
 Plans:
 - [ ] 53-01-PLAN.md — Lock `samples/avalonia-host-minimal` as the sole plain-net10 PROOF-01 build surface

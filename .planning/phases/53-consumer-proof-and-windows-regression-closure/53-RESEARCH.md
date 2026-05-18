@@ -325,7 +325,7 @@ Assert.Equal(harness.Snapshot, harness.StartedSnapshots[^1]);
 |--------|----------|-----------|-------------------|-------------|
 | PROOF-01 | Plain `net10.0` consumer host builds directly against the control | build smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | ✅ |
 | WPRS-03 | Windows consumer output still contains copied runtime and resolves through the existing runtime contract | integration + unit | `dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~RuntimeRefresh|FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"` | ✅ |
-| WPRS-03 | Real host attach / stop / relaunch still works against the copied runtime | manual runtime proof | `dotnet run --project .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | ❌ Wave 0 phase-local checklist artifact |
+| WPRS-03 | Real host attach / stop / relaunch still works against the copied runtime | manual runtime proof | `dotnet run --project .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | ❌ Plan 03 phase-local checklist artifact |
 
 ### Sampling Rate
 
@@ -335,8 +335,9 @@ Assert.Equal(harness.Snapshot, harness.StartedSnapshots[^1]);
 
 ### Wave 0 Gaps
 
-- [ ] `.planning/phases/53-consumer-proof-and-windows-regression-closure/53-MANUAL-CHECKLIST.md` (or equivalent phase-local proof artifact) — records copied-runtime presence plus attach/stop/relaunch against the current `StartAsync` / `StopAsync` host UI
-- [ ] `.planning/phases/53-consumer-proof-and-windows-regression-closure/53-VALIDATION.md` — phase-local validation ledger mapping the split proof strategy cleanly to `PROOF-01` and `WPRS-03`
+- Existing automated infrastructure covers the proof/build lanes Phase 53 needs.
+- The phase-local validation ledger is required up front.
+- The manual checklist/proof artifact belongs to **Plan 3**, not Wave 0, because it records the final human runtime proof outcome rather than enabling earlier automated work.
 
 ## Risks and Boundary Traps
 
