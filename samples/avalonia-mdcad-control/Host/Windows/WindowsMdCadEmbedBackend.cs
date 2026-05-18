@@ -446,6 +446,11 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
         startInfo.ArgumentList.Add("--parent-hwnd");
         startInfo.ArgumentList.Add($"0x{placeholderHandle.ToInt64():X}");
 
+        if (snapshot.ViewportOnlyStartupMode)
+        {
+            startInfo.ArgumentList.Add("--viewport-only");
+        }
+
         if (snapshot.ShouldPassJsonlArgument)
         {
             startInfo.ArgumentList.Add("--jsonl");
