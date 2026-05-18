@@ -125,12 +125,12 @@ Plans:
 **Goal:** Let embedded hosts start mdCAD in a viewport-only mode that preserves its own dedicated embedded layout between launches, while adding an `F` camera reset shortcut through the existing embedded-vs-standalone input seams without widening runtime support or redesigning the viewer.  
 **Requirements:** P55-01, P55-02, P55-03, P55-04  
 **Depends on:** Phase 54  
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 **Status:** Planned
 
 Plans:
 - [x] 55-01-PLAN.md — Add the control viewport-only launch property, snapshot contract, and Windows `--viewport-only` arg flow
-- [ ] 55-02-PLAN.md — Parse the native viewport-only flag, add dedicated embedded viewport-only layout persistence, and lock app draw/layout policy
+- [x] 55-02-PLAN.md — Parse the native viewport-only flag, add dedicated embedded viewport-only layout persistence, and lock app draw/layout policy
 - [ ] 55-03-PLAN.md — Add the `F` camera reset shortcut through existing shortcut seams and close Phase 55 validation
 
 ## Progress
@@ -143,7 +143,7 @@ Plans:
 | 52.1 | ✓ | 3/3 complete | 100% |
 | 53 | ✓ | 3/3 complete | 100% |
 | 54 | ✓ | 3/3 complete | 100% |
-| 55 | 1/3 | In Progress|  |
+| 55 | 2/3 | In Progress|  |
 
 ## Coverage
 
