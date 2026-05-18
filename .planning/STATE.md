@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: Phase 55 added
-last_updated: "2026-05-18T19:48:13.286+01:00"
-last_activity: 2026-05-18 -- Added Phase 55 to roadmap
+status: planning
+stopped_at: Phase 55 planned
+last_updated: "2026-05-18T20:30:00+01:00"
+last_activity: 2026-05-18 -- Planned Phase 55
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 18
+  total_plans: 21
   completed_plans: 18
-  percent: 100
+  percent: 86
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 55 — viewport-only-startup-mode-and-f-camera-reset-hotkey (planning next)
+**Current focus:** Phase 55 — viewport-only-startup-mode-and-f-camera-reset-hotkey (planned; execution next)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 54 (docs-and-onboarding-truthfulness) — COMPLETE
-Plan: Complete
-Status: Phase 54 complete; Phase 55 added and planning next
-Last activity: 2026-05-18 -- Added Phase 55 to roadmap
+Phase: 55 (viewport-only-startup-mode-and-f-camera-reset-hotkey) — PLANNED
+Plan: All plans created
+Status: Phase 55 planned; execution next
+Last activity: 2026-05-18 -- Planned Phase 55
 
-Progress: [██████████] 100%
+Progress: [████████░░] 86%
 
 ## Milestone Scope
 
@@ -127,10 +127,11 @@ Recent decisions affecting current work:
 - Phase 54 plan 02 completed: QUICKSTART and the minimal sample now align with the plain-net10 onboarding contract.
 - Phase 54 completed: onboarding docs, sample defaults, and proof references now reflect the proven runtime boundary truthfully.
 - Phase 55 added: Viewport-only startup mode and F camera reset hotkey.
+- Phase 55 planned: 3 executable plans are ready for launch-contract, native/layout, and camera-shortcut validation work.
 
 ### Pending Todos
 
-- Plan Phase 55 next so the viewport-only embedded startup mode and F-key camera reset can be broken into executable work.
+- Execute Phase 55 next so the viewport-only embedded startup mode and F-key camera reset can be implemented against the new plans.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -160,5 +161,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-18T19:48:13.286+01:00
-Stopped at: Phase 55 added
+Stopped at: Phase 55 planned
 Resume file: .planning/ROADMAP.md
