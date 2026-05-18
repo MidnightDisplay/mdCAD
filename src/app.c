@@ -2222,6 +2222,11 @@ static void frame(void) {
                 gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
             }
 
+            // F: reset camera to the default view
+            if (mdcad_embedded_shortcut_pressed(ImGuiKey_F, dockspace_id)) {
+                orbit_camera_reset(&state.camera);
+            }
+
             // C: open context-aware constraint authoring menu at cursor
             if (mdcad_embedded_shortcut_pressed(ImGuiKey_C, dockspace_id)) {
                 ecs_entity_t sketch = 0;
@@ -2276,6 +2281,11 @@ static void frame(void) {
                 gizmo_edit_mode_t new_mode = (state.gizmo.edit_mode == GIZMO_TRANSFORM_MODE)
                     ? GIZMO_GEOMETRY_MODE : GIZMO_TRANSFORM_MODE;
                 gizmo_set_edit_mode(&state.gizmo, new_mode, &state.ecs_scene, &state.selection);
+            }
+
+            // F: reset camera to the default view
+            if (igIsKeyPressed_Bool(ImGuiKey_F, false)) {
+                orbit_camera_reset(&state.camera);
             }
 
             // C: open context-aware constraint authoring menu at cursor
