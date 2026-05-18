@@ -115,6 +115,36 @@ public sealed class MdCadSessionCoordinatorTests
         Assert.True(coordinator.IsSessionRunning);
     }
 
+    [Fact]
+    public async Task StopAsync_FollowedByLaunchChange_RestartsWithNewestSnapshot()
+    {
+        TestCoordinatorHarness harness = new()
+        {
+            AutoStart = false,
+            SurfaceReady = true,
+            PlaceholderHandle = new IntPtr(0x100),
+            Snapshot = MdCadLaunchSnapshot.Create(
+                Path.Combine(Path.GetTempPath(), "phase50-first.jsonl"),
+                startupLiveRefreshEnabled: false),
+        };
+
+        await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
+        await coordinator.StartAsync();
+        await coordinator.StopAsync();
+
+        harness.Snapshot = MdCadLaunchSnapshot.Create(
+            Path.Combine(Path.GetTempPath(), "phase50-second.jsonl"),
+            startupLiveRefreshEnabled: true);
+
+        await coordinator.StartAsync();
+
+        Assert.Equal(1, harness.StopCount);
+        Assert.Equal(1, harness.RecreateCount);
+        Assert.Equal(2, harness.StartedSnapshots.Count);
+        Assert.Equal(harness.Snapshot, harness.StartedSnapshots[^1]);
+        Assert.True(coordinator.IsSessionRunning);
+    }
+
     private sealed class TestCoordinatorHarness
     {
         public bool AutoStart { get; set; }
@@ -124,8 +154,6 @@ public sealed class MdCadSessionCoordinatorTests
         public IntPtr PlaceholderHandle { get; set; }
 
         public MdCadLaunchSnapshot Snapshot { get; set; }
-
-        public string? WarningText { get; private set; }
 
         public int StopCount { get; private set; }
 
@@ -144,7 +172,7 @@ public sealed class MdCadSessionCoordinatorTests
                 canStartSession: () => SurfaceReady && PlaceholderHandle != IntPtr.Zero,
                 getPlaceholderHandle: () => PlaceholderHandle,
                 getAutoStart: () => AutoStart,
-                applyWarning: warningText => WarningText = warningText,
+                applyWarning: _ => { },
                 startSessionAsync: (snapshot, _) =>
                 {
                     StartedSnapshots.Add(snapshot);

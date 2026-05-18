@@ -2,54 +2,103 @@
 
 Purpose: keep the existing Windows diagnostic host as the authoritative proof surface while the internal backend seam is extracted.
 
-## Preconditions
+## Automated Preflight
 
-1. Build the diagnostic host:
+1. Run the Phase 50 regression preflight:
+   `dotnet test samples/avalonia-mdcad-control.tests/MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadSessionCoordinatorTests|FullyQualifiedName~MdCadLaunchSnapshotTests|FullyQualifiedName~WindowsMdCadEmbedBackendTests|FullyQualifiedName~MdCadRuntimeResolverTests"`
+   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+   - Notes:
+2. Build the diagnostic host:
    `dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release`
-2. Confirm the copied runtime bundle is present under the host output:
-   `samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe`
-3. Launch the host from the repo root with one of these flows:
-   - Diagnostic default:
-     `dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release`
-   - Sealed mode:
-     `dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release -- --presentation-mode sealed`
+   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+   - Notes:
+3. Confirm the copied runtime bundle is present under the host output:
+   `Test-Path "samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe"`
+   - Expected output: `True`
+   - Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+   - Notes:
+
+## Launch Commands
+
+- Diagnostic default:
+  `dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release`
+- Sealed mode:
+  `dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release -- --presentation-mode sealed`
 
 ## Checklist
 
 ### 1. Runtime bundle presence
 
-- Confirm the host-owned runtime status line starts with:
+- In the running host, confirm the runtime line starts with:
   `runtime: copied bundle present ->`
-- Confirm the resolved path points at the copied output bundle, not a repo-root fallback.
+- Confirm the path points at:
+  `samples/avalonia-host/bin/Release/net10.0-windows10.0.19041.0/mdcad-runtime/mdCAD.exe`
+- Confirm the harness line starts with:
+  `harness: mode=diagnostic; AutoStart=true; live refresh=off; jsonl: example resolved ->`
+- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+- Notes:
 
 ### 2. Diagnostic launch and attach
 
 - Start the host in diagnostic mode.
 - If `AutoStart=false`, press **Launch Session**; otherwise wait for the automatic launch.
-- Confirm mdCAD attaches inside the embed region and remains interactive.
-- Confirm the host continues to use the existing diagnostic harness controls instead of a new proof surface.
+- If you click **Launch Session**, confirm the harness line ends with:
+  `action: StartAsync requested`
+- Confirm the embedded mdCAD window attaches inside the host region and remains interactive.
+- In the control's diagnostic status area, confirm:
+  - `launch: active`
+  - `attach: attached`
+  - `jsonl: viewer-managed after launch (requested: <resolved example path>)`
+  - `live refresh: viewer-managed after launch (off)`
+  - `detail: child hwnd attached: 0x...`
+- Confirm the proof surface is still `samples/avalonia-host`, not a new backend-only harness.
+- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+- Notes:
 
 ### 3. Stop and relaunch
 
 - Click **Close Session** and confirm the viewer exits cleanly.
+- Confirm the harness line ends with:
+  `action: StopAsync requested`
+- In diagnostic mode after stop, confirm:
+  - `launch: idle`
+  - `attach: idle`
+  - `detail: No host-owned failure.`
+- Before relaunch, run:
+  `Get-CimInstance Win32_Process -Filter "Name = 'mdCAD.exe'" | Select-Object ProcessId, ExecutablePath`
+  - Expected result before relaunch: no rows
 - Click **Launch Session** again and confirm a second attach succeeds in the same host window.
-- Confirm there is no orphaned `mdCAD.exe` left behind after relaunch.
+- After relaunch, confirm the harness line ends with:
+  `action: StartAsync requested`
+- After relaunch, run the same process query and confirm the only running `mdCAD.exe` comes from the copied runtime bundle path.
+- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+- Notes:
 
 ### 4. Resize continuity
 
 - With an attached session running, resize the host window wider and taller.
 - Confirm the embedded mdCAD surface resizes with the placeholder and stays attached.
-- Confirm no attach-loss or broken-child behavior appears after resize.
+- Confirm the control still shows:
+  - `launch: active`
+  - `attach: attached`
+- Confirm no attach-loss, blank child, or broken-parent behavior appears after resize.
+- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+- Notes:
 
 ### 5. Sealed and diagnostic equivalence
 
-- Run the host once in diagnostic mode and once in sealed mode.
+- Run the host once in diagnostic mode and once in sealed mode using the commands above.
+- In sealed mode, confirm the harness line starts with:
+  `harness: mode=sealed; AutoStart=true; live refresh=off; jsonl: example resolved ->`
 - Confirm both modes still launch the same embedded runtime and preserve attach, stop, relaunch, and resize behavior.
-- Confirm diagnostic mode still exposes the extra launch/status chrome while sealed mode remains minimal.
+- Confirm diagnostic mode still exposes the embedded launch/status chrome while sealed mode hides that extra control-owned chrome.
+- Result: [ ] PASS [ ] FAIL [ ] BLOCKED
+- Notes:
 
 ## Result
 
 - [ ] PASS
 - [ ] FAIL
+- [ ] BLOCKED
 
 Notes:

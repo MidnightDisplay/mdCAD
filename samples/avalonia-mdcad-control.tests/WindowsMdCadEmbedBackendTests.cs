@@ -79,6 +79,40 @@ public sealed class WindowsMdCadEmbedBackendTests
         }
     }
 
+    [Fact]
+    public void CreateStartInfo_UsesCurrentPlaceholderHandleOnRelaunch()
+    {
+        string jsonlPath = CreateReadableJsonlPath();
+        try
+        {
+            MdCadRuntimePaths runtime = new(
+                ExecutablePath: @"C:\runtime\mdCAD.exe",
+                RuntimeRoot: @"C:\runtime");
+
+            ProcessStartInfo initialStartInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
+                runtime,
+                new IntPtr(0x1234),
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: false));
+
+            ProcessStartInfo relaunchedStartInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
+                runtime,
+                new IntPtr(0x5678),
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true));
+
+            Assert.Equal(["--embedded", "--parent-hwnd", "0x1234", "--jsonl", jsonlPath], initialStartInfo.ArgumentList);
+            Assert.Equal(
+                ["--embedded", "--parent-hwnd", "0x5678", "--jsonl", jsonlPath, "--jsonl-live-refresh"],
+                relaunchedStartInfo.ArgumentList);
+            Assert.DoesNotContain("0x1234", relaunchedStartInfo.ArgumentList);
+            Assert.Equal(runtime.RuntimeRoot, relaunchedStartInfo.WorkingDirectory);
+            Assert.Equal(runtime.ExecutablePath, relaunchedStartInfo.FileName);
+        }
+        finally
+        {
+            File.Delete(jsonlPath);
+        }
+    }
+
     private static string CreateReadableJsonlPath()
     {
         string path = Path.Combine(Path.GetTempPath(), $"mdcad-launch-{Guid.NewGuid():N}.jsonl");
