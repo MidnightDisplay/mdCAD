@@ -56,6 +56,17 @@ public sealed record RuntimeRefreshResult(
 public sealed class RuntimeRefreshOrchestrator
 {
     private const string ExecutableName = "mdCAD.exe";
+    private readonly Func<ProcessStartInfo, CancellationToken, Task<int>> _processRunner;
+
+    public RuntimeRefreshOrchestrator()
+        : this(RunProcessAsync)
+    {
+    }
+
+    public RuntimeRefreshOrchestrator(Func<ProcessStartInfo, CancellationToken, Task<int>> processRunner)
+    {
+        _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
+    }
 
     public RuntimeRefreshPlan CreatePlan(RuntimeRefreshOptions options)
     {
@@ -82,10 +93,64 @@ public sealed class RuntimeRefreshOrchestrator
             OutputExecutablePath: outputExecutablePath);
     }
 
-    public Task<RuntimeRefreshResult> RunAsync(RuntimeRefreshOptions options, CancellationToken cancellationToken)
+    public async Task<RuntimeRefreshResult> RunAsync(RuntimeRefreshOptions options, CancellationToken cancellationToken)
     {
-        _ = CreatePlan(options);
-        _ = cancellationToken;
-        throw new NotSupportedException("Runtime refresh execution is added in the next task.");
+        RuntimeRefreshPlan plan = CreatePlan(options);
+
+        if (!File.Exists(plan.CMakeCachePath))
+        {
+            throw new InvalidOperationException($"Configured CMake cache is missing: {plan.CMakeCachePath}");
+        }
+
+        ProcessStartInfo startInfo = plan.CreateBuildStartInfo();
+        int exitCode = await _processRunner(startInfo, cancellationToken);
+        if (exitCode != 0)
+        {
+            throw new InvalidOperationException($"cmake --build failed with exit code {exitCode}.");
+        }
+
+        if (!File.Exists(plan.SourceExecutablePath))
+        {
+            throw new InvalidOperationException($"Built mdCAD executable is missing: {plan.SourceExecutablePath}");
+        }
+
+        CopyExecutable(plan.SourceExecutablePath, plan.RuntimeExecutablePath);
+        if (plan.OutputExecutablePath is not null)
+        {
+            CopyExecutable(plan.SourceExecutablePath, plan.OutputExecutablePath);
+        }
+
+        return new RuntimeRefreshResult(
+            SourceExecutablePath: plan.SourceExecutablePath,
+            RuntimeExecutablePath: plan.RuntimeExecutablePath,
+            OutputExecutablePath: plan.OutputExecutablePath);
+    }
+
+    private static void CopyExecutable(string sourceExecutablePath, string targetExecutablePath)
+    {
+        string? targetDirectory = Path.GetDirectoryName(targetExecutablePath);
+        if (string.IsNullOrEmpty(targetDirectory))
+        {
+            throw new InvalidOperationException($"Target executable path has no directory: {targetExecutablePath}");
+        }
+
+        Directory.CreateDirectory(targetDirectory);
+        File.Copy(sourceExecutablePath, targetExecutablePath, overwrite: true);
+    }
+
+    private static async Task<int> RunProcessAsync(ProcessStartInfo startInfo, CancellationToken cancellationToken)
+    {
+        using Process process = new()
+        {
+            StartInfo = startInfo
+        };
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException($"Failed to start process: {startInfo.FileName}");
+        }
+
+        await process.WaitForExitAsync(cancellationToken);
+        return process.ExitCode;
     }
 }
