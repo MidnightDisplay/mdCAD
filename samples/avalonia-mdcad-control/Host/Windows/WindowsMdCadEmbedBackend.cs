@@ -73,6 +73,8 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
         width > 4 &&
         height > 4;
 
+    public string? StartBlockedReason => null;
+
     public IntPtr PlaceholderHandle => _placeholderHandle;
 
     public bool HasActiveSession => _mdcadProcess != null || _attachedChildHwnd != IntPtr.Zero;

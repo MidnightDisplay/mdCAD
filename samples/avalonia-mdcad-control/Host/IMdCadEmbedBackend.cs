@@ -11,6 +11,8 @@ internal interface IMdCadEmbedBackend
 
     bool CanStartSession { get; }
 
+    string? StartBlockedReason { get; }
+
     IntPtr PlaceholderHandle { get; }
 
     bool HasActiveSession { get; }

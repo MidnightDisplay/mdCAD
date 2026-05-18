@@ -9,6 +9,7 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
     private readonly Func<bool> _canStartSession;
     private readonly Func<IntPtr> _getPlaceholderHandle;
     private readonly Func<bool> _getAutoStart;
+    private readonly Func<string?> _getStartBlockedReason;
     private readonly Action<string?> _applyWarning;
     private readonly Func<MdCadLaunchSnapshot, CancellationToken, Task> _startSessionAsync;
     private readonly Func<CancellationToken, Task> _stopSessionAsync;
@@ -31,12 +32,14 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
         Action<string?> applyWarning,
         Func<MdCadLaunchSnapshot, CancellationToken, Task> startSessionAsync,
         Func<CancellationToken, Task> stopSessionAsync,
-        Func<CancellationToken, Task> recreateSurfaceAsync)
+        Func<CancellationToken, Task> recreateSurfaceAsync,
+        Func<string?>? getStartBlockedReason = null)
     {
         _captureSnapshot = captureSnapshot ?? throw new ArgumentNullException(nameof(captureSnapshot));
         _canStartSession = canStartSession ?? throw new ArgumentNullException(nameof(canStartSession));
         _getPlaceholderHandle = getPlaceholderHandle ?? throw new ArgumentNullException(nameof(getPlaceholderHandle));
         _getAutoStart = getAutoStart ?? throw new ArgumentNullException(nameof(getAutoStart));
+        _getStartBlockedReason = getStartBlockedReason ?? (() => null);
         _applyWarning = applyWarning ?? throw new ArgumentNullException(nameof(applyWarning));
         _startSessionAsync = startSessionAsync ?? throw new ArgumentNullException(nameof(startSessionAsync));
         _stopSessionAsync = stopSessionAsync ?? throw new ArgumentNullException(nameof(stopSessionAsync));
