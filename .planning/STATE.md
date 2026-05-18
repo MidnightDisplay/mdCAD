@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: Phase 51 plan 02 complete
-last_updated: "2026-05-18T14:33:30.5395754+01:00"
-last_activity: 2026-05-18 -- Completed Phase 51 plan 02 internal runtime implementation
+status: completed
+stopped_at: Phase 51 complete
+last_updated: "2026-05-18T14:39:13.7835657+01:00"
+last_activity: 2026-05-18 -- Completed Phase 51 unsupported-platform contract
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 3
-  percent: 0
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 51 — unsupported-platform-contract
+**Current focus:** Phase 52 — plain-net10-control-compatibility
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 51 (unsupported-platform-contract) — EXECUTING
-Plan: 3 of 3
-Status: Phase 51 plan 02 complete; plan 03 next
-Last activity: 2026-05-18 -- Completed Phase 51 plan 02 internal runtime implementation
+Phase: 51 (unsupported-platform-contract) — COMPLETE
+Plan: Complete
+Status: Phase 51 complete; Phase 52 planning next
+Last activity: 2026-05-18 -- Completed Phase 51 unsupported-platform contract
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -84,6 +84,7 @@ Recent decisions affecting current work:
 - [Phase 50]: Relaunch-safe proof now explicitly pins the current placeholder HWND in repeated backend start-info generation, and the Windows diagnostic host checklist is approved as PASS. — This closes the backend extraction loop without introducing a new proof surface or widening platform scope.
 - [Phase 51]: Unsupported hosts should show one consistent Windows-only runtime truth in both presentation modes, with `sealed` minimal and `diagnostic` more explicit. — This keeps the default surface lightweight while making unsupported runtime behavior visible immediately.
 - [Phase 51]: Unsupported `StartAsync()` must fail immediately with the same canonical message the placeholder shows, while `StopAsync()` remains a safe no-op. — Programmatic hosts get deterministic behavior without implying cross-platform runtime support.
+- [Phase 51]: The public control shell now selects backends through `MdCadEmbedBackendFactory` and treats `StartBlockedReason` as the primary warning truth, while diagnostic JSONL/live-refresh lines remain informational-only. — This keeps unsupported runtime behavior explicit without changing the public API or the locked Windows launch path.
 
 ### Roadmap Evolution
 
@@ -104,10 +105,11 @@ Recent decisions affecting current work:
 - Phase 51 planned: 3 verified execution plans plus context, research, and validation artifacts are ready for execution.
 - Phase 51 plan 01 completed: Wave 0 unsupported backend/coordinator contract tests are committed and red for the intended missing seams.
 - Phase 51 plan 02 completed: Internal unsupported backend selection, canonical message ownership, and blocked coordinator behavior are implemented and green.
+- Phase 51 completed: unsupported backend selection, blocked coordinator behavior, and truthful shell messaging are recorded.
 
 ### Pending Todos
 
-- Execute Phase 51.
+- Plan Phase 52.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
@@ -138,6 +140,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T14:33:30.5395754+01:00
-Stopped at: Phase 51 plan 02 complete
-Resume file: .planning/phases/51-unsupported-platform-contract/51-03-PLAN.md
+Last session: 2026-05-18T14:39:13.7835657+01:00
+Stopped at: Phase 51 complete
+Resume file: .planning/phases/51-unsupported-platform-contract/51-03-SUMMARY.md

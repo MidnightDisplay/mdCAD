@@ -36,12 +36,12 @@ Plans:
 **Depends on:** Phase 50  
 **Plans:** 3 plans  
 **Requirements:** PLAT-01, PLAT-02, PLAT-03  
-**Status:** Executing
+**Status:** Complete
 
 Plans:
 - [x] 51-01-PLAN.md — Add Wave 0 unsupported-backend and coordinator contract tests in the existing Windows-targeted test project
 - [x] 51-02-PLAN.md — Implement the internal unsupported backend, backend factory, canonical message, and blocked-reason coordinator seam
-- [ ] 51-03-PLAN.md — Wire unsupported selection into the control shell and surface truthful sealed/diagnostic unsupported messaging
+- [x] 51-03-PLAN.md — Wire unsupported selection into the control shell and surface truthful sealed/diagnostic unsupported messaging
 
 **Success Criteria:**
 1. Non-Windows hosts render a clear placeholder/warning instead of a blank or broken embed surface.
@@ -108,7 +108,7 @@ Plans:
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
 | 50 | ✓ | 3/3 complete | 100% |
-| 51 | ◐ | 2/3 complete | 67% |
+| 51 | ✓ | 3/3 complete | 100% |
 | 52 | ○ | 0 planned | 0% |
 | 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
@@ -121,4 +121,4 @@ Plans:
 
 ## Next Step
 
-- Execute `/gsd-execute-phase 51`
+- Start `/gsd-plan-phase 52`
