@@ -76,7 +76,7 @@ Plans:
 
 Plans:
 - [x] 52.1-01-PLAN.md — Add the dotnet-managed runtime-refresh helper and lock path/copy-policy tests
-- [ ] 52.1-02-PLAN.md — Wire opt-in control-project post-build refresh for the committed bundle plus current output
+- [x] 52.1-02-PLAN.md — Wire opt-in control-project post-build refresh for the committed bundle plus current output
 - [ ] 52.1-03-PLAN.md — Close integration with host build and hash/path verification of the refreshed runtime chain
 
 **Success Criteria:**
@@ -117,7 +117,7 @@ Plans:
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
 | 52 | ✓ | 3/3 complete | 100% |
-| 52.1 | ◐ | 1/3 complete | 33% |
+| 52.1 | ◐ | 2/3 complete | 67% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
 
