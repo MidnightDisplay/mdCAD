@@ -17,7 +17,8 @@ static int expect_parse_success(char** argv,
                                 bool expected_embedded,
                                 uintptr_t expected_parent,
                                 const char *expected_startup_jsonl,
-                                bool expected_startup_jsonl_live_refresh) {
+                                bool expected_startup_jsonl_live_refresh,
+                                bool expected_viewport_only) {
     mdcad_launch_config_t cfg = {0};
     char error[128] = {0};
     if (!mdcad_launch_config_parse(argc, argv, &cfg, error, sizeof(error))) {
@@ -38,6 +39,10 @@ static int expect_parse_success(char** argv,
     }
     if (cfg.startup_jsonl_live_refresh != expected_startup_jsonl_live_refresh) {
         fprintf(stderr, "Unexpected startup JSONL live refresh flag\n");
+        return 1;
+    }
+    if (cfg.viewport_only != expected_viewport_only) {
+        fprintf(stderr, "Unexpected viewport-only flag\n");
         return 1;
     }
     if (error[0] != '\0') {
@@ -63,22 +68,22 @@ static int expect_parse_failure_contains(char** argv, int argc, const char* expe
 
 static int test_embed_launch_config_no_embed_flags(void) {
     char* argv[] = { ARG("mdcad"), ARG("--ignored-flag"), ARG("value") };
-    return expect_parse_success(argv, 3, false, 0, "", false);
+    return expect_parse_success(argv, 3, false, 0, "", false, false);
 }
 
 static int test_embed_launch_config_valid_hex_parent_hwnd(void) {
     char* argv[] = { ARG("mdcad"), ARG("--embedded"), ARG("--parent-hwnd"), ARG("0x12345678") };
-    return expect_parse_success(argv, 4, true, (uintptr_t)0x12345678ull, "", false);
+    return expect_parse_success(argv, 4, true, (uintptr_t)0x12345678ull, "", false, false);
 }
 
 static int test_embed_launch_config_valid_decimal_parent_hwnd(void) {
     char* argv[] = { ARG("mdcad"), ARG("--embedded"), ARG("--parent-hwnd"), ARG("305419896") };
-    return expect_parse_success(argv, 4, true, (uintptr_t)305419896ull, "", false);
+    return expect_parse_success(argv, 4, true, (uintptr_t)305419896ull, "", false, false);
 }
 
 static int test_startup_jsonl_path_parses_in_standalone_launch(void) {
     char* argv[] = { ARG("mdcad"), ARG("--jsonl"), ARG(TEST_ABSOLUTE_JSONL_PATH) };
-    return expect_parse_success(argv, 3, false, 0, TEST_ABSOLUTE_JSONL_PATH, false);
+    return expect_parse_success(argv, 3, false, 0, TEST_ABSOLUTE_JSONL_PATH, false, false);
 }
 
 static int test_startup_jsonl_path_parses_in_embedded_launch(void) {
@@ -88,7 +93,7 @@ static int test_startup_jsonl_path_parses_in_embedded_launch(void) {
         ARG("--parent-hwnd"), ARG("0x12345678"),
         ARG("--jsonl"), ARG(TEST_ABSOLUTE_JSONL_PATH)
     };
-    return expect_parse_success(argv, 6, true, (uintptr_t)0x12345678ull, TEST_ABSOLUTE_JSONL_PATH, false);
+    return expect_parse_success(argv, 6, true, (uintptr_t)0x12345678ull, TEST_ABSOLUTE_JSONL_PATH, false, false);
 }
 
 static int test_startup_jsonl_live_refresh_parses_in_standalone_launch(void) {
@@ -97,7 +102,7 @@ static int test_startup_jsonl_live_refresh_parses_in_standalone_launch(void) {
         ARG("--jsonl"), ARG(TEST_ABSOLUTE_JSONL_PATH),
         ARG("--jsonl-live-refresh")
     };
-    return expect_parse_success(argv, 4, false, 0, TEST_ABSOLUTE_JSONL_PATH, true);
+    return expect_parse_success(argv, 4, false, 0, TEST_ABSOLUTE_JSONL_PATH, true, false);
 }
 
 static int test_startup_jsonl_live_refresh_parses_in_embedded_launch(void) {
@@ -108,7 +113,17 @@ static int test_startup_jsonl_live_refresh_parses_in_embedded_launch(void) {
         ARG("--jsonl"), ARG(TEST_ABSOLUTE_JSONL_PATH),
         ARG("--jsonl-live-refresh")
     };
-    return expect_parse_success(argv, 7, true, (uintptr_t)0x12345678ull, TEST_ABSOLUTE_JSONL_PATH, true);
+    return expect_parse_success(argv, 7, true, (uintptr_t)0x12345678ull, TEST_ABSOLUTE_JSONL_PATH, true, false);
+}
+
+static int test_viewport_only_parses_in_embedded_launch(void) {
+    char* argv[] = {
+        ARG("mdcad"),
+        ARG("--embedded"),
+        ARG("--parent-hwnd"), ARG("0x12345678"),
+        ARG("--viewport-only")
+    };
+    return expect_parse_success(argv, 5, true, (uintptr_t)0x12345678ull, "", false, true);
 }
 
 static int test_embed_launch_config_missing_parent_hwnd(void) {
@@ -165,6 +180,17 @@ static int test_startup_jsonl_live_refresh_duplicate_flag(void) {
     return expect_parse_failure_contains(argv, 5, "Duplicate --jsonl-live-refresh flag");
 }
 
+static int test_viewport_only_duplicate_flag(void) {
+    char* argv[] = {
+        ARG("mdcad"),
+        ARG("--embedded"),
+        ARG("--parent-hwnd"), ARG("0x12345678"),
+        ARG("--viewport-only"),
+        ARG("--viewport-only")
+    };
+    return expect_parse_failure_contains(argv, 6, "Duplicate --viewport-only flag");
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct {
     const char* name;
@@ -180,6 +206,7 @@ int main(void) {
         { "test_startup_jsonl_path_parses_in_embedded_launch", test_startup_jsonl_path_parses_in_embedded_launch },
         { "test_startup_jsonl_live_refresh_parses_in_standalone_launch", test_startup_jsonl_live_refresh_parses_in_standalone_launch },
         { "test_startup_jsonl_live_refresh_parses_in_embedded_launch", test_startup_jsonl_live_refresh_parses_in_embedded_launch },
+        { "test_viewport_only_parses_in_embedded_launch", test_viewport_only_parses_in_embedded_launch },
         { "test_embed_launch_config_missing_parent_hwnd", test_embed_launch_config_missing_parent_hwnd },
         { "test_embed_launch_config_parent_without_embedded", test_embed_launch_config_parent_without_embedded },
         { "test_embed_launch_config_invalid_parent_hwnd", test_embed_launch_config_invalid_parent_hwnd },
@@ -189,6 +216,7 @@ int main(void) {
         { "test_startup_jsonl_rejects_relative_path", test_startup_jsonl_rejects_relative_path },
         { "test_startup_jsonl_live_refresh_requires_jsonl", test_startup_jsonl_live_refresh_requires_jsonl },
         { "test_startup_jsonl_live_refresh_duplicate_flag", test_startup_jsonl_live_refresh_duplicate_flag },
+        { "test_viewport_only_duplicate_flag", test_viewport_only_duplicate_flag },
     };
 
     for (size_t i = 0; i < (sizeof(tests) / sizeof(tests[0])); ++i) {
