@@ -120,6 +120,16 @@ Plans:
 2. Sample-host wording reflects Windows-only runtime support truthfully.
 3. Final onboarding/proof checklist covers both plain-host and Windows-runtime expectations.
 
+### Phase 55: Viewport-only startup mode and F camera reset hotkey
+
+**Goal:** [To be planned]  
+**Requirements**: TBD  
+**Depends on:** Phase 54  
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 55 to break down)
+
 ## Progress
 
 | Phase | Status | Plans | Progress |
@@ -130,6 +140,7 @@ Plans:
 | 52.1 | ✓ | 3/3 complete | 100% |
 | 53 | ✓ | 3/3 complete | 100% |
 | 54 | ✓ | 3/3 complete | 100% |
+| 55 | ○ | 0 planned | 0% |
 
 ## Coverage
 
@@ -138,4 +149,4 @@ Plans:
 
 ## Next Step
 
-- Start `/gsd-audit-milestone`
+- Start `/gsd-plan-phase 55`

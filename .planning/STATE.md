@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Phase 54 complete
-last_updated: "2026-05-18T18:30:06.7915024+01:00"
-last_activity: 2026-05-18 -- Completed Phase 54 docs and onboarding truthfulness
+stopped_at: Phase 55 added
+last_updated: "2026-05-18T19:48:13.286+01:00"
+last_activity: 2026-05-18 -- Added Phase 55 to roadmap
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
   total_plans: 18
   completed_plans: 18
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Milestone v1.9 — audit next
+**Current focus:** Phase 55 — viewport-only-startup-mode-and-f-camera-reset-hotkey (planning next)
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 Phase: 54 (docs-and-onboarding-truthfulness) — COMPLETE
 Plan: Complete
-Status: Phase 54 complete; milestone audit next
-Last activity: 2026-05-18 -- Completed Phase 54 docs and onboarding truthfulness
+Status: Phase 54 complete; Phase 55 added and planning next
+Last activity: 2026-05-18 -- Added Phase 55 to roadmap
 
 Progress: [██████████] 100%
 
@@ -38,7 +38,7 @@ Progress: [██████████] 100%
 
 - Milestone v1.9 goal: let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
 - Scope includes host-facing TFM compatibility widening, a safe non-Windows placeholder contract, and preservation of the existing Windows child-HWND embedding/runtime packaging path.
-- Roadmap v1.9 spans phases 50-54 plus inserted Phase 52.1 across backend extraction, unsupported-platform contract, plain-net10 compatibility, Windows runtime refresh automation, consumer proof, and onboarding truthfulness.
+- Roadmap v1.9 spans phases 50-55 plus inserted Phase 52.1 across backend extraction, unsupported-platform contract, plain-net10 compatibility, Windows runtime refresh automation, consumer proof, onboarding truthfulness, and the new embedded viewport/camera follow-up work.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -126,10 +126,11 @@ Recent decisions affecting current work:
 - Phase 54 plan 01 completed: README now documents the plain-net10 host contract, the Windows runtime proof surface, and unsupported-platform truth.
 - Phase 54 plan 02 completed: QUICKSTART and the minimal sample now align with the plain-net10 onboarding contract.
 - Phase 54 completed: onboarding docs, sample defaults, and proof references now reflect the proven runtime boundary truthfully.
+- Phase 55 added: Viewport-only startup mode and F camera reset hotkey.
 
 ### Pending Todos
 
-- Audit milestone v1.9 next so the completed roadmap can be checked against the original scope before archival.
+- Plan Phase 55 next so the viewport-only embedded startup mode and F-key camera reset can be broken into executable work.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -158,6 +159,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T18:30:06.7915024+01:00
-Stopped at: Phase 54 complete
+Last session: 2026-05-18T19:48:13.286+01:00
+Stopped at: Phase 55 added
 Resume file: .planning/ROADMAP.md
