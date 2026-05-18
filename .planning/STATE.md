@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: ready
-stopped_at: Phase 50 complete; Phase 51 next
-last_updated: "2026-05-18T13:02:15.0898229+01:00"
+status: completed
+stopped_at: Phase 51 context gathered
+last_updated: "2026-05-18T12:20:55.756Z"
 last_activity: 2026-05-18 -- Completed Phase 50 regression closure
 progress:
   total_phases: 6
@@ -133,6 +133,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T13:02:15.0898229+01:00
-Stopped at: Phase 50 complete; Phase 51 next
-Resume file: .planning/ROADMAP.md
+Last session: 2026-05-18T12:20:55.752Z
+Stopped at: Phase 51 context gathered
+Resume file: .planning/phases/51-unsupported-platform-contract/51-CONTEXT.md
