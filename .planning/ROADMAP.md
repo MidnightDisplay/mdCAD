@@ -94,7 +94,7 @@ Plans:
 
 Plans:
 - [x] 53-01-PLAN.md — Lock `samples/avalonia-host-minimal` as the sole plain-net10 PROOF-01 build surface
-- [ ] 53-02-PLAN.md — Re-close the automated Windows regression preflight from the existing host build plus targeted tests
+- [x] 53-02-PLAN.md — Re-close the automated Windows regression preflight from the existing host build plus targeted tests
 - [ ] 53-03-PLAN.md — Create and complete a new Phase 53 manual lifecycle proof artifact on `samples/avalonia-host`
 
 **Success Criteria:**
@@ -123,7 +123,7 @@ Plans:
 | 51 | ✓ | 3/3 complete | 100% |
 | 52 | ✓ | 3/3 complete | 100% |
 | 52.1 | ✓ | 3/3 complete | 100% |
-| 53 | ◐ | 1/3 complete | 33% |
+| 53 | ◐ | 2/3 complete | 67% |
 | 54 | ○ | 0 planned | 0% |
 
 ## Coverage
