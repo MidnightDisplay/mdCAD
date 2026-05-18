@@ -38,8 +38,8 @@ created: 2026-05-18
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 54-01-01 | 01 | 1 | PROOF-02 | docs grep | `rg -n "net10\\.0|runtime proof|minimal host|diagnostic host" README.md` | `README.md` | ⬜ pending |
-| 54-01-02 | 01 | 1 | PROOF-02 | docs grep | `rg -n "net10\\.0|Windows-only|unsupported|runtime proof|minimal host|diagnostic host" README.md` | `README.md` | ⬜ pending |
+| 54-01-01 | 01 | 1 | PROOF-02 | docs grep | `rg -n "net10\\.0|runtime proof|minimal host|diagnostic host" README.md` | `README.md` | ✅ green |
+| 54-01-02 | 01 | 1 | PROOF-02 | docs grep | `rg -n "net10\\.0|Windows-only|unsupported|runtime proof|minimal host|diagnostic host" README.md` | `README.md` | ✅ green |
 | 54-02-01 | 02 | 2 | PROOF-02 | docs grep | `rg -n "net10\\.0|Windows-only|unsupported|JsonlPath" samples/avalonia-mdcad-control/QUICKSTART.md` | `samples/avalonia-mdcad-control/QUICKSTART.md` | ⬜ pending |
 | 54-02-02 | 02 | 2 | PROOF-02 | docs grep + build smoke | `rg -n "net10\\.0|Windows-only|unsupported|replace|JsonlPath" samples/avalonia-mdcad-control/QUICKSTART.md samples/avalonia-host-minimal/ViewModels/MainWindowViewModel.cs && dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | `samples/avalonia-mdcad-control/QUICKSTART.md` | ⬜ pending |
 | 54-03-01 | 03 | 3 | PROOF-02 | validation ledger grep | `Select-String -Path ".\.planning\phases\54-docs-and-onboarding-truthfulness\54-VALIDATION.md" -Pattern "Phase 53|53-MANUAL-CHECKLIST|53-03-SUMMARY|PROOF-02"` | `.planning/phases/54-docs-and-onboarding-truthfulness/54-VALIDATION.md` | ⬜ pending |

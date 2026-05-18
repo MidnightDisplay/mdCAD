@@ -13,7 +13,7 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 - **Interactive UI**: Dear ImGui interface with scene hierarchy, property inspector, search/filter
 - **Editing tools**: Undo/redo, drag-and-drop reparenting, multi-select, translation gizmo
 - **Serialization**: Save/load scenes to JSON
-- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus a reusable Avalonia control for `net10.0-windows10.0.19041.0` Avalonia hosts, a minimal sealed host sample, and a diagnostic harness with explicit host-owned status lines and repeatable launch/close proof controls
+- **Windows embedding workflow**: Strict `--embedded --parent-hwnd` child-window launch path plus a reusable Avalonia control that can be referenced from a plain `net10.0` Avalonia host, a minimal sealed host sample that serves as the compile/build proof surface, and a Windows diagnostic harness that remains the runtime proof surface with explicit host-owned status lines and repeatable launch/close proof controls
 - **Startup JSONL launch**: Optional `--jsonl <absolute-path>` auto-import plus explicit `--jsonl-live-refresh` opt-in that reuses the existing linked flat refresh behavior without changing the default startup path
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android, Web (Emscripten)
 
@@ -37,21 +37,22 @@ cmake -B build-vulkan -G "Visual Studio 18" -DUSE_VULKAN=ON; cmake --build build
 .\build-vulkan\bin\Release\mdCAD.exe --jsonl C:\absolute\path\to\data.jsonl --jsonl-live-refresh
 ```
 
-**Windows sample host proof harness:**
+**Windows runtime proof harness:**
 ```powershell
 dotnet build samples/avalonia-host/AvaloniaHost.csproj -c Release
 dotnet run --project samples/avalonia-host/AvaloniaHost.csproj -c Release
 ```
 
-The sample host resolves a bundled JSONL example from `resources/examples`, shows host-owned `launch:`, `attach:`, `jsonl:`, and `live refresh:` status lines, and supports repeated `Launch Session` / `Close Session` cycles from the same window.
+`samples/avalonia-host` is the authoritative Windows runtime proof surface. It resolves a bundled JSONL example from `resources/examples`, shows host-owned `launch:`, `attach:`, `jsonl:`, and `live refresh:` status lines, and supports repeated `Launch Session` / `Close Session` cycles from the same window.
 
-**Windows minimal sealed host sample:**
+**Plain `net10.0` compile/build proof host:**
 ```powershell
 dotnet build samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
+# Optional local smoke only; this is not proof of cross-platform runtime embedding:
 dotnet run --project samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj -c Release
 ```
 
-The minimal sample hosts a single sealed `MdCadEmbeddedControl` in a grid cell and binds its startup `JsonlPath` from a viewmodel property. Both the reusable control and the sample hosts now target `net10.0-windows10.0.19041.0`. See `samples/avalonia-mdcad-control/QUICKSTART.md` for step-by-step wiring.
+`samples/avalonia-host-minimal` proves that a plain `net10.0` Avalonia host can reference `MdCadEmbeddedControl` and build successfully. The embedded mdCAD viewer itself still remains Windows-only at runtime. On unsupported platforms, the host/control is still valid, but embedded viewing will not launch and the control shows the canonical Windows-only warning instead. See `samples/avalonia-mdcad-control/QUICKSTART.md` for step-by-step wiring.
 
 **Web (Emscripten):**
 ```bash
