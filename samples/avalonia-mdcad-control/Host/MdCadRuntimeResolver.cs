@@ -11,7 +11,12 @@ internal static class MdCadRuntimeResolver
 
     public static MdCadRuntimePaths Resolve()
     {
-        string runtimeRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, RuntimeDirectoryName));
+        return ResolveFromBaseDirectory(AppContext.BaseDirectory);
+    }
+
+    internal static MdCadRuntimePaths ResolveFromBaseDirectory(string baseDirectory)
+    {
+        string runtimeRoot = Path.GetFullPath(Path.Combine(baseDirectory, RuntimeDirectoryName));
         if (!Directory.Exists(runtimeRoot))
         {
             throw new InvalidOperationException($"mdCAD runtime folder is missing: {runtimeRoot}");
