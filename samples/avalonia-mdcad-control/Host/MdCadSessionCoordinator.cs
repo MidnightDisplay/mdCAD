@@ -57,6 +57,13 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
     {
         _desiredRunning = true;
         _autoStartSuppressed = false;
+        string? startBlockedReason = GetStartBlockedReason();
+        if (startBlockedReason != null)
+        {
+            _applyWarning(startBlockedReason);
+            return Task.FromException(new PlatformNotSupportedException(startBlockedReason));
+        }
+
         return ReconcileAsync(Interlocked.Increment(ref _requestedGeneration));
     }
 
@@ -92,9 +99,10 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
             }
 
             MdCadLaunchSnapshot snapshot = _captureSnapshot();
-            _applyWarning(snapshot.WarningText);
+            string? startBlockedReason = GetStartBlockedReason();
+            _applyWarning(startBlockedReason ?? snapshot.WarningText);
 
-            bool shouldBeRunning = ShouldBeRunning();
+            bool shouldBeRunning = ShouldBeRunning(startBlockedReason);
             bool launchChanged = _isSessionRunning && (!_activeSnapshot.HasValue || _activeSnapshot.Value != snapshot);
 
             if (_isSessionRunning && (!shouldBeRunning || launchChanged))
@@ -110,8 +118,9 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
                 }
 
                 snapshot = _captureSnapshot();
-                _applyWarning(snapshot.WarningText);
-                shouldBeRunning = ShouldBeRunning();
+                startBlockedReason = GetStartBlockedReason();
+                _applyWarning(startBlockedReason ?? snapshot.WarningText);
+                shouldBeRunning = ShouldBeRunning(startBlockedReason);
             }
 
             if (_isDisposed || generation != _requestedGeneration || _isSessionRunning || !shouldBeRunning)
@@ -137,8 +146,13 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
         }
     }
 
-    private bool ShouldBeRunning()
+    private bool ShouldBeRunning(string? startBlockedReason)
     {
+        if (startBlockedReason != null)
+        {
+            return false;
+        }
+
         if (!_canStartSession())
         {
             return false;
@@ -150,6 +164,12 @@ internal sealed class MdCadSessionCoordinator : IAsyncDisposable
         }
 
         return !_hasStartedOnce && !_autoStartSuppressed && _getAutoStart();
+    }
+
+    private string? GetStartBlockedReason()
+    {
+        string? startBlockedReason = _getStartBlockedReason();
+        return string.IsNullOrWhiteSpace(startBlockedReason) ? null : startBlockedReason;
     }
 
     private async Task QueueReconcileAsync(long generation)
