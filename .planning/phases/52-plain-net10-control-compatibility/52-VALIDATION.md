@@ -44,7 +44,7 @@ created: 2026-05-18
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 52-01-01 | 01 | 1 | HOSTC-01 | build smoke | `dotnet build .\samples\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj -c Release` | `samples/avalonia-mdcad-control/MdCad.Avalonia.Control.csproj` | ⬜ pending |
+| 52-01-01 | 01 | 1 | HOSTC-01 | build smoke | `dotnet build .\samples\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj -c Release` | `samples/avalonia-mdcad-control/MdCad.Avalonia.Control.csproj` | ✅ green |
 | 52-02-01 | 02 | 2 | HOSTC-01, HOSTC-02 | build smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | `samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj` | ⬜ pending |
 | 52-03-01 | 03 | 3 | HOSTC-01, HOSTC-02 | regression build + unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release -v minimal && dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `samples/avalonia-host/AvaloniaHost.csproj` | ⬜ pending |
 
