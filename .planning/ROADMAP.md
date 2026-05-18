@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Phases:** 50-54, plus inserted Phase 52.1  
-**Total Plans:** 15
+**Total Plans:** 18
 
 ## Overview
 
@@ -106,9 +106,14 @@ Plans:
 
 **Goal:** Make the compile-time vs runtime support contract explicit in docs, samples, and onboarding proof so consumers understand exactly what v1.9 delivers.  
 **Depends on:** Phase 53  
-**Plans:** 0 planned  
+**Plans:** 3 plans  
 **Requirements:** PROOF-02  
-**Status:** Pending
+**Status:** Planned
+
+Plans:
+- [ ] 54-01-PLAN.md — Rewrite README so plain-net10 host compatibility, Windows-only runtime support, and proof-surface boundaries are explicit
+- [ ] 54-02-PLAN.md — Align control QUICKSTART and minimal-sample onboarding with the plain-net10 contract and scoped JsonlPath truth
+- [ ] 54-03-PLAN.md — Lock Phase 54 validation against the existing minimal-host build lane and Phase 53 Windows proof artifacts
 
 **Success Criteria:**
 1. Quickstart/README clearly separate compile-time host compatibility from runtime viewer support.
@@ -124,7 +129,7 @@ Plans:
 | 52 | ✓ | 3/3 complete | 100% |
 | 52.1 | ✓ | 3/3 complete | 100% |
 | 53 | ✓ | 3/3 complete | 100% |
-| 54 | ○ | 0 planned | 0% |
+| 54 | ○ | 0/3 complete | 0% |
 
 ## Coverage
 
@@ -133,4 +138,4 @@ Plans:
 
 ## Next Step
 
-- Start `/gsd-plan-phase 54`
+- Start `/gsd-execute-phase 54`
