@@ -145,6 +145,80 @@ public sealed class MdCadSessionCoordinatorTests
         Assert.True(coordinator.IsSessionRunning);
     }
 
+    [Fact]
+    public async Task AutoStart_WhenBackendBlocked_NeverInvokesStartDelegate()
+    {
+        TestCoordinatorHarness harness = new()
+        {
+            AutoStart = true,
+            SurfaceReady = true,
+            PlaceholderHandle = new IntPtr(0x100),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
+        };
+
+        await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
+
+        await coordinator.RequestReconcileAsync();
+
+        Assert.Empty(harness.StartedSnapshots);
+        Assert.Equal(0, harness.StopCount);
+        Assert.Equal(0, harness.RecreateCount);
+        Assert.False(coordinator.IsSessionRunning);
+        Assert.Equal(MdCadUnsupportedRuntime.UnsupportedRuntimeMessage, harness.LastWarning);
+    }
+
+    [Fact]
+    public async Task LaunchSettingChanges_WhenBackendBlocked_UpdateWarningWithoutStarting()
+    {
+        TestCoordinatorHarness harness = new()
+        {
+            AutoStart = true,
+            SurfaceReady = true,
+            PlaceholderHandle = new IntPtr(0x100),
+            Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-first.jsonl", startupLiveRefreshEnabled: false),
+            StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
+        };
+
+        await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
+
+        await coordinator.RequestReconcileAsync();
+
+        harness.Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-second.jsonl", startupLiveRefreshEnabled: true);
+        await coordinator.RequestReconcileAsync();
+
+        Assert.Empty(harness.StartedSnapshots);
+        Assert.Equal(0, harness.StopCount);
+        Assert.Equal(0, harness.RecreateCount);
+        Assert.All(harness.AppliedWarnings, warning => Assert.Equal(MdCadUnsupportedRuntime.UnsupportedRuntimeMessage, warning));
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenBackendBlocked_ThrowsImmediately_AndStopAsync_RemainsSafe()
+    {
+        TestCoordinatorHarness harness = new()
+        {
+            AutoStart = false,
+            SurfaceReady = false,
+            PlaceholderHandle = IntPtr.Zero,
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
+        };
+
+        await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
+
+        PlatformNotSupportedException ex = await Assert.ThrowsAsync<PlatformNotSupportedException>(() => coordinator.StartAsync());
+        Assert.Equal(MdCadUnsupportedRuntime.UnsupportedRuntimeMessage, ex.Message);
+        Assert.Empty(harness.StartedSnapshots);
+
+        await coordinator.StopAsync();
+
+        Assert.Equal(0, harness.StopCount);
+        Assert.Equal(0, harness.RecreateCount);
+        Assert.False(coordinator.IsSessionRunning);
+        Assert.Equal(MdCadUnsupportedRuntime.UnsupportedRuntimeMessage, harness.LastWarning);
+    }
+
     private sealed class TestCoordinatorHarness
     {
         public bool AutoStart { get; set; }
@@ -165,6 +239,12 @@ public sealed class MdCadSessionCoordinatorTests
 
         public TaskCompletionSource<bool>? ContinueStop { get; set; }
 
+        public string? StartBlockedReason { get; set; }
+
+        public string? LastWarning { get; private set; }
+
+        public List<string?> AppliedWarnings { get; } = [];
+
         public MdCadSessionCoordinator CreateCoordinator()
         {
             return new MdCadSessionCoordinator(
@@ -172,7 +252,12 @@ public sealed class MdCadSessionCoordinatorTests
                 canStartSession: () => SurfaceReady && PlaceholderHandle != IntPtr.Zero,
                 getPlaceholderHandle: () => PlaceholderHandle,
                 getAutoStart: () => AutoStart,
-                applyWarning: _ => { },
+                getStartBlockedReason: () => StartBlockedReason,
+                applyWarning: warning =>
+                {
+                    LastWarning = warning;
+                    AppliedWarnings.Add(warning);
+                },
                 startSessionAsync: (snapshot, _) =>
                 {
                     StartedSnapshots.Add(snapshot);
