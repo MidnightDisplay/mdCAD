@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: Ready for `/gsd-execute-phase 50`
-stopped_at: Phase 52.1 inserted; Phase 50 execution still next
-last_updated: "2026-05-18T11:08:38.4543995+01:00"
-last_activity: 2026-05-18 - Inserted Phase 52.1 runtime refresh automation after Phase 52
+status: executing
+stopped_at: 50-01 complete; 50-02 next
+last_updated: "2026-05-18T11:17:30.0593926+01:00"
+last_activity: 2026-05-18 -- Completed 50-01 behavior lock baseline
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 50 execution
+**Current focus:** Phase 50 — backend-seam-extraction-and-windows-behavior-lock
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 50
-Plan: 50-01, 50-02, 50-03 ready
-Status: Ready for `/gsd-execute-phase 50`
-Last activity: 2026-05-18 - Inserted Phase 52.1 and kept Phase 50 execution next
+Phase: 50 (backend-seam-extraction-and-windows-behavior-lock) — EXECUTING
+Plan: 2 of 3 (50-02 next)
+Status: Executing Phase 50
+Last activity: 2026-05-18 -- Completed 50-01 behavior lock baseline
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Milestone Scope
 
@@ -98,7 +98,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 50 plans `50-01`, `50-02`, and `50-03`.
+- Execute Phase 50 plans `50-02` and `50-03`.
 - Verify the Windows diagnostic host still preserves attach, stop, relaunch, resize, and sealed/diagnostic behavior after the backend extraction.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
@@ -130,6 +130,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T11:02:08.1281263+01:00
-Stopped at: Phase 50 plans verified
-Resume file: .planning/phases/50-backend-seam-extraction-and-windows-behavior-lock/50-01-PLAN.md
+Last session: 2026-05-18T11:17:30.0593926+01:00
+Stopped at: 50-01 complete; 50-02 next
+Resume file: .planning/phases/50-backend-seam-extraction-and-windows-behavior-lock/50-02-PLAN.md
