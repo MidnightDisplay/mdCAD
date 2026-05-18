@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Phases:** 50-54, plus inserted Phase 52.1  
-**Total Plans:** 6
+**Total Plans:** 9
 
 ## Overview
 
@@ -52,9 +52,14 @@ Plans:
 
 **Goal:** Widen the public control contract to plain `net10.0` so cross-platform Avalonia hosts can reference and instantiate the control without the current TFM compatibility wall.  
 **Depends on:** Phase 51  
-**Plans:** 0 planned  
+**Plans:** 3 plans  
 **Requirements:** HOSTC-01, HOSTC-02  
-**Status:** Pending
+**Status:** Planned
+
+Plans:
+- [ ] 52-01-PLAN.md — Retarget the reusable control library to plain `net10.0` without changing the internal Windows runtime seam
+- [ ] 52-02-PLAN.md — Retarget `samples/avalonia-host-minimal` as the D-01 plain-net10 proof host and manually smoke shared XAML control instantiation
+- [ ] 52-03-PLAN.md — Re-close the existing control test lane and Windows diagnostic harness against the widened contract
 
 **Success Criteria:**
 1. A plain `net10.0` host can restore/build against the control without `NU1201`.
@@ -109,7 +114,7 @@ Plans:
 |-------|--------|-------|----------|
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
-| 52 | ○ | 0 planned | 0% |
+| 52 | ○ | 3 planned | 0% |
 | 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
@@ -121,4 +126,4 @@ Plans:
 
 ## Next Step
 
-- Start `/gsd-plan-phase 52`
+- Execute `/gsd-execute-phase 52`
