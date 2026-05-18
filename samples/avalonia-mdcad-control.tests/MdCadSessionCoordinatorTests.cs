@@ -93,6 +93,47 @@ public sealed class MdCadSessionCoordinatorTests
     }
 
     [Fact]
+    public async Task LaunchAffectingChanges_WhenOnlyViewportOnlyStartupModeChanges_CoalesceToOneRelaunchUsingNewestSnapshot()
+    {
+        TaskCompletionSource<bool> stopStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> continueStop = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        string jsonlPath = Path.Combine(Path.GetTempPath(), "phase55-viewport-only.jsonl");
+        TestCoordinatorHarness harness = new()
+        {
+            AutoStart = true,
+            SurfaceReady = true,
+            PlaceholderHandle = new IntPtr(0x100),
+            Snapshot = MdCadLaunchSnapshot.Create(
+                jsonlPath,
+                startupLiveRefreshEnabled: false,
+                viewportOnlyStartupMode: false),
+            StopStarted = stopStarted,
+            ContinueStop = continueStop,
+        };
+
+        await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
+        await coordinator.RequestReconcileAsync();
+
+        harness.Snapshot = MdCadLaunchSnapshot.Create(
+            jsonlPath,
+            startupLiveRefreshEnabled: false,
+            viewportOnlyStartupMode: true);
+        Task firstReconcile = coordinator.RequestReconcileAsync();
+        await stopStarted.Task;
+
+        Task secondReconcile = coordinator.RequestReconcileAsync();
+        continueStop.SetResult(true);
+
+        await Task.WhenAll(firstReconcile, secondReconcile);
+
+        Assert.Equal(1, harness.StopCount);
+        Assert.Equal(1, harness.RecreateCount);
+        Assert.Equal(2, harness.StartedSnapshots.Count);
+        Assert.True(harness.StartedSnapshots[^1].ViewportOnlyStartupMode);
+        Assert.Equal(harness.Snapshot, harness.StartedSnapshots[^1]);
+    }
+
+    [Fact]
     public async Task StopAsync_TearsDownStateAndRecreatesPlaceholderBeforeNextStart()
     {
         TestCoordinatorHarness harness = new()

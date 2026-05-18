@@ -80,6 +80,31 @@ public sealed class WindowsMdCadEmbedBackendTests
     }
 
     [Fact]
+    public void CreateStartInfo_ForwardsViewportOnlyBeforeOptionalJsonlArgs()
+    {
+        string jsonlPath = CreateReadableJsonlPath();
+        try
+        {
+            MdCadRuntimePaths runtime = new(
+                ExecutablePath: @"C:\runtime\mdCAD.exe",
+                RuntimeRoot: @"C:\runtime");
+
+            ProcessStartInfo startInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
+                runtime,
+                new IntPtr(0xCAFE),
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true, viewportOnlyStartupMode: true));
+
+            Assert.Equal(
+                ["--embedded", "--parent-hwnd", "0xCAFE", "--viewport-only", "--jsonl", jsonlPath, "--jsonl-live-refresh"],
+                startInfo.ArgumentList);
+        }
+        finally
+        {
+            File.Delete(jsonlPath);
+        }
+    }
+
+    [Fact]
     public void CreateStartInfo_UsesCurrentPlaceholderHandleOnRelaunch()
     {
         string jsonlPath = CreateReadableJsonlPath();
