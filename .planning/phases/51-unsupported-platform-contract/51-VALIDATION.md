@@ -21,7 +21,7 @@ created: 2026-05-18
 | **Config file** | none |
 | **Quick run command** | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~UnsupportedMdCadEmbedBackendTests"` |
 | **Full suite command** | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal` |
-| **Estimated runtime** | single-class filters: ~20-30s warm; combined shell/coordinator/backend lane: ~35-45s and used only when a task changes their wiring together |
+| **Estimated runtime** | single-class filters: ~20-30s warm; combined shell/coordinator/backend lane: ~35-45s and reserved for plan-level cross-wiring checks after shell work lands |
 
 ---
 
@@ -35,7 +35,7 @@ created: 2026-05-18
 ### Nyquist note
 
 - Most Phase 51 tasks can use a single test class filter and should stay within the 30-second target after the first warm build.
-- `51-03-01` intentionally uses a three-class lane because shell wiring is only safe when backend selection, coordinator blocking, and control warning precedence stay aligned; that broader loop is the minimum safe feedback path for that task.
+- `51-03-01` should use the shell-only `MdCadEmbeddedControlTests` filter for quick feedback because the control now has an internal-only platform-probe seam that lets tests force `MdCadEmbedBackendFactory.Create(..., isWindows: () => false)` through the real shell path without widening the public API. Keep the broader shell/coordinator/backend lane as the plan-level cross-wiring check after the task, not as the inner loop.
 
 ---
 
@@ -47,7 +47,7 @@ created: 2026-05-18
 | 51-01-02 | 01 | 0 | PLAT-02, PLAT-03 | unit (red-first) | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~MdCadSessionCoordinatorTests"` | `samples/avalonia-mdcad-control.tests/MdCadSessionCoordinatorTests.cs` | ⬜ pending |
 | 51-02-01 | 02 | 1 | PLAT-01, PLAT-03 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~UnsupportedMdCadEmbedBackendTests"` | `samples/avalonia-mdcad-control/Host/UnsupportedMdCadEmbedBackend.cs` | ⬜ pending |
 | 51-02-02 | 02 | 1 | PLAT-02, PLAT-03 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~UnsupportedMdCadEmbedBackendTests|FullyQualifiedName~MdCadSessionCoordinatorTests"` | `samples/avalonia-mdcad-control/Host/MdCadSessionCoordinator.cs` | ⬜ pending |
-| 51-03-01 | 03 | 2 | PLAT-01, PLAT-02 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~MdCadEmbeddedControlTests|FullyQualifiedName~UnsupportedMdCadEmbedBackendTests|FullyQualifiedName~MdCadSessionCoordinatorTests"` | `samples/avalonia-mdcad-control.tests/MdCadEmbeddedControlTests.cs` | ⬜ pending |
+| 51-03-01 | 03 | 2 | PLAT-01, PLAT-02 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~MdCadEmbeddedControlTests"` | `samples/avalonia-mdcad-control.tests/MdCadEmbeddedControlTests.cs` | ⬜ pending |
 | 51-03-02 | 03 | 2 | PLAT-01, PLAT-02, PLAT-03 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj --no-restore -v minimal --filter "FullyQualifiedName~MdCadEmbeddedControlTests"` | `samples/avalonia-mdcad-control/MdCadEmbeddedControl.axaml` | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
