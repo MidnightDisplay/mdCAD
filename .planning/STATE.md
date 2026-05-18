@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Phase 54 plan 02 complete
-last_updated: "2026-05-18T18:27:36.1741781+01:00"
-last_activity: 2026-05-18 -- Completed Phase 54 plan 02 onboarding cleanup
+stopped_at: Phase 54 complete
+last_updated: "2026-05-18T18:30:06.7915024+01:00"
+last_activity: 2026-05-18 -- Completed Phase 54 docs and onboarding truthfulness
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 17
-  percent: 94
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 54 — docs-and-onboarding-truthfulness
+**Current focus:** Milestone v1.9 — audit next
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 54 (docs-and-onboarding-truthfulness) — EXECUTING
-Plan: 3 of 3
-Status: Phase 54 plan 02 complete; plan 03 next
-Last activity: 2026-05-18 -- Completed Phase 54 plan 02 onboarding cleanup
+Phase: 54 (docs-and-onboarding-truthfulness) — COMPLETE
+Plan: Complete
+Status: Phase 54 complete; milestone audit next
+Last activity: 2026-05-18 -- Completed Phase 54 docs and onboarding truthfulness
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -88,6 +88,7 @@ Recent decisions affecting current work:
 - [Phase 52]: `samples/avalonia-host-minimal` is part of Phase 52 itself as the smallest plain-`net10.0` proof host, while the Windows diagnostic harness remains a separate regression consumer. — This gives the compatibility widening a real plain-host proof surface without pulling broader Phase 53 proof scope into this phase.
 - [Phase 52]: The reusable control and minimal proof host now both target plain `net10.0`, while the Windows diagnostic harness remains Windows-targeted and continues to validate the runtime-specific path separately. — This keeps compile-time compatibility widening distinct from Windows runtime proof.
 - [Phase 53]: Consumer proof is closed only when the plain `net10.0` build proof, automated Windows preflight, and approved manual host lifecycle proof all remain separate and green. — This preserves the compile-vs-runtime support boundary for the docs and onboarding phase.
+- [Phase 54]: Docs and onboarding are only closed when README, QUICKSTART, sample defaults, and validation all point at the same compile/build-versus-runtime proof split. — This keeps milestone closeout truthful without widening runtime scope.
 
 ### Roadmap Evolution
 
@@ -124,17 +125,18 @@ Recent decisions affecting current work:
 - Phase 54 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 - Phase 54 plan 01 completed: README now documents the plain-net10 host contract, the Windows runtime proof surface, and unsupported-platform truth.
 - Phase 54 plan 02 completed: QUICKSTART and the minimal sample now align with the plain-net10 onboarding contract.
+- Phase 54 completed: onboarding docs, sample defaults, and proof references now reflect the proven runtime boundary truthfully.
 
 ### Pending Todos
 
-- Execute Phase 54 plan 03 next so the docs truth closes against the existing proof surfaces and validation ledger.
+- Audit milestone v1.9 next so the completed roadmap can be checked against the original scope before archival.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
 ### Blockers/Concerns
 
 - The control owns real Win32 seams, so widening compile-time compatibility must not accidentally imply cross-platform runtime embedding support.
-- Phase 53 must prove the refreshed runtime through real consumer flows without reopening compile-time compatibility or broadening prematurely into docs/onboarding scope.
+- Milestone closeout must keep compile/build compatibility wording separate from Windows runtime support claims.
 
 ### Quick Tasks Completed
 
@@ -156,6 +158,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T18:27:36.1741781+01:00
-Stopped at: Phase 54 plan 02 complete
-Resume file: .planning/phases/54-docs-and-onboarding-truthfulness/54-03-PLAN.md
+Last session: 2026-05-18T18:30:06.7915024+01:00
+Stopped at: Phase 54 complete
+Resume file: .planning/ROADMAP.md
