@@ -1851,7 +1851,7 @@ static void init(void) {
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Default startup theme
-    ui_theme_apply(UI_THEME_VISUAL_STUDIO);
+    ui_theme_apply(UI_THEME_DEFAULT);
 
     // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
     imgui_storage_init();
