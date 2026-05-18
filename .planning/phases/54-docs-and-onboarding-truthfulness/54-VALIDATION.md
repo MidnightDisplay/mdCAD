@@ -1,9 +1,9 @@
 ---
 phase: 54
 slug: docs-and-onboarding-truthfulness
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-18
 ---
 
@@ -43,7 +43,7 @@ created: 2026-05-18
 | 54-02-01 | 02 | 2 | PROOF-02 | docs grep | `rg -n "net10\\.0|Windows-only|unsupported|JsonlPath" samples/avalonia-mdcad-control/QUICKSTART.md` | `samples/avalonia-mdcad-control/QUICKSTART.md` | ✅ green |
 | 54-02-02 | 02 | 2 | PROOF-02 | docs grep + build smoke | `rg -n "net10\\.0|Windows-only|unsupported|replace|JsonlPath" samples/avalonia-mdcad-control/QUICKSTART.md samples/avalonia-host-minimal/ViewModels/MainWindowViewModel.cs && dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | `samples/avalonia-mdcad-control/QUICKSTART.md` | ✅ green |
 | 54-03-01 | 03 | 3 | PROOF-02 | validation ledger grep | `Select-String -Path ".\.planning\phases\54-docs-and-onboarding-truthfulness\54-VALIDATION.md" -Pattern "Phase 53|53-MANUAL-CHECKLIST|53-03-SUMMARY|PROOF-02"` | `.planning/phases/54-docs-and-onboarding-truthfulness/54-VALIDATION.md` | ✅ green |
-| 54-03-02 | 03 | 3 | PROOF-02 | docs proof smoke + diagnostic host build | `rg -n "net10\\.0|Windows-only|unsupported|minimal host|diagnostic host" README.md samples/avalonia-mdcad-control/QUICKSTART.md && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `.planning/phases/54-docs-and-onboarding-truthfulness/54-VALIDATION.md` | ⬜ pending |
+| 54-03-02 | 03 | 3 | PROOF-02 | docs proof smoke + diagnostic host build | `rg -n "net10\\.0|Windows-only|unsupported|minimal host|diagnostic host" README.md samples/avalonia-mdcad-control/QUICKSTART.md && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `.planning/phases/54-docs-and-onboarding-truthfulness/54-VALIDATION.md` | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -70,12 +70,11 @@ None expected. Phase 54 should reuse the already-approved Phase 53 manual checkl
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 180s
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
-
+**Approval:** approved 2026-05-18
