@@ -22,7 +22,7 @@ The roadmap absorbs risk in the order the research recommended: first isolate th
 
 Plans:
 - [x] 50-01-PLAN.md — Lock Windows runtime lookup/launch behavior with backend-proof tests, seam contract, and manual checklist scaffold
-- [ ] 50-02-PLAN.md — Extract the Windows backend implementation and thin the shared control shell without changing behavior
+- [x] 50-02-PLAN.md — Extract the Windows backend implementation and thin the shared control shell without changing behavior
 - [ ] 50-03-PLAN.md — Re-close automated/manual Windows regression proof on the existing diagnostic host
 
 **Success Criteria:**
@@ -102,7 +102,7 @@ Plans:
 
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
-| 50 | ◆ | 1/3 complete | 33% |
+| 50 | ◆ | 2/3 complete | 67% |
 | 51 | ○ | 0 planned | 0% |
 | 52 | ○ | 0 planned | 0% |
 | 52.1 | ○ | 0 planned | 0% |

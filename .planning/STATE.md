@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: 50-01 complete; 50-02 next
-last_updated: "2026-05-18T11:17:30.0593926+01:00"
-last_activity: 2026-05-18 -- Completed 50-01 behavior lock baseline
+stopped_at: 50-02 complete; 50-03 next
+last_updated: "2026-05-18T11:27:57.0101018+01:00"
+last_activity: 2026-05-18 -- Completed 50-02 backend seam extraction
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 ## Current Position
 
 Phase: 50 (backend-seam-extraction-and-windows-behavior-lock) — EXECUTING
-Plan: 2 of 3 (50-02 next)
+Plan: 3 of 3 (50-03 next)
 Status: Executing Phase 50
-Last activity: 2026-05-18 -- Completed 50-01 behavior lock baseline
+Last activity: 2026-05-18 -- Completed 50-02 backend seam extraction
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Milestone Scope
 
@@ -79,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 48]: Runtime packaging now resolves mdCAD only from AppContext.BaseDirectory\\mdcad-runtime and ships a committed curated win-x64 bundle — This removes repo-root discovery, keeps the control self-contained for ProjectReference consumers, and preserves imgui.embedded.ini persistence through a runtime-root working directory in later lifecycle work.
 - [Phase 48]: The reusable control keeps a bare sealed surface by default and exposes the Phase 47 launch/status chrome only through explicit diagnostic mode while the sample host stays the scenario harness — This preserves the minimal embeddable API while still giving the in-repo consumer a truthful proof surface for start, stop, relaunch, and warning behavior.
 - [Phase 49]: The repo now ships both a diagnostic harness and a separate minimal sealed consumer sample, with the control quickstart living beside the reusable control project — This keeps external onboarding lightweight while preserving the richer sample host as the proof and debugging surface.
+- [Phase 50]: Windows lifecycle ownership now lives behind `IMdCadEmbedBackend`, while `MdCadEmbeddedControl` keeps the public properties, warning/status UI, and presentation-mode surface. — This isolates Win32/process state without changing the consumer-facing control contract.
+- [Phase 50]: `MdCadSessionCoordinator` now starts, stops, and recreates sessions through backend delegates instead of shell-owned Win32 state. — Keeping the same generation gate and relaunch ordering preserves the existing stop/recreate/restart behavior while decoupling the coordinator from the shell implementation.
 
 ### Roadmap Evolution
 
@@ -98,7 +100,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Execute Phase 50 plans `50-02` and `50-03`.
+- Execute Phase 50 plan `50-03`.
 - Verify the Windows diagnostic host still preserves attach, stop, relaunch, resize, and sealed/diagnostic behavior after the backend extraction.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
@@ -130,6 +132,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T11:17:30.0593926+01:00
-Stopped at: 50-01 complete; 50-02 next
-Resume file: .planning/phases/50-backend-seam-extraction-and-windows-behavior-lock/50-02-PLAN.md
+Last session: 2026-05-18T11:27:57.0101018+01:00
+Stopped at: 50-02 complete; 50-03 next
+Resume file: .planning/phases/50-backend-seam-extraction-and-windows-behavior-lock/50-03-PLAN.md
