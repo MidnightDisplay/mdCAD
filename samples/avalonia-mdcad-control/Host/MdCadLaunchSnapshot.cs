@@ -6,13 +6,17 @@ internal readonly record struct MdCadLaunchSnapshot(
     string? RequestedJsonlPath,
     string? LaunchJsonlPath,
     bool StartupLiveRefreshEnabled,
+    bool ViewportOnlyStartupMode,
     string? WarningText)
 {
     public bool ShouldPassJsonlArgument => !string.IsNullOrWhiteSpace(LaunchJsonlPath);
 
     public bool ShouldPassLiveRefreshArgument => ShouldPassJsonlArgument && StartupLiveRefreshEnabled;
 
-    public static MdCadLaunchSnapshot Create(string? requestedJsonlPath, bool startupLiveRefreshEnabled)
+    public static MdCadLaunchSnapshot Create(
+        string? requestedJsonlPath,
+        bool startupLiveRefreshEnabled,
+        bool viewportOnlyStartupMode)
     {
         string? normalizedRequest = NormalizeRequestedJsonlPath(requestedJsonlPath);
         if (normalizedRequest == null)
@@ -21,6 +25,7 @@ internal readonly record struct MdCadLaunchSnapshot(
                 RequestedJsonlPath: null,
                 LaunchJsonlPath: null,
                 StartupLiveRefreshEnabled: startupLiveRefreshEnabled,
+                ViewportOnlyStartupMode: viewportOnlyStartupMode,
                 WarningText: null);
         }
 
@@ -30,6 +35,7 @@ internal readonly record struct MdCadLaunchSnapshot(
                 RequestedJsonlPath: normalizedRequest,
                 LaunchJsonlPath: null,
                 StartupLiveRefreshEnabled: startupLiveRefreshEnabled,
+                ViewportOnlyStartupMode: viewportOnlyStartupMode,
                 WarningText: $"Requested JSONL path must be absolute: {normalizedRequest}");
         }
 
@@ -41,6 +47,7 @@ internal readonly record struct MdCadLaunchSnapshot(
             RequestedJsonlPath: normalizedRequest,
             LaunchJsonlPath: normalizedRequest,
             StartupLiveRefreshEnabled: startupLiveRefreshEnabled,
+            ViewportOnlyStartupMode: viewportOnlyStartupMode,
             WarningText: warningText);
     }
 

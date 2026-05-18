@@ -18,7 +18,7 @@ public sealed class WindowsMdCadEmbedBackendTests
         ProcessStartInfo startInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
             runtime,
             new IntPtr(0x1234),
-            MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: true));
+            MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: true, viewportOnlyStartupMode: false));
 
         Assert.Equal(runtime.ExecutablePath, startInfo.FileName);
         Assert.Equal(runtime.RuntimeRoot, startInfo.WorkingDirectory);
@@ -42,7 +42,7 @@ public sealed class WindowsMdCadEmbedBackendTests
             ProcessStartInfo startInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
                 runtime,
                 new IntPtr(0xFEED),
-                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: false));
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false));
 
             Assert.Equal(
                 ["--embedded", "--parent-hwnd", "0xFEED", "--jsonl", jsonlPath],
@@ -67,7 +67,7 @@ public sealed class WindowsMdCadEmbedBackendTests
             ProcessStartInfo startInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
                 runtime,
                 new IntPtr(0xBEEF),
-                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true));
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true, viewportOnlyStartupMode: false));
 
             Assert.Equal(
                 ["--embedded", "--parent-hwnd", "0xBEEF", "--jsonl", jsonlPath, "--jsonl-live-refresh"],
@@ -92,12 +92,12 @@ public sealed class WindowsMdCadEmbedBackendTests
             ProcessStartInfo initialStartInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
                 runtime,
                 new IntPtr(0x1234),
-                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: false));
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false));
 
             ProcessStartInfo relaunchedStartInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
                 runtime,
                 new IntPtr(0x5678),
-                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true));
+                MdCadLaunchSnapshot.Create(jsonlPath, startupLiveRefreshEnabled: true, viewportOnlyStartupMode: false));
 
             Assert.Equal(["--embedded", "--parent-hwnd", "0x1234", "--jsonl", jsonlPath], initialStartInfo.ArgumentList);
             Assert.Equal(

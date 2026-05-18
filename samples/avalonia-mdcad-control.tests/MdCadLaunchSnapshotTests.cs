@@ -14,7 +14,8 @@ public sealed class MdCadLaunchSnapshotTests
     {
         MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
             requestedJsonlPath,
-            startupLiveRefreshEnabled: true);
+            startupLiveRefreshEnabled: true,
+            viewportOnlyStartupMode: false);
 
         Assert.Null(snapshot.RequestedJsonlPath);
         Assert.Null(snapshot.LaunchJsonlPath);
@@ -28,7 +29,8 @@ public sealed class MdCadLaunchSnapshotTests
     {
         MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
             @"relative\sample.jsonl",
-            startupLiveRefreshEnabled: true);
+            startupLiveRefreshEnabled: true,
+            viewportOnlyStartupMode: false);
 
         Assert.Equal(@"relative\sample.jsonl", snapshot.RequestedJsonlPath);
         Assert.Null(snapshot.LaunchJsonlPath);
@@ -46,7 +48,8 @@ public sealed class MdCadLaunchSnapshotTests
 
         MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
             missingJsonlPath,
-            startupLiveRefreshEnabled: true);
+            startupLiveRefreshEnabled: true,
+            viewportOnlyStartupMode: false);
 
         Assert.Equal(missingJsonlPath, snapshot.RequestedJsonlPath);
         Assert.Equal(missingJsonlPath, snapshot.LaunchJsonlPath);

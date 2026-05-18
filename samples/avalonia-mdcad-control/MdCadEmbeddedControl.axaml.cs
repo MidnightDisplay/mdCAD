@@ -19,6 +19,9 @@ public partial class MdCadEmbeddedControl : UserControl
     public static readonly StyledProperty<bool> StartupLiveRefreshEnabledProperty =
         AvaloniaProperty.Register<MdCadEmbeddedControl, bool>(nameof(StartupLiveRefreshEnabled));
 
+    public static readonly StyledProperty<bool> ViewportOnlyStartupModeProperty =
+        AvaloniaProperty.Register<MdCadEmbeddedControl, bool>(nameof(ViewportOnlyStartupMode));
+
     public static readonly StyledProperty<bool> AutoStartProperty =
         AvaloniaProperty.Register<MdCadEmbeddedControl, bool>(nameof(AutoStart), defaultValue: true);
 
@@ -48,6 +51,7 @@ public partial class MdCadEmbeddedControl : UserControl
     {
         JsonlPathProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
         StartupLiveRefreshEnabledProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
+        ViewportOnlyStartupModeProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
         AutoStartProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.OnLaunchSettingsChanged());
         PresentationModeProperty.Changed.AddClassHandler<MdCadEmbeddedControl>((control, _) => control.UpdatePresentationMode());
     }
@@ -87,7 +91,7 @@ public partial class MdCadEmbeddedControl : UserControl
         _diagnosticStartButton.Click += OnDiagnosticStartClick;
         _diagnosticStopButton.Click += OnDiagnosticStopClick;
 
-        _lastLaunchSnapshot = MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled);
+        _lastLaunchSnapshot = MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled, ViewportOnlyStartupMode);
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
 
@@ -142,6 +146,12 @@ public partial class MdCadEmbeddedControl : UserControl
         set => SetValue(StartupLiveRefreshEnabledProperty, value);
     }
 
+    public bool ViewportOnlyStartupMode
+    {
+        get => GetValue(ViewportOnlyStartupModeProperty);
+        set => SetValue(ViewportOnlyStartupModeProperty, value);
+    }
+
     public bool AutoStart
     {
         get => GetValue(AutoStartProperty);
@@ -194,7 +204,7 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private MdCadLaunchSnapshot CaptureLaunchSnapshot()
     {
-        return MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled);
+        return MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled, ViewportOnlyStartupMode);
     }
 
     private bool CanStartSession()

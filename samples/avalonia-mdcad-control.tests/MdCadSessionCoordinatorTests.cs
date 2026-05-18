@@ -12,7 +12,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = true,
             SurfaceReady = false,
             PlaceholderHandle = new IntPtr(0x100),
-            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
         };
 
         await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
@@ -35,7 +35,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = false,
             SurfaceReady = true,
             PlaceholderHandle = new IntPtr(0x100),
-            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
         };
 
         await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
@@ -61,7 +61,8 @@ public sealed class MdCadSessionCoordinatorTests
             PlaceholderHandle = new IntPtr(0x100),
             Snapshot = MdCadLaunchSnapshot.Create(
                 Path.Combine(Path.GetTempPath(), "phase48-first.jsonl"),
-                startupLiveRefreshEnabled: false),
+                startupLiveRefreshEnabled: false,
+                viewportOnlyStartupMode: false),
             StopStarted = stopStarted,
             ContinueStop = continueStop,
         };
@@ -71,13 +72,15 @@ public sealed class MdCadSessionCoordinatorTests
 
         harness.Snapshot = MdCadLaunchSnapshot.Create(
             Path.Combine(Path.GetTempPath(), "phase48-second.jsonl"),
-            startupLiveRefreshEnabled: false);
+            startupLiveRefreshEnabled: false,
+            viewportOnlyStartupMode: false);
         Task firstReconcile = coordinator.RequestReconcileAsync();
         await stopStarted.Task;
 
         harness.Snapshot = MdCadLaunchSnapshot.Create(
             Path.Combine(Path.GetTempPath(), "phase48-third.jsonl"),
-            startupLiveRefreshEnabled: true);
+            startupLiveRefreshEnabled: true,
+            viewportOnlyStartupMode: false);
         Task secondReconcile = coordinator.RequestReconcileAsync();
         continueStop.SetResult(true);
 
@@ -97,7 +100,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = false,
             SurfaceReady = true,
             PlaceholderHandle = new IntPtr(0x100),
-            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
         };
 
         await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
@@ -125,7 +128,8 @@ public sealed class MdCadSessionCoordinatorTests
             PlaceholderHandle = new IntPtr(0x100),
             Snapshot = MdCadLaunchSnapshot.Create(
                 Path.Combine(Path.GetTempPath(), "phase50-first.jsonl"),
-                startupLiveRefreshEnabled: false),
+                startupLiveRefreshEnabled: false,
+                viewportOnlyStartupMode: false),
         };
 
         await using MdCadSessionCoordinator coordinator = harness.CreateCoordinator();
@@ -134,7 +138,8 @@ public sealed class MdCadSessionCoordinatorTests
 
         harness.Snapshot = MdCadLaunchSnapshot.Create(
             Path.Combine(Path.GetTempPath(), "phase50-second.jsonl"),
-            startupLiveRefreshEnabled: true);
+            startupLiveRefreshEnabled: true,
+            viewportOnlyStartupMode: false);
 
         await coordinator.StartAsync();
 
@@ -153,7 +158,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = true,
             SurfaceReady = true,
             PlaceholderHandle = new IntPtr(0x100),
-            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
             StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
         };
 
@@ -176,7 +181,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = true,
             SurfaceReady = true,
             PlaceholderHandle = new IntPtr(0x100),
-            Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-first.jsonl", startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-first.jsonl", startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
             StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
         };
 
@@ -184,7 +189,7 @@ public sealed class MdCadSessionCoordinatorTests
 
         await coordinator.RequestReconcileAsync();
 
-        harness.Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-second.jsonl", startupLiveRefreshEnabled: true);
+        harness.Snapshot = MdCadLaunchSnapshot.Create(@"C:\phase51-second.jsonl", startupLiveRefreshEnabled: true, viewportOnlyStartupMode: false);
         await coordinator.RequestReconcileAsync();
 
         Assert.Empty(harness.StartedSnapshots);
@@ -201,7 +206,7 @@ public sealed class MdCadSessionCoordinatorTests
             AutoStart = false,
             SurfaceReady = false,
             PlaceholderHandle = IntPtr.Zero,
-            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false),
+            Snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false),
             StartBlockedReason = MdCadUnsupportedRuntime.UnsupportedRuntimeMessage,
         };
 

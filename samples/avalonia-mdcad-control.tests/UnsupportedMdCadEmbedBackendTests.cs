@@ -24,7 +24,7 @@ public sealed class UnsupportedMdCadEmbedBackendTests
     public async Task StartSessionAsync_WhenUnsupported_ThrowsImmediately_WithCanonicalMessage()
     {
         IMdCadEmbedBackend backend = CreateBackend();
-        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(@"C:\missing\phase51.jsonl", startupLiveRefreshEnabled: true);
+        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(@"C:\missing\phase51.jsonl", startupLiveRefreshEnabled: true, viewportOnlyStartupMode: false);
 
         PlatformNotSupportedException ex = await Assert.ThrowsAsync<PlatformNotSupportedException>(
             () => backend.StartSessionAsync(snapshot, CancellationToken.None));
@@ -50,7 +50,7 @@ public sealed class UnsupportedMdCadEmbedBackendTests
 
     private static IMdCadEmbedBackend CreateBackend()
     {
-        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false);
+        MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(null, startupLiveRefreshEnabled: false, viewportOnlyStartupMode: false);
         return MdCadEmbedBackendFactory.Create(
             initialSnapshot: snapshot,
             setLaunchStatus: _ => { },
