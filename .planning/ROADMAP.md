@@ -54,10 +54,10 @@ Plans:
 **Depends on:** Phase 51  
 **Plans:** 3 plans  
 **Requirements:** HOSTC-01, HOSTC-02  
-**Status:** Planned
+**Status:** Executing
 
 Plans:
-- [ ] 52-01-PLAN.md — Retarget the reusable control library to plain `net10.0` without changing the internal Windows runtime seam
+- [x] 52-01-PLAN.md — Retarget the reusable control library to plain `net10.0` without changing the internal Windows runtime seam
 - [ ] 52-02-PLAN.md — Retarget `samples/avalonia-host-minimal` as the D-01 plain-net10 proof host and manually smoke shared XAML control instantiation
 - [ ] 52-03-PLAN.md — Re-close the existing control test lane and Windows diagnostic harness against the widened contract
 
@@ -114,7 +114,7 @@ Plans:
 |-------|--------|-------|----------|
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
-| 52 | ○ | 3 planned | 0% |
+| 52 | ◐ | 1/3 complete | 33% |
 | 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
