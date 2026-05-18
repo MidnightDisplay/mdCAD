@@ -13,6 +13,7 @@
 
 typedef struct {
     bool embedded;
+    bool viewport_only;
     uintptr_t parent_hwnd_value;
     bool startup_jsonl_live_refresh;
     char startup_jsonl_path[MDCAD_STARTUP_JSONL_PATH_MAX];
@@ -89,6 +90,7 @@ static inline bool mdcad_launch_config_parse(int argc,
     bool parent_seen = false;
     bool jsonl_seen = false;
     bool jsonl_live_refresh_seen = false;
+    bool viewport_only_seen = false;
 
     if (error_buffer && (error_buffer_size > 0)) {
         error_buffer[0] = '\0';
@@ -122,6 +124,15 @@ static inline bool mdcad_launch_config_parse(int argc,
             }
             parent_seen = true;
             ++i;
+            continue;
+        }
+
+        if (strcmp(arg, "--viewport-only") == 0) {
+            if (viewport_only_seen) {
+                return mdcad_launch_config_set_error(error_buffer, error_buffer_size, "Duplicate --viewport-only flag");
+            }
+            cfg.viewport_only = true;
+            viewport_only_seen = true;
             continue;
         }
 
