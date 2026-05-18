@@ -40,7 +40,7 @@ Plans:
 
 Plans:
 - [x] 51-01-PLAN.md — Add Wave 0 unsupported-backend and coordinator contract tests in the existing Windows-targeted test project
-- [ ] 51-02-PLAN.md — Implement the internal unsupported backend, backend factory, canonical message, and blocked-reason coordinator seam
+- [x] 51-02-PLAN.md — Implement the internal unsupported backend, backend factory, canonical message, and blocked-reason coordinator seam
 - [ ] 51-03-PLAN.md — Wire unsupported selection into the control shell and surface truthful sealed/diagnostic unsupported messaging
 
 **Success Criteria:**
@@ -108,7 +108,7 @@ Plans:
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
 | 50 | ✓ | 3/3 complete | 100% |
-| 51 | ◐ | 1/3 complete | 33% |
+| 51 | ◐ | 2/3 complete | 67% |
 | 52 | ○ | 0 planned | 0% |
 | 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
