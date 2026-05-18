@@ -36,7 +36,7 @@ Plans:
 **Depends on:** Phase 50  
 **Plans:** 3 plans  
 **Requirements:** PLAT-01, PLAT-02, PLAT-03  
-**Status:** Pending
+**Status:** Planned
 
 Plans:
 - [ ] 51-01-PLAN.md — Add Wave 0 unsupported-backend and coordinator contract tests in the existing Windows-targeted test project

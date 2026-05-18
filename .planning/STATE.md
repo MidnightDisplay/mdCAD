@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: completed
-stopped_at: Phase 51 context gathered
-last_updated: "2026-05-18T12:20:55.756Z"
-last_activity: 2026-05-18 -- Completed Phase 50 regression closure
+status: planned
+stopped_at: Phase 51 planned
+last_updated: "2026-05-18T14:22:19.3815037+01:00"
+last_activity: 2026-05-18 -- Completed Phase 51 planning and verification
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 3
-  completed_plans: 3
-  percent: 100
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 ## Current Position
 
-Phase: 50 (backend-seam-extraction-and-windows-behavior-lock) — COMPLETE
-Plan: Complete
-Status: Phase 50 complete; Phase 51 next
-Last activity: 2026-05-18 -- Completed Phase 50 regression closure
+Phase: 51 (unsupported-platform-contract) — PLANNED
+Plan: 3 plans ready (51-01 next)
+Status: Phase 51 planned; execute Wave 0 first
+Last activity: 2026-05-18 -- Completed Phase 51 planning and verification
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone Scope
 
@@ -82,6 +82,8 @@ Recent decisions affecting current work:
 - [Phase 50]: Windows lifecycle ownership now lives behind `IMdCadEmbedBackend`, while `MdCadEmbeddedControl` keeps the public properties, warning/status UI, and presentation-mode surface. — This isolates Win32/process state without changing the consumer-facing control contract.
 - [Phase 50]: `MdCadSessionCoordinator` now starts, stops, and recreates sessions through backend delegates instead of shell-owned Win32 state. — Keeping the same generation gate and relaunch ordering preserves the existing stop/recreate/restart behavior while decoupling the coordinator from the shell implementation.
 - [Phase 50]: Relaunch-safe proof now explicitly pins the current placeholder HWND in repeated backend start-info generation, and the Windows diagnostic host checklist is approved as PASS. — This closes the backend extraction loop without introducing a new proof surface or widening platform scope.
+- [Phase 51]: Unsupported hosts should show one consistent Windows-only runtime truth in both presentation modes, with `sealed` minimal and `diagnostic` more explicit. — This keeps the default surface lightweight while making unsupported runtime behavior visible immediately.
+- [Phase 51]: Unsupported `StartAsync()` must fail immediately with the same canonical message the placeholder shows, while `StopAsync()` remains a safe no-op. — Programmatic hosts get deterministic behavior without implying cross-platform runtime support.
 
 ### Roadmap Evolution
 
@@ -99,10 +101,11 @@ Recent decisions affecting current work:
 - Phase 50 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 - Phase 52.1 inserted after Phase 52: Automate Windows runtime refresh from build-vulkan with a dotnet-managed post-build helper (URGENT)
 - Phase 50 completed: backend extraction, automated relaunch lock, and approved Windows diagnostic-host proof are recorded.
+- Phase 51 planned: 3 verified execution plans plus context, research, and validation artifacts are ready for execution.
 
 ### Pending Todos
 
-- Discuss and plan Phase 51.
+- Execute Phase 51.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
@@ -133,6 +136,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T12:20:55.752Z
-Stopped at: Phase 51 context gathered
-Resume file: .planning/phases/51-unsupported-platform-contract/51-CONTEXT.md
+Last session: 2026-05-18T14:22:19.3815037+01:00
+Stopped at: Phase 51 planned
+Resume file: .planning/phases/51-unsupported-platform-contract/51-01-PLAN.md
