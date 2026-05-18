@@ -1,163 +1,93 @@
 # Domain Pitfalls
 
-**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
-**Domain:** Windows child-HWND embedding, launch-time JSONL viewing, and mixed host/viewer input ownership  
-**Researched:** 2026-05-14  
-**Confidence:** HIGH for Win32 lifecycle and process concerns; MEDIUM for host-specific polish
+**Domain:** Plain `net10.0` Avalonia host compatibility for a Windows-only embedded mdCAD control  
+**Researched:** 2026-05-18  
+**Confidence:** HIGH
 
-## Critical Launch Blockers
+## Critical pitfalls
 
-### 1. Reparenting a top-level window instead of creating a true child window
-**Risk:** Launching mdCAD normally and calling `SetParent` later can leave styles, activation, clipping, and DPI behavior inconsistent.
+### 1. Fixing only the samples instead of the control asset
 
-**Prevention:**
-- Make embedding a dedicated startup mode
-- Create the mdCAD window as a child from the start
-- Fail fast on invalid parent HWND or incompatible DPI assumptions
+If `MdCad.Avalonia.Control` stays `net10.0-windows...`, external plain `net10.0` consumers will still fail with `NU1201` even if repo samples look fixed.
 
-**Phase to absorb:** Phase 1
+**Prevention:** ship a plain `net10.0` consumable asset for the control itself.
 
-### 2. Treating process spawn as "viewer ready"
-**Risk:** The host reports success before the child surface actually exists and is usable.
+### 2. Letting Windows-only implementation leak into the public surface
 
-**Prevention:**
-- Separate statuses for:
-  1. process launched
-  2. child surface attached
-  3. first non-zero resize applied
-  4. optional JSONL import complete
-- Use bounded startup timeouts and explicit failure reporting
+If the public API effectively stays Windows-only, consumers will hit CA1416 noise, XAML load friction, or platform-specific assumptions despite the wider TFM.
 
-**Phase to absorb:** Phase 1
+**Prevention:** keep Win32 types/helpers internal; keep the public control API platform-neutral.
 
-### 3. No explicit focus/input ownership contract
-**Risk:** Mouse enters the viewer, but keyboard stays with the host; first click only focuses; shortcuts go to the wrong process.
+### 3. Leaving non-Windows behavior implicit
 
-**Prevention:**
-- Define click-to-focus behavior
-- Define what happens on focus loss and host re-focus
-- Make focus-loss cleanup mandatory for transient interaction state
+Relying on “placeholder handle never appears” creates a silent idle state instead of a real unsupported-platform contract.
 
-**Phase to absorb:** Phase 2
+**Prevention:** add an explicit unsupported-platform warning/placeholder and a deterministic no-launch path.
 
-### 4. Mouse capture / drag state leaks across host boundaries
-**Risk:** Orbit/gizmo drag stays stuck after focus loss, host resize, or mouse-up outside the child region.
+### 4. Breaking the already-shipped Windows harness path
 
-**Prevention:**
-- Cancel drags on focus loss, capture loss, parent destroy, and hide/minimize
-- Explicitly test mouse-down inside / mouse-up outside scenarios
+The compatibility widening must not regress:
+- attach
+- relaunch
+- runtime bundle lookup
+- close/teardown ordering
 
-**Phase to absorb:** Phase 2
+**Prevention:** treat the current Windows HWND/runtime path as locked; widen around it, not through it.
 
-### 5. Whole-window size assumptions break in embedded mode
-**Risk:** Zero-size transitions, rapid resize bursts, or layout churn break the viewport, pick math, or render targets.
+### 5. Breaking runtime packaging while chasing cross-platform builds
 
-**Prevention:**
-- Treat zero-size as a valid transient state
-- Gate heavy resize work behind actual size changes
-- Verify repeated resize with active content
+The current `mdcad-runtime\mdCAD.exe` copy flow can be accidentally broken by TFM conditions or packaging tweaks.
 
-**Phase to absorb:** Phase 2
+**Prevention:** preserve the exact `AppContext.BaseDirectory\\mdcad-runtime` contract unless there is a deliberate packaging redesign.
 
-### 6. Startup JSONL import runs too early
-**Risk:** Large import begins before the embed path is stable, producing blank startup or race conditions.
+## Moderate pitfalls
 
-**Prevention:**
-- Parse CLI immediately, but delay actual import until:
-  - embed mode is validated
-  - child surface exists
-  - first non-zero size has been observed
-- Keep the viewer alive on import failure and surface the error clearly
+### 6. Misleading non-Windows users with Windows-only JSONL validation
 
-**Phase to absorb:** Phase 3
+If non-Windows hosts see a “path must be absolute” launch warning first, the contract becomes confusing because runtime support is the real issue.
 
-### 7. Windows path and quoting bugs
-**Risk:** Spaces, backslashes, UNC paths, or quotes break launch-time import.
+**Prevention:** unsupported-platform warning takes precedence over launch/path diagnostics.
 
-**Prevention:**
-- Accept absolute paths only
-- Prefer wide-character argument parsing on the viewer side
-- Avoid hand-rolled quoting on the host side
-- Log the resolved path and embed HWND
+### 7. `StartAsync()` remaining callable but semantically undefined
 
-**Phase to absorb:** Phase 3
+Hosts need a clear imperative contract on unsupported platforms.
 
-### 8. Host/control destruction leaves orphan process or invalid child state
-**Risk:** Host closes or recreates the control while mdCAD keeps running or renders into a dead parent.
+**Prevention:** define `StartAsync()` as immediate, explicit unsupported-runtime failure or stable no-op with warning; keep `StopAsync()` safe when nothing can run.
 
-**Prevention:**
-- Define ownership clearly
-- Treat control destruction/recreation as a first-class lifecycle path
-- Test repeated launch/close/reopen cycles
+### 8. Multi-target drift
 
-**Phase to absorb:** Phases 1 and 4
+If both `net10.0` and `net10.0-windows...` assets exist, they can drift in API or behavior.
 
-### 9. Launch-time live refresh accidentally changes established observer semantics
-**Risk:** v1.8 reopens previously fixed large-file observer regressions by changing defaults or bypassing commit-on-success behavior.
+**Prevention:** keep one shared public API and isolate only Windows internals.
 
-**Prevention:**
-- Keep live refresh opt-in only
-- Reuse the same observer metadata and commit-on-success semantics as the current linked flat import flow
-- Validate launch matrix:
-  - embed only
-  - embed + import
-  - embed + import + live refresh
-  - invalid/missing/locked file
+## Minor pitfalls
 
-**Phase to absorb:** Phase 3
+### 9. Docs staying in the old Windows-only-host shape
 
----
+If `QUICKSTART.md` still says “target `net10.0-windows...`”, consumers will never discover the widened host contract.
 
-## Moderate Pitfalls
+**Prevention:** document compile-time host compatibility separately from runtime viewer compatibility.
 
-### Embedded changes leak into normal standalone mode
-**Prevention:** Keep embedded mode as an explicit branch and run standalone smoke verification after each embedding phase.
+### 10. Tests staying Windows-targeted only
 
-### Sample host becomes demo-only instead of the conformance harness
-**Prevention:** Make the sample host validate resize, focus switching, close/relaunch, good/bad JSONL paths, and optional live refresh.
+Repo tests can all pass while the new plain-`net10.0` contract remains unproven.
 
-### Poor error surfacing
-**Prevention:** Distinguish embed-contract failure from import failure and avoid silent blank-host failure modes.
+**Prevention:** add at least one plain-`net10.0` consumer smoke and one unsupported-platform behavior seam.
 
----
+## Recommended rollout order
 
-## Phase-Specific Warning Map
+1. **Compile-time compatibility first**
+   - Make the control referenceable from plain `net10.0`
+   - Add a plain `net10.0` consumer restore/build proof
 
-| Phase | Main risk | Mitigation |
-|-------|-----------|------------|
-| 1 — Embed contract + lifecycle | `SetParent`-style shortcut instead of true child-window startup | Dedicated embed mode, parent validation, child-style creation |
-| 1 — Startup coordination | Process exists but viewer is not ready | Separate readiness states |
-| 2 — Focus/input | First click eaten, keyboard remains with host | Explicit focus policy and cleanup |
-| 2 — Resize | Zero-size / resize storms break viewport | Guard size changes and verify repeated resize |
-| 3 — CLI import | Quoting/path bugs | Absolute paths, wide-char parsing, clear logging |
-| 3 — Live refresh | Semantics drift from v1.7 | Keep opt-in default OFF and reuse existing observer contract |
-| 4 — Sample hardening | Host only proves happy path | Make sample the actual validation harness |
+2. **Unsupported-platform contract second**
+   - Add explicit no-launch placeholder behavior
+   - Ensure unsupported platforms never attempt mdCAD launch
 
----
+3. **Windows regression closure third**
+   - Re-run the shipped harness path checks
+   - Verify runtime copy, attach, stop, relaunch
 
-## Recommended Risk Absorption Order
-
-1. Embed contract, child-window creation, startup/teardown rules
-2. Focus, input, resize, and interaction-state correctness
-3. Startup import and live refresh wiring
-4. Sample host hardening and regression closure
-
----
-
-## Sources
-
-- `.planning/PROJECT.md`
-- `src/app.c`
-- `src/ui/ui_viewport.h`
-- `src/jsonl_import_job.h`
-- `src/jsonl_observer_system.h`
-- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent
-- Microsoft `WM_MOUSEACTIVATE`: https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-mouseactivate
-- Microsoft `SetFocus`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setfocus
-- Microsoft `SetCapture`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setcapture
-- Microsoft `GetClientRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclientrect
-- Microsoft `WM_SIZE`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-size
-- Microsoft `CreateProcessW`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-- Microsoft `WaitForInputIdle`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-waitforinputidle
-- Microsoft `CommandLineToArgvW`: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
-- Avalonia `NativeControlHost`: https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_NativeControlHost
+4. **Docs/tests cleanup fourth**
+   - Rewrite quickstart around compile-time vs runtime contract
+   - Add consumer-facing proof that the widened host contract is real

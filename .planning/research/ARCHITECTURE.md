@@ -1,210 +1,181 @@
-# Architecture Patterns
+# Architecture Research: Plain `net10.0` Avalonia Host Compatibility
 
-**Project:** mdCAD v1.8 — Embeddable Windows JSONL Viewer  
-**Domain:** Windows-hosted embeddable viewer for an existing native CAD app  
-**Researched:** 2026-05-14  
+**Milestone:** v1.9  
+**Scope:** architecture only for adding plain `net10.0` host compatibility without changing the proven Windows embedded-runtime seam  
 **Confidence:** MEDIUM-HIGH
 
-## Recommended Architecture
+## Current repo shape
 
-Treat v1.8 as a **launch/windowing integration layer** around the existing mdCAD runtime, not as a renderer rewrite or a host API redesign.
+Today the reusable control project mixes two responsibilities:
 
-Reuse these existing systems as much as possible:
-- app lifecycle in `src/app.c` (`init -> frame -> event -> sokol_main`)
-- ECS scene/update/render flow
-- existing viewport/picking/gizmo/input pipeline
-- existing large flat JSONL import job
-- existing linked JSONL observer/refresh system
+1. **Host-facing Avalonia surface**
+   - `MdCadEmbeddedControl.axaml`
+   - `MdCadEmbeddedControl.axaml.cs`
 
-Add only three new runtime seams:
-1. Launch config parser
-2. Windows embedding adapter
-3. Startup flat-JSONL import controller
+2. **Windows-only runtime ownership**
+   - `Host/EmbedNativeControlHost.cs`
+   - `Host/MdCadRuntimeResolver.cs`
+   - child-HWND placeholder/attach, resize sync, runtime bundle lookup, process launch
 
-The highest-risk area is **Win32 child-window creation under Sokol**, not JSONL import.
+That was fine for v1.8 when every consumer targeted `net10.0-windows10.0.19041.0`, but it is the reason plain `net10.0` hosts currently fail at restore.
 
----
+## Architectural options
 
-## Existing Integration Points
+### Option 1 — Retarget the existing control project to `net10.0` and keep the current structure
 
-| Area | Current role | Why it matters for v1.8 |
-|------|--------------|-------------------------|
-| `src/app.c` | Single app entry/lifecycle owner | Best place to own launch mode and startup orchestration |
-| `src/ui/ui_scene_hierarchy.h` | Current flat JSONL import UI flow | Good reference for existing behavior, but wrong owner for launch-time import |
-| `src/jsonl_import_job.h` | Chunked flat JSONL import job | Reuse directly for startup auto-import |
-| `src/jsonl_observer_system.h` | Linked refresh/manual refresh observer logic | Reuse after launch-time import succeeds |
-| `src/ui/ui_viewport.h` | Viewport sizing and input math | Resize/input behavior should stay authoritative here |
-| `vendors/libsokol/sokol.c` / `sokol_app.h` | Native window creation boundary | Likely where the Windows embedding seam must live |
+**Pros**
+- Smallest diff
+- Directly removes the TFM compatibility wall
 
----
+**Cons**
+- Leaves Win32/runtime ownership smeared through shared control code
+- Keeps non-Windows behavior implicit instead of intentional
 
-## New / Modified Components
+**Verdict:** technically viable, but not the cleanest shape for v1.9.
 
-### 1. Launch config parser
-Recommended component: `src/app_launch_config.h` (or equivalent)
+### Option 2 — **Recommended**: one public project, internal backend split
 
-Suggested responsibility:
-- parse `--embedded`
-- parse/validate `--parent-hwnd`
-- parse `--jsonl`
-- parse `--jsonl-live-refresh`
-- make launch mode available to `app.c` before init begins
+Keep one public project/assembly: `MdCad.Avalonia.Control`, but split its internals into:
 
-This should be a single source of truth for startup behavior.
+```text
+MdCadEmbeddedControl (shared shell / public API)
+  -> IMdCadEmbedBackend (internal)
+      -> WindowsMdCadEmbedBackend
+      -> UnsupportedMdCadEmbedBackend
+```
 
-### 2. Windows embedding adapter
-Recommended component: `src/platform/win32_embed.h/.c` (or equivalent thin Win32-only layer)
+**Why this fits best**
+- Plain `net10.0` hosts get a compatible reference path
+- The proven Windows runtime seam stays explicit and library-owned
+- Existing XAML namespace / assembly identity stays unchanged
+- Non-Windows behavior becomes deliberate, not accidental
 
-Suggested responsibility:
-- validate `parent_hwnd`
-- expose embedded vs standalone state
-- own parent-liveness/orphan detection
-- own Win32-specific sizing/focus glue
+### Option 3 — Split into two public projects
 
-Keep Win32 child-window logic out of general app code as much as possible.
+For example:
+- `MdCad.Avalonia.Control` (`net10.0`)
+- `MdCad.Avalonia.Control.Windows` (`net10.0-windows...`)
 
-### 3. Sokol Win32 creation seam
-Recommended approach: a **narrow local Sokol Win32 extension/patch** so embedded mode can create a child window from birth.
+**Verdict:** not recommended for v1.9 because it complicates direct consumer onboarding and packaging without solving a problem this milestone actually needs to solve.
 
-Why:
-- mdCAD window creation happens before `init()`
-- Sokol exposes `sapp_win32_get_hwnd()` but not a documented parent-HWND creation field
-- `SetParent` is not a sufficient final architecture for correct child-window semantics
+## Recommended architecture
 
-### 4. Embedded layout mode
-Recommended change: add an embedded viewer layout mode that:
-- skips normal dockspace/panel-heavy standalone layout
-- lets the viewport fill the child client area (or nearly so)
-- keeps the same viewport coordinate/input math
+### Public surface
 
-This is a UI policy change, not a renderer fork.
+Keep the current public contract:
 
-### 5. Startup flat JSONL import controller
-Recommended component: `src/startup_flat_import.h/.c` or equivalent `app.c`-owned helper state
+- `MdCadEmbeddedControl`
+- `JsonlPath`
+- `StartupLiveRefreshEnabled`
+- `AutoStart`
+- `PresentationMode`
+- `StartAsync()`
+- `StopAsync()`
 
-Do **not** drive startup import from `ui_scene_hierarchy_state_t`.
+Do **not** add public Windows-specific knobs in this milestone.
 
-Instead, create a non-UI wrapper that can:
-- start a flat import from an absolute path
-- request live refresh opt-in when asked
-- tick import progress from `frame()`
-- reuse existing success/error/reset semantics
+### Shared shell
 
----
+`MdCadEmbeddedControl` should own only:
+- styled properties
+- warning/diagnostic UI
+- presentation mode switching
+- coordinator/backend wiring
 
-## Runtime vs Host Boundaries
+It should stop owning directly:
+- placeholder HWND creation
+- child attach polling
+- resize sync
+- runtime resolution
+- process launch details
 
-| Concern | mdCAD runtime | Avalonia sample host |
-|---------|---------------|----------------------|
-| Parse embedded-mode CLI | Yes | No |
-| Own scene/render/input loop | Yes | No |
-| Create/attach child-window semantics | Yes | Supplies parent HWND only |
-| Auto-import JSONL | Yes | Passes CLI only |
-| Enable live refresh | Yes | Passes CLI only |
-| Tick linked refresh | Yes | No |
-| Resize child HWND | Accepts it | Yes |
-| Focus child HWND on host interaction | Must handle it | Yes |
-| Process launch/termination | No | Yes |
-| Status UI for launch/attach | Minimal/debug only | Yes |
-| Example JSONL bundling | No | Yes |
+### Windows backend
 
-The host should own HWND/process lifecycle only. mdCAD should continue owning rendering, input, scene state, import, refresh, and shutdown behavior.
+Own:
+- `NativeControlHost` placeholder creation
+- `user32.dll` P/Invokes
+- runtime bundle resolution from `AppContext.BaseDirectory\\mdcad-runtime`
+- `mdCAD.exe --embedded --parent-hwnd ...` launch
+- attach polling / child HWND checks
+- resize sync and teardown
 
----
+### Unsupported backend
 
-## Recommended Control Flow
+Own:
+- non-Windows inert surface
+- warning text such as `Embedded mdCAD runtime is currently supported only on Windows.`
+- never-start behavior
 
-### Standalone mode
-`Process start -> sokol_main -> init -> frame -> event`
+It should never attempt:
+- runtime resolution
+- Windows path validation for launch
+- process launch
+- placeholder HWND logic
 
-No material change.
+## Important boundary correction
 
-### Embedded mode
-1. Host creates a native placeholder HWND
-2. Host launches `mdCAD.exe --embedded --parent-hwnd <HWND> --jsonl <abs-path> [--jsonl-live-refresh]`
-3. mdCAD parses CLI into launch config
-4. Sokol/Win32 layer creates mdCAD as a child HWND
-5. `init()` initializes normal runtime systems
-6. Embedded layout mode is selected
-7. Startup import controller begins flat JSONL import if requested
-8. `frame()` ticks import, observer systems, and normal viewport rendering
-9. Host resizes the placeholder; mdCAD receives native resize and adapts through existing viewport/render-target paths
-10. If the parent HWND disappears, mdCAD requests shutdown
+`MdCadLaunchSnapshot` is currently too Windows-shaped to stay fully shared.
 
----
+Recommended:
+- shared layer: `MdCadLaunchRequest` (raw host intent)
+- Windows backend: normalize into Windows-specific launch arguments
+- Unsupported backend: ignore launch normalization beyond basic host intent and show the platform warning
 
-## What Should Not Change
+This avoids misleading non-Windows users with Windows-only path diagnostics.
 
-- ECS scene ownership
-- Rendering backend selection logic
-- Pick buffer / gizmo / selection architecture
-- Linked JSONL observer semantics
-- Existing large flat import implementation
-- Manual Scene Hierarchy import workflow for standalone mode
+## New vs modified surfaces
 
-v1.8 should add a **new launch path**, not a separate scene/import stack.
+### New
 
----
+- `Host/IMdCadEmbedBackend.cs`
+- `Host/MdCadEmbedBackendFactory.cs`
+- `Host/UnsupportedMdCadEmbedBackend.cs`
+- `Host/Windows/WindowsMdCadEmbedBackend.cs`
+- optionally `Host/MdCadLaunchRequest.cs`
 
-## Low-Risk Build Order
+### Modified
 
-### Phase 1 — Launch config and child-window bootstrap
-Deliver:
-- CLI parser
-- embedded mode flag
-- parent HWND contract
-- minimal child-window creation path
-- simple host sample that launches and displays mdCAD
+- `MdCadEmbeddedControl.axaml.cs` → shared shell/orchestrator only
+- `MdCadEmbeddedControl.axaml` → explicit unsupported-platform warning behavior
+- `MdCad.Avalonia.Control.csproj` → `net10.0`
+- `Host/MdCadSessionCoordinator.cs` → backend-neutral lifecycle orchestration
+- `Host/EmbedNativeControlHost.cs` → Windows backend helper
+- `Host/MdCadRuntimeResolver.cs` → Windows backend only
+- `samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj` → plain `net10.0`
+- `QUICKSTART.md` → compile-time vs runtime contract wording
 
-### Phase 2 — Resize, focus, and input correctness
-Deliver:
-- host-driven resize
-- focus acquisition
-- keyboard/mouse sanity
-- parent-close/orphan shutdown behavior
-- embedded viewer layout mode
+## Safe rollout / phase order
 
-### Phase 3 — Startup flat JSONL auto-import
-Deliver:
-- non-UI startup import controller
-- absolute-path startup import
-- launch-time success/error path
+### Phase 1 — Extract backend seam without changing behavior
 
-### Phase 4 — Live refresh opt-in
-Deliver:
-- `--jsonl-live-refresh`
-- observer contract wiring
-- embedded-mode refresh proof
+- Introduce `IMdCadEmbedBackend`
+- Move Win32/runtime/process logic behind a Windows backend
+- Keep current Windows behavior identical
 
-### Phase 5 — Sample host polish and docs
-Deliver:
-- bundled example JSONL
-- status messaging
-- build/run instructions
-- cleanup behavior
-- integration validation notes
+### Phase 2 — Add unsupported-platform backend + explicit warning contract
 
----
+- Add inert backend
+- Make non-Windows behavior intentional and visible
+- Stop the shared shell from using Windows-only readiness/path logic directly
 
-## Anti-Patterns
+### Phase 3 — Retarget the consumer-facing control to plain `net10.0`
 
-- Putting embedded startup import logic inside `ui_scene_hierarchy`
-- Treating embedding as "the host controls mdCAD"
-- Relying on late `SetParent` as the final design
-- Mixing the Avalonia sample into the core native build/test flow
+- Change `MdCad.Avalonia.Control.csproj` to `net10.0`
+- Move shared tests to the new host-facing contract
 
----
+### Phase 4 — Add the plain `net10.0` consumer proof
 
-## Sources
+- Retarget `samples/avalonia-host-minimal` to plain `net10.0`
+- Keep `samples/avalonia-host` as the Windows diagnostic harness
 
-- `src/app.c`
-- `src/ui/ui_scene_hierarchy.h`
-- `src/jsonl_import_job.h`
-- `src/jsonl_observer_system.h`
-- `src/ui/ui_viewport.h`
-- `src/CMakeLists.txt`
-- `docs/VULKAN_WINDOWS.md`
-- Sokol `sokol_app.h`: https://github.com/floooh/sokol
-- Microsoft `SetParent`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent
-- Microsoft child-window docs: https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features
-- Avalonia `NativeControlHost`: https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_NativeControlHost
+### Phase 5 — Docs and packaging cleanup
+
+- Update `QUICKSTART.md`
+- Update README wording
+- Make compile-time vs runtime support matrix explicit
+
+## Biggest pitfall to avoid
+
+Do **not** solve this by merely changing the TFM while leaving all Windows semantics smeared across shared control code.
+
+That would remove the `NU1201` blocker but leave the runtime boundary unclear and unsupported-platform behavior under-specified.
