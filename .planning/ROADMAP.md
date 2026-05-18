@@ -1,14 +1,14 @@
 # Milestone v1.9: Plain net10 Avalonia Host Compatibility
 
 **Status:** ACTIVE  
-**Phases:** 50-54  
+**Phases:** 50-54, plus inserted Phase 52.1  
 **Total Plans:** 3
 
 ## Overview
 
 v1.9 widens the **host-facing compile-time contract** for the reusable Avalonia control so a plain `net10.0` host can reference it directly, while keeping the actual mdCAD embedded viewer runtime **Windows-only**.
 
-The roadmap absorbs risk in the order the research recommended: first isolate the existing Windows runtime seam behind a backend boundary, then make non-Windows behavior explicit, then widen the public control TFM, then prove the new consumer path while re-closing the Windows harness, and finally make the docs/onboarding contract truthful.
+The roadmap absorbs risk in the order the research recommended: first isolate the existing Windows runtime seam behind a backend boundary, then make non-Windows behavior explicit, then widen the public control TFM, then automate the Windows runtime refresh path, then prove the new consumer path while re-closing the Windows harness, and finally make the docs/onboarding contract truthful.
 
 ## Phases
 
@@ -56,10 +56,26 @@ Plans:
 2. The control can be instantiated from shared XAML/code in the plain-`net10.0` proof host without startup crash.
 3. The Windows diagnostic harness still builds against the widened public contract.
 
+### Phase 52.1: Automate Windows runtime refresh from build-vulkan with a dotnet-managed post-build helper (INSERTED)
+
+**Goal:** Add a dotnet-managed C# build helper and control-project post-build flow that rebuilds mdCAD in `build-vulkan` and refreshes the committed Windows runtime payload under `samples/avalonia-mdcad-control/runtime/win-x64` without relying on PowerShell.  
+**Depends on:** Phase 52  
+**Plans:** 0 planned  
+**Requirements:** WPRS-04  
+**Status:** Pending
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 52.1 to break down)
+
+**Success Criteria:**
+1. The repo has a .NET/C# helper flow that can rebuild mdCAD from the Windows Vulkan build path and refresh the runtime bundle without PowerShell.
+2. The Avalonia control project can trigger that helper from a post-build path instead of depending on manual runtime refresh steps.
+3. The refreshed runtime lands in `samples/avalonia-mdcad-control/runtime/win-x64` so later proof and docs phases consume the maintained bundle contract.
+
 ### Phase 53: Consumer Proof and Windows Regression Closure
 
 **Goal:** Prove the new host-facing compatibility path while re-verifying that the already-shipped Windows runtime path still copies, attaches, stops, and relaunches correctly.  
-**Depends on:** Phase 52  
+**Depends on:** Phase 52.1  
 **Plans:** 0 planned  
 **Requirements:** WPRS-03, PROOF-01  
 **Status:** Pending
@@ -89,12 +105,13 @@ Plans:
 | 50 | ○ | 3 planned | 0% |
 | 51 | ○ | 0 planned | 0% |
 | 52 | ○ | 0 planned | 0% |
+| 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
 
 ## Coverage
 
-- Requirements mapped: 10 / 10
+- Requirements mapped: 11 / 11
 - Unmapped requirements: 0 ✓
 
 ## Next Step

@@ -21,6 +21,7 @@
 - [ ] **WPRS-01**: On Windows, the control still resolves `mdcad-runtime\mdCAD.exe` from consumer output and launches mdCAD with the existing child-HWND contract.
 - [ ] **WPRS-02**: On Windows, sealed and diagnostic modes preserve current attach/relaunch/status behavior after the host-compatibility widening.
 - [ ] **WPRS-03**: Windows consumer proof hosts still verify copied-runtime presence plus attach/stop/relaunch lifecycle without regressions.
+- [ ] **WPRS-04**: Repository build tooling can refresh the Windows embedded runtime through a dotnet-managed C# helper that rebuilds mdCAD in `build-vulkan` and copies `mdCAD.exe` into `samples/avalonia-mdcad-control/runtime/win-x64` without PowerShell.
 
 ### Consumer Proof and Docs
 
@@ -59,14 +60,15 @@
 | WPRS-01 | Phase 50 | Pending |
 | WPRS-02 | Phase 50 | Pending |
 | WPRS-03 | Phase 53 | Pending |
+| WPRS-04 | Phase 52.1 | Pending |
 | PROOF-01 | Phase 53 | Pending |
 | PROOF-02 | Phase 54 | Pending |
 
 **Coverage:**
-- v1 requirements: 10 total
-- Mapped to phases: 10
+- v1 requirements: 11 total
+- Mapped to phases: 11
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-15*
-*Last updated: 2026-05-15 after roadmap creation*
+*Last updated: 2026-05-18 after inserting Phase 52.1*

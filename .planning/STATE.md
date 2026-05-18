@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: Ready for `/gsd-execute-phase 50`
-stopped_at: Phase 50 plans verified
-last_updated: "2026-05-18T11:02:08.1281263+01:00"
-last_activity: 2026-05-18 - Researched and verified Phase 50 plans
+stopped_at: Phase 52.1 inserted; Phase 50 execution still next
+last_updated: "2026-05-18T11:08:38.4543995+01:00"
+last_activity: 2026-05-18 - Inserted Phase 52.1 runtime refresh automation after Phase 52
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 0
   total_plans: 3
   completed_plans: 0
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 Phase: 50
 Plan: 50-01, 50-02, 50-03 ready
 Status: Ready for `/gsd-execute-phase 50`
-Last activity: 2026-05-18 - Researched and verified Phase 50 plans
+Last activity: 2026-05-18 - Inserted Phase 52.1 and kept Phase 50 execution next
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -38,7 +38,7 @@ Progress: [░░░░░░░░░░] 0%
 
 - Milestone v1.9 goal: let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
 - Scope includes host-facing TFM compatibility widening, a safe non-Windows placeholder contract, and preservation of the existing Windows child-HWND embedding/runtime packaging path.
-- Roadmap v1.9 spans phases 50-54 across backend extraction, unsupported-platform contract, plain-net10 compatibility, consumer proof, and onboarding truthfulness.
+- Roadmap v1.9 spans phases 50-54 plus inserted Phase 52.1 across backend extraction, unsupported-platform contract, plain-net10 compatibility, Windows runtime refresh automation, consumer proof, and onboarding truthfulness.
 - Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
 
 ## Accumulated Context
@@ -94,11 +94,13 @@ Recent decisions affecting current work:
 - Phase 48 added: Reusable Avalonia mdCAD user control.
 - Phase 49 added: Add minimal sealed Avalonia host sample and QUICKSTART for reusable control.
 - Phase 50 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
+- Phase 52.1 inserted after Phase 52: Automate Windows runtime refresh from build-vulkan with a dotnet-managed post-build helper (URGENT)
 
 ### Pending Todos
 
 - Execute Phase 50 plans `50-01`, `50-02`, and `50-03`.
 - Verify the Windows diagnostic host still preserves attach, stop, relaunch, resize, and sealed/diagnostic behavior after the backend extraction.
+- Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -106,6 +108,7 @@ Recent decisions affecting current work:
 
 - Plain `net10.0` hosts currently fail project restore with `NU1201` against the reusable control.
 - The control owns real Win32 seams, so widening compile-time compatibility must not accidentally imply cross-platform runtime embedding support.
+- The committed Windows runtime bundle still depends on manual refresh today; Phase 52.1 now tracks the required dotnet-managed automation.
 
 ### Quick Tasks Completed
 
