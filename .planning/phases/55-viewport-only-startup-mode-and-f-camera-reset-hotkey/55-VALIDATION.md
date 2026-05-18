@@ -1,7 +1,7 @@
 ---
 phase: 55
 slug: viewport-only-startup-mode-and-f-camera-reset-hotkey
-status: draft
+status: complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-05-18
@@ -42,8 +42,8 @@ created: 2026-05-18
 | 55-01-02 | 01 | 1 | P55-01 | unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~WindowsMdCadEmbedBackendTests" && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCadSessionCoordinatorTests"` | `samples/avalonia-mdcad-control.tests/WindowsMdCadEmbedBackendTests.cs` | ✅ green |
 | 55-02-01 | 02 | 2 | P55-02 | native unit | `ctest --test-dir build-vulkan -C Release -R embed_launch_config_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R embed_layout_state_test --output-on-failure` | `src/tests/embed_launch_config_test.c` | ✅ green |
 | 55-02-02 | 02 | 2 | P55-03 | native contract | `ctest --test-dir build-vulkan -C Release -R embed_layout_state_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R viewport_only_app_contract_test --output-on-failure` | `src/tests/viewport_only_app_contract_test.c` | ✅ green |
-| 55-03-01 | 03 | 3 | P55-04 | native contract | `ctest --test-dir build-vulkan -C Release -R viewport_only_app_contract_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R camera_shortcut_app_contract_test --output-on-failure` | `src/tests/camera_shortcut_app_contract_test.c` | ⬜ pending |
-| 55-03-02 | 03 | 3 | P55-04 | integration smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCad" && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~WindowsMdCadEmbedBackendTests" && ctest --test-dir build-vulkan -C Release -R embed_launch_config_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R embed_layout_state_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R viewport_only_app_contract_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R camera_shortcut_app_contract_test --output-on-failure` | `.planning/phases/55-viewport-only-startup-mode-and-f-camera-reset-hotkey/55-VALIDATION.md` | ⬜ pending |
+| 55-03-01 | 03 | 3 | P55-04 | native contract | `ctest --test-dir build-vulkan -C Release -R viewport_only_app_contract_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R camera_shortcut_app_contract_test --output-on-failure` | `src/tests/camera_shortcut_app_contract_test.c` | ✅ green |
+| 55-03-02 | 03 | 3 | P55-04 | integration smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~MdCad" && dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release --filter "FullyQualifiedName~WindowsMdCadEmbedBackendTests" && ctest --test-dir build-vulkan -C Release -R embed_launch_config_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R embed_layout_state_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R viewport_only_app_contract_test --output-on-failure && ctest --test-dir build-vulkan -C Release -R camera_shortcut_app_contract_test --output-on-failure` | `.planning/phases/55-viewport-only-startup-mode-and-f-camera-reset-hotkey/55-VALIDATION.md` | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

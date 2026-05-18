@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: Phase 55 planned
-last_updated: "2026-05-18T22:24:26.531Z"
+status: verifying
+stopped_at: Phase 55 executed
+last_updated: "2026-05-18T22:30:18.802Z"
 last_activity: 2026-05-18
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 21
-  completed_plans: 20
-  percent: 86
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 55 — viewport-only-startup-mode-and-f-camera-reset-hotkey
+**Current focus:** Phase 55 verification and milestone closeout readiness
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 55 (viewport-only-startup-mode-and-f-camera-reset-hotkey) — EXECUTING
+Phase: 55 (viewport-only-startup-mode-and-f-camera-reset-hotkey) — COMPLETE
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-18
 
-Progress: [████████░░] 86%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -128,10 +128,14 @@ Recent decisions affecting current work:
 - Phase 54 completed: onboarding docs, sample defaults, and proof references now reflect the proven runtime boundary truthfully.
 - Phase 55 added: Viewport-only startup mode and F camera reset hotkey.
 - Phase 55 planned: 3 executable plans are ready for launch-contract, native/layout, and camera-shortcut validation work.
+- Phase 55 plan 01 completed: the control now exposes viewport-only startup intent, snapshots track it, and Windows backend launch args forward `--viewport-only`.
+- Phase 55 plan 02 completed: native launch parsing, dedicated embedded viewport-only layout persistence, and viewport-only app contract coverage are all green.
+- Phase 55 plan 03 completed: `F` now resets the camera in embedded and standalone paths, the full proof lane is green, and the committed Windows runtime bundle was refreshed to match the rebuilt native executable.
+- Phase 55 completed: viewport-only embedded startup mode and `F` camera reset are ready for phase verification.
 
 ### Pending Todos
 
-- Execute Phase 55 next so the viewport-only embedded startup mode and F-key camera reset can be implemented against the new plans.
+- Run `/gsd-verify-work 55` next to confirm the delivered viewport-only embedded startup mode and `F` camera reset against the phase goal.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -161,5 +165,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-05-18T19:48:13.286+01:00
-Stopped at: Phase 55 planned
+Stopped at: Phase 55 executed
 Resume file: .planning/ROADMAP.md
