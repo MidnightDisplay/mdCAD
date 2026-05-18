@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Phase 52 plan 02 complete
-last_updated: "2026-05-18T15:28:16.3920314+01:00"
-last_activity: 2026-05-18 -- Completed Phase 52 plan 02 proof host retarget
+stopped_at: Phase 52 complete
+last_updated: "2026-05-18T15:29:28.7188386+01:00"
+last_activity: 2026-05-18 -- Completed Phase 52 plain-net10 compatibility
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 9
-  completed_plans: 8
-  percent: 67
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 ## Current Position
 
-Phase: 52 (plain-net10-control-compatibility) — EXECUTING
-Plan: 3 of 3
-Status: Phase 52 plan 02 complete; plan 03 next
-Last activity: 2026-05-18 -- Completed Phase 52 plan 02 proof host retarget
+Phase: 52 (plain-net10-control-compatibility) — COMPLETE
+Plan: Complete
+Status: Phase 52 complete; Phase 52.1 planning next
+Last activity: 2026-05-18 -- Completed Phase 52 plain-net10 compatibility
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
@@ -86,6 +86,7 @@ Recent decisions affecting current work:
 - [Phase 51]: Unsupported `StartAsync()` must fail immediately with the same canonical message the placeholder shows, while `StopAsync()` remains a safe no-op. — Programmatic hosts get deterministic behavior without implying cross-platform runtime support.
 - [Phase 51]: The public control shell now selects backends through `MdCadEmbedBackendFactory` and treats `StartBlockedReason` as the primary warning truth, while diagnostic JSONL/live-refresh lines remain informational-only. — This keeps unsupported runtime behavior explicit without changing the public API or the locked Windows launch path.
 - [Phase 52]: `samples/avalonia-host-minimal` is part of Phase 52 itself as the smallest plain-`net10.0` proof host, while the Windows diagnostic harness remains a separate regression consumer. — This gives the compatibility widening a real plain-host proof surface without pulling broader Phase 53 proof scope into this phase.
+- [Phase 52]: The reusable control and minimal proof host now both target plain `net10.0`, while the Windows diagnostic harness remains Windows-targeted and continues to validate the runtime-specific path separately. — This keeps compile-time compatibility widening distinct from Windows runtime proof.
 
 ### Roadmap Evolution
 
@@ -110,17 +111,17 @@ Recent decisions affecting current work:
 - Phase 52 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
 - Phase 52 plan 01 completed: the reusable control now targets plain `net10.0` and the immediate regression bundle remains green.
 - Phase 52 plan 02 completed: the minimal proof host now targets plain `net10.0` and its startup smoke is approved.
+- Phase 52 completed: the control and minimal proof host now target plain `net10.0`, and the Windows regression lane remains green.
 
 ### Pending Todos
 
-- Execute Phase 52.
 - Plan Phase 52.1 before Phase 53 so consumer proof can rely on the dotnet-managed Windows runtime refresh path.
+- Plan Phase 52.1 next.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
 ### Blockers/Concerns
 
-- Plain `net10.0` hosts currently fail project restore with `NU1201` against the reusable control.
 - The control owns real Win32 seams, so widening compile-time compatibility must not accidentally imply cross-platform runtime embedding support.
 - The committed Windows runtime bundle still depends on manual refresh today; Phase 52.1 now tracks the required dotnet-managed automation.
 
@@ -144,6 +145,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T15:28:16.3920314+01:00
-Stopped at: Phase 52 plan 02 complete
-Resume file: .planning/phases/52-plain-net10-control-compatibility/52-03-PLAN.md
+Last session: 2026-05-18T15:29:28.7188386+01:00
+Stopped at: Phase 52 complete
+Resume file: .planning/phases/52-plain-net10-control-compatibility/52-03-SUMMARY.md

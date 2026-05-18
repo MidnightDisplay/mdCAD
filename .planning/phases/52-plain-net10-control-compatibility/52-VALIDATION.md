@@ -1,7 +1,7 @@
 ---
 phase: 52
 slug: plain-net10-control-compatibility
-status: draft
+status: complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-05-18
@@ -46,7 +46,7 @@ created: 2026-05-18
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 52-01-01 | 01 | 1 | HOSTC-01 | build smoke | `dotnet build .\samples\avalonia-mdcad-control\MdCad.Avalonia.Control.csproj -c Release` | `samples/avalonia-mdcad-control/MdCad.Avalonia.Control.csproj` | ✅ green |
 | 52-02-01 | 02 | 2 | HOSTC-01, HOSTC-02 | build smoke | `dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` | `samples/avalonia-host-minimal/AvaloniaHostMinimal.csproj` | ✅ green |
-| 52-03-01 | 03 | 3 | HOSTC-01, HOSTC-02 | regression build + unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release -v minimal && dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `samples/avalonia-host/AvaloniaHost.csproj` | ⬜ pending |
+| 52-03-01 | 03 | 3 | HOSTC-01, HOSTC-02 | regression build + unit | `dotnet test .\samples\avalonia-mdcad-control.tests\MdCad.Avalonia.Control.Tests.csproj -c Release -v minimal && dotnet build .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release && dotnet build .\samples\avalonia-host\AvaloniaHost.csproj -c Release` | `samples/avalonia-host/AvaloniaHost.csproj` | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -64,16 +64,18 @@ Existing infrastructure covers all phase requirements.
 |----------|-------------|------------|-------------------|
 | Plain `net10.0` minimal host starts and instantiates `MdCadEmbeddedControl` without startup crash | HOSTC-02 | No existing automated UI harness should be added in this phase | On Windows, run `dotnet run --project .\samples\avalonia-host-minimal\AvaloniaHostMinimal.csproj -c Release` and confirm the app opens without type-load/startup failure and the control instantiates successfully. On unsupported platforms, confirm the app still opens and the control shows the existing unsupported-platform presentation instead of crashing. |
 
+**Recorded result:** approved 2026-05-18 during Plan 52-02 checkpoint.
+
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] No task uses `MISSING` verification placeholders
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency justified per task map and stays within the smallest safe lane
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] No task uses `MISSING` verification placeholders
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency justified per task map and stays within the smallest safe lane
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-05-18

@@ -54,12 +54,12 @@ Plans:
 **Depends on:** Phase 51  
 **Plans:** 3 plans  
 **Requirements:** HOSTC-01, HOSTC-02  
-**Status:** Executing
+**Status:** Complete
 
 Plans:
 - [x] 52-01-PLAN.md — Retarget the reusable control library to plain `net10.0` without changing the internal Windows runtime seam
 - [x] 52-02-PLAN.md — Retarget `samples/avalonia-host-minimal` as the D-01 plain-net10 proof host and manually smoke shared XAML control instantiation
-- [ ] 52-03-PLAN.md — Re-close the existing control test lane and Windows diagnostic harness against the widened contract
+- [x] 52-03-PLAN.md — Re-close the existing control test lane and Windows diagnostic harness against the widened contract
 
 **Success Criteria:**
 1. A plain `net10.0` host can restore/build against the control without `NU1201`.
@@ -114,7 +114,7 @@ Plans:
 |-------|--------|-------|----------|
 | 50 | ✓ | 3/3 complete | 100% |
 | 51 | ✓ | 3/3 complete | 100% |
-| 52 | ◐ | 2/3 complete | 67% |
+| 52 | ✓ | 3/3 complete | 100% |
 | 52.1 | ○ | 0 planned | 0% |
 | 53 | ○ | 0 planned | 0% |
 | 54 | ○ | 0 planned | 0% |
@@ -126,4 +126,4 @@ Plans:
 
 ## Next Step
 
-- Execute `/gsd-execute-phase 52`
+- Start `/gsd-plan-phase 52.1`
