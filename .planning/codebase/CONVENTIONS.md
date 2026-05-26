@@ -88,7 +88,7 @@
 
 **TODO Comments:**
 - TODO-style notes are not standardized beyond occasional inline comments.
-- Long-lived work is tracked in planning docs such as `.plans/` and `CHECKPOINT.md` instead of relying on TODO comments.
+- Long-lived work is tracked in the active `.planning/` docs (especially `.planning/STATE.md`, roadmap artifacts, and phase/quick-task plans) instead of relying on TODO comments.
 
 ## Function Design
 

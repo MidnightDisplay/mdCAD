@@ -6,14 +6,13 @@
 
 ```text
 mdCAD/
-├── AGENTS.md                 # Agent operating instructions for this repo
 ├── CHANGELOG.md              # Archived session summaries and delivered changes
-├── CHECKPOINT.md             # Current project state and recent implementation notes
 ├── CMakeLists.txt            # Top-level CMake configuration
 ├── README.md                 # Project overview and quick start
+├── .planning/                # Active GSD planning, state, and codebase maps
 ├── android/                  # Android Gradle project and NativeActivity glue
 ├── build/                    # Local macOS + Ninja build output used on this machine
-├── docs/                     # Developer docs and quickstart guides
+├── docs/                     # Developer docs, quickstart guides, and legacy archive
 ├── ios/                      # iOS bundle resources and Xcode support files
 ├── scripts/                  # Utility scripts, browser tests, and shader tooling
 ├── src/                      # Application source and header-only modules
@@ -103,9 +102,15 @@ mdCAD/
 
 **`docs/`:**
 - Purpose: Developer-facing documentation
-- Contains: Quick start and architecture notes
+- Contains: Quick start and architecture notes plus `docs/legacy/pre-gsd-agent-workflow/` for frozen pre-GSD agent docs
 - Key files: `docs/QUICKSTART.md`
 - Subdirectories: None
+
+**`.planning/`:**
+- Purpose: Active planning, continuity, roadmap, and codebase reference area for the current GSD workflow
+- Contains: `STATE.md`, roadmap/requirements artifacts, quick-task plans, and active codebase maps
+- Key files: `.planning/STATE.md`, `.planning/ROADMAP.md`, `.planning/codebase/STRUCTURE.md`, `.planning/codebase/CONVENTIONS.md`
+- Subdirectories: `.planning/phases/`, `.planning/quick/`, `.planning/codebase/`, `.planning/milestones/`
 
 ## Key File Locations
 
@@ -137,7 +142,8 @@ mdCAD/
 **Documentation:**
 - `README.md`: Project introduction and quick start
 - `docs/QUICKSTART.md`: Build and run instructions by platform
-- `CHECKPOINT.md`: Current project state and active work notes
+- `.planning/STATE.md`: Active project state and continuity entry point
+- `docs/legacy/pre-gsd-agent-workflow/`: Frozen pre-GSD workflow archive
 - `CHANGELOG.md`: Archived session summaries
 
 ## Naming Conventions
