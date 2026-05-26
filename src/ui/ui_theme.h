@@ -20,6 +20,9 @@
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 
+#include <stdbool.h>
+#include <string.h>
+
 //------------------------------------------------------------------------------
 // Theme Types
 //------------------------------------------------------------------------------
@@ -55,10 +58,60 @@ static const char* const ui_theme_names[UI_THEME_COUNT] = {
     "shadcn/ui Dark"
 };
 
+static const char* const ui_theme_tokens[UI_THEME_COUNT] = {
+    "visual-studio-dark",
+    "ios-light",
+    "catppuccin-frappe",
+    "one-dark",
+    "rose-moon",
+    "nord",
+    "tokyo-storm",
+    "tokyo-night",
+    "gruvbox-material-dark",
+    "cyberpunk-2077",
+    "shadcn-ui-dark"
+};
+
 static ui_theme_t g_ui_theme_current = UI_THEME_DEFAULT;
+
+typedef struct {
+    bool has_pending_theme;
+    ui_theme_t pending_theme;
+} ui_theme_settings_state_t;
+
+static ui_theme_settings_state_t g_ui_theme_settings_state = {
+    false,
+    UI_THEME_DEFAULT
+};
 
 static inline ui_theme_t ui_theme_get_current(void) {
     return g_ui_theme_current;
+}
+
+static inline const char* ui_theme_get_token(ui_theme_t theme) {
+    if ((theme < 0) || (theme >= UI_THEME_COUNT)) {
+        theme = UI_THEME_DEFAULT;
+    }
+    return ui_theme_tokens[theme];
+}
+
+static inline bool ui_theme_try_parse_token(const char* token, ui_theme_t* out_theme) {
+    if (!token || !out_theme) {
+        return false;
+    }
+
+    for (int i = 0; i < (int)UI_THEME_COUNT; ++i) {
+        if (strcmp(token, ui_theme_tokens[i]) == 0) {
+            *out_theme = (ui_theme_t)i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static inline void ui_theme_mark_settings_dirty(void) {
+    igMarkIniSettingsDirty_Nil();
 }
 
 static inline void ui_theme_apply_zero_rounding(ImGuiStyle* style) {
@@ -990,6 +1043,102 @@ static inline void ui_theme_apply(ui_theme_t theme) {
             ui_theme_apply_shadcn_dark();
             break;
     }
+}
+
+static inline void ui_theme_settings_reset_pending(void) {
+    g_ui_theme_settings_state.has_pending_theme = false;
+    g_ui_theme_settings_state.pending_theme = UI_THEME_DEFAULT;
+}
+
+static inline void ui_theme_settings_clear_all(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
+    (void)ctx;
+    (void)handler;
+    ui_theme_settings_reset_pending();
+}
+
+static inline void ui_theme_settings_read_init(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
+    (void)ctx;
+    (void)handler;
+    ui_theme_settings_reset_pending();
+}
+
+static inline void* ui_theme_settings_read_open(ImGuiContext* ctx, ImGuiSettingsHandler* handler, const char* name) {
+    (void)ctx;
+    (void)handler;
+    if (!name || strcmp(name, "Theme") != 0) {
+        return NULL;
+    }
+
+    ui_theme_settings_reset_pending();
+    return &g_ui_theme_settings_state;
+}
+
+static inline void ui_theme_settings_read_line(ImGuiContext* ctx, ImGuiSettingsHandler* handler, void* entry, const char* line) {
+    (void)ctx;
+    (void)handler;
+    if (!entry || !line || strncmp(line, "Selected=", 9) != 0) {
+        return;
+    }
+
+    const char* value = line + 9;
+    while (*value == ' ' || *value == '\t') {
+        ++value;
+    }
+
+    char token[64];
+    size_t len = strlen(value);
+    while (len > 0u && (value[len - 1u] == ' ' || value[len - 1u] == '\t' || value[len - 1u] == '\r')) {
+        --len;
+    }
+    if (len == 0u || len >= sizeof(token)) {
+        return;
+    }
+
+    memcpy(token, value, len);
+    token[len] = '\0';
+
+    ui_theme_t parsed_theme = UI_THEME_DEFAULT;
+    if (ui_theme_try_parse_token(token, &parsed_theme)) {
+        ui_theme_settings_state_t* settings = (ui_theme_settings_state_t*)entry;
+        settings->has_pending_theme = true;
+        settings->pending_theme = parsed_theme;
+    }
+}
+
+static inline void ui_theme_settings_apply_all(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
+    (void)ctx;
+    (void)handler;
+    if (g_ui_theme_settings_state.has_pending_theme) {
+        ui_theme_apply(g_ui_theme_settings_state.pending_theme);
+        ui_theme_settings_reset_pending();
+    }
+}
+
+static inline void ui_theme_settings_write_all(ImGuiContext* ctx, ImGuiSettingsHandler* handler, ImGuiTextBuffer* out_buf) {
+    (void)ctx;
+    (void)handler;
+    ImGuiTextBuffer_appendf(
+        out_buf,
+        "[mdCAD][Theme]\nSelected=%s\n\n",
+        ui_theme_get_token(ui_theme_get_current()));
+}
+
+static inline void ui_theme_register_settings_handler(void) {
+    if (!igGetCurrentContext() || igFindSettingsHandler("mdCAD") != NULL) {
+        return;
+    }
+
+    ImGuiSettingsHandler handler = {0};
+    handler.TypeName = "mdCAD";
+    handler.TypeHash = igImHashStr(handler.TypeName, 0, 0);
+    handler.ClearAllFn = ui_theme_settings_clear_all;
+    handler.ReadInitFn = ui_theme_settings_read_init;
+    handler.ReadOpenFn = ui_theme_settings_read_open;
+    handler.ReadLineFn = ui_theme_settings_read_line;
+    handler.ApplyAllFn = ui_theme_settings_apply_all;
+    handler.WriteAllFn = ui_theme_settings_write_all;
+    handler.UserData = &g_ui_theme_settings_state;
+    igAddSettingsHandler(&handler);
 }
 
 // Get the current theme's FrameBg color (useful for viewport clear color)

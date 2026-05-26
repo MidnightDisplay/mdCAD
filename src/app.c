@@ -1863,10 +1863,10 @@ static void init(void) {
     ImGuiIO* io = igGetIO_Nil();
     io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    // Default startup theme
+    // Default startup theme remains the fallback until ini-backed restore overrides it.
     ui_theme_apply(UI_THEME_DEFAULT);
 
-    // Initialize ImGui persistence (must be after simgui_setup and ConfigFlags)
+    // Initialize ImGui persistence (registers custom handlers before any ini load occurs)
     imgui_storage_init();
 
     // Initialize render target

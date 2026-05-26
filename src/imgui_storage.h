@@ -6,6 +6,7 @@
 
 #include "platform.h"
 #include "embed_layout_state.h"
+#include "ui/ui_theme.h"
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
@@ -379,6 +380,7 @@ static inline const char* imgui_storage_native_manual_store_path(void) {
 // Initialize ImGui settings persistence
 // Call after simgui_setup() and setting ConfigFlags
 static inline void imgui_storage_init(void) {
+    ui_theme_register_settings_handler();
 #ifdef PLATFORM_IOS
     char* ini_data = imgui_storage_ios_load();
     if (ini_data) {
