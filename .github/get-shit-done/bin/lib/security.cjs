@@ -141,7 +141,7 @@ const INJECTION_PATTERNS = [
   // Requires > to close the tag (not just whitespace) to avoid matching generic types like Promise<User | null>
   /<\/?(?:system|assistant|human)>/i,
   /\[SYSTEM\]/i,
-  /\[INST\]/i,
+  /\[\/?(INST)\]/i,
   /<<\s*SYS\s*>>/i,
 
   // Exfiltration attempts
@@ -150,6 +150,25 @@ const INJECTION_PATTERNS = [
 
   // Tool manipulation
   /(?:run|execute|call|invoke)\s+(?:the\s+)?(?:bash|shell|exec|spawn)\s+(?:tool|command)/i,
+];
+
+/**
+ * Layer 2: Encoding-obfuscation patterns with custom finding messages.
+ * Each entry: { pattern: RegExp, message: string }
+ */
+const OBFUSCATION_PATTERN_ENTRIES = [
+  {
+    pattern: /\b(\w\s){4,}\w\b/,
+    message: 'Character-spacing obfuscation pattern detected (e.g. "i g n o r e")',
+  },
+  {
+    pattern: /<\/?(system|human|assistant|user)\s*>/i,
+    message: 'Delimiter injection pattern: <system>/<human>/<assistant>/<user> tag detected',
+  },
+  {
+    pattern: /0x[0-9a-fA-F]{16,}/,
+    message: 'Long hex sequence detected — possible encoded payload',
+  },
 ];
 
 /**
@@ -174,6 +193,13 @@ function scanForInjection(text, opts = {}) {
     }
   }
 
+  // Layer 2: encoding-obfuscation patterns with custom messages
+  for (const entry of OBFUSCATION_PATTERN_ENTRIES) {
+    if (entry.pattern.test(text)) {
+      findings.push(entry.message);
+    }
+  }
+
   if (opts.strict) {
     // Check for suspicious Unicode that could hide instructions
     // (zero-width chars, RTL override, homoglyph attacks)
@@ -181,9 +207,17 @@ function scanForInjection(text, opts = {}) {
       findings.push('Contains suspicious zero-width or invisible Unicode characters');
     }
 
-    // Check for extremely long strings that could be prompt stuffing
-    if (text.length > 50000) {
-      findings.push(`Suspicious text length: ${text.length} chars (potential prompt stuffing)`);
+    // Layer 1: Unicode tag block U+E0000–U+E007F (2025 supply-chain attack vector)
+    // These characters are invisible and can embed hidden instructions
+    if (/[\uDB40\uDC00-\uDB40\uDC7F]/u.test(text) || /[\u{E0000}-\u{E007F}]/u.test(text)) {
+      findings.push('Contains Unicode tag block characters (U+E0000–E007F) — invisible instruction injection vector');
+    }
+
+    // Check for extremely long strings that could be prompt stuffing.
+    // Normalize CRLF → LF before measuring so Windows checkouts don't inflate the count.
+    const normalizedLength = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').length;
+    if (normalizedLength > 50000) {
+      findings.push(`Suspicious text length: ${normalizedLength} chars (potential prompt stuffing)`);
     }
   }
 
@@ -211,14 +245,15 @@ function sanitizeForPrompt(text) {
   // Neutralize XML/HTML tags that mimic system boundaries
   // Replace < > with full-width equivalents to prevent tag interpretation
   // Note: <instructions> is excluded — GSD uses it as legitimate prompt structure
-  sanitized = sanitized.replace(/<(\/?)(?:system|assistant|human)>/gi,
+  // Matches system|assistant|human|user with optional whitespace before the closing >
+  sanitized = sanitized.replace(/<(\/?)\s*(?:system|assistant|human|user)\s*>/gi,
     (_, slash) => `＜${slash || ''}system-text＞`);
 
-  // Neutralize [SYSTEM] / [INST] markers
-  sanitized = sanitized.replace(/\[(SYSTEM|INST)\]/gi, '[$1-TEXT]');
+  // Neutralize [SYSTEM] / [INST] / [/INST] markers — both opening and closing variants
+  sanitized = sanitized.replace(/\[(\/?)(SYSTEM|INST)\]/gi, (_, slash, tag) => `[${slash}${tag.toUpperCase()}-TEXT]`);
 
-  // Neutralize <<SYS>> markers
-  sanitized = sanitized.replace(/<<\s*SYS\s*>>/gi, '«SYS-TEXT»');
+  // Neutralize <<SYS>> and <</SYS>> markers (Llama-style delimiters)
+  sanitized = sanitized.replace(/<<\/?\s*SYS\s*>>/gi, '«SYS-TEXT»');
 
   return sanitized;
 }
@@ -359,6 +394,87 @@ function validateFieldName(field) {
   return { valid: false, error: `Invalid field name: "${field}"` };
 }
 
+// ─── Layer 3: Structural Schema Validation ───────────────────────────────────
+
+const KNOWN_VALID_TAGS = new Set([
+  'objective', 'process', 'step', 'success_criteria', 'critical_rules',
+  'available_agent_types', 'purpose', 'required_reading',
+]);
+
+/**
+ * Validate the XML structure of a prompt file.
+ * For agent/workflow files, flags any XML tag not in the known-valid set.
+ *
+ * @param {string} text - The file content to validate
+ * @param {'agent'|'workflow'|'unknown'} fileType - The type of prompt file
+ * @returns {{ valid: boolean, violations: string[] }}
+ */
+function validatePromptStructure(text, fileType) {
+  if (!text || typeof text !== 'string') {
+    return { valid: true, violations: [] };
+  }
+
+  if (fileType !== 'agent' && fileType !== 'workflow') {
+    return { valid: true, violations: [] };
+  }
+
+  const violations = [];
+  const tagRegex = /<([A-Za-z][A-Za-z0-9_-]*)/g;
+  let match;
+  while ((match = tagRegex.exec(text)) !== null) {
+    const tag = match[1].toLowerCase();
+    if (!KNOWN_VALID_TAGS.has(tag)) {
+      violations.push(`Unknown XML tag in ${fileType} file: <${tag}>`);
+    }
+  }
+
+  return { valid: violations.length === 0, violations };
+}
+
+// ─── Layer 4: Paragraph-Level Entropy Anomaly Detection ─────────────────────
+
+function shannonEntropy(text) {
+  if (!text || text.length === 0) return 0;
+  const freq = {};
+  for (const ch of text) {
+    freq[ch] = (freq[ch] || 0) + 1;
+  }
+  const len = text.length;
+  let entropy = 0;
+  for (const count of Object.values(freq)) {
+    const p = count / len;
+    entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+/**
+ * Scan text for paragraphs with anomalously high Shannon entropy.
+ *
+ * @param {string} text - The text to scan
+ * @returns {{ clean: boolean, findings: string[] }}
+ */
+function scanEntropyAnomalies(text) {
+  if (!text || typeof text !== 'string') {
+    return { clean: true, findings: [] };
+  }
+
+  const findings = [];
+  const paragraphs = text.split(/\n\n+/);
+
+  for (const para of paragraphs) {
+    if (para.length <= 50) continue;
+    const entropy = shannonEntropy(para);
+    if (entropy > 5.5) {
+      findings.push(
+        `High-entropy paragraph detected (${entropy.toFixed(2)} bits/char) — possible encoded payload`
+      );
+    }
+  }
+
+  return { clean: findings.length === 0, findings };
+}
+
 module.exports = {
   // Path safety
   validatePath,
@@ -379,4 +495,10 @@ module.exports = {
   // Input validation
   validatePhaseNumber,
   validateFieldName,
+
+  // Structural validation (Layer 3)
+  validatePromptStructure,
+
+  // Entropy anomaly detection (Layer 4)
+  scanEntropyAnomalies,
 };

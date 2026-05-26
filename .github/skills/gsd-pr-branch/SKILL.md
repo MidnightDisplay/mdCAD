@@ -1,6 +1,6 @@
 ---
 name: gsd-pr-branch
-description: Create a clean PR branch by filtering out .planning/ commits — ready for code review
+description: "Create a clean PR branch by filtering out .planning/ commits — ready for code review"
 argument-hint: "[target branch, default: main]"
 allowed-tools: Bash, Read, AskUserQuestion
 ---
@@ -19,5 +19,5 @@ changes that are irrelevant to code review.
 </execution_context>
 
 <process>
-Execute the pr-branch workflow from @.github/get-shit-done/workflows/pr-branch.md end-to-end.
+Execute end-to-end.
 </process>

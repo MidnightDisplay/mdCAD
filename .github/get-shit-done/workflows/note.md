@@ -1,5 +1,7 @@
 <purpose>
 Zero-friction idea capture. One Write call, one confirmation line. No questions, no prompts.
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 Runs inline — no Task, no AskUserQuestion, no Bash.
 </purpose>
 
@@ -101,7 +103,7 @@ If a scope has no directory or no entries, show: `(no notes)`
 3. If N is invalid or refers to an already-promoted note, tell the user and stop
 4. **Requires `.planning/` directory** — if it doesn't exist, warn: "Todos require a GSD project. Run `/gsd-new-project` to initialize one."
 5. Ensure `.planning/todos/pending/` directory exists
-6. Generate todo ID: `{NNN}-{slug}` where NNN is the next sequential number (scan both `.planning/todos/pending/` and `.planning/todos/done/` for the highest existing number, increment by 1, zero-pad to 3 digits) and slug is the first ~4 meaningful words of the note text
+6. Generate todo ID: `{NNN}-{slug}` where NNN is the next sequential number (scan both `.planning/todos/pending/` and `.planning/todos/completed/` for the highest existing number, increment by 1, zero-pad to 3 digits) and slug is the first ~4 meaningful words of the note text
 7. Extract the note text from the source file (body after frontmatter)
 8. Create `.planning/todos/pending/{id}.md`:
 

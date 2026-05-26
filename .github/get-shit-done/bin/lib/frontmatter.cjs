@@ -4,17 +4,48 @@
 
 const fs = require('fs');
 const path = require('path');
-const { safeReadFile, normalizeMd, output, error } = require('./core.cjs');
+const { output, error } = require('./core.cjs');
+const { platformReadSync: safeReadFile, platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Parsing engine ───────────────────────────────────────────────────────────
 
+/**
+ * Split a YAML inline array body on commas, respecting quoted strings.
+ * e.g. '"a, b", c' → ['a, b', 'c']
+ */
+function splitInlineArray(body) {
+  const items = [];
+  let current = '';
+  let inQuote = null; // null | '"' | "'"
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (inQuote) {
+      if (ch === inQuote) {
+        inQuote = null;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch;
+    } else if (ch === ',') {
+      const trimmed = current.trim();
+      if (trimmed) items.push(trimmed);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed) items.push(trimmed);
+  return items;
+}
+
 function extractFrontmatter(content) {
   const frontmatter = {};
-  // Find ALL frontmatter blocks at the start of the file.
-  // If multiple blocks exist (corruption from CRLF mismatch), use the LAST one
-  // since it represents the most recent state sync.
-  const allBlocks = [...content.matchAll(/(?:^|\n)\s*---\r?\n([\s\S]+?)\r?\n---/g)];
-  const match = allBlocks.length > 0 ? allBlocks[allBlocks.length - 1] : null;
+  // Match frontmatter only at byte 0 — a `---` block later in the document
+  // body (YAML examples, horizontal rules) must never be treated as frontmatter.
+  const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
   if (!match) return frontmatter;
 
   const yaml = match[1];
@@ -53,8 +84,8 @@ function extractFrontmatter(content) {
         // Push new context for potential nested content
         stack.push({ obj: current.obj[key], key: null, indent });
       } else if (value.startsWith('[') && value.endsWith(']')) {
-        // Inline array: key: [a, b, c]
-        current.obj[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        // Inline array: key: [a, b, c] — quote-aware split (REG-04 fix)
+        current.obj[key] = splitInlineArray(value.slice(1, -1));
         current.key = null;
       } else {
         // Simple key: value
@@ -212,17 +243,26 @@ function parseMustHavesBlock(content, blockName) {
       // Only treat as a top-level list item if at the expected indent
       if (indent === listItemIndent) {
         if (current) items.push(current);
-        current = {};
         const afterDash = trimmed.slice(2);
+        const trimmedAfterDash = afterDash.trim();
+        // Check if it's a fully-quoted string (may contain ':' inside the quotes)
+        if ((trimmedAfterDash.startsWith('"') && trimmedAfterDash.endsWith('"')) ||
+            (trimmedAfterDash.startsWith("'") && trimmedAfterDash.endsWith("'"))) {
+          current = trimmedAfterDash.slice(1, -1);
         // Check if it's a simple string item (no colon means not a key-value)
-        if (!afterDash.includes(':')) {
+        } else if (!afterDash.includes(':')) {
           current = afterDash.replace(/^["']|["']$/g, '');
         } else {
           // Key-value on same line as dash: "- path: value"
-          const kvMatch = afterDash.match(/^(\w+):\s*"?([^"]*)"?\s*$/);
+          // YAML KV always has at least one space after the colon: "key: value"
+          // Requiring \s+ rejects "Class::Method" and "db:seed" (no space after colon)
+          const kvMatch = afterDash.match(/^(\w+):\s+"?([^"]*)"?\s*$/);
           if (kvMatch) {
             current = {};
             current[kvMatch[1]] = kvMatch[2];
+          } else {
+            // Looks like KV but doesn't match — treat as plain string (#2757)
+            current = afterDash.replace(/^["']|["']$/g, '');
           }
         }
         continue;
@@ -251,6 +291,19 @@ function parseMustHavesBlock(content, blockName) {
     }
   }
   if (current) items.push(current);
+
+  // Warn when must_haves block exists but parsed as empty -- likely YAML formatting issue.
+  // This is a critical diagnostic: empty must_haves causes verification to silently degrade
+  // to Option C (LLM-derived truths) instead of checking documented contracts.
+  if (items.length === 0 && blockLines.length > 0) {
+    const nonEmptyLines = blockLines.filter(l => l.trim() !== '').length;
+    if (nonEmptyLines > 0) {
+      process.stderr.write(
+        `[gsd-tools] WARNING: must_haves.${blockName} block has ${nonEmptyLines} content lines but parsed 0 items. ` +
+        `Possible YAML formatting issue — verification will fall back to LLM-derived truths.\n`
+      );
+    }
+  }
 
   return items;
 }
@@ -292,7 +345,7 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   try { parsedValue = JSON.parse(value); } catch { parsedValue = value; }
   fm[field] = parsedValue;
   const newContent = spliceFrontmatter(content, fm);
-  fs.writeFileSync(fullPath, normalizeMd(newContent), 'utf-8');
+  platformWriteSync(fullPath, newContent);
   output({ updated: true, field, value: parsedValue }, raw, 'true');
 }
 
@@ -306,7 +359,7 @@ function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   try { mergeData = JSON.parse(data); } catch { error('Invalid JSON for --data'); return; }
   Object.assign(fm, mergeData);
   const newContent = spliceFrontmatter(content, fm);
-  fs.writeFileSync(fullPath, normalizeMd(newContent), 'utf-8');
+  platformWriteSync(fullPath, newContent);
   output({ merged: true, fields: Object.keys(mergeData) }, raw, 'true');
 }
 

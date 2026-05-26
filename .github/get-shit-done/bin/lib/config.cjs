@@ -4,40 +4,17 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningRoot } = require('./core.cjs');
+const { output, error, ERROR_REASON, CONFIG_DEFAULTS } = require('./core.cjs');
+const { platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
+const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,
   formatAgentToModelMapAsTable,
 } = require('./model-profiles.cjs');
-
-const VALID_CONFIG_KEYS = new Set([
-  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
-  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
-  'workflow.research', 'workflow.plan_check', 'workflow.verifier',
-  'workflow.nyquist_validation', 'workflow.ui_phase', 'workflow.ui_safety_gate',
-  'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',
-  'workflow.text_mode',
-  'workflow.research_before_questions',
-  'workflow.discuss_mode',
-  'workflow.skip_discuss',
-  'workflow._auto_chain_active',
-  'git.branching_strategy', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
-  'planning.commit_docs', 'planning.search_gitignored',
-  'hooks.context_warnings',
-]);
-
-/**
- * Check whether a config key path is valid.
- * Supports exact matches from VALID_CONFIG_KEYS plus dynamic patterns
- * like `agent_skills.<agent-type>` where the sub-key is freeform.
- */
-function isValidConfigKey(keyPath) {
-  if (VALID_CONFIG_KEYS.has(keyPath)) return true;
-  // Allow agent_skills.<agent-type> with any agent type string
-  if (/^agent_skills\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
-  return false;
-}
+const { VALID_CONFIG_KEYS, isValidConfigKey } = require('./config-schema.cjs');
+const { isSecretKey, maskSecret } = require('./secrets.cjs');
+const { normalizeConfiguredDefaultReviewers } = require('./review-reviewer-selection.cjs');
 
 const CONFIG_KEY_SUGGESTIONS = {
   'workflow.nyquist_validation_enabled': 'workflow.nyquist_validation',
@@ -45,13 +22,89 @@ const CONFIG_KEY_SUGGESTIONS = {
   'nyquist.validation_enabled': 'workflow.nyquist_validation',
   'hooks.research_questions': 'workflow.research_before_questions',
   'workflow.research_questions': 'workflow.research_before_questions',
+  'workflow.codereview': 'workflow.code_review',
+  'workflow.review_command': 'workflow.code_review_command',
+  'workflow.review': 'workflow.code_review',
+  'workflow.code_review_level': 'workflow.code_review_depth',
+  'workflow.review_depth': 'workflow.code_review_depth',
+  'review.model': 'review.models.<cli-name>',
+  'sub_repos': 'planning.sub_repos',
+  'plan_checker': 'workflow.plan_check',
 };
+
+const SHIP_PR_BODY_SECTION_KEYS = new Set(['heading', 'enabled', 'source', 'fallback', 'template']);
+const SHIP_PR_BODY_TEMPLATE_TOKENS = new Set([
+  'phase_number',
+  'phase_name',
+  'phase_dir',
+  'base_branch',
+  'padded_phase',
+]);
+const SHIP_PR_BODY_SOURCE_RE = /^(ROADMAP|PLAN|SUMMARY|VERIFICATION|STATE|REQUIREMENTS|CONTEXT)\.md\s+##\s+[^\r\n#][^\r\n]*$/;
 
 function validateKnownConfigKeyPath(keyPath) {
   const suggested = CONFIG_KEY_SUGGESTIONS[keyPath];
   if (suggested) {
-    error(`Unknown config key: ${keyPath}. Did you mean ${suggested}?`);
+    error(`Unknown config key: ${keyPath}. Did you mean ${suggested}?`, ERROR_REASON.CONFIG_INVALID_KEY);
   }
+}
+
+function validateShipPrBodySections(value) {
+  if (!Array.isArray(value)) {
+    error('Invalid ship.pr_body_sections value. Expected a JSON array of section objects.');
+  }
+
+  value.forEach((section, index) => {
+    const prefix = `Invalid ship.pr_body_sections[${index}]`;
+    if (!section || typeof section !== 'object' || Array.isArray(section)) {
+      error(`${prefix}. Expected an object.`);
+    }
+
+    const unknownKeys = Object.keys(section).filter((key) => !SHIP_PR_BODY_SECTION_KEYS.has(key));
+    if (unknownKeys.length > 0) {
+      error(`${prefix}. Unknown field(s): ${unknownKeys.join(', ')}.`);
+    }
+
+    if (typeof section.heading !== 'string' || section.heading.trim() === '') {
+      error(`${prefix}. heading must be a non-empty string.`);
+    }
+    if (/[\r\n]/.test(section.heading)) {
+      error(`${prefix}. heading must be a single line.`);
+    }
+
+    if ('enabled' in section && typeof section.enabled !== 'boolean') {
+      error(`${prefix}. enabled must be true or false.`);
+    }
+
+    for (const field of ['source', 'fallback', 'template']) {
+      if (field in section && typeof section[field] !== 'string') {
+        error(`${prefix}. ${field} must be a string.`);
+      }
+    }
+
+    const hasContent = ['source', 'fallback', 'template'].some((field) => {
+      return typeof section[field] === 'string' && section[field].trim() !== '';
+    });
+    if (!hasContent) {
+      error(`${prefix}. Provide at least one of source, fallback, or template.`);
+    }
+
+    if (typeof section.source === 'string' && section.source.trim() !== '') {
+      const selectors = section.source.split('||').map((selector) => selector.trim()).filter(Boolean);
+      if (selectors.length === 0 || selectors.some((selector) => !SHIP_PR_BODY_SOURCE_RE.test(selector))) {
+        error(`${prefix}. source must use selectors like "PLAN.md ## Risks", separated with "||".`);
+      }
+    }
+
+    if (typeof section.template === 'string') {
+      const tokens = section.template.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g);
+      for (const match of tokens) {
+        if (!SHIP_PR_BODY_TEMPLATE_TOKENS.has(match[1])) {
+          error(`${prefix}. Unsupported template token: {${match[1]}}.`);
+        }
+      }
+    }
+  });
 }
 
 /**
@@ -92,7 +145,7 @@ function buildNewProjectConfig(userChoices) {
         userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
         delete userDefaults.depth;
         try {
-          fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8');
+          platformWriteSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2));
         } catch { /* intentionally empty */ }
       }
     }
@@ -101,18 +154,19 @@ function buildNewProjectConfig(userChoices) {
   }
 
   const hardcoded = {
-    model_profile: 'balanced',
-    commit_docs: true,
-    parallelization: true,
-    search_gitignored: false,
+    model_profile: CONFIG_DEFAULTS.model_profile,
+    commit_docs: CONFIG_DEFAULTS.commit_docs,
+    parallelization: CONFIG_DEFAULTS.parallelization,
+    search_gitignored: CONFIG_DEFAULTS.search_gitignored,
     brave_search: hasBraveSearch,
     firecrawl: hasFirecrawl,
     exa_search: hasExaSearch,
     git: {
-      branching_strategy: 'none',
-      phase_branch_template: 'gsd/phase-{phase}-{slug}',
-      milestone_branch_template: 'gsd/{milestone}-{slug}',
-      quick_branch_template: null,
+      branching_strategy: CONFIG_DEFAULTS.branching_strategy,
+      create_tag: true,
+      phase_branch_template: CONFIG_DEFAULTS.phase_branch_template,
+      milestone_branch_template: CONFIG_DEFAULTS.milestone_branch_template,
+      quick_branch_template: CONFIG_DEFAULTS.quick_branch_template,
     },
     workflow: {
       research: true,
@@ -124,19 +178,40 @@ function buildNewProjectConfig(userChoices) {
       node_repair_budget: 2,
       ui_phase: true,
       ui_safety_gate: true,
+      ai_integration_phase: true,
+      tdd_mode: false,
+      human_verify_mode: 'end-of-phase',
       text_mode: false,
       research_before_questions: false,
       discuss_mode: 'discuss',
       skip_discuss: false,
+      code_review: true,
+      code_review_depth: 'standard',
+      code_review_command: null,
+      pattern_mapper: true,
+      plan_bounce: false,
+      plan_bounce_script: null,
+      plan_bounce_passes: 2,
+      auto_prune_state: false,
+      post_planning_gaps: CONFIG_DEFAULTS.post_planning_gaps,
+      security_enforcement: CONFIG_DEFAULTS.security_enforcement,
+      security_asvs_level: CONFIG_DEFAULTS.security_asvs_level,
+      security_block_on: CONFIG_DEFAULTS.security_block_on,
+    },
+    ship: {
+      pr_body_sections: [],
     },
     hooks: {
       context_warnings: true,
     },
+    project_code: null,
+    phase_naming: 'sequential',
     agent_skills: {},
+    claude_md_path: './copilot-instructions.md',
   };
 
   // Three-level deep merge: hardcoded <- userDefaults <- choices
-  return {
+  const config = {
     ...hardcoded,
     ...userDefaults,
     ...choices,
@@ -150,6 +225,11 @@ function buildNewProjectConfig(userChoices) {
       ...(userDefaults.workflow || {}),
       ...(choices.workflow || {}),
     },
+    ship: {
+      ...hardcoded.ship,
+      ...(userDefaults.ship || {}),
+      ...(choices.ship || {}),
+    },
     hooks: {
       ...hardcoded.hooks,
       ...(userDefaults.hooks || {}),
@@ -161,6 +241,9 @@ function buildNewProjectConfig(userChoices) {
       ...(choices.agent_skills || {}),
     },
   };
+
+  validateShipPrBodySections(config.ship.pr_body_sections);
+  return config;
 }
 
 /**
@@ -173,7 +256,7 @@ function buildNewProjectConfig(userChoices) {
  * Idempotent: if config.json already exists, returns { created: false }.
  */
 function cmdConfigNewProject(cwd, choicesJson, raw) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Idempotent: don't overwrite existing config
@@ -194,9 +277,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -204,7 +285,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
   const config = buildNewProjectConfig(userChoices);
 
   try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     output({ created: true, path: '.planning/config.json' }, raw, 'created');
   } catch (err) {
     error('Failed to write config.json: ' + err.message);
@@ -218,14 +299,12 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function ensureConfigFile(cwd) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -238,7 +317,7 @@ function ensureConfigFile(cwd) {
   const config = buildNewProjectConfig({});
 
   try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     return { created: true, path: '.planning/config.json' };
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
@@ -268,38 +347,40 @@ function cmdConfigEnsureSection(cwd, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function setConfigValue(cwd, keyPath, parsedValue) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd), 'config.json');
 
-  // Load existing config or start with empty object
-  let config = {};
-  try {
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  return withPlanningLock(cwd, () => {
+    // Load existing config or start with empty object
+    let config = {};
+    try {
+      if (fs.existsSync(configPath)) {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      }
+    } catch (err) {
+      error('Failed to read config.json: ' + err.message, ERROR_REASON.CONFIG_PARSE_FAILED);
     }
-  } catch (err) {
-    error('Failed to read config.json: ' + err.message);
-  }
 
-  // Set nested value using dot notation (e.g., "workflow.research")
-  const keys = keyPath.split('.');
-  let current = config;
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    if (current[key] === undefined || typeof current[key] !== 'object') {
-      current[key] = {};
+    // Set nested value using dot notation (e.g., "workflow.research")
+    const keys = keyPath.split('.');
+    let current = config;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (current[key] === undefined || typeof current[key] !== 'object') {
+        current[key] = {};
+      }
+      current = current[key];
     }
-    current = current[key];
-  }
-  const previousValue = current[keys[keys.length - 1]]; // Capture previous value before overwriting
-  current[keys[keys.length - 1]] = parsedValue;
+    const previousValue = current[keys[keys.length - 1]]; // Capture previous value before overwriting
+    current[keys[keys.length - 1]] = parsedValue;
 
-  // Write back
-  try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-    return { updated: true, key: keyPath, value: parsedValue, previousValue };
-  } catch (err) {
-    error('Failed to write config.json: ' + err.message);
-  }
+    // Write back
+    try {
+      platformWriteSync(configPath, JSON.stringify(config, null, 2));
+      return { updated: true, key: keyPath, value: parsedValue, previousValue };
+    } catch (err) {
+      error('Failed to write config.json: ' + err.message);
+    }
+  });
 }
 
 /**
@@ -311,13 +392,23 @@ function setConfigValue(cwd, keyPath, parsedValue) {
  */
 function cmdConfigSet(cwd, keyPath, value, raw) {
   if (!keyPath) {
-    error('Usage: config-set <key.path> <value>');
+    error('Usage: config-set <key.path> <value>', ERROR_REASON.USAGE);
+  }
+  // #3593: reject the "key without value" form (e.g. `config-set
+  // model_profile` with args[2] === undefined). Without this guard the
+  // value passes through as undefined, the number/boolean/json branches
+  // all fall through, and the write either silently strips the key
+  // (JSON.stringify drops undefined values) or writes a corrupt entry.
+  // Typed reason so the negative-matrix test can assert on it instead
+  // of greppinng prose.
+  if (value === undefined) {
+    error('Usage: config-set <key.path> <value>', ERROR_REASON.USAGE);
   }
 
   validateKnownConfigKeyPath(keyPath);
 
   if (!isValidConfigKey(keyPath)) {
-    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>`);
+    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>, features.<feature_name>`, ERROR_REASON.CONFIG_INVALID_KEY);
   }
 
   // Parse value (handle booleans, numbers, and JSON arrays/objects)
@@ -329,27 +420,130 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     try { parsedValue = JSON.parse(value); } catch { /* keep as string */ }
   }
 
+  const VALID_CONTEXT_VALUES = ['dev', 'research', 'review'];
+  if (keyPath === 'context' && !VALID_CONTEXT_VALUES.includes(String(parsedValue))) {
+    error(`Invalid context value '${value}'. Valid values: ${VALID_CONTEXT_VALUES.join(', ')}`);
+  }
+
+  // Codebase drift detector (#2003)
+  const VALID_DRIFT_ACTIONS = ['warn', 'auto-remap'];
+  if (keyPath === 'workflow.drift_action' && !VALID_DRIFT_ACTIONS.includes(String(parsedValue))) {
+    error(`Invalid workflow.drift_action '${value}'. Valid values: ${VALID_DRIFT_ACTIONS.join(', ')}`);
+  }
+  if (keyPath === 'workflow.drift_threshold') {
+    if (typeof parsedValue !== 'number' || !Number.isInteger(parsedValue) || parsedValue < 1) {
+      error(`Invalid workflow.drift_threshold '${value}'. Must be a positive integer.`);
+    }
+  }
+
+  // Post-planning gap checker (#2493)
+  if (keyPath === 'workflow.post_planning_gaps') {
+    if (typeof parsedValue !== 'boolean') {
+      error(`Invalid workflow.post_planning_gaps '${value}'. Must be a boolean (true or false).`);
+    }
+  }
+
+  // #3086 — git.create_tag: boolean only
+  if (keyPath === 'git.create_tag') {
+    if (typeof parsedValue !== 'boolean') {
+      error(`Invalid git.create_tag '${value}'. Must be a boolean (true or false).`);
+    }
+  }
+
+  if (keyPath === 'ship.pr_body_sections') {
+    validateShipPrBodySections(parsedValue);
+  }
+
+  // Human verification checkpoint mode (#3309)
+  const VALID_HUMAN_VERIFY_MODES = ['mid-flight', 'end-of-phase'];
+  if (keyPath === 'workflow.human_verify_mode' && !VALID_HUMAN_VERIFY_MODES.includes(String(parsedValue))) {
+    error(`Invalid workflow.human_verify_mode '${value}'. Valid values: ${VALID_HUMAN_VERIFY_MODES.join(', ')}`);
+  }
+
+  // Context position enum validation (#2937)
+  const VALID_CONTEXT_POSITIONS = ['front', 'end'];
+  if (keyPath === 'statusline.context_position' && !VALID_CONTEXT_POSITIONS.includes(String(parsedValue))) {
+    error(`Invalid statusline.context_position '${value}'. Valid values: ${VALID_CONTEXT_POSITIONS.join(', ')}`);
+  }
+
+  // Fallow scope + profile enum validation (#3424)
+  const VALID_FALLOW_SCOPES = ['phase', 'repo'];
+  if (keyPath === 'code_quality.fallow.scope' && !VALID_FALLOW_SCOPES.includes(String(parsedValue))) {
+    error(`Invalid code_quality.fallow.scope '${value}'. Valid values: ${VALID_FALLOW_SCOPES.join(', ')}`);
+  }
+  const VALID_FALLOW_PROFILES = ['minimal', 'standard', 'strict'];
+  if (keyPath === 'code_quality.fallow.profile' && !VALID_FALLOW_PROFILES.includes(String(parsedValue))) {
+    error(`Invalid code_quality.fallow.profile '${value}'. Valid values: ${VALID_FALLOW_PROFILES.join(', ')}`);
+  }
+
+  if (keyPath === 'review.default_reviewers') {
+    const normalized = normalizeConfiguredDefaultReviewers(parsedValue);
+    if (normalized.errors.length > 0) {
+      error(normalized.errors[0]);
+    }
+    parsedValue = normalized.values;
+  }
+
   const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);
+
+  // Mask secrets in both JSON and text output. The plaintext is written
+  // to config.json (that's where secrets live on disk); the CLI output
+  // must never echo it. See lib/secrets.cjs.
+  if (isSecretKey(keyPath)) {
+    const masked = maskSecret(parsedValue);
+    const maskedPrev = setConfigValueResult.previousValue === undefined
+      ? undefined
+      : maskSecret(setConfigValueResult.previousValue);
+    const maskedResult = {
+      ...setConfigValueResult,
+      value: masked,
+      previousValue: maskedPrev,
+      masked: true,
+    };
+    output(maskedResult, raw, `${keyPath}=${masked}`);
+    return;
+  }
+
   output(setConfigValueResult, raw, `${keyPath}=${parsedValue}`);
 }
 
-function cmdConfigGet(cwd, keyPath, raw) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+/**
+ * Schema-level defaults for well-known config keys.
+ * When a key is absent from config.json and no --default flag was supplied,
+ * cmdConfigGet checks here before emitting "Key not found".
+ */
+const SCHEMA_DEFAULTS = {
+  'context_window': 200000,
+  'executor.stall_detect_interval_minutes': 5,
+  'executor.stall_threshold_minutes': 10,
+  'git.create_tag': true,
+};
+
+function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
+  const configPath = path.join(planningDir(cwd), 'config.json');
+  const hasDefault = defaultValue !== undefined;
 
   if (!keyPath) {
-    error('Usage: config-get <key.path>');
+    error('Usage: config-get <key.path> [--default <value>]');
   }
 
   let config = {};
   try {
     if (fs.existsSync(configPath)) {
       config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } else if (hasDefault) {
+      output(defaultValue, raw, String(defaultValue));
+      return;
+    } else if (Object.prototype.hasOwnProperty.call(SCHEMA_DEFAULTS, keyPath)) {
+      const def = SCHEMA_DEFAULTS[keyPath];
+      output(def, raw, String(def));
+      return;
     } else {
-      error('No config.json found at ' + configPath);
+      error('No config.json found at ' + configPath, ERROR_REASON.CONFIG_NO_FILE);
     }
   } catch (err) {
     if (err.message.startsWith('No config.json')) throw err;
-    error('Failed to read config.json: ' + err.message);
+    error('Failed to read config.json: ' + err.message, ERROR_REASON.CONFIG_PARSE_FAILED);
   }
 
   // Traverse dot-notation path (e.g., "workflow.auto_advance")
@@ -357,13 +551,33 @@ function cmdConfigGet(cwd, keyPath, raw) {
   let current = config;
   for (const key of keys) {
     if (current === undefined || current === null || typeof current !== 'object') {
-      error(`Key not found: ${keyPath}`);
+      if (hasDefault) { output(defaultValue, raw, String(defaultValue)); return; }
+      if (Object.prototype.hasOwnProperty.call(SCHEMA_DEFAULTS, keyPath)) {
+        const def = SCHEMA_DEFAULTS[keyPath];
+        output(def, raw, String(def));
+        return;
+      }
+      error(`Key not found: ${keyPath}`, ERROR_REASON.CONFIG_KEY_NOT_FOUND);
     }
     current = current[key];
   }
 
   if (current === undefined) {
-    error(`Key not found: ${keyPath}`);
+    if (hasDefault) { output(defaultValue, raw, String(defaultValue)); return; }
+    if (Object.prototype.hasOwnProperty.call(SCHEMA_DEFAULTS, keyPath)) {
+      const def = SCHEMA_DEFAULTS[keyPath];
+      output(def, raw, String(def));
+      return;
+    }
+    error(`Key not found: ${keyPath}`, ERROR_REASON.CONFIG_KEY_NOT_FOUND);
+  }
+
+  // Never echo plaintext for sensitive keys via config-get. Plaintext lives
+  // in config.json on disk; the CLI surface always shows the masked form.
+  if (isSecretKey(keyPath)) {
+    const masked = maskSecret(current);
+    output(masked, raw, masked);
+    return;
   }
 
   output(current, raw, String(current));
@@ -433,10 +647,23 @@ function getCmdConfigSetModelProfileResultMessage(
   return paragraphs.join('\n\n');
 }
 
+/**
+ * Print the resolved config.json path (workstream-aware). Used by settings.md
+ * so the workflow writes/reads the correct file when a workstream is active (#2282).
+ */
+function cmdConfigPath(cwd) {
+  // Always emit as plain text — a file path is used via shell substitution,
+  // never consumed as JSON. Passing raw=true forces plain-text output.
+  const configPath = path.join(planningDir(cwd), 'config.json');
+  output(configPath, true, configPath);
+}
+
 module.exports = {
+  VALID_CONFIG_KEYS,
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
   cmdConfigSetModelProfile,
   cmdConfigNewProject,
+  cmdConfigPath,
 };

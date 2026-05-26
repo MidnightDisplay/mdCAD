@@ -12,7 +12,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 Parse arguments and load project state:
 
 ```bash
-INIT=$(node ".github/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
+INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -20,10 +20,19 @@ Parse from init JSON: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, 
 
 Also load config for branching strategy:
 ```bash
-CONFIG=$(node ".github/get-shit-done/bin/gsd-tools.cjs" state load)
+CONFIG=$(gsd-sdk query state.load)
 ```
 
 Extract: `branching_strategy`, `branch_name`.
+
+Detect base branch for PRs and merges:
+```bash
+BASE_BRANCH=$(gsd-sdk query config-get git.base_branch 2>/dev/null || echo "")
+if [ -z "$BASE_BRANCH" ] || [ "$BASE_BRANCH" = "null" ]; then
+  BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||')
+  BASE_BRANCH="${BASE_BRANCH:-main}"
+fi
+```
 </step>
 
 <step name="preflight_checks">
@@ -33,8 +42,8 @@ Verify the work is ready to ship:
    ```bash
    VERIFICATION=$(cat ${PHASE_DIR}/*-VERIFICATION.md 2>/dev/null)
    ```
-   Check for `status: passed` or `status: human_needed` (with human approval).
-   If no VERIFICATION.md or status is `gaps_found`: warn and ask user to confirm.
+   Check for `status: pass` or `status: passed`.
+   If no VERIFICATION.md or status is anything other than `pass` / `passed` (including `human_needed` / `gaps_found`): block with `PHASE_VERIFICATION_INCOMPLETE`; complete or formally re-run verification before shipping.
 
 2. **Clean working tree?**
    ```bash
@@ -46,7 +55,7 @@ Verify the work is ready to ship:
    ```bash
    CURRENT_BRANCH=$(git branch --show-current)
    ```
-   If on `main`/`master`: warn — should be on a feature branch.
+   If on `${BASE_BRANCH}`: warn — should be on a feature branch.
    If branching_strategy is `none`: offer to create a branch now.
 
 4. **Remote configured?**
@@ -74,7 +83,7 @@ If push fails (e.g., no upstream): set upstream:
 git push --set-upstream origin ${CURRENT_BRANCH} 2>&1
 ```
 
-Report: "Pushed `{branch}` to origin ({commit_count} commits ahead of main)"
+Report: "Pushed `{branch}` to origin ({commit_count} commits ahead of ${BASE_BRANCH})"
 </step>
 
 <step name="generate_pr_body">
@@ -132,16 +141,69 @@ For each SUMMARY.md in the phase directory:
 
 {Decisions from STATE.md accumulated context relevant to this phase}
 ```
+
+**7. Configured project sections:**
+Read append-only project-specific PRD/PR body sections from config:
+
+```bash
+CUSTOM_PR_SECTIONS=$(gsd-sdk query config-get ship.pr_body_sections --default '[]' 2>/dev/null || echo '[]')
+```
+
+`ship.pr_body_sections` is an onboarding-time extension point for teams that need extra PRD-style sections such as `User Stories & Acceptance Criteria`, `Risks & Dependencies`, `Success Metrics`, `Release Criteria`, or `Stakeholder Review & Approval`.
+
+Use these sections for lean/agile PRD material that should travel with the PR without making the core `/gsd-ship` body configurable:
+
+- User stories and acceptance criteria that explain the functional increment from the user's point of view.
+- Definition of Done or release criteria that make the completion standard explicit.
+- Risks, dependencies, stakeholder review, and traceability notes needed by regulated or approval-heavy projects.
+
+Rules:
+
+- Treat configured sections as append-only. They are rendered after `Key Decisions` and cannot replace, remove, or reorder the required core sections: `Summary`, `Changes`, `Requirements Addressed`, `Verification`, and `Key Decisions`.
+- Each entry must have `heading` plus at least one of `source`, `template`, or `fallback`.
+- `enabled` defaults to `true`; when `enabled` is `false`, skip the section without warning. This lets onboarding seed optional sections that a project can enable later.
+- `source` is a fallback chain of planning artifact headings: `PLAN.md ## Risks || VERIFICATION.md ## Manual Checks`. Allowed artifacts are `ROADMAP.md`, `PLAN.md`, `SUMMARY.md`, `VERIFICATION.md`, `STATE.md`, `REQUIREMENTS.md`, and `CONTEXT.md`.
+- `template` is literal Markdown with a closed token namespace only: `{phase_number}`, `{phase_name}`, `{phase_dir}`, `{base_branch}`, `{padded_phase}`.
+- `fallback` is literal Markdown used when `source` finds no content and no `template` is present.
+- Omit sections whose final rendered body is empty after trimming.
+
+Example configured sections:
+
+```json
+[
+  {
+    "heading": "User Stories & Acceptance Criteria",
+    "enabled": true,
+    "source": "REQUIREMENTS.md ## User Stories || REQUIREMENTS.md ## Acceptance Criteria",
+    "fallback": "- Acceptance criteria are covered by the linked requirements and verification evidence."
+  },
+  {
+    "heading": "Risks & Dependencies",
+    "enabled": true,
+    "source": "PLAN.md ## Risks || PLAN.md ## Dependencies",
+    "fallback": "- No known high-risk rollout dependencies."
+  },
+  {
+    "heading": "Stakeholder Review & Approval",
+    "enabled": false,
+    "template": "- Product owner approval pending for {phase_name}."
+  }
+]
+```
 </step>
 
 <step name="create_pr">
-Create the PR using the generated body:
+Create the PR using the generated body. Write the body to a temp file first so large generated PRD sections do not hit shell argument limits:
 
 ```bash
+PR_BODY_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-pr-body.XXXXXX.md")
+trap 'rm -f "${PR_BODY_FILE:-}"' EXIT
+printf '%s\n' "${PR_BODY}" > "${PR_BODY_FILE}"
+
 gh pr create \
   --title "Phase ${PHASE_NUMBER}: ${PHASE_NAME}" \
-  --body "${PR_BODY}" \
-  --base main
+  --body-file "${PR_BODY_FILE}" \
+  --base "${BASE_BRANCH}"
 ```
 
 If `--draft` flag was passed: add `--draft`.
@@ -150,7 +212,72 @@ Report: "PR #{number} created: {url}"
 </step>
 
 <step name="optional_review">
+
+**External code review command (automated sub-step):**
+
+Before prompting the user, check if an external review command is configured:
+
+```bash
+REVIEW_CMD=$(gsd-sdk query config-get workflow.code_review_command 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
+```
+
+If `REVIEW_CMD` is non-empty and not `"null"`, run the external review:
+
+1. **Generate diff and stats:**
+   ```bash
+   DIFF=$(git diff ${BASE_BRANCH}...HEAD)
+   DIFF_STATS=$(git diff --stat ${BASE_BRANCH}...HEAD)
+   ```
+
+2. **Load phase context from STATE.md:**
+   ```bash
+   STATE_STATUS=$(gsd-sdk query state.load 2>/dev/null | head -20)
+   ```
+
+3. **Build review prompt and pipe to command via stdin:**
+   Construct a review prompt containing the diff, diff stats, and phase context, then pipe it to the configured command:
+   ```bash
+   REVIEW_PROMPT="You are reviewing a pull request.\n\nDiff stats:\n${DIFF_STATS}\n\nPhase context:\n${STATE_STATUS}\n\nFull diff:\n${DIFF}\n\nRespond with JSON: { \"verdict\": \"APPROVED\" or \"REVISE\", \"confidence\": 0-100, \"summary\": \"...\", \"issues\": [{\"severity\": \"...\", \"file\": \"...\", \"line_range\": \"...\", \"description\": \"...\", \"suggestion\": \"...\"}] }"
+   REVIEW_OUTPUT=$(echo "${REVIEW_PROMPT}" | timeout 120 ${REVIEW_CMD} 2>/tmp/gsd-review-stderr.log)
+   REVIEW_EXIT=$?
+   ```
+
+4. **Handle timeout (120s) and failure:**
+   If `REVIEW_EXIT` is non-zero or the command times out:
+   ```bash
+   if [ $REVIEW_EXIT -ne 0 ]; then
+     REVIEW_STDERR=$(cat /tmp/gsd-review-stderr.log 2>/dev/null)
+     echo "WARNING: External review command failed (exit ${REVIEW_EXIT}). stderr: ${REVIEW_STDERR}"
+     echo "Continuing with manual review flow..."
+   fi
+   ```
+   On failure, warn with stderr output and fall through to the manual review flow below.
+
+5. **Parse JSON result:**
+   If the command succeeded, parse the JSON output and report the verdict:
+   ```bash
+   # Parse verdict and summary from REVIEW_OUTPUT JSON
+   VERDICT=$(echo "${REVIEW_OUTPUT}" | node -e "
+     let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+       try { const r=JSON.parse(d); console.log(r.verdict); }
+       catch(e) { console.log('INVALID_JSON'); }
+     });
+   ")
+   ```
+   - If `verdict` is `"APPROVED"`: report approval with confidence and summary.
+   - If `verdict` is `"REVISE"`: report issues found, list each issue with severity, file, line_range, description, and suggestion.
+   - If JSON is invalid (`INVALID_JSON`): warn "External review returned invalid JSON" with stderr and continue.
+
+   Regardless of the external review result, fall through to the manual review options below.
+
+---
+
+**Manual review options:**
+
 Ask if user wants to trigger a code review:
+
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 
 ```
 AskUserQuestion:
@@ -177,13 +304,13 @@ Report the PR URL and suggest: "Review the diff at {url}/files"
 Update STATE.md to reflect the shipping action:
 
 ```bash
-node ".github/get-shit-done/bin/gsd-tools.cjs" state update "Last Activity" "$(date +%Y-%m-%d)"
-node ".github/get-shit-done/bin/gsd-tools.cjs" state update "Status" "Phase ${PHASE_NUMBER} shipped — PR #${PR_NUMBER}"
+gsd-sdk query state.update "Last Activity" "$(date +%Y-%m-%d)"
+gsd-sdk query state.update "Status" "Phase ${PHASE_NUMBER} shipped — PR #${PR_NUMBER}"
 ```
 
 If `commit_docs` is true:
 ```bash
-node ".github/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER}" --files .planning/STATE.md
+gsd-sdk query commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER}" --files .planning/STATE.md
 ```
 </step>
 
@@ -194,7 +321,7 @@ node ".github/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): sh
 ## ✓ Phase {X}: {Name} — Shipped
 
 PR: #{number} ({url})
-Branch: {branch} → main
+Branch: {branch} → ${BASE_BRANCH}
 Commits: {count}
 Verification: ✓ Passed
 Requirements: {N} REQ-IDs addressed

@@ -18,6 +18,12 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
 
 **When:** the agent completed automated work, human confirms it works correctly.
 
+> **Default mode (#3309): `workflow.human_verify_mode = end-of-phase`.** New projects do NOT halt mid-flight at `checkpoint:human-verify`. The planner suppresses those task emissions and embeds the verification details into the relevant `auto` task's `<verify><human-check>` block; the verifier harvests every `<verify><human-check>` at end-of-phase (Step 8) and consolidates them into the existing `human_needed` → HUMAN-UAT.md flow in `workflows/execute-phase.md`. The user reviews everything in one batch.
+>
+> **Why this is the default:** every mid-flight halt costs a full executor cold-start (copilot-instructions.md, MEMORY.md, STATE.md, plan re-read on respawn) because subagent context is discarded across the pause. A plan with N human-verify checkpoints pays the cold-start cost N+1 times — measured at "tens of thousands of tokens" per round-trip on real projects.
+>
+> Set `workflow.human_verify_mode = mid-flight` in `.planning/config.json` to opt back into the pre-#3309 behavior of halting at every checkpoint. `checkpoint:decision` and `checkpoint:human-action` are unaffected by either value — those gate the work itself, not post-hoc verification.
+
 **Use for:**
 - Visual UI checks (layout, styling, responsiveness)
 - Interactive flows (click through wizard, test user flows)
@@ -758,6 +764,36 @@ timeout 30 bash -c 'until node -e "fetch(\"http://localhost:3000\").then(r=>{pro
 **Why bad:** Stripe has an API. the agent should create the webhook via API and write to .env directly.
 
 </anti_patterns>
+
+<type name="tdd-review">
+## checkpoint:tdd-review (TDD Mode Only)
+
+**When:** All waves in a phase complete and `workflow.tdd_mode` is enabled. Inserted by the execute-phase orchestrator after `aggregate_results`.
+
+**Purpose:** Collaborative review of TDD gate compliance across all `type: tdd` plans in the phase. Advisory — does not block execution.
+
+**Use for:**
+- Verifying RED/GREEN/REFACTOR commit sequence for each TDD plan
+- Surfacing gate violations (missing RED or GREEN commits)
+- Reviewing test quality (tests fail for the right reason)
+- Confirming minimal GREEN implementations
+
+**Structure:**
+```xml
+<task type="checkpoint:tdd-review" gate="advisory">
+  <what-checked>TDD gate compliance for {count} plans in Phase {X}</what-checked>
+  <gate-results>
+    | Plan | RED | GREEN | REFACTOR | Status |
+    |------|-----|-------|----------|--------|
+    | {id} |  ✓  |   ✓   |    ✓     | Pass   |
+  </gate-results>
+  <violations>[List of gate violations, or "None"]</violations>
+  <resume-signal>Review complete — proceed to phase verification</resume-signal>
+</task>
+```
+
+**Auto-mode behavior:** When `workflow._auto_chain_active` or `workflow.auto_advance` is true, the TDD review checkpoint auto-approves (advisory gate — never blocks).
+</type>
 
 <summary>
 

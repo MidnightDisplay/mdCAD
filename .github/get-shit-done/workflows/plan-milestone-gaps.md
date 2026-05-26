@@ -65,7 +65,7 @@ Gap: Flow "View dashboard" broken at data fetch
 Find highest existing phase:
 ```bash
 # Get sorted phase list, extract last one
-HIGHEST=$(node ".github/get-shit-done/bin/gsd-tools.cjs" phases list --pick directories[-1])
+HIGHEST=$(gsd-sdk query phases.list --pick directories[-1])
 ```
 
 New phases continue from there:
@@ -139,14 +139,21 @@ grep -c "Pending" .planning/REQUIREMENTS.md
 
 ## 8. Create Phase Directories
 
+For each new phase (N, N+1, …), resolve the directory name via `init.phase-op` so the `project_code` prefix is honoured:
+
 ```bash
-mkdir -p ".planning/phases/{NN}-{name}"
+INIT=$(gsd-sdk query init.phase-op "{NN}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+expected_phase_dir=$(echo "$INIT" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).expected_phase_dir)")
+mkdir -p "${expected_phase_dir}"
 ```
+
+Repeat for each gap-closure phase number. This produces `{CODE}-{NN}-{slug}/` when `project_code` is set in `.planning/config.json`, and `{NN}-{slug}/` otherwise — consistent with all other phase-creation paths.
 
 ## 9. Commit Roadmap and Requirements Update
 
 ```bash
-node ".github/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files .planning/ROADMAP.md .planning/REQUIREMENTS.md
+gsd-sdk query commit "docs(roadmap): add gap closure phases {N}-{M}" --files .planning/ROADMAP.md .planning/REQUIREMENTS.md
 ```
 
 ## 10. Offer Next Steps
@@ -159,13 +166,13 @@ node ".github/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap cl
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Plan first gap closure phase**
 
-`/gsd-plan-phase {N}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd-plan-phase {N}`
 
 ---
 
