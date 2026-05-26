@@ -4,8 +4,8 @@ milestone: v1.9
 milestone_name: milestone
 status: verifying
 stopped_at: Phase 55 executed
-last_updated: "2026-05-18T22:30:18.802Z"
-last_activity: 2026-05-18
+last_updated: "2026-05-26T09:35:12.191Z"
+last_activity: 2026-05-26
 progress:
   total_phases: 7
   completed_phases: 7
@@ -148,9 +148,10 @@ Recent decisions affecting current work:
 
 | Date       | ID         | Task | Status | Commit |
 |------------|------------|------|--------|--------|
-| 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
-| 2026-05-05 | 260505-p42v | Create missing Phase 42 verification artifact | done | `e2ce8fe` |
+| 2026-05-26 | 260526-epc | Archive legacy pre-GSD agent docs under `docs/legacy` and align live docs with `.planning` | done | `0ca5ea4` |
 | 2026-05-15 | 260515-nvk | Retarget Avalonia control and sample hosts to net10 for net10 host compatibility | done | `d847033` |
+| 2026-05-05 | 260505-p42v | Create missing Phase 42 verification artifact | done | `e2ce8fe` |
+| 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
 
 ## Performance Metrics
 

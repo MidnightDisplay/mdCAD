@@ -104,7 +104,7 @@ mdCAD/
 - Purpose: Developer-facing documentation
 - Contains: Quick start and architecture notes plus `docs/legacy/pre-gsd-agent-workflow/` for frozen pre-GSD agent docs
 - Key files: `docs/QUICKSTART.md`
-- Subdirectories: None
+- Subdirectories: `docs/legacy/`, `docs/feature-proposal/`, `docs/improvements/`, `docs/solver/`
 
 **`.planning/`:**
 - Purpose: Active planning, continuity, roadmap, and codebase reference area for the current GSD workflow
