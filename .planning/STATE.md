@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 Phase: 55 (viewport-only-startup-mode-and-f-camera-reset-hotkey) — COMPLETE
 Plan: 3 of 3
 Status: Phase complete — ready for verification
-Last activity: 2026-05-18
+Last activity: 2026-05-26 - Completed quick task 260526-epc (legacy doc archive and `.planning` alignment)
 
 Progress: [██████████] 100%
 
