@@ -63,6 +63,7 @@ static inline void ui_controls_draw(ui_controls_state_t* ctrl) {
     igText("UI Theme");
     if (igCombo_Str_arr("##Theme", &current_theme, ui_theme_names, UI_THEME_COUNT, -1)) {
         ui_theme_apply((ui_theme_t)current_theme);
+        ui_theme_mark_settings_dirty();
         // Sync clear color with new theme's FrameBg
         ui_controls_sync_clear_color(ctrl);
     }

@@ -377,6 +377,18 @@ if(MDCAD_NATIVE_DESKTOP)
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_test(NAME camera_shortcut_app_contract_test COMMAND camera_shortcut_app_contract_test)
+
+    add_executable(theme_persistence_contract_test tests/theme_persistence_contract_test.c)
+    target_compile_features(theme_persistence_contract_test PRIVATE c_std_11)
+    target_include_directories(theme_persistence_contract_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(theme_persistence_contract_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME theme_persistence_contract_test COMMAND theme_persistence_contract_test)
 endif()
 
 # Emscripten-specific linker options
