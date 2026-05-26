@@ -71,11 +71,11 @@ static int test_manual_edit_tokens_roundtrip_in_ini_stream(void) {
 
 static int test_mark_settings_dirty_schedules_save(void) {
     static const char* paths[] = {
-        "src\\ui\\ui_controls.h",
-        "..\\src\\ui\\ui_controls.h",
-        "..\\..\\src\\ui\\ui_controls.h",
-        "..\\..\\..\\src\\ui\\ui_controls.h",
-        "..\\..\\..\\..\\src\\ui\\ui_controls.h"
+        "src/ui/ui_controls.h",
+        "../src/ui/ui_controls.h",
+        "../../src/ui/ui_controls.h",
+        "../../../src/ui/ui_controls.h",
+        "../../../../src/ui/ui_controls.h"
     };
 
     for (size_t i = 0; i < (sizeof(paths) / sizeof(paths[0])); ++i) {

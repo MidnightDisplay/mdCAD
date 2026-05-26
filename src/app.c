@@ -71,6 +71,7 @@ static struct {
     uint64_t last_time;
     float elapsed_time;
     bool ui_visible;
+    bool theme_clear_color_restore_pending;
     mdcad_launch_config_t launch;
     embed_input_state_t embed_input;
     uint32_t embed_runtime_cancel_serial;
@@ -1881,6 +1882,7 @@ static void init(void) {
         (void)embed_input_state_apply(&state.embed_input, EMBED_INPUT_TRIGGER_ATTACH);
     }
     state.ui_visible = !(state.launch.embedded && state.launch.viewport_only);
+    state.theme_clear_color_restore_pending = !state.embed_layout.use_manual_persistence;
 
     // Initialize UI modules
     ui_controls_init(&state.controls, &state.camera, &state.offscreen_pass_action);
@@ -2166,6 +2168,10 @@ static void frame(void) {
         .delta_time = sapp_frame_duration(),
         .dpi_scale = sapp_dpi_scale(),
     });
+    if (state.theme_clear_color_restore_pending) {
+        ui_controls_sync_clear_color(&state.controls);
+        state.theme_clear_color_restore_pending = false;
+    }
     bool startup_jsonl_scene_dirty = startup_jsonl_import_controller_tick(&state.startup_jsonl_import_controller, &state.ecs_scene);
     if (startup_jsonl_scene_dirty) {
         ui_scene_hierarchy_mark_dirty(&state.scene_hierarchy);
