@@ -1,5 +1,7 @@
 # QUICKSTART
 
+Active planning and continuity now live under `.planning/` (start with `.planning/STATE.md`). The old root-level agent docs are archived under `docs/legacy/pre-gsd-agent-workflow/`.
+
 ## MacOS build using Ninja
 
 Clean, configure and build using Ninja:
@@ -415,7 +417,7 @@ xcodebuild -project build-ios/mdCAD.xcodeproj -scheme mdCAD -sdk iphoneos -confi
 # GLES3 backend, requires Android SDK/NDK
 cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-# Debug logs (for investigating known issues - see CHECKPOINT.md):
+# Debug logs (for investigating known issues, use the relevant `.planning/` phase artifacts):
 # adb logcat -s imgui_storage:* alpha_polylines:*
 ```
 

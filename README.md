@@ -19,6 +19,8 @@ A lightweight, cross-platform CAD viewer and geometry editor built with C, ECS a
 
 ## Quick Start
 
+For active project planning and continuity, use the `.planning/` tree and start with `.planning/STATE.md`. The older pre-GSD agent docs now live under `docs/legacy/pre-gsd-agent-workflow/` as frozen historical reference only.
+
 **macOS (Ninja):**
 ```bash
 cmake -B build -G Ninja && ninja -C build

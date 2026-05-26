@@ -5,5 +5,6 @@
 - Treat `/gsd-...` or `gsd-...` as command invocations and load the matching file from `.github/skills/gsd-*`.
 - When a command says to spawn a subagent, prefer a matching custom agent from `.github/agents`.
 - Do not apply GSD workflows unless the user explicitly asks for them.
+- Treat `.planning/` as the active project-memory tree; the old root `AGENTS.md`, `CHECKPOINT.md`, and `.plans/` docs are archived under `docs/legacy/pre-gsd-agent-workflow/` as frozen reference only.
 - After completing any `gsd-*` command (or any deliverable it triggers: feature, bug fix, tests, docs, etc.), ALWAYS: (1) offer the user the next step by prompting via `ask_user`; repeat this feedback loop until the user explicitly indicates they are done.
 <!-- /GSD Configuration -->
