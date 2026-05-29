@@ -162,13 +162,13 @@ Plans:
 **Goal:** Stop the embedded mdCAD crash triggered by deleting startup-imported JSONL nodes, emit a stable working-directory crash/error record, and surface truthful crash/log detail through the existing Avalonia/WPF embedded host seams.  
 **Requirements:** P57-01, P57-02, P57-03, P57-04, P57-05  
 **Depends on:** Phase 56  
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 **Status:** In Progress
 
 Plans:
 - [x] 57-01-PLAN.md — Fix the native startup-import delete crash and add embedded working-directory crash logging with native regression coverage
 - [ ] 57-02-PLAN.md — Surface native crash/log detail through the Avalonia backend, control, and full host
-- [ ] 57-03-PLAN.md — Surface native crash/log detail through the WPF backend, control, and full host
+- [x] 57-03-PLAN.md — Surface native crash/log detail through the WPF backend, control, and full host
 - [ ] 57-04-PLAN.md — Rebaseline Phase 57 validation and close the host delete-smoke matrix
 
 **Success Criteria:**
@@ -188,7 +188,7 @@ Plans:
 | 54 | ✓ | 3/3 complete | 100% |
 | 55 | 3/3 | Complete   | 2026-05-18 |
 | 56 | 9/9 | Complete   | 100% |
-| 57 | 1/4 | In Progress | 25% |
+| 57 | 2/4 | In Progress|  |
 
 ## Coverage
 

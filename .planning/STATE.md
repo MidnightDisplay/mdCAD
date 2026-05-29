@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Completed 57-01-PLAN.md
-last_updated: "2026-05-29T11:15:21Z"
+stopped_at: Completed 57-03-PLAN.md
+last_updated: "2026-05-29T12:13:35Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 34
-  completed_plans: 31
-  percent: 91
+  completed_plans: 32
+  percent: 89
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 ## Current Position
 
 Phase: 57 (investigate-mdcad-embedded-crash-when-deleting-imported-json) — IN PROGRESS
-Plan: 1 of 4
-Status: Completed 57-01 native delete hardening + crash-log diagnostics; ready for 57-02
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-05-29
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 94%
 
 ## Milestone Scope
 
@@ -97,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 56]: Phase 56 validation must keep full/minimal WPF build proof automated while reserving real child-HWND attach/stop/relaunch checks for the full diagnostic host manual row. — This preserves compile/build truth separately from real Windows runtime proof.
 - [Phase 57]: Hierarchy delete requests must collapse to live roots before undo snapshotting or teardown. — This prevents descendant-first imported deletes from replaying unsafe order through the native delete chain.
 - [Phase 57]: Embedded crash diagnostics should write one stable `mdcad-embed-crash.log` record and derive stderr summaries from the same helper. — This keeps host-visible crash detail truthful without adding IPC.
+- [Phase 57]: The WPF backend now reuses the native stderr/log summary line when available instead of inventing a crash cause from host state.
+- [Phase 57]: MdCadEmbeddedControl keeps SetLaunchWarning as the single warning source of truth, while the full host only mirrors the already-observed detail.
 
 ### Roadmap Evolution
 
@@ -191,9 +193,10 @@ Recent decisions affecting current work:
 | Phase 56 P08 | 8 min | 1 tasks | 6 files |
 | Phase 56 P09 | 3 min | 1 tasks | 5 files |
 | Phase 57 P01 | 18 min | 2 tasks | 8 files |
+| Phase 57 P03 | 3110 | 2 tasks | 20 files |
 
 ## Session Continuity
 
-Last session: 2026-05-29T11:15:21Z
+Last session: 2026-05-29T11:36:50.557Z
 Stopped at: Completed 57-01-PLAN.md
 Resume file: None
