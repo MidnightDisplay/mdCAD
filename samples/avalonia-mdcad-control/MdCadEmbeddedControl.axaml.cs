@@ -8,6 +8,9 @@ using Avalonia.Markup.Xaml;
 using Avalonia.VisualTree;
 
 using MdCad.Avalonia.Control.Host;
+using SharedMdCadLaunchSnapshot = MdCad.Embed.Core.MdCadLaunchSnapshot;
+using SharedMdCadSessionCoordinator = MdCad.Embed.Core.MdCadSessionCoordinator;
+using HostMdCadLaunchSnapshot = MdCad.Avalonia.Control.Host.MdCadLaunchSnapshot;
 
 namespace MdCad.Avalonia.Control;
 
@@ -41,11 +44,12 @@ public partial class MdCadEmbeddedControl : UserControl
     private readonly TextBlock _jsonlStatusTextBlock;
     private readonly TextBlock _liveRefreshStatusTextBlock;
     private readonly TextBlock _failureTextBlock;
-    private readonly MdCadSessionCoordinator _sessionCoordinator;
+    private readonly SharedMdCadSessionCoordinator _sessionCoordinator;
     private readonly IMdCadEmbedBackend _backend;
     private string? _warningText;
+    private string? _unexpectedSessionLossDetail;
     private bool _isVisualAttached;
-    private MdCadLaunchSnapshot _lastLaunchSnapshot;
+    private SharedMdCadLaunchSnapshot _lastLaunchSnapshot;
 
     static MdCadEmbeddedControl()
     {
@@ -91,31 +95,32 @@ public partial class MdCadEmbeddedControl : UserControl
         _diagnosticStartButton.Click += OnDiagnosticStartClick;
         _diagnosticStopButton.Click += OnDiagnosticStopClick;
 
-        _lastLaunchSnapshot = MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled, ViewportOnlyStartupMode);
+        _lastLaunchSnapshot = CaptureLaunchSnapshot();
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
 
         _backend = MdCadEmbedBackendFactory.Create(
-            initialSnapshot: _lastLaunchSnapshot,
+            initialSnapshot: ToHostLaunchSnapshot(_lastLaunchSnapshot),
             setLaunchStatus: SetLaunchStatus,
             setAttachStatus: SetAttachStatus,
-            updatePreLaunchStatus: UpdatePreLaunchStatus,
-            updatePostLaunchStatus: UpdatePostLaunchStatus,
+            updatePreLaunchStatus: snapshot => UpdatePreLaunchStatus(ToSharedLaunchSnapshot(snapshot)),
+            updatePostLaunchStatus: snapshot => UpdatePostLaunchStatus(ToSharedLaunchSnapshot(snapshot)),
             setFailureStatus: SetFailureStatus,
             setLaunchWarning: SetLaunchWarning,
             updateControlState: UpdateControlState,
-            captureLaunchSnapshot: CaptureLaunchSnapshot,
+            captureLaunchSnapshot: () => ToHostLaunchSnapshot(CaptureLaunchSnapshot()),
             isWindows: isWindowsOverride);
         _backend.StateChanged += OnBackendStateChanged;
         _backend.UnexpectedSessionLoss += OnBackendUnexpectedSessionLoss;
         _embedSurfaceContainer.Content = _backend.Surface;
-        _sessionCoordinator = new MdCadSessionCoordinator(
+        _sessionCoordinator = new SharedMdCadSessionCoordinator(
             captureSnapshot: CaptureLaunchSnapshot,
             canStartSession: CanStartSession,
             getPlaceholderHandle: () => _backend.PlaceholderHandle,
             getAutoStart: () => AutoStart,
             applyWarning: SetLaunchWarning,
-            startSessionAsync: (snapshot, cancellationToken) => _backend.StartSessionAsync(snapshot, cancellationToken),
+            startSessionAsync: (snapshot, cancellationToken) =>
+                _backend.StartSessionAsync(ToHostLaunchSnapshot(snapshot), cancellationToken),
             stopSessionAsync: async cancellationToken =>
             {
                 await _backend.StopSessionAsync(cancellationToken);
@@ -164,8 +169,13 @@ public partial class MdCadEmbeddedControl : UserControl
         set => SetValue(PresentationModeProperty, value);
     }
 
+    public string? UnexpectedSessionLossDetail => _unexpectedSessionLossDetail;
+
+    public event Action<string?>? UnexpectedSessionLossChanged;
+
     public Task StartAsync()
     {
+        ClearUnexpectedSessionLossDetail();
         return RunCoordinatorTaskAsync(_sessionCoordinator.StartAsync(), rethrow: true);
     }
 
@@ -185,11 +195,12 @@ public partial class MdCadEmbeddedControl : UserControl
 
     internal void SetLaunchWarning(string? warningText)
     {
-        _warningText = warningText;
-        UpdateWarningSurface(warningText);
-        if (!string.IsNullOrWhiteSpace(warningText))
+        string? effectiveWarningText = ResolveEffectiveWarningText(warningText);
+        _warningText = effectiveWarningText;
+        UpdateWarningSurface(effectiveWarningText);
+        if (!string.IsNullOrWhiteSpace(effectiveWarningText))
         {
-            SetFailureStatus(warningText);
+            SetFailureStatus(effectiveWarningText);
         }
         else if (!_backend.HasActiveSession)
         {
@@ -202,9 +213,9 @@ public partial class MdCadEmbeddedControl : UserControl
         AvaloniaXamlLoader.Load(this);
     }
 
-    private MdCadLaunchSnapshot CaptureLaunchSnapshot()
+    private SharedMdCadLaunchSnapshot CaptureLaunchSnapshot()
     {
-        return MdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled, ViewportOnlyStartupMode);
+        return SharedMdCadLaunchSnapshot.Create(JsonlPath, StartupLiveRefreshEnabled, ViewportOnlyStartupMode);
     }
 
     private bool CanStartSession()
@@ -235,6 +246,7 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void OnBackendUnexpectedSessionLoss(string detail)
     {
+        SetUnexpectedSessionLossDetail(detail);
         SetLaunchWarning(detail);
         UpdateControlState();
         _ = RunCoordinatorTaskAsync(_sessionCoordinator.StopAsync(), rethrow: false);
@@ -267,6 +279,7 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void OnLaunchSettingsChanged()
     {
+        ClearUnexpectedSessionLossDetail();
         _lastLaunchSnapshot = CaptureLaunchSnapshot();
         if (!_backend.HasActiveSession)
         {
@@ -279,6 +292,7 @@ public partial class MdCadEmbeddedControl : UserControl
 
     private void OnDiagnosticStartClick(object? sender, RoutedEventArgs e)
     {
+        ClearUnexpectedSessionLossDetail();
         _ = RunCoordinatorTaskAsync(_sessionCoordinator.StartAsync(), rethrow: false);
     }
 
@@ -308,7 +322,7 @@ public partial class MdCadEmbeddedControl : UserControl
         QueueReconcile();
     }
 
-    private void RefreshPreSessionPresentation(MdCadLaunchSnapshot snapshot)
+    private void RefreshPreSessionPresentation(SharedMdCadLaunchSnapshot snapshot)
     {
         string? primaryWarning = GetPrimaryWarningText(snapshot);
         SetLaunchWarning(primaryWarning);
@@ -331,7 +345,7 @@ public partial class MdCadEmbeddedControl : UserControl
         UpdatePreLaunchStatus(snapshot);
     }
 
-    private string? GetPrimaryWarningText(MdCadLaunchSnapshot snapshot)
+    private string? GetPrimaryWarningText(SharedMdCadLaunchSnapshot snapshot)
     {
         return _backend.StartBlockedReason ?? snapshot.WarningText;
     }
@@ -341,7 +355,7 @@ public partial class MdCadEmbeddedControl : UserControl
         return !string.IsNullOrWhiteSpace(_backend.StartBlockedReason);
     }
 
-    private void UpdateUnsupportedPreLaunchStatus(MdCadLaunchSnapshot snapshot)
+    private void UpdateUnsupportedPreLaunchStatus(SharedMdCadLaunchSnapshot snapshot)
     {
         if (!string.IsNullOrWhiteSpace(snapshot.RequestedJsonlPath))
         {
@@ -357,7 +371,7 @@ public partial class MdCadEmbeddedControl : UserControl
             : "off");
     }
 
-    private void UpdatePreLaunchStatus(MdCadLaunchSnapshot snapshot)
+    private void UpdatePreLaunchStatus(SharedMdCadLaunchSnapshot snapshot)
     {
         if (snapshot.ShouldPassJsonlArgument)
         {
@@ -375,7 +389,7 @@ public partial class MdCadEmbeddedControl : UserControl
         SetLiveRefreshStatus(snapshot.ShouldPassLiveRefreshArgument ? "requested" : "off");
     }
 
-    private void UpdatePostLaunchStatus(MdCadLaunchSnapshot snapshot)
+    private void UpdatePostLaunchStatus(SharedMdCadLaunchSnapshot snapshot)
     {
         if (snapshot.ShouldPassJsonlArgument)
         {
@@ -425,5 +439,62 @@ public partial class MdCadEmbeddedControl : UserControl
         bool hasWarning = !string.IsNullOrWhiteSpace(warningText);
         _warningSurface.IsVisible = hasWarning;
         _warningTextBlock.Text = hasWarning ? warningText! : string.Empty;
+    }
+
+    private string? ResolveEffectiveWarningText(string? warningText)
+    {
+        if (!string.IsNullOrWhiteSpace(warningText))
+        {
+            return warningText;
+        }
+
+        return _unexpectedSessionLossDetail;
+    }
+
+    private void SetUnexpectedSessionLossDetail(string? detail)
+    {
+        string? normalizedDetail = string.IsNullOrWhiteSpace(detail) ? null : detail;
+        if (string.Equals(_unexpectedSessionLossDetail, normalizedDetail, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _unexpectedSessionLossDetail = normalizedDetail;
+        UnexpectedSessionLossChanged?.Invoke(_unexpectedSessionLossDetail);
+    }
+
+    private void ClearUnexpectedSessionLossDetail()
+    {
+        string? previousDetail = _unexpectedSessionLossDetail;
+        if (string.IsNullOrWhiteSpace(previousDetail))
+        {
+            return;
+        }
+
+        SetUnexpectedSessionLossDetail(null);
+        if (string.Equals(_warningText, previousDetail, StringComparison.Ordinal))
+        {
+            SetLaunchWarning(null);
+        }
+    }
+
+    private static SharedMdCadLaunchSnapshot ToSharedLaunchSnapshot(HostMdCadLaunchSnapshot snapshot)
+    {
+        return new SharedMdCadLaunchSnapshot(
+            snapshot.RequestedJsonlPath,
+            snapshot.LaunchJsonlPath,
+            snapshot.StartupLiveRefreshEnabled,
+            snapshot.ViewportOnlyStartupMode,
+            snapshot.WarningText);
+    }
+
+    private static HostMdCadLaunchSnapshot ToHostLaunchSnapshot(SharedMdCadLaunchSnapshot snapshot)
+    {
+        return new HostMdCadLaunchSnapshot(
+            snapshot.RequestedJsonlPath,
+            snapshot.LaunchJsonlPath,
+            snapshot.StartupLiveRefreshEnabled,
+            snapshot.ViewportOnlyStartupMode,
+            snapshot.WarningText);
     }
 }

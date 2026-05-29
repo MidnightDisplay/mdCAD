@@ -169,6 +169,7 @@ public partial class MainWindow : Window
     private string? _currentJsonlPath;
     private string _currentJsonlStatus = string.Empty;
     private string? _lastActionNote;
+    private string? _observedUnexpectedSessionLossDetail;
 
     public MainWindow()
         : this(HostLaunchOptions.Parse(Array.Empty<string>()))
@@ -199,6 +200,7 @@ public partial class MainWindow : Window
             ?? throw new InvalidOperationException("Missing HarnessStatusTextBlock.");
         _embeddedControl = this.FindControl<MdCadEmbeddedControl>("EmbeddedControl")
             ?? throw new InvalidOperationException("Missing EmbeddedControl.");
+        _embeddedControl.UnexpectedSessionLossChanged += OnEmbeddedControlUnexpectedSessionLossChanged;
 
         ApplyStartupOptions();
         _isInitializing = false;
@@ -251,6 +253,7 @@ public partial class MainWindow : Window
         _embeddedControl.AutoStart = _autoStartCheckBox.IsChecked == true;
         _embeddedControl.StartupLiveRefreshEnabled = _liveRefreshCheckBox.IsChecked == true;
         _embeddedControl.JsonlPath = _currentJsonlPath;
+        _observedUnexpectedSessionLossDetail = _embeddedControl.UnexpectedSessionLossDetail;
         _runtimeStatusTextBlock.Text = BuildRuntimeStatus();
         _harnessStatusTextBlock.Text = BuildHarnessStatus();
     }
@@ -286,8 +289,13 @@ public partial class MainWindow : Window
         string modeText = GetSelectedPresentationMode() == MdCadPresentationMode.Sealed ? "sealed" : "diagnostic";
         string autoStartText = _autoStartCheckBox.IsChecked == true ? "true" : "false";
         string liveRefreshText = _liveRefreshCheckBox.IsChecked == true ? "requested" : "off";
-        string note = string.IsNullOrWhiteSpace(_lastActionNote) ? string.Empty : $" | action: {_lastActionNote}";
-        return $"harness: mode={modeText}; AutoStart={autoStartText}; live refresh={liveRefreshText}; {_currentJsonlStatus}{note}";
+        return ComposeHarnessStatus(
+            modeText,
+            autoStartText,
+            liveRefreshText,
+            _currentJsonlStatus,
+            _lastActionNote,
+            _observedUnexpectedSessionLossDetail);
     }
 
     private static string? ResolveJsonlPath(HostJsonlScenario scenario, out string statusText)
@@ -362,6 +370,15 @@ public partial class MainWindow : Window
         ApplyHarnessSettings();
     }
 
+    private void OnEmbeddedControlUnexpectedSessionLossChanged(string? detail)
+    {
+        _observedUnexpectedSessionLossDetail = string.IsNullOrWhiteSpace(detail) ? null : detail;
+        if (!_isInitializing && string.IsNullOrWhiteSpace(_options.ParseError))
+        {
+            _harnessStatusTextBlock.Text = BuildHarnessStatus();
+        }
+    }
+
     private async void OnStartViewerClick(object? sender, RoutedEventArgs e)
     {
         try
@@ -390,5 +407,20 @@ public partial class MainWindow : Window
         }
 
         _harnessStatusTextBlock.Text = BuildHarnessStatus();
+    }
+
+    private static string ComposeHarnessStatus(
+        string modeText,
+        string autoStartText,
+        string liveRefreshText,
+        string currentJsonlStatus,
+        string? actionNote,
+        string? observedUnexpectedSessionLossDetail)
+    {
+        string note = string.IsNullOrWhiteSpace(actionNote) ? string.Empty : $" | action: {actionNote}";
+        string observedDetail = string.IsNullOrWhiteSpace(observedUnexpectedSessionLossDetail)
+            ? string.Empty
+            : $" | observed detail: {observedUnexpectedSessionLossDetail}";
+        return $"harness: mode={modeText}; AutoStart={autoStartText}; live refresh={liveRefreshText}; {currentJsonlStatus}{note}{observedDetail}";
     }
 }

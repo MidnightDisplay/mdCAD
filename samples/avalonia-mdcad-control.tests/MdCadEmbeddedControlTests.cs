@@ -130,7 +130,7 @@ public sealed class MdCadEmbeddedControlTests
             "Embedded runtime failure: mdCAD terminated with an unhandled embedded exception (exception=0xC0000005). See mdcad-embed-crash.log";
 
         InvokePrivateInstanceMethod(control, "OnBackendUnexpectedSessionLoss", detail);
-        InvokePrivateInstanceMethod(control, "SetLaunchWarning", null);
+        InvokePrivateInstanceMethod(control, "SetLaunchWarning", [null]);
 
         Border warningSurface = GetControl<Border>(control, "WarningSurface");
         TextBlock warningText = GetControl<TextBlock>(control, "WarningTextBlock");
@@ -204,9 +204,14 @@ public sealed class MdCadEmbeddedControlTests
 
     private static object? InvokePrivateInstanceMethod(MdCadEmbeddedControl control, string methodName, params object?[] args)
     {
-        MethodInfo method = typeof(MdCadEmbeddedControl).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+        object?[] effectiveArgs = args ?? [];
+        MethodInfo method = typeof(MdCadEmbeddedControl)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .SingleOrDefault(candidate =>
+                candidate.Name == methodName &&
+                candidate.GetParameters().Length == effectiveArgs.Length)
             ?? throw new InvalidOperationException($"Missing {methodName} method.");
 
-        return method.Invoke(control, args);
+        return method.Invoke(control, effectiveArgs);
     }
 }
