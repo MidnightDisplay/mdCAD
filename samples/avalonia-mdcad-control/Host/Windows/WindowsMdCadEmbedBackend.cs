@@ -9,11 +9,14 @@ using Avalonia.Threading;
 using AvaloniaControl = Avalonia.Controls.Control;
 
 using MdCad.Avalonia.Control.Host;
+using MdCad.Embed.Core.Windows;
 
 namespace MdCad.Avalonia.Control.Host.Windows;
 
 internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
 {
+    private const string EmbeddedFailurePrefix = "Embedded ";
+
     private static readonly TimeSpan GracefulEmbeddedExitWait = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ChildAttachTimeout = TimeSpan.FromSeconds(10);
 
@@ -256,11 +259,14 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
         {
             _attachTimer.Stop();
             CleanupAfterUnexpectedSessionLoss(
-                _capturedFailureLine ?? $"mdCAD exited before child attach (exit code {_mdcadProcess.ExitCode}).");
+                BuildUnexpectedSessionLossDetail(
+                    _capturedFailureLine,
+                    "mdCAD exited before child attach.",
+                    _mdcadProcess.ExitCode));
             return;
         }
 
-        IntPtr childHwnd = FindChildWindowForProcess(_launchParentHwnd, _mdcadProcess.Id);
+        IntPtr childHwnd = Win32NativeMethods.FindChildWindowForProcess(_launchParentHwnd, _mdcadProcess.Id);
         if (childHwnd != IntPtr.Zero)
         {
             _attachedChildHwnd = childHwnd;
@@ -278,7 +284,11 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
         if ((DateTimeOffset.UtcNow - _launchStartedAt) >= ChildAttachTimeout)
         {
             _attachTimer.Stop();
-            CleanupAfterUnexpectedSessionLoss(_capturedFailureLine ?? "Timed out waiting for child attach.");
+            CleanupAfterUnexpectedSessionLoss(
+                BuildUnexpectedSessionLossDetail(
+                    _capturedFailureLine,
+                    "Timed out waiting for child attach.",
+                    null));
         }
     }
 
@@ -292,7 +302,11 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
 
         if (_mdcadProcess?.HasExited == true)
         {
-            CleanupAfterUnexpectedSessionLoss($"mdCAD exited after attach (exit code {_mdcadProcess.ExitCode}).");
+            CleanupAfterUnexpectedSessionLoss(
+                BuildUnexpectedSessionLossDetail(
+                    _capturedFailureLine,
+                    "mdCAD exited after attach.",
+                    _mdcadProcess.ExitCode));
             return;
         }
 
@@ -316,7 +330,11 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
             !Win32NativeMethods.IsWindow(_attachedChildHwnd) ||
             Win32NativeMethods.GetParent(_attachedChildHwnd) != _placeholderHandle)
         {
-            CleanupAfterUnexpectedSessionLoss("Attached child HWND is no longer parented to the placeholder.");
+            CleanupAfterUnexpectedSessionLoss(
+                BuildUnexpectedSessionLossDetail(
+                    _capturedFailureLine,
+                    "Attached child HWND is no longer parented to the placeholder.",
+                    _mdcadProcess?.HasExited == true ? _mdcadProcess.ExitCode : null));
             return false;
         }
 
@@ -337,22 +355,20 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
 
     private void OnChildOutputDataReceived(object sender, DataReceivedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(e.Data))
+        string? embeddedFailureSummary = TryCaptureEmbeddedFailureSummary(e.Data);
+        if (embeddedFailureSummary == null)
         {
             return;
         }
 
-        if (_capturedFailureLine == null && e.Data.Contains("Embedded startup failed:", StringComparison.Ordinal))
+        _capturedFailureLine = embeddedFailureSummary;
+        Dispatcher.UIThread.Post(() =>
         {
-            _capturedFailureLine = e.Data.Trim();
-            Dispatcher.UIThread.Post(() =>
+            if (_attachedChildHwnd == IntPtr.Zero)
             {
-                if (_attachedChildHwnd == IntPtr.Zero)
-                {
-                    _setLaunchWarning(_capturedFailureLine);
-                }
-            });
-        }
+                _setLaunchWarning(_capturedFailureLine);
+            }
+        });
     }
 
     private void CleanupAfterUnexpectedSessionLoss(string detail)
@@ -404,64 +420,56 @@ internal sealed class WindowsMdCadEmbedBackend : IMdCadEmbedBackend
         }
     }
 
-    private static IntPtr FindChildWindowForProcess(IntPtr parentHwnd, int processId)
-    {
-        if (!OperatingSystem.IsWindows() || parentHwnd == IntPtr.Zero || !Win32NativeMethods.IsWindow(parentHwnd))
-        {
-            return IntPtr.Zero;
-        }
-
-        IntPtr matchedChild = IntPtr.Zero;
-        Win32NativeMethods.EnumChildWindows(parentHwnd, (hwnd, _) =>
-        {
-            Win32NativeMethods.GetWindowThreadProcessId(hwnd, out uint windowProcessId);
-            if (windowProcessId == (uint)processId)
-            {
-                matchedChild = hwnd;
-                return false;
-            }
-
-            return true;
-        }, IntPtr.Zero);
-
-        return matchedChild;
-    }
-
     internal static ProcessStartInfo CreateStartInfo(
         MdCadRuntimePaths runtime,
         IntPtr placeholderHandle,
         MdCadLaunchSnapshot snapshot)
     {
-        ProcessStartInfo startInfo = new()
-        {
-            FileName = runtime.ExecutablePath,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = false,
-            WorkingDirectory = runtime.RuntimeRoot,
-        };
+        return MdCadWindowsStartInfoBuilder.CreateEmbeddedProcessStartInfo(
+            executablePath: runtime.ExecutablePath,
+            runtimeRoot: runtime.RuntimeRoot,
+            parentHwnd: placeholderHandle,
+            viewportOnlyStartupMode: snapshot.ViewportOnlyStartupMode,
+            launchJsonlPath: snapshot.LaunchJsonlPath,
+            startupLiveRefreshEnabled: snapshot.ShouldPassLiveRefreshArgument);
+    }
 
-        startInfo.ArgumentList.Add("--embedded");
-        startInfo.ArgumentList.Add("--parent-hwnd");
-        startInfo.ArgumentList.Add($"0x{placeholderHandle.ToInt64():X}");
-
-        if (snapshot.ViewportOnlyStartupMode)
+    private static string? TryCaptureEmbeddedFailureSummary(string? data)
+    {
+        if (string.IsNullOrWhiteSpace(data))
         {
-            startInfo.ArgumentList.Add("--viewport-only");
+            return null;
         }
 
-        if (snapshot.ShouldPassJsonlArgument)
+        string trimmed = data.Trim();
+        if (trimmed.Contains("Embedded startup failed:", StringComparison.Ordinal) ||
+            (trimmed.StartsWith(EmbeddedFailurePrefix, StringComparison.Ordinal) &&
+             trimmed.Contains(" failure:", StringComparison.Ordinal)))
         {
-            startInfo.ArgumentList.Add("--jsonl");
-            startInfo.ArgumentList.Add(snapshot.LaunchJsonlPath!);
+            return trimmed;
         }
 
-        if (snapshot.ShouldPassLiveRefreshArgument)
+        return null;
+    }
+
+    private static string BuildUnexpectedSessionLossDetail(string? capturedFailureLine, string fallbackDetail, int? exitCode)
+    {
+        if (!string.IsNullOrWhiteSpace(capturedFailureLine))
         {
-            startInfo.ArgumentList.Add("--jsonl-live-refresh");
+            return capturedFailureLine;
         }
 
-        return startInfo;
+        if (!exitCode.HasValue || fallbackDetail.Contains("exit code", StringComparison.OrdinalIgnoreCase))
+        {
+            return fallbackDetail;
+        }
+
+        string normalizedDetail = fallbackDetail.TrimEnd();
+        if (normalizedDetail.EndsWith(".", StringComparison.Ordinal))
+        {
+            normalizedDetail = normalizedDetail[..^1];
+        }
+
+        return $"{normalizedDetail} (exit code {exitCode.Value}).";
     }
 }
