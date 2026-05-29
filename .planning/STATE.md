@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 55 executed
-last_updated: "2026-05-26T10:15:41Z"
-last_activity: 2026-05-26
+status: executing
+stopped_at: Completed 57-01-PLAN.md
+last_updated: "2026-05-29T11:15:21Z"
+last_activity: 2026-05-29
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 21
-  completed_plans: 21
-  percent: 100
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 34
+  completed_plans: 31
+  percent: 91
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 55 verification and milestone closeout readiness
+**Current focus:** Phase 57 native delete-crash closure and embedded diagnostics surfacing
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 55 (viewport-only-startup-mode-and-f-camera-reset-hotkey) — COMPLETE
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-05-26 - Completed quick task 260526-f53 (persist selected user theme in active ImGui ini)
+Phase: 57 (investigate-mdcad-embedded-crash-when-deleting-imported-json) — IN PROGRESS
+Plan: 1 of 4
+Status: Completed 57-01 native delete hardening + crash-log diagnostics; ready for 57-02
+Last activity: 2026-05-29
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Milestone Scope
 
@@ -89,6 +89,14 @@ Recent decisions affecting current work:
 - [Phase 52]: The reusable control and minimal proof host now both target plain `net10.0`, while the Windows diagnostic harness remains Windows-targeted and continues to validate the runtime-specific path separately. — This keeps compile-time compatibility widening distinct from Windows runtime proof.
 - [Phase 53]: Consumer proof is closed only when the plain `net10.0` build proof, automated Windows preflight, and approved manual host lifecycle proof all remain separate and green. — This preserves the compile-vs-runtime support boundary for the docs and onboarding phase.
 - [Phase 54]: Docs and onboarding are only closed when README, QUICKSTART, sample defaults, and validation all point at the same compile/build-versus-runtime proof split. — This keeps milestone closeout truthful without widening runtime scope.
+- [Phase 56]: Launch snapshot, presentation mode, and unsupported-runtime truth now live in `MdCad.Embed.Core` before WPF UI work begins. — This locks parity-critical non-visual contracts in a framework-neutral assembly first.
+- [Phase 56]: Runtime resolution, canonical runtime paths, and relaunch coordination now live in `MdCad.Embed.Core` with green shared-core tests before Avalonia or WPF rewiring. — This keeps future UI stacks on one runtime-root and lifecycle truth.
+- [Phase 56]: Windows embedded launch/start-info construction and child-HWND helper logic now live in `MdCad.Embed.Core.Windows`, while Avalonia delegates to that shared seam without changing its remaining host-surface contract. — This single-sources the Windows launch boundary before WPF backend work begins.
+- [Phase 56]: The full WPF proof host should consume `MdCad.Wpf.Control` directly, bundle its proof JSONL in output, and report only host-owned runtime/lifecycle truth. — This keeps the diagnostic harness deployment-rooted and honest about the external-process boundary.
+- [Phase 56]: WPF runtime-copy proof now builds both WPF consumer hosts inside the targeted test lane and compares their copied `mdcad-runtime` payload against the canonical Avalonia-managed bundle. — This closes the runtime-copy evidence without depending on stale prebuilt outputs.
+- [Phase 56]: Phase 56 validation must keep full/minimal WPF build proof automated while reserving real child-HWND attach/stop/relaunch checks for the full diagnostic host manual row. — This preserves compile/build truth separately from real Windows runtime proof.
+- [Phase 57]: Hierarchy delete requests must collapse to live roots before undo snapshotting or teardown. — This prevents descendant-first imported deletes from replaying unsafe order through the native delete chain.
+- [Phase 57]: Embedded crash diagnostics should write one stable `mdcad-embed-crash.log` record and derive stderr summaries from the same helper. — This keeps host-visible crash detail truthful without adding IPC.
 
 ### Roadmap Evolution
 
@@ -132,10 +140,21 @@ Recent decisions affecting current work:
 - Phase 55 plan 02 completed: native launch parsing, dedicated embedded viewport-only layout persistence, and viewport-only app contract coverage are all green.
 - Phase 55 plan 03 completed: `F` now resets the camera in embedded and standalone paths, the full proof lane is green, and the committed Windows runtime bundle was refreshed to match the rebuilt native executable.
 - Phase 55 completed: viewport-only embedded startup mode and `F` camera reset are ready for phase verification.
+- Phase 56 added: Create WPF mdCAD control for net10.0-windows consumers with Avalonia-parity parameters plus full and minimal sample test projects.
+- Phase 56 plan 01 completed: `MdCad.Embed.Core` now owns launch snapshot, presentation-mode, and unsupported-runtime truth with a green standalone xUnit lane.
+- Phase 56 plan 02 completed: shared runtime resolution, canonical runtime paths, and session coordination now live in `MdCad.Embed.Core` with green shared-core tests.
+- Phase 56 plan 03 completed: shared Windows start-info construction and Win32 helper logic now live in `MdCad.Embed.Core.Windows`, and the Avalonia backend delegates to that seam with green backend proof.
+- Phase 56 plan 07 completed: the repo now has a full WPF diagnostic host with bundled proof JSONL, explicit lifecycle controls, and truthful host-owned runtime/status messaging.
+- Phase 56 plan 08 completed: the repo now has the smallest sealed WPF consumer proof host built around one project-referenced `MdCadEmbeddedControl`.
+- Phase 56 completed: WPF runtime-copy integration proof is green, the validation ledger reflects the nine-plan split, and the phase is ready for `/gsd-verify-work 56`.
+- Phase 57 added: Investigate mdCAD embedded crash when deleting imported JSONL nodes and add crash diagnostics plus surfaced crash reasons across Avalonia and WPF sample hosts.
+- Phase 57 plan 01 completed: startup-import hierarchy delete regression coverage and embedded crash-log diagnostics are green in the native proof lanes.
 
 ### Pending Todos
 
+- Run `/gsd-plan-phase 57` next to break down mdCAD crash reproduction, root-cause analysis, crash logging, and surfaced crash-reason handling across the embedded sample hosts.
 - Run `/gsd-verify-work 55` next to confirm the delivered viewport-only embedded startup mode and `F` camera reset against the phase goal.
+- Run `/gsd-verify-work 56` next to capture the manual WPF diagnostic-host lifecycle proof against the now-complete execution ledger.
 - Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
 - Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
 
@@ -163,9 +182,18 @@ Recent decisions affecting current work:
 | Phase 48 P03 | 12 min | 2 tasks | 9 files |
 | Phase 48 P04 | 7 min | 3 tasks | 5 files |
 | Phase 49 P01 | 8 min | 1 tasks | 11 files |
+| Phase 56 P01 | 15 min | 1 tasks | 11 files |
+| Phase 56 P02 | 10 min | 1 tasks | 9 files |
+| Phase 56 P03 | 4 min | 1 tasks | 9 files |
+| Phase 56 P05 | 18 min | 1 tasks | 6 files |
+| Phase 56 P06 | 53 min | 1 tasks | 12 files |
+| Phase 56 P07 | 14 min | 1 tasks | 5 files |
+| Phase 56 P08 | 8 min | 1 tasks | 6 files |
+| Phase 56 P09 | 3 min | 1 tasks | 5 files |
+| Phase 57 P01 | 18 min | 2 tasks | 8 files |
 
 ## Session Continuity
 
-Last session: 2026-05-18T19:48:13.286+01:00
-Stopped at: Phase 55 executed
-Resume file: .planning/ROADMAP.md
+Last session: 2026-05-29T11:15:21Z
+Stopped at: Completed 57-01-PLAN.md
+Resume file: None

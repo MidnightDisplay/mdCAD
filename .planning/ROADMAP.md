@@ -1,8 +1,8 @@
 # Milestone v1.9: Plain net10 Avalonia Host Compatibility
 
 **Status:** ACTIVE  
-**Phases:** 50-54, plus inserted Phase 52.1  
-**Total Plans:** 21
+**Phases:** 50-57, plus inserted Phase 52.1  
+**Total Plans:** 34
 
 ## Overview
 
@@ -16,7 +16,7 @@ The roadmap absorbs risk in the order the research recommended: first isolate th
 
 **Goal:** Isolate Windows-only placeholder, attach, resize, runtime lookup, and process-launch logic behind an internal backend seam without changing the shipped Windows runtime behavior.  
 **Depends on:** Phase 49  
-**Plans:** 3 plans  
+**Plans:** 9 plans  
 **Requirements:** WPRS-01, WPRS-02  
 **Status:** Complete
 
@@ -34,7 +34,7 @@ Plans:
 
 **Goal:** Make non-Windows behavior intentional, visible, and safe instead of relying on Windows-only seams failing implicitly.  
 **Depends on:** Phase 50  
-**Plans:** 3 plans  
+**Plans:** 9 plans  
 **Requirements:** PLAT-01, PLAT-02, PLAT-03  
 **Status:** Complete
 
@@ -133,6 +133,49 @@ Plans:
 - [x] 55-02-PLAN.md — Parse the native viewport-only flag, add dedicated embedded viewport-only layout persistence, and lock app draw/layout policy
 - [x] 55-03-PLAN.md — Add the `F` camera reset shortcut through existing shortcut seams and close Phase 55 validation (completed 2026-05-18)
 
+### Phase 56: Create WPF mdCAD control for net10.0-windows consumers with Avalonia-parity parameters plus full and minimal sample test projects
+
+**Goal:** Add a reusable `net10.0-windows` WPF mdCAD control that mirrors the Avalonia control's host-facing launch contract, preserves the Windows-only external-process child-HWND runtime/package seam, and ships both full and minimal WPF proof hosts.  
+**Requirements:** P56-01, P56-02, P56-03, P56-04  
+**Depends on:** Phase 55  
+**Plans:** 9/9 plans executed
+**Status:** Complete
+
+Plans:
+- [x] 56-01-PLAN.md — Create the first shared embed-core slice for launch snapshot and presentation/support truth
+- [x] 56-02-PLAN.md — Move runtime resolution and session coordination into the shared-core lane
+- [x] 56-03-PLAN.md — Single-source the Windows start-info builder and repoint the Avalonia backend
+- [x] 56-04-PLAN.md — Repoint the Avalonia control surface to shared-core types without public API drift
+- [x] 56-05-PLAN.md — Create the WPF control scaffold and STA-backed parity test lane
+- [x] 56-06-PLAN.md — Implement the WPF backend, `HwndHost` seam, and canonical runtime-copy wiring
+- [x] 56-07-PLAN.md — Add the full diagnostic WPF host with bundled proof-JSONL content-link
+- [x] 56-08-PLAN.md — Add the minimal sealed WPF host as the smallest consumer proof
+- [x] 56-09-PLAN.md — Close WPF runtime-copy integration proof and re-baseline the Phase 56 validation ledger
+
+**Success Criteria:**
+1. WPF consumers get the same launch/property/method surface as the Avalonia control without widening the runtime contract beyond Windows child-HWND embedding.
+2. The WPF control copies and resolves the same canonical committed `mdcad-runtime` payload and reuses the existing runtime-refresh helper instead of introducing a second toolchain or payload.
+3. The repository closes proof with both a diagnostic WPF harness and a minimal sealed WPF host, keeping compile/build truth separate from real Windows runtime proof.
+
+### Phase 57: Investigate mdCAD embedded crash when deleting imported JSONL nodes and add crash diagnostics plus surfaced crash reasons across Avalonia and WPF sample hosts
+
+**Goal:** Stop the embedded mdCAD crash triggered by deleting startup-imported JSONL nodes, emit a stable working-directory crash/error record, and surface truthful crash/log detail through the existing Avalonia/WPF embedded host seams.  
+**Requirements:** P57-01, P57-02, P57-03, P57-04, P57-05  
+**Depends on:** Phase 56  
+**Plans:** 1/4 plans executed
+**Status:** In Progress
+
+Plans:
+- [x] 57-01-PLAN.md — Fix the native startup-import delete crash and add embedded working-directory crash logging with native regression coverage
+- [ ] 57-02-PLAN.md — Surface native crash/log detail through the Avalonia backend, control, and full host
+- [ ] 57-03-PLAN.md — Surface native crash/log detail through the WPF backend, control, and full host
+- [ ] 57-04-PLAN.md — Rebaseline Phase 57 validation and close the host delete-smoke matrix
+
+**Success Criteria:**
+1. The exact startup-imported delete repro no longer crashes mdCAD in embedded mode, including the materially different startup JSONL modes.
+2. Embedded failures write a stable working-directory crash/error record and reuse the existing stderr/unexpected-session-loss seam instead of introducing new IPC.
+3. Avalonia and WPF full/minimal host proof stays truthful: automated lanes cover diagnostics propagation, and manual rows confirm the shipped host delete smoke matrix.
+
 ## Progress
 
 | Phase | Status | Plans | Progress |
@@ -144,6 +187,8 @@ Plans:
 | 53 | ✓ | 3/3 complete | 100% |
 | 54 | ✓ | 3/3 complete | 100% |
 | 55 | 3/3 | Complete   | 2026-05-18 |
+| 56 | 9/9 | Complete   | 100% |
+| 57 | 1/4 | In Progress | 25% |
 
 ## Coverage
 
@@ -152,4 +197,4 @@ Plans:
 
 ## Next Step
 
-- Run `/gsd-verify-work 55`
+- Run `/gsd-execute-phase 57`
