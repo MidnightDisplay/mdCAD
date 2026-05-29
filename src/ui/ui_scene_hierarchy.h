@@ -968,6 +968,95 @@ static inline ecs_entity_t ui_scene_hierarchy_find_refreshing_flat_anchor(ui_sce
     return 0;
 }
 
+static inline bool ui_scene_hierarchy_entity_is_descendant_of(ui_scene_hierarchy_state_t *state,
+                                                              ecs_entity_t entity,
+                                                              ecs_entity_t ancestor) {
+    if (!state || !state->scene || entity == 0 || ancestor == 0 || entity == ancestor) return false;
+    ecs_entity_t current = scene_get_parent(state->scene, entity);
+    while (current != 0 && ecs_is_alive(state->scene->world->world, current)) {
+        if (current == ancestor) return true;
+        current = scene_get_parent(state->scene, current);
+    }
+    return false;
+}
+
+static inline bool ui_scene_hierarchy_delete_root_list_contains(ui_scene_hierarchy_state_t *state,
+                                                                const ecs_entity_t *roots,
+                                                                int root_count,
+                                                                ecs_entity_t entity) {
+    if (!state || !roots || root_count <= 0 || entity == 0) return false;
+    for (int i = 0; i < root_count; i++) {
+        if (roots[i] == entity) return true;
+    }
+    return false;
+}
+
+static inline void ui_scene_hierarchy_delete_root_list_remove_descendants(ui_scene_hierarchy_state_t *state,
+                                                                          ecs_entity_t *roots,
+                                                                          int *root_count,
+                                                                          ecs_entity_t ancestor) {
+    if (!state || !roots || !root_count || *root_count <= 0 || ancestor == 0) return;
+    for (int i = 0; i < *root_count; ) {
+        if (ui_scene_hierarchy_entity_is_descendant_of(state, roots[i], ancestor)) {
+            roots[i] = roots[*root_count - 1];
+            (*root_count)--;
+            continue;
+        }
+        i++;
+    }
+}
+
+static inline bool ui_scene_hierarchy_collect_delete_roots(ui_scene_hierarchy_state_t *state,
+                                                           const ecs_entity_t *entities,
+                                                           int count,
+                                                           ecs_entity_t **out_roots,
+                                                           int *out_root_count) {
+    if (!out_roots || !out_root_count) return false;
+    *out_roots = NULL;
+    *out_root_count = 0;
+    if (!state || !state->scene || !entities || count <= 0) return true;
+
+    ecs_entity_t *roots = (ecs_entity_t*)malloc(sizeof(ecs_entity_t) * (size_t)count);
+    if (!roots) return false;
+
+    int root_count = 0;
+    for (int i = 0; i < count; i++) {
+        ecs_entity_t candidate = entities[i];
+        if (candidate == 0 || !ecs_is_alive(state->scene->world->world, candidate)) continue;
+
+        bool covered_by_existing_root = false;
+        for (int root_index = 0; root_index < root_count; root_index++) {
+            if (roots[root_index] == candidate ||
+                ui_scene_hierarchy_entity_is_descendant_of(state, candidate, roots[root_index])) {
+                covered_by_existing_root = true;
+                break;
+            }
+        }
+        if (covered_by_existing_root) continue;
+
+        ui_scene_hierarchy_delete_root_list_remove_descendants(state, roots, &root_count, candidate);
+        if (!ui_scene_hierarchy_delete_root_list_contains(state, roots, root_count, candidate)) {
+            roots[root_count++] = candidate;
+        }
+    }
+
+    *out_roots = roots;
+    *out_root_count = root_count;
+    return true;
+}
+
+static inline void ui_scene_hierarchy_selection_remove_subtree(ui_scene_hierarchy_state_t *state,
+                                                               ecs_entity_t root) {
+    if (!state || !state->selection || root == 0) return;
+    selection_remove(state->selection, root);
+    for (int i = selection_count(state->selection) - 1; i >= 0; i--) {
+        ecs_entity_t selected = selection_get(state->selection, i);
+        if (selected != 0 && ui_scene_hierarchy_entity_is_descendant_of(state, selected, root)) {
+            selection_remove(state->selection, selected);
+        }
+    }
+}
+
 static inline bool ui_scene_hierarchy_is_under_refreshing_flat_anchor(ui_scene_hierarchy_state_t *state,
                                                                        ecs_entity_t e) {
     ecs_entity_t refresh_anchor = ui_scene_hierarchy_find_refreshing_flat_anchor(state, e);
@@ -979,27 +1068,57 @@ static inline void ui_scene_hierarchy_delete_entities(ui_scene_hierarchy_state_t
                                                       int count) {
     if (!state || !state->scene || !entities || count <= 0) return;
 
-    if (state->undo_redo) {
-        undo_cmd_bulk_delete_entities(state->undo_redo, (ecs_entity_t*)entities, count);
+    ecs_entity_t *delete_roots = NULL;
+    int delete_root_count = 0;
+    if (!ui_scene_hierarchy_collect_delete_roots(state, entities, count, &delete_roots, &delete_root_count)) {
+        return;
+    }
+    if (delete_root_count <= 0) {
+        if (delete_roots) free(delete_roots);
+        return;
     }
 
-    for (int i = 0; i < count; i++) {
-        ecs_entity_t e = entities[i];
+    if (state->undo_redo) {
+        undo_cmd_bulk_delete_entities(state->undo_redo, delete_roots, delete_root_count);
+    }
+
+    ecs_entity_t *canceled_observer_roots = (ecs_entity_t*)calloc((size_t)delete_root_count, sizeof(ecs_entity_t));
+    int canceled_observer_root_count = 0;
+
+    for (int i = 0; i < delete_root_count; i++) {
+        ecs_entity_t e = delete_roots[i];
         if (e == 0 || !ecs_is_alive(state->scene->world->world, e)) continue;
 
-        ecs_entity_t refresh_anchor = ui_scene_hierarchy_find_refreshing_flat_anchor(state, e);
-        jsonl_observer_cancel_flat_refresh_for_root(state->scene, refresh_anchor != 0 ? refresh_anchor : e);
-
-        if (state->selection) {
-            selection_remove(state->selection, e);
+        ecs_entity_t observer_root = jsonl_observer_find_root_for_entity(state->scene, e);
+        if (observer_root != 0 &&
+            jsonl_observer_is_flat_refresh_running(state->scene, observer_root)) {
+            bool already_canceled = false;
+            for (int canceled_index = 0; canceled_index < canceled_observer_root_count; canceled_index++) {
+                if (canceled_observer_roots[canceled_index] == observer_root) {
+                    already_canceled = true;
+                    break;
+                }
+            }
+            if (!already_canceled) {
+                jsonl_observer_cancel_flat_refresh_for_root(state->scene, observer_root);
+                if (canceled_observer_roots) {
+                    canceled_observer_roots[canceled_observer_root_count++] = observer_root;
+                }
+            }
         }
-        scene_remove_entity(state->scene, e);
+
+        ui_scene_hierarchy_selection_remove_subtree(state, e);
+        if (ecs_is_alive(state->scene->world->world, e)) {
+            scene_remove_entity(state->scene, e);
+        }
     }
 
     if (state->selection) {
         selection_prune_dead(state->selection);
     }
     state->cache_dirty = true;
+    if (canceled_observer_roots) free(canceled_observer_roots);
+    free(delete_roots);
 }
 
 //------------------------------------------------------------------------------

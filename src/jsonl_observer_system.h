@@ -42,6 +42,19 @@ static inline bool jsonl_observer_is_descendant_of(ecs_scene_t *scene,
     return false;
 }
 
+static inline ecs_entity_t jsonl_observer_find_root_for_entity(ecs_scene_t *scene,
+                                                               ecs_entity_t entity) {
+    if (!scene || entity == 0) return 0;
+    ecs_entity_t current = entity;
+    while (current != 0 && ecs_is_alive(scene->world->world, current)) {
+        if (ecs_world_get_jsonl_observer(scene->world, current)) {
+            return current;
+        }
+        current = scene_get_parent(scene, current);
+    }
+    return 0;
+}
+
 static inline bool jsonl_observer_selected_descendant_replaced(const jsonl_flat_refresh_slot_t *slot,
                                                                ecs_scene_t *scene) {
     if (!slot || !slot->selection || !scene || slot->target_root == 0) return false;
@@ -774,4 +787,3 @@ static inline void jsonl_observer_system_tick(ecs_scene_t *scene,
 }
 
 #endif // JSONL_OBSERVER_SYSTEM_H
-
