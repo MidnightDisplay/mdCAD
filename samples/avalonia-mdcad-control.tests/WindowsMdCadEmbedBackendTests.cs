@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
 using MdCad.Avalonia.Control.Host;
 using MdCad.Avalonia.Control.Host.Windows;
@@ -138,10 +139,62 @@ public sealed class WindowsMdCadEmbedBackendTests
         }
     }
 
+
+    [Fact]
+    public void NativeFailureSummary_IsCapturedFromStableEmbeddedSummaryLine()
+    {
+        const string summary = "Embedded startup failure: bad parent hwnd. See mdcad-embed-crash.log";
+
+        Assert.Equal(summary, InvokeTryCaptureEmbeddedFailureSummary(summary));
+    }
+
+    [Fact]
+    public void UnexpectedSessionLoss_PrefersCapturedNativeFailureSummary()
+    {
+        const string capturedSummary =
+            "Embedded runtime failure: mdCAD terminated with an unhandled embedded exception (exception=0xC0000005). See mdcad-embed-crash.log";
+
+        string detail = InvokeBuildUnexpectedSessionLossDetail(
+            capturedSummary,
+            "mdCAD exited after attach.",
+            exitCode: 11);
+
+        Assert.Equal(capturedSummary, detail);
+    }
+
+    [Fact]
+    public void UnexpectedSessionLoss_FallsBackToTruthfulExitStateWhenNoFailureSummaryWasObserved()
+    {
+        string detail = InvokeBuildUnexpectedSessionLossDetail(
+            capturedFailureLine: null,
+            fallbackDetail: "mdCAD exited after attach.",
+            exitCode: 11);
+
+        Assert.Equal("mdCAD exited after attach (exit code 11).", detail);
+    }
     private static string CreateReadableJsonlPath()
     {
         string path = Path.Combine(Path.GetTempPath(), $"mdcad-launch-{Guid.NewGuid():N}.jsonl");
         File.WriteAllText(path, "{}");
         return path;
+    }
+    private static string? InvokeTryCaptureEmbeddedFailureSummary(string? data)
+    {
+        MethodInfo method = typeof(WindowsMdCadEmbedBackend).GetMethod(
+            "TryCaptureEmbeddedFailureSummary",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Missing TryCaptureEmbeddedFailureSummary.");
+
+        return (string?)method.Invoke(null, [data]);
+    }
+
+    private static string InvokeBuildUnexpectedSessionLossDetail(string? capturedFailureLine, string fallbackDetail, int? exitCode)
+    {
+        MethodInfo method = typeof(WindowsMdCadEmbedBackend).GetMethod(
+            "BuildUnexpectedSessionLossDetail",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Missing BuildUnexpectedSessionLossDetail.");
+
+        return Assert.IsType<string>(method.Invoke(null, [capturedFailureLine, fallbackDetail, exitCode]));
     }
 }
