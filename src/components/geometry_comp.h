@@ -343,14 +343,27 @@ static inline void geom_mesh_init(geom_mesh_data_t *m, int vertex_capacity, int 
 
 static inline int geom_mesh_add_vertex(geom_mesh_data_t *m, vec3_t pos) {
     if (m->vertex_count >= m->vertex_capacity) {
-        m->vertex_capacity *= 2;
-        m->vertices = (vec3_t*)realloc(m->vertices, sizeof(vec3_t) * m->vertex_capacity);
+        int new_capacity = (m->vertex_capacity > 0) ? (m->vertex_capacity * 2) : 1;
+        vec3_t *new_vertices = (vec3_t*)realloc(m->vertices, sizeof(vec3_t) * new_capacity);
+        if (!new_vertices) {
+            return -1;
+        }
+        m->vertices = new_vertices;
         if (m->vertex_colors) {
-            m->vertex_colors = (vec4_t*)realloc(m->vertex_colors, sizeof(vec4_t) * m->vertex_capacity);
+            vec4_t *new_vertex_colors = (vec4_t*)realloc(m->vertex_colors, sizeof(vec4_t) * new_capacity);
+            if (!new_vertex_colors) {
+                return -1;
+            }
+            m->vertex_colors = new_vertex_colors;
         }
         if (m->normals) {
-            m->normals = (vec3_t*)realloc(m->normals, sizeof(vec3_t) * m->vertex_capacity);
+            vec3_t *new_normals = (vec3_t*)realloc(m->normals, sizeof(vec3_t) * new_capacity);
+            if (!new_normals) {
+                return -1;
+            }
+            m->normals = new_normals;
         }
+        m->vertex_capacity = new_capacity;
     }
     int idx = m->vertex_count;
     m->vertices[idx] = pos;
@@ -360,8 +373,13 @@ static inline int geom_mesh_add_vertex(geom_mesh_data_t *m, vec3_t pos) {
 
 static inline void geom_mesh_add_triangle(geom_mesh_data_t *m, uint32_t i0, uint32_t i1, uint32_t i2) {
     if (m->index_count + 3 > m->index_capacity) {
-        m->index_capacity *= 2;
-        m->indices = (uint32_t*)realloc(m->indices, sizeof(uint32_t) * m->index_capacity);
+        int new_capacity = (m->index_capacity > 0) ? (m->index_capacity * 2) : 3;
+        uint32_t *new_indices = (uint32_t*)realloc(m->indices, sizeof(uint32_t) * new_capacity);
+        if (!new_indices) {
+            return;
+        }
+        m->indices = new_indices;
+        m->index_capacity = new_capacity;
     }
     m->indices[m->index_count++] = i0;
     m->indices[m->index_count++] = i1;

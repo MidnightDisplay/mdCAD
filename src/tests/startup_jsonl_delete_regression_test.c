@@ -78,8 +78,16 @@ static ecs_entity_t ensure_imported_child_under_root(ecs_scene_t *scene, ecs_ent
     if (child != 0) {
         return child;
     }
-    child = scene_add_anchor(scene, "Imported Child", "startup-imported delete fixture child");
+    child = ecs_world_create_entity(scene->world);
     if (child != 0) {
+        vec3_t vertices[3] = {
+            { 0.0f, 0.0f, 0.0f },
+            { 1.0f, 0.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f }
+        };
+        uint32_t indices[3] = { 0u, 1u, 2u };
+        GeometryComp mesh = geometry_comp_mesh(vertices, 3, indices, 3, NULL, (vec4_t){ 0.8f, 0.8f, 0.8f, 1.0f });
+        ecs_world_set_geometry(scene->world, child, &mesh);
         scene_set_parent(scene, child, root);
     }
     return child;

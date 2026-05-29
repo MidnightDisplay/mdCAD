@@ -108,19 +108,43 @@ static inline undo_entity_snapshot_t undo_snapshot_entity(ecs_scene_t *scene, ec
                 geom_mesh_data_t *mesh = &g->data.mesh;
                 snap.data.mesh.vertex_count = mesh->vertex_count;
                 snap.data.mesh.index_count = mesh->index_count;
-                snap.data.mesh.vertices = (vec3_t*)malloc(sizeof(vec3_t) * mesh->vertex_count);
-                memcpy(snap.data.mesh.vertices, mesh->vertices, sizeof(vec3_t) * mesh->vertex_count);
-                snap.data.mesh.indices = (uint32_t*)malloc(sizeof(uint32_t) * mesh->index_count);
-                memcpy(snap.data.mesh.indices, mesh->indices, sizeof(uint32_t) * mesh->index_count);
-                if (mesh->normals) {
-                    snap.data.mesh.normals = (vec3_t*)malloc(sizeof(vec3_t) * mesh->vertex_count);
-                    memcpy(snap.data.mesh.normals, mesh->normals, sizeof(vec3_t) * mesh->vertex_count);
+                snap.data.mesh.vertices = NULL;
+                snap.data.mesh.indices = NULL;
+                snap.data.mesh.normals = NULL;
+                snap.data.mesh.vertex_colors = NULL;
+                if (mesh->vertex_count > 0 && mesh->vertices) {
+                    snap.data.mesh.vertices = (vec3_t*)malloc(sizeof(vec3_t) * (size_t)mesh->vertex_count);
+                    if (snap.data.mesh.vertices) {
+                        memcpy(snap.data.mesh.vertices,
+                               mesh->vertices,
+                               sizeof(vec3_t) * (size_t)mesh->vertex_count);
+                    }
+                }
+                if (mesh->index_count > 0 && mesh->indices) {
+                    snap.data.mesh.indices = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)mesh->index_count);
+                    if (snap.data.mesh.indices) {
+                        memcpy(snap.data.mesh.indices,
+                               mesh->indices,
+                               sizeof(uint32_t) * (size_t)mesh->index_count);
+                    }
+                }
+                if (mesh->vertex_count > 0 && mesh->normals) {
+                    snap.data.mesh.normals = (vec3_t*)malloc(sizeof(vec3_t) * (size_t)mesh->vertex_count);
+                    if (snap.data.mesh.normals) {
+                        memcpy(snap.data.mesh.normals,
+                               mesh->normals,
+                               sizeof(vec3_t) * (size_t)mesh->vertex_count);
+                    }
                 } else {
                     snap.data.mesh.normals = NULL;
                 }
-                if (mesh->vertex_colors) {
-                    snap.data.mesh.vertex_colors = (vec4_t*)malloc(sizeof(vec4_t) * mesh->vertex_count);
-                    memcpy(snap.data.mesh.vertex_colors, mesh->vertex_colors, sizeof(vec4_t) * mesh->vertex_count);
+                if (mesh->vertex_count > 0 && mesh->vertex_colors) {
+                    snap.data.mesh.vertex_colors = (vec4_t*)malloc(sizeof(vec4_t) * (size_t)mesh->vertex_count);
+                    if (snap.data.mesh.vertex_colors) {
+                        memcpy(snap.data.mesh.vertex_colors,
+                               mesh->vertex_colors,
+                               sizeof(vec4_t) * (size_t)mesh->vertex_count);
+                    }
                 } else {
                     snap.data.mesh.vertex_colors = NULL;
                 }
