@@ -319,6 +319,18 @@ if(MDCAD_NATIVE_DESKTOP)
     )
     add_test(NAME startup_jsonl_app_contract_test COMMAND startup_jsonl_app_contract_test)
 
+    add_executable(win32_embed_diagnostics_test tests/win32_embed_diagnostics_test.c)
+    target_compile_features(win32_embed_diagnostics_test PRIVATE c_std_11)
+    target_include_directories(win32_embed_diagnostics_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/cglm/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendors/flecs
+        ${MDCAD_LIBSOKOL_INCLUDE_DIRS}
+        ${MDCAD_LIBCIMGUI_INCLUDE_DIRS}
+    )
+    target_link_libraries(win32_embed_diagnostics_test PRIVATE libsokol libcimgui flecs_static cjson)
+    add_test(NAME win32_embed_diagnostics_test COMMAND win32_embed_diagnostics_test)
+
     add_executable(jsonl_flat_observer_manual_refresh_test tests/jsonl_flat_observer_manual_refresh_test.c)
     target_compile_features(jsonl_flat_observer_manual_refresh_test PRIVATE c_std_11)
     target_include_directories(jsonl_flat_observer_manual_refresh_test PRIVATE
