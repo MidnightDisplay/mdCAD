@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
 status: executing
-stopped_at: Completed 57-03-PLAN.md
-last_updated: "2026-05-29T12:13:35Z"
+stopped_at: Completed 57-02-PLAN.md
+last_updated: "2026-05-29T12:19:36.231Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 34
-  completed_plans: 32
+  completed_plans: 33
   percent: 89
 ---
 
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 ## Current Position
 
 Phase: 57 (investigate-mdcad-embedded-crash-when-deleting-imported-json) — IN PROGRESS
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-05-29
 
-Progress: [█████████░] 94%
+Progress: [██████████] 97%
 
 ## Milestone Scope
 
@@ -99,6 +99,9 @@ Recent decisions affecting current work:
 - [Phase 57]: Embedded crash diagnostics should write one stable `mdcad-embed-crash.log` record and derive stderr summaries from the same helper. — This keeps host-visible crash detail truthful without adding IPC.
 - [Phase 57]: The WPF backend now reuses the native stderr/log summary line when available instead of inventing a crash cause from host state.
 - [Phase 57]: MdCadEmbeddedControl keeps SetLaunchWarning as the single warning source of truth, while the full host only mirrors the already-observed detail.
+- [Phase 57]: Kept Avalonia crash-detail surfacing on the stderr plus UnexpectedSessionLoss seam.
+- [Phase 57]: Exposed a read-only UnexpectedSessionLossDetail property plus event while keeping warning ownership inside MdCadEmbeddedControl.
+- [Phase 57]: Added samples/avalonia-host.tests/NuGet.Config so the new host lane restores from nuget.org-only sources.
 
 ### Roadmap Evolution
 
@@ -194,9 +197,10 @@ Recent decisions affecting current work:
 | Phase 56 P09 | 3 min | 1 tasks | 5 files |
 | Phase 57 P01 | 18 min | 2 tasks | 8 files |
 | Phase 57 P03 | 3110 | 2 tasks | 20 files |
+| Phase 57 P02 | 51min | 2 tasks | 9 files |
 
 ## Session Continuity
 
-Last session: 2026-05-29T11:36:50.557Z
-Stopped at: Completed 57-01-PLAN.md
+Last session: 2026-05-29T12:19:36.223Z
+Stopped at: Completed 57-02-PLAN.md
 Resume file: None
