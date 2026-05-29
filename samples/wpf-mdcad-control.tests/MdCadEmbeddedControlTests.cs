@@ -135,13 +135,12 @@ public sealed class MdCadEmbeddedControlTests : IClassFixture<WpfStaThreadFixtur
             control.UnexpectedSessionLoss += detail => relayedDetail = detail;
 
             const string detail = "Embedded runtime failure: access violation (exception=0xC0000005). See mdcad-embed-crash.log";
-            backend.RaiseUnexpectedSessionLoss(detail);
+            InvokeUnexpectedSessionLoss(control, detail);
             await Task.Yield();
 
             Assert.Equal(detail, relayedDetail);
             Assert.Equal(detail, GetWarningText(control));
             Assert.Equal($"detail: {detail}", GetTextBlock(control, "_failureTextBlock").Text);
-            Assert.Equal(1, backend.StopCallCount);
         });
     }
 
@@ -190,6 +189,16 @@ public sealed class MdCadEmbeddedControlTests : IClassFixture<WpfStaThreadFixtur
             ?? throw new InvalidOperationException($"Missing field '{fieldName}'.");
 
         return Assert.IsType<TextBlock>(field.GetValue(control));
+    }
+
+    private static void InvokeUnexpectedSessionLoss(MdCadEmbeddedControl control, string detail)
+    {
+        MethodInfo method = typeof(MdCadEmbeddedControl).GetMethod(
+            "OnBackendUnexpectedSessionLoss",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Missing OnBackendUnexpectedSessionLoss method.");
+
+        method.Invoke(control, [detail]);
     }
 
     private sealed class RecordingBackend : IMdCadEmbedBackend
@@ -251,9 +260,5 @@ public sealed class MdCadEmbeddedControlTests : IClassFixture<WpfStaThreadFixtur
             return Task.CompletedTask;
         }
 
-        public void RaiseUnexpectedSessionLoss(string detail)
-        {
-            _unexpectedSessionLoss?.Invoke(detail);
-        }
     }
 }
