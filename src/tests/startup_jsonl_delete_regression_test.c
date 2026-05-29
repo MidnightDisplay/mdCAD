@@ -330,6 +330,65 @@ static int test_startup_import_root_delete_cancels_active_refresh(void) {
     return failed;
 }
 
+static int test_startup_import_root_delete_forgets_controller_root(void) {
+    const char *relative_fixture = "startup_jsonl_delete_root_controller_cleanup.jsonl";
+    char absolute_fixture[MDCAD_STARTUP_JSONL_PATH_MAX] = {0};
+    if (!write_startup_jsonl_fixture(relative_fixture)) return 1;
+    if (!make_absolute_path(relative_fixture, absolute_fixture, sizeof(absolute_fixture))) {
+        remove(relative_fixture);
+        return 1;
+    }
+
+    ecs_world_state_t world = {0};
+    ecs_scene_t scene = {0};
+    selection_buffer_t selection = {0};
+    undo_redo_t undo = {0};
+    ui_scene_hierarchy_state_t hierarchy = {0};
+    startup_jsonl_import_controller_t controller = {0};
+    int failed = 0;
+
+    ecs_world_init(&world);
+    memset(&scene, 0, sizeof(scene));
+    scene.world = &world;
+    scene.visible = true;
+    selection_init(&selection, &world);
+    undo_redo_init(&undo, &scene, 16);
+    undo_redo_set_selection(&undo, &selection);
+    ui_scene_hierarchy_init(&hierarchy, &selection, &scene);
+    ui_scene_hierarchy_set_undo_redo(&hierarchy, &undo);
+
+    if (!run_startup_import(&scene, absolute_fixture, 0, &controller)) {
+        fprintf(stderr, "  fail: startup import did not complete for controller cleanup test\n");
+        failed = 1;
+    }
+
+    ecs_entity_t root = controller.job.root_entity;
+    ecs_entity_t child = failed ? 0 : ensure_imported_child_under_root(&scene, root);
+    if (!failed && (root == 0 || child == 0)) {
+        fprintf(stderr, "  fail: expected root/child for controller cleanup root=%llu child=%llu\n",
+                (unsigned long long)root, (unsigned long long)child);
+        failed = 1;
+    }
+
+    if (!failed) {
+        ui_scene_hierarchy_delete_entities(&hierarchy, &root, 1);
+        startup_jsonl_import_controller_forget_deleted_root(&controller, &scene);
+
+        if (controller.job.root_entity != 0) {
+            fprintf(stderr, "  fail: controller kept deleted startup root root=%llu\n",
+                    (unsigned long long)controller.job.root_entity);
+            failed = 1;
+        }
+    }
+
+    ui_scene_hierarchy_shutdown(&hierarchy);
+    undo_redo_shutdown(&undo);
+    selection_shutdown(&selection);
+    ecs_world_shutdown(&world);
+    remove(relative_fixture);
+    return failed;
+}
+
 typedef int (*test_fn_t)(void);
 typedef struct {
     const char *name;
@@ -350,6 +409,7 @@ int main(void) {
         { "test_startup_import_child_delete_live_refresh", test_startup_import_child_delete_live_refresh },
         { "test_startup_import_bulk_delete_canonicalizes_root_order", test_startup_import_bulk_delete_canonicalizes_root_order },
         { "test_startup_import_root_delete_cancels_active_refresh", test_startup_import_root_delete_cancels_active_refresh },
+        { "test_startup_import_root_delete_forgets_controller_root", test_startup_import_root_delete_forgets_controller_root },
     };
 
     stm_setup();

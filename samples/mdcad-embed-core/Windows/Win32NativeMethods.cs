@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 
-namespace MdCad.Avalonia.Control.Host;
+namespace MdCad.Embed.Core.Windows;
 
-internal static class Win32NativeMethods
+public static class Win32NativeMethods
 {
     private const uint WsChild = 0x40000000;
     private const uint WsVisible = 0x10000000;
@@ -63,6 +63,29 @@ internal static class Win32NativeMethods
         width = rect.Right - rect.Left;
         height = rect.Bottom - rect.Top;
         return true;
+    }
+
+    public static IntPtr FindChildWindowForProcess(IntPtr parentHwnd, int processId)
+    {
+        if (!OperatingSystem.IsWindows() || parentHwnd == IntPtr.Zero || !IsWindow(parentHwnd))
+        {
+            return IntPtr.Zero;
+        }
+
+        IntPtr matchedChild = IntPtr.Zero;
+        EnumChildWindows(parentHwnd, (hwnd, _) =>
+        {
+            GetWindowThreadProcessId(hwnd, out uint windowProcessId);
+            if (windowProcessId == (uint)processId)
+            {
+                matchedChild = hwnd;
+                return false;
+            }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return matchedChild;
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

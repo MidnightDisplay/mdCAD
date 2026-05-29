@@ -10,7 +10,8 @@
   <Grid Margin="12">
     <mdcad:MdCadEmbeddedControl PresentationMode="Sealed"
                                 AutoStart="True"
-                                ViewportOnlyStartupMode="True"
+                                ViewportOnlyStartupMode="False"
+                                StartupLiveRefreshEnabled="False"
                                 JsonlPath="{Binding JsonlPath}" />
   </Grid>
 </Window>

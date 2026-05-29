@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Platform;
 
+using MdCad.Embed.Core.Windows;
+
 namespace MdCad.Avalonia.Control.Host;
 
 internal sealed class EmbedNativeControlHost : NativeControlHost

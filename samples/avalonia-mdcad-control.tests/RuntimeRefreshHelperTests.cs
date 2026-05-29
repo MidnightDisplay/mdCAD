@@ -196,7 +196,7 @@ public sealed class RuntimeRefreshHelperTests
             Assert.Equal("fresh-mdcad", File.ReadAllText(runtimeExecutablePath));
             Assert.Equal("fresh-mdcad", File.ReadAllText(outputExecutablePath));
             Assert.Equal("runtime-seed", File.ReadAllText(runtimeIniPath));
-            Assert.Equal("output-state", File.ReadAllText(outputIniPath));
+            Assert.Equal("runtime-seed", File.ReadAllText(outputIniPath));
         }
         finally
         {

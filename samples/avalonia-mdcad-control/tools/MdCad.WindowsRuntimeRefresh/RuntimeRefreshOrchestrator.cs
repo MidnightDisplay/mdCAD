@@ -117,7 +117,7 @@ public sealed class RuntimeRefreshOrchestrator
         CopyExecutable(plan.SourceExecutablePath, plan.RuntimeExecutablePath);
         if (plan.OutputExecutablePath is not null)
         {
-            CopyExecutable(plan.SourceExecutablePath, plan.OutputExecutablePath);
+            CopyRuntimeBundle(options.RuntimeDirectory, options.OutputRuntimeDirectory!);
         }
 
         return new RuntimeRefreshResult(
@@ -136,6 +136,24 @@ public sealed class RuntimeRefreshOrchestrator
 
         Directory.CreateDirectory(targetDirectory);
         File.Copy(sourceExecutablePath, targetExecutablePath, overwrite: true);
+    }
+
+    private static void CopyRuntimeBundle(string sourceRuntimeDirectory, string targetRuntimeDirectory)
+    {
+        Directory.CreateDirectory(targetRuntimeDirectory);
+
+        foreach (string sourceFilePath in Directory.EnumerateFiles(sourceRuntimeDirectory, "*", SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourceRuntimeDirectory, sourceFilePath);
+            string targetFilePath = Path.Combine(targetRuntimeDirectory, relativePath);
+            string? targetDirectory = Path.GetDirectoryName(targetFilePath);
+            if (!string.IsNullOrEmpty(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            File.Copy(sourceFilePath, targetFilePath, overwrite: true);
+        }
     }
 
     private static async Task<int> RunProcessAsync(ProcessStartInfo startInfo, CancellationToken cancellationToken)

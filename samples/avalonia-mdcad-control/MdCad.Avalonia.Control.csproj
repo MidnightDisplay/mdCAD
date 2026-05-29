@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\mdcad-embed-core\MdCad.Embed.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="tools\**\*.cs" />
   </ItemGroup>
 

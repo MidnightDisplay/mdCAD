@@ -36,6 +36,22 @@ static inline void startup_jsonl_import_controller_init(startup_jsonl_import_con
     controller->state = STARTUP_JSONL_IMPORT_IDLE;
 }
 
+static inline void startup_jsonl_import_controller_forget_deleted_root(startup_jsonl_import_controller_t *controller,
+                                                                       ecs_scene_t *scene) {
+    if (!controller || !scene || !scene->world) {
+        return;
+    }
+    if (controller->state != STARTUP_JSONL_IMPORT_COMPLETE) {
+        return;
+    }
+
+    ecs_entity_t root_entity = controller->job.root_entity;
+    if (root_entity != 0 && !ecs_is_alive(scene->world->world, root_entity)) {
+        controller->job.root_entity = 0;
+        controller->status_text[0] = '\0';
+    }
+}
+
 static inline bool startup_jsonl_import_controller_arm(startup_jsonl_import_controller_t *controller,
                                                        const char *path,
                                                        bool live_refresh_enabled) {
@@ -57,6 +73,9 @@ static inline bool startup_jsonl_import_controller_tick(startup_jsonl_import_con
         return false;
     }
     controller->scene_dirty = false;
+    if (scene) {
+        startup_jsonl_import_controller_forget_deleted_root(controller, scene);
+    }
     if (controller->state == STARTUP_JSONL_IMPORT_IDLE ||
         controller->state == STARTUP_JSONL_IMPORT_COMPLETE ||
         controller->state == STARTUP_JSONL_IMPORT_ERROR) {

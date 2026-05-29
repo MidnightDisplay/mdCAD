@@ -5,10 +5,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <MdCadRefreshWindowsRuntime>true</MdCadRefreshWindowsRuntime>
+    <MdCadRuntimeRefreshHelperProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\avalonia-mdcad-control\tools\MdCad.WindowsRuntimeRefresh\MdCad.WindowsRuntimeRefresh.csproj'))</MdCadRuntimeRefreshHelperProject>
+    <MdCadRuntimeRefreshRepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</MdCadRuntimeRefreshRepoRoot>
+    <MdCadRuntimeRefreshBuildDir Condition="'$(MdCadRuntimeRefreshBuildDir)' == ''">$([System.IO.Path]::GetFullPath('$(MdCadRuntimeRefreshRepoRoot)\build-vulkan'))</MdCadRuntimeRefreshBuildDir>
+    <MdCadRuntimeRefreshConfiguration Condition="'$(MdCadRuntimeRefreshConfiguration)' == ''">Release</MdCadRuntimeRefreshConfiguration>
+    <MdCadCommittedRuntimeDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\avalonia-mdcad-control\runtime\win-x64'))</MdCadCommittedRuntimeDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\wpf-mdcad-control\MdCad.Wpf.Control.csproj" />
+    <ProjectReference Include="..\wpf-mdcad-control\MdCad.Wpf.Control.csproj">
+      <AdditionalProperties>MdCadRefreshWindowsRuntime=true</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -17,4 +25,17 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <Target Name="RefreshPinnedWindowsRuntime"
+          AfterTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' and '$(DesignTimeBuild)' != 'true' and '$(MdCadRefreshWindowsRuntime)' == 'true'">
+    <PropertyGroup>
+      <_MdCadOutputRuntimeDir>$([System.IO.Path]::GetFullPath('$(TargetDir)mdcad-runtime'))</_MdCadOutputRuntimeDir>
+    </PropertyGroup>
+
+    <Message Text="Refreshing mdCAD runtime bundle through MdCad.WindowsRuntimeRefresh." Importance="high" />
+
+    <Exec Command='dotnet run --project &quot;$(MdCadRuntimeRefreshHelperProject)&quot; -c &quot;$(Configuration)&quot; -- --repo-root &quot;$(MdCadRuntimeRefreshRepoRoot)&quot; --build-dir &quot;$(MdCadRuntimeRefreshBuildDir)&quot; --runtime-dir &quot;$(MdCadCommittedRuntimeDir)&quot; --output-runtime-dir &quot;$(_MdCadOutputRuntimeDir)&quot; --configuration &quot;$(MdCadRuntimeRefreshConfiguration)&quot;'
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
 </Project>

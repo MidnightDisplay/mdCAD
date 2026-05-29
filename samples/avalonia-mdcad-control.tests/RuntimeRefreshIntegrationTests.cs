@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 
@@ -7,32 +8,87 @@ namespace MdCad.Avalonia.Control.Tests;
 
 public sealed class RuntimeRefreshIntegrationTests
 {
+    private static readonly Lazy<RuntimeIntegrationArtifacts> Artifacts = new(CreateArtifacts);
+
     [Fact]
-    public void RuntimeRefresh_HostOutputExecutableMatchesBuildAndCommittedRuntime()
+    public void RuntimeRefresh_FullHostOutputExecutableMatchesBuildAndCommittedRuntime()
     {
         Assert.True(OperatingSystem.IsWindows(), "Runtime refresh integration tests require Windows.");
 
-        string repoRoot = FindRepoRoot();
-        string sourceExecutablePath = Path.Combine(repoRoot, "build-vulkan", "bin", "Release", "mdCAD.exe");
-        string committedExecutablePath = Path.Combine(repoRoot, "samples", "avalonia-mdcad-control", "runtime", "win-x64", "mdCAD.exe");
-        string hostRuntimeRoot = GetHostRuntimeRoot(repoRoot);
-        string hostExecutablePath = Path.Combine(hostRuntimeRoot, "mdCAD.exe");
+        RuntimeIntegrationArtifacts artifacts = Artifacts.Value;
 
-        string sourceHash = GetFileHash(sourceExecutablePath);
-        string committedHash = GetFileHash(committedExecutablePath);
-        string hostHash = GetFileHash(hostExecutablePath);
-
-        Assert.Equal(sourceHash, committedHash);
-        Assert.Equal(sourceHash, hostHash);
+        AssertCanonicalRuntimeBundle(
+            Path.Combine(artifacts.FullHostBaseDirectory, "mdcad-runtime"),
+            artifacts.CommittedRuntimeRoot,
+            artifacts.SourceExecutablePath);
     }
 
     [Fact]
-    public void RuntimeRefresh_HostOutputStillResolvesThroughMdCadRuntimeResolver()
+    public void RuntimeRefresh_MinimalHostOutputExecutableMatchesBuildAndCommittedRuntime()
     {
         Assert.True(OperatingSystem.IsWindows(), "Runtime refresh integration tests require Windows.");
 
+        RuntimeIntegrationArtifacts artifacts = Artifacts.Value;
+
+        AssertCanonicalRuntimeBundle(
+            Path.Combine(artifacts.MinimalHostBaseDirectory, "mdcad-runtime"),
+            artifacts.CommittedRuntimeRoot,
+            artifacts.SourceExecutablePath);
+    }
+
+    [Fact]
+    public void RuntimeRefresh_HostOutputsStillResolveThroughMdCadRuntimeResolver()
+    {
+        Assert.True(OperatingSystem.IsWindows(), "Runtime refresh integration tests require Windows.");
+
+        RuntimeIntegrationArtifacts artifacts = Artifacts.Value;
+
+        AssertRuntimeResolver(artifacts.FullHostBaseDirectory);
+        AssertRuntimeResolver(artifacts.MinimalHostBaseDirectory);
+    }
+
+    [Fact]
+    public void RuntimeRefresh_HostOutputsRetainEmbeddedIniBundleEntry()
+    {
+        Assert.True(OperatingSystem.IsWindows(), "Runtime refresh integration tests require Windows.");
+
+        RuntimeIntegrationArtifacts artifacts = Artifacts.Value;
+        string committedIniPath = Path.Combine(artifacts.CommittedRuntimeRoot, "imgui.embedded.ini");
+
+        Assert.True(File.Exists(committedIniPath), $"Committed embedded ini is missing: {committedIniPath}");
+        Assert.True(File.Exists(Path.Combine(artifacts.FullHostBaseDirectory, "mdcad-runtime", "imgui.embedded.ini")));
+        Assert.True(File.Exists(Path.Combine(artifacts.MinimalHostBaseDirectory, "mdcad-runtime", "imgui.embedded.ini")));
+    }
+
+    private static RuntimeIntegrationArtifacts CreateArtifacts()
+    {
         string repoRoot = FindRepoRoot();
-        string hostBaseDirectory = GetHostBaseDirectory(repoRoot);
+        string fullHostProjectPath = Path.Combine(repoRoot, "samples", "avalonia-host", "AvaloniaHost.csproj");
+        string minimalHostProjectPath = Path.Combine(repoRoot, "samples", "avalonia-host-minimal", "AvaloniaHostMinimal.csproj");
+        string sourceExecutablePath = Path.Combine(repoRoot, "build-vulkan", "bin", "Release", "mdCAD.exe");
+
+        BuildProject(fullHostProjectPath, repoRoot);
+        BuildProject(minimalHostProjectPath, repoRoot);
+
+        return new RuntimeIntegrationArtifacts(
+            repoRoot,
+            sourceExecutablePath,
+            Path.Combine(repoRoot, "samples", "avalonia-mdcad-control", "runtime", "win-x64"),
+            GetHostBaseDirectory(repoRoot, "avalonia-host"),
+            GetHostBaseDirectory(repoRoot, "avalonia-host-minimal"));
+    }
+
+    private static void AssertCanonicalRuntimeBundle(string hostRuntimeRoot, string committedRuntimeRoot, string sourceExecutablePath)
+    {
+        string committedExecutablePath = Path.Combine(committedRuntimeRoot, "mdCAD.exe");
+        string hostExecutablePath = Path.Combine(hostRuntimeRoot, "mdCAD.exe");
+
+        Assert.Equal(GetFileHash(sourceExecutablePath), GetFileHash(committedExecutablePath));
+        Assert.Equal(GetFileHash(sourceExecutablePath), GetFileHash(hostExecutablePath));
+    }
+
+    private static void AssertRuntimeResolver(string hostBaseDirectory)
+    {
         string expectedRuntimeRoot = Path.Combine(hostBaseDirectory, "mdcad-runtime");
         string expectedExecutablePath = Path.Combine(expectedRuntimeRoot, "mdCAD.exe");
 
@@ -42,19 +98,6 @@ public sealed class RuntimeRefreshIntegrationTests
         Assert.Equal(expectedExecutablePath, runtime.ExecutablePath);
     }
 
-    [Fact]
-    public void RuntimeRefresh_HostOutputRetainsEmbeddedIniBundleEntry()
-    {
-        Assert.True(OperatingSystem.IsWindows(), "Runtime refresh integration tests require Windows.");
-
-        string repoRoot = FindRepoRoot();
-        string committedIniPath = Path.Combine(repoRoot, "samples", "avalonia-mdcad-control", "runtime", "win-x64", "imgui.embedded.ini");
-        string hostIniPath = Path.Combine(GetHostRuntimeRoot(repoRoot), "imgui.embedded.ini");
-
-        Assert.True(File.Exists(committedIniPath), $"Committed embedded ini is missing: {committedIniPath}");
-        Assert.True(File.Exists(hostIniPath), $"Host embedded ini is missing: {hostIniPath}");
-    }
-
     private static string FindRepoRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);
@@ -62,7 +105,7 @@ public sealed class RuntimeRefreshIntegrationTests
         {
             string planningPath = Path.Combine(current.FullName, ".planning");
             string gitPath = Path.Combine(current.FullName, ".git");
-            if (Directory.Exists(planningPath) && Directory.Exists(gitPath))
+            if (Directory.Exists(planningPath) && (Directory.Exists(gitPath) || File.Exists(gitPath)))
             {
                 return current.FullName;
             }
@@ -73,11 +116,14 @@ public sealed class RuntimeRefreshIntegrationTests
         throw new InvalidOperationException("Could not locate the mdCAD repository root from the test output directory.");
     }
 
-    private static string GetHostBaseDirectory(string repoRoot)
+    private static string GetHostBaseDirectory(string repoRoot, string hostDirectoryName)
     {
-        string hostReleaseRoot = Path.Combine(repoRoot, "samples", "avalonia-host", "bin", "Release");
+        string hostReleaseRoot = Path.Combine(repoRoot, "samples", hostDirectoryName, "bin", "Release");
+        string directoryPattern = string.Equals(hostDirectoryName, "avalonia-host-minimal", StringComparison.OrdinalIgnoreCase)
+            ? "net10.0"
+            : "net10.0-windows*";
         string? hostBaseDirectory = Directory
-            .EnumerateDirectories(hostReleaseRoot, "net10.0-windows*")
+            .EnumerateDirectories(hostReleaseRoot, directoryPattern)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .LastOrDefault();
 
@@ -89,9 +135,34 @@ public sealed class RuntimeRefreshIntegrationTests
         return hostBaseDirectory;
     }
 
-    private static string GetHostRuntimeRoot(string repoRoot)
+    private static void BuildProject(string projectPath, string workingDirectory)
     {
-        return Path.Combine(GetHostBaseDirectory(repoRoot), "mdcad-runtime");
+        ProcessStartInfo startInfo = new("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+
+        startInfo.ArgumentList.Add("build");
+        startInfo.ArgumentList.Add(projectPath);
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("Release");
+        startInfo.ArgumentList.Add("--nologo");
+
+        using Process process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"Failed to start build for {projectPath}");
+
+        string standardOutput = process.StandardOutput.ReadToEnd();
+        string standardError = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Build failed for {projectPath}.{Environment.NewLine}{standardOutput}{Environment.NewLine}{standardError}");
+        }
     }
 
     private static string GetFileHash(string path)
@@ -105,4 +176,11 @@ public sealed class RuntimeRefreshIntegrationTests
         byte[] hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash);
     }
+
+    private sealed record RuntimeIntegrationArtifacts(
+        string RepoRoot,
+        string SourceExecutablePath,
+        string CommittedRuntimeRoot,
+        string FullHostBaseDirectory,
+        string MinimalHostBaseDirectory);
 }

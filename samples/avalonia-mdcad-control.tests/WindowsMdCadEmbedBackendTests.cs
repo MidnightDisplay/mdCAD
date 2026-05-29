@@ -4,6 +4,7 @@ using System.Reflection;
 
 using MdCad.Avalonia.Control.Host;
 using MdCad.Avalonia.Control.Host.Windows;
+using MdCad.Embed.Core.Windows;
 
 namespace MdCad.Avalonia.Control.Tests;
 
@@ -139,6 +140,41 @@ public sealed class WindowsMdCadEmbedBackendTests
         }
     }
 
+    [Fact]
+    public void CreateStartInfo_DelegatesToSharedWindowsStartInfoBuilder()
+    {
+        string jsonlPath = CreateReadableJsonlPath();
+        try
+        {
+            MdCadRuntimePaths runtime = new(
+                ExecutablePath: @"C:\runtime\mdCAD.exe",
+                RuntimeRoot: @"C:\runtime");
+            MdCadLaunchSnapshot snapshot = MdCadLaunchSnapshot.Create(
+                jsonlPath,
+                startupLiveRefreshEnabled: true,
+                viewportOnlyStartupMode: true);
+
+            ProcessStartInfo backendStartInfo = WindowsMdCadEmbedBackend.CreateStartInfo(
+                runtime,
+                new IntPtr(0xD00D),
+                snapshot);
+            ProcessStartInfo sharedStartInfo = MdCadWindowsStartInfoBuilder.CreateEmbeddedProcessStartInfo(
+                executablePath: runtime.ExecutablePath,
+                runtimeRoot: runtime.RuntimeRoot,
+                parentHwnd: new IntPtr(0xD00D),
+                viewportOnlyStartupMode: snapshot.ViewportOnlyStartupMode,
+                launchJsonlPath: snapshot.LaunchJsonlPath,
+                startupLiveRefreshEnabled: snapshot.ShouldPassLiveRefreshArgument);
+
+            Assert.Equal(sharedStartInfo.FileName, backendStartInfo.FileName);
+            Assert.Equal(sharedStartInfo.WorkingDirectory, backendStartInfo.WorkingDirectory);
+            Assert.Equal(sharedStartInfo.ArgumentList, backendStartInfo.ArgumentList);
+        }
+        finally
+        {
+            File.Delete(jsonlPath);
+        }
+    }
 
     [Fact]
     public void NativeFailureSummary_IsCapturedFromStableEmbeddedSummaryLine()
@@ -172,12 +208,14 @@ public sealed class WindowsMdCadEmbedBackendTests
 
         Assert.Equal("mdCAD exited after attach (exit code 11).", detail);
     }
+
     private static string CreateReadableJsonlPath()
     {
         string path = Path.Combine(Path.GetTempPath(), $"mdcad-launch-{Guid.NewGuid():N}.jsonl");
         File.WriteAllText(path, "{}");
         return path;
     }
+
     private static string? InvokeTryCaptureEmbeddedFailureSummary(string? data)
     {
         MethodInfo method = typeof(WindowsMdCadEmbedBackend).GetMethod(

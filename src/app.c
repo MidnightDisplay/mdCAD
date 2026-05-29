@@ -1711,6 +1711,7 @@ static void mdcad_draw_solver_drag_block_toast(void) {
 
 static void mdcad_draw_startup_jsonl_import_overlay(void) {
     startup_jsonl_import_controller_t *controller = &state.startup_jsonl_import_controller;
+    startup_jsonl_import_controller_forget_deleted_root(controller, &state.ecs_scene);
     ecs_entity_t startup_root = controller->job.root_entity;
     JsonlObserverComp *observer = NULL;
     bool startup_refresh_running = false;
