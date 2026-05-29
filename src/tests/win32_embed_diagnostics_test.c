@@ -102,16 +102,33 @@ static int test_parse_failure_diagnostics_apply_only_to_embedded_launches(void) 
 }
 
 static int test_app_contract_uses_embed_helpers(void) {
-    char *src = read_file_text("src\\app.c");
-    if (!src) {
-        src = read_file_text("..\\src\\app.c");
+    static const char *paths[] = {
+        "src\\app.c",
+        "..\\src\\app.c",
+        "..\\..\\src\\app.c",
+        "..\\..\\..\\src\\app.c",
+        "..\\..\\..\\..\\src\\app.c"
+    };
+    char *src = NULL;
+    for (size_t i = 0; i < (sizeof(paths) / sizeof(paths[0])); ++i) {
+        src = read_file_text(paths[i]);
+        if (src) break;
     }
     if (!src) return 1;
 
-    int failed =
-        strstr(src, "mdcad_win32_embed_args_request_diagnostics(argc, argv)") == NULL ||
-        strstr(src, "mdcad_win32_embed_fail_startup(") == NULL ||
-        strstr(src, "mdcad_win32_embed_install_fatal_handlers();") == NULL;
+    int failed = 0;
+    if (strstr(src, "mdcad_win32_embed_args_request_diagnostics(argc, argv)") == NULL) {
+        fprintf(stderr, "missing args helper call\n");
+        failed = 1;
+    }
+    if (strstr(src, "mdcad_win32_embed_fail_startup(") == NULL) {
+        fprintf(stderr, "missing startup helper call\n");
+        failed = 1;
+    }
+    if (strstr(src, "mdcad_win32_embed_install_fatal_handlers();") == NULL) {
+        fprintf(stderr, "missing fatal handler install\n");
+        failed = 1;
+    }
     free(src);
     return failed;
 }

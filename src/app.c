@@ -2967,11 +2967,16 @@ sapp_desc sokol_main(int argc, char* argv[]) {
     mdcad_launch_config_t launch_config = {0};
     char launch_error[256] = {0};
     if (!mdcad_launch_config_parse(argc, argv, &launch_config, launch_error, sizeof(launch_error))) {
-        fprintf(stderr, "Embedded startup failed: %s\n", launch_error[0] ? launch_error : "Invalid embedded launch configuration");
+        const char* reason = launch_error[0] ? launch_error : "Invalid embedded launch configuration";
+        if (mdcad_win32_embed_args_request_diagnostics(argc, argv)) {
+            mdcad_win32_embed_fail_startup(reason);
+        }
+        fprintf(stderr, "Embedded startup failed: %s\n", reason);
         exit(2);
     }
     state.launch = launch_config;
     mdcad_win32_embed_set_config(&launch_config);
+    mdcad_win32_embed_install_fatal_handlers();
     return (sapp_desc){
         .init_cb = init,
         .frame_cb = frame,
