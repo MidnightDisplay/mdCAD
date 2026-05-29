@@ -10,23 +10,36 @@ Interactive geometry editing and rendering must remain stable, responsive, and t
 
 ## Milestone Status
 
-**Shipped:** `v1.8` — Embeddable Windows JSONL Viewer (2026-05-15)
+**Shipped:** `v1.9` — Plain net10 Avalonia Host Compatibility (2026-05-29)
 
-**Current milestone:** `v1.9` — Plain net10 Avalonia Host Compatibility
+**Audit:** `gaps_found` accepted as tech debt in `.planning/v1.9-MILESTONE-AUDIT.md`
 
-**Current focus:** Defining requirements and roadmap for plain `net10.0` host compatibility without widening mdCAD's runtime embedding seam beyond Windows.
+**Current milestone:** none active
 
-## Current Milestone: v1.9 Plain net10 Avalonia Host Compatibility
+**Current focus:** Start the next milestone with fresh requirements and roadmap definition.
+
+## Current State
+
+- Plain `net10.0` Avalonia hosts can reference the reusable control directly while the actual embedded mdCAD runtime remains Windows-only.
+- Unsupported platforms now surface an explicit non-launching placeholder contract instead of implicit Windows-only failures.
+- The Windows runtime refresh chain is dotnet-managed and host builds now restamp a full fresh `mdcad-runtime` bundle.
+- The repo now ships both Avalonia and WPF reusable controls plus full/minimal proof hosts with aligned launch/runtime behavior.
+- Startup-import delete of embedded JSONL roots no longer crashes the viewer, and host-visible crash diagnostics stay truthful.
+
+<details>
+<summary>Archived milestone focus: v1.9 Plain net10 Avalonia Host Compatibility</summary>
 
 **Goal:** Let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
 
-**Target features:**
-- Plain `net10.0` host projects can reference the reusable control without hitting a TFM compatibility wall.
+**Delivered features:**
+- Plain `net10.0` host projects can reference the reusable control without the old TFM compatibility wall.
 - The existing Win32 child-HWND launch path remains the only runtime activation path for the embedded viewer.
 - Non-Windows hosts render a safe placeholder/warning and never attempt to launch mdCAD.
-- Windows proof harnesses, packaging, and consumer docs stay aligned with the widened host-facing contract.
+- Windows proof harnesses, packaging, docs, WPF parity, and embedded delete-crash closure now stay aligned with the widened host-facing contract.
 
-## Last Shipped Milestone: v1.7 Linked Flat JSONL Large-File Refresh Stability
+</details>
+
+## Last Shipped Milestone: v1.8 Embeddable Windows JSONL Viewer
 
 **Goal:** Fix the large-file regression in linked flat JSONL imports so import, refresh, and deletion all preserve the full rendered geometry.
 
@@ -152,10 +165,9 @@ v1.9 is driven by a host-compatibility gap discovered immediately after v1.8: ev
 - Quick task `260515-nvk` retargeted the live Avalonia control, hosts, and tests to `net10.0-windows10.0.19041.0`, but a scratch plain `net10.0` host still reproduced `NU1201`, confirming the next milestone must address host-facing TFM compatibility separately from the Windows runtime seam.
 ## Next Milestone Goals
 
-1. Remove the current plain-`net10.0` project-reference blocker while preserving the proven Windows child-HWND embedding seam.
-2. Define the non-Windows runtime contract clearly enough that hosts can compile cross-platform without accidental mdCAD launch attempts.
-3. Keep the existing Windows diagnostic harness, runtime packaging, and minimal onboarding path valid after the compatibility widening.
-4. Preserve current native build reliability while keeping deferred `Clear Scene` lifecycle parity and Nyquist backfill visible.
+1. Define fresh milestone requirements and roadmap scope with `/gsd-new-milestone`.
+2. Decide whether the accepted v1.9 verification/traceability debt should be pulled forward as explicit closure work.
+3. Continue evolving the embedded-host/runtime surface without weakening the current Windows-only runtime truth.
 
 ## Constraints
 

@@ -2,44 +2,43 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: milestone
-status: executing
-stopped_at: Completed 57-02-PLAN.md
-last_updated: "2026-05-29T12:19:36.231Z"
+status: milestone_archived
+stopped_at: Archived v1.9 milestone
+last_updated: "2026-05-29T23:59:59.000Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 34
-  completed_plans: 33
-  percent: 89
+  completed_plans: 34
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-15)
+See: .planning/PROJECT.md (updated 2026-05-29)
 
 **Core value:** Interactive geometry editing and rendering must remain stable, responsive, and trustworthy on supported native platforms while the math foundation evolves underneath it.
-**Current focus:** Phase 57 native delete-crash closure and embedded diagnostics surfacing
+**Current focus:** Milestone v1.9 archived; ready to define the next milestone
 **Locked backend:** `cglm 0.9.6`
 **Adoption mode:** direct cglm adoption through a thin project-owned math entrypoint
 
 ## Current Position
 
-Phase: 57 (investigate-mdcad-embedded-crash-when-deleting-imported-json) — IN PROGRESS
-Plan: 3 of 4
-Status: Ready to execute
+Phase: none active
+Plan: —
+Status: Awaiting next milestone
 Last activity: 2026-05-29
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 
 ## Milestone Scope
 
-- Milestone v1.9 goal: let a plain `net10.0` Avalonia host reference the reusable control directly while keeping the embedded mdCAD viewer itself Windows-only.
-- Scope includes host-facing TFM compatibility widening, a safe non-Windows placeholder contract, and preservation of the existing Windows child-HWND embedding/runtime packaging path.
-- Roadmap v1.9 spans phases 50-55 plus inserted Phase 52.1 across backend extraction, unsupported-platform contract, plain-net10 compatibility, Windows runtime refresh automation, consumer proof, onboarding truthfulness, and the new embedded viewport/camera follow-up work.
-- Existing `Clear Scene` lifecycle parity and Nyquist validation backfill debt remain explicitly deferred unless this milestone exposes them as blockers.
+- Milestone v1.9 is archived. See `.planning/milestones/v1.9-ROADMAP.md` and `.planning/milestones/v1.9-REQUIREMENTS.md`.
+- Archive-time audit remained `gaps_found` and was accepted as tech debt. See `.planning/v1.9-MILESTONE-AUDIT.md`.
+- No active roadmap exists until the next milestone is created.
 
 ## Accumulated Context
 
@@ -48,159 +47,19 @@ Progress: [██████████] 97%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Milestone v1.4]: Continue phase numbering from 25; active roadmap starts at Phase 26.
-- [Phase 35]: Linked JSONL observer metadata persists on imported content and refresh uses commit-on-success semantics.
-- [Phase 35]: Linked JSONL observer default remains OFF unless the user explicitly enables it.
-- [Phases 38-39]: Flat import refresh uses same-anchor transactional replacement plus debounce/retry/auto-disable safety behavior.
-- [Phase 40]: Large repeated flat refreshes must preserve hierarchy, selection, and interaction coherence.
-- [Milestone v1.7]: Scope is limited to observer-enabled large flat JSONL regression closure across import, refresh, and delete lifecycle behavior.
-- [Milestone v1.8]: Scope is limited to Windows child-HWND embedding, CLI launch-time JSONL viewing, and a minimal Avalonia host with no new IPC layer.
-- [Phase 44]: Front-load pure embedded input/layout reducers and a manual checklist before the runtime focus/layout changes land.
-- [Phase 44]: Embedded mode now persists a dedicated `imgui.embedded.ini` store and seeds a one-time DockBuilder viewer layout on first run.
-- [Phase 44]: The Avalonia host now distinguishes the mdCAD-side destroyed-parent quit path from the host-side `destroy-after-attach` fallback cleanup.
-- [Phase 44]: Embedded keyboard ownership is now claimed from mdCAD's own Win32 child-window message path instead of from the Avalonia host. — Host-side SetFocus into the external child HWND is unreliable; the child now claims focus from its own first-click native path.
-- [Phase 44]: Host chrome regains focus through Avalonia focus APIs only; the host never calls SetFocus or SetActiveWindow on the external mdCAD child HWND. — Separating host focus return from child focus acquisition preserves the CLI host boundary and avoids cross-process focus forcing.
-- [Phase 44]: Normal host close now reuses the same placeholder invalidation seam that destroyed-parent mode already proved. — The missing normal-close flush behavior came from close ordering in the host, so the fix reuses the proven parent-invalid signal before waiting for process exit.
-- [Phase 44]: The host-close path no longer performs an extra unconditional kill after the graceful wait path runs. — Keeping fallback cleanup inside the wait helper preserves a real chance for mdCAD to self-exit and flush embedded layout state before host cleanup intervenes.
-- [Phase 44]: Embedded mode now routes mdCAD-global shortcuts through ImGui's Shortcut API because the shortcut block runs outside a specific window and raw key polling missed routed non-text shortcuts. — The final human UAT showed Win32 focus was fixed and only app-level global shortcuts remained broken, so the fix moved into ImGui's routing layer.
-- [Phase 44]: Standalone mdCAD keeps the previous raw key polling path so the embedded shortcut fix does not change non-embedded behavior. — The remaining gap was embedded-only, so keeping the standalone path unchanged minimized regression risk.
-- [Phase 44]: Normal WM_CAPTURECHANGED and WM_CANCELMODE no longer count as embedded host deactivation. — A normal mouse release also changes capture, so treating capture-change as runtime cancel cleared keyboard ownership, reverted gizmo drops, and stopped camera inertia even though focus never left mdCAD.
-- [Phase 44]: The embedded child HWND now advertises WM_GETDLGCODE ownership for keyboard/dialog keys. — Claiming dialog keys from the native child-window seam keeps Tab-class input with mdCAD instead of leaving it available to the host message pump.
-- [Phase 45]: `--jsonl` is a shape-validated launch flag only; bad startup paths remain runtime import failures instead of parse-time launch failures. — Preserving a usable viewer session on bad files requires the parser to validate syntax and absoluteness without probing the filesystem.
-- [Phase 45]: Startup JSONL import must flow through a reusable non-UI controller that wraps `jsonl_import_job_t` with flat-import defaults and linked refresh disabled. — The existing importer already owns the large-flat ingest behavior, so Phase 45 should bridge launch config into that job instead of duplicating it behind Scene Hierarchy UI state.
-- [Phase 45]: Startup JSONL import now ticks from `app.c` before the Scene Hierarchy visibility gate and marks hierarchy cache dirty on completion. — Embedded viewer-first launches can hide panels entirely, so startup import ownership must live in the app frame loop instead of in panel draw code.
-- [Phase 45]: Launch-time JSONL failure now surfaces through a dismissible app-level overlay and never exits the viewer. — A missing or unreadable startup file must leave embedded and standalone sessions usable for inspection and retry.
-- [Phase 46]: Startup live refresh is enabled only by the explicit `--jsonl-live-refresh` companion flag; plain startup imports stay passive because their observer metadata remains unlinked and unbaselined. — This preserves Phase 45 default-off behavior while reusing the existing linked observer runtime unchanged.
-- [Phase 46]: Startup refresh status is surfaced from the imported root's observer component in `app.c` and never advances a second refresh loop. — The startup overlay may inspect runtime observer state, but `jsonl_observer_system_tick(...)` and `jsonl_observer_tick_flat_refreshes(...)` remain the only refresh drivers.
-- [Phase 47]: The sample host now reports only host-owned session/request state and switches JSONL/live-refresh status lines to `viewer-managed` wording after attach. — This preserves the CLI/process boundary and avoids inventing import-confirmation IPC.
-- [Phase 47]: Repeated relaunch recreates the placeholder/native host surface after teardown before starting the next embedded session. — The close/relaunch path destroys the old attach seam, so the placeholder must be renewed for the next child HWND.
-- [Phase 47]: Restored MSVC full-suite validation reuses `win32_embed_test_stub.h` in standalone Windows tests that link `libsokol` outside `app.c`. — The shared embed-state symbol must still exist during full-suite verification even when the application entry point is absent.
-- [Phase 48]: Phase 48 starts from a Windows-only Avalonia UserControl with StyledProperty launch configuration and an internal NativeControlHost placeholder seam — This preserves the XAML-drop consumer contract while keeping the proven Win32 child-HWND wiring library-owned for later runtime packaging and relaunch work.
-- [Phase 48]: Runtime packaging now resolves mdCAD only from AppContext.BaseDirectory\\mdcad-runtime and ships a committed curated win-x64 bundle — This removes repo-root discovery, keeps the control self-contained for ProjectReference consumers, and preserves imgui.embedded.ini persistence through a runtime-root working directory in later lifecycle work.
-- [Phase 48]: The reusable control keeps a bare sealed surface by default and exposes the Phase 47 launch/status chrome only through explicit diagnostic mode while the sample host stays the scenario harness — This preserves the minimal embeddable API while still giving the in-repo consumer a truthful proof surface for start, stop, relaunch, and warning behavior.
-- [Phase 49]: The repo now ships both a diagnostic harness and a separate minimal sealed consumer sample, with the control quickstart living beside the reusable control project — This keeps external onboarding lightweight while preserving the richer sample host as the proof and debugging surface.
-- [Phase 50]: Windows lifecycle ownership now lives behind `IMdCadEmbedBackend`, while `MdCadEmbeddedControl` keeps the public properties, warning/status UI, and presentation-mode surface. — This isolates Win32/process state without changing the consumer-facing control contract.
-- [Phase 50]: `MdCadSessionCoordinator` now starts, stops, and recreates sessions through backend delegates instead of shell-owned Win32 state. — Keeping the same generation gate and relaunch ordering preserves the existing stop/recreate/restart behavior while decoupling the coordinator from the shell implementation.
-- [Phase 50]: Relaunch-safe proof now explicitly pins the current placeholder HWND in repeated backend start-info generation, and the Windows diagnostic host checklist is approved as PASS. — This closes the backend extraction loop without introducing a new proof surface or widening platform scope.
-- [Phase 51]: Unsupported hosts should show one consistent Windows-only runtime truth in both presentation modes, with `sealed` minimal and `diagnostic` more explicit. — This keeps the default surface lightweight while making unsupported runtime behavior visible immediately.
-- [Phase 51]: Unsupported `StartAsync()` must fail immediately with the same canonical message the placeholder shows, while `StopAsync()` remains a safe no-op. — Programmatic hosts get deterministic behavior without implying cross-platform runtime support.
-- [Phase 51]: The public control shell now selects backends through `MdCadEmbedBackendFactory` and treats `StartBlockedReason` as the primary warning truth, while diagnostic JSONL/live-refresh lines remain informational-only. — This keeps unsupported runtime behavior explicit without changing the public API or the locked Windows launch path.
-- [Phase 52]: `samples/avalonia-host-minimal` is part of Phase 52 itself as the smallest plain-`net10.0` proof host, while the Windows diagnostic harness remains a separate regression consumer. — This gives the compatibility widening a real plain-host proof surface without pulling broader Phase 53 proof scope into this phase.
-- [Phase 52]: The reusable control and minimal proof host now both target plain `net10.0`, while the Windows diagnostic harness remains Windows-targeted and continues to validate the runtime-specific path separately. — This keeps compile-time compatibility widening distinct from Windows runtime proof.
-- [Phase 53]: Consumer proof is closed only when the plain `net10.0` build proof, automated Windows preflight, and approved manual host lifecycle proof all remain separate and green. — This preserves the compile-vs-runtime support boundary for the docs and onboarding phase.
-- [Phase 54]: Docs and onboarding are only closed when README, QUICKSTART, sample defaults, and validation all point at the same compile/build-versus-runtime proof split. — This keeps milestone closeout truthful without widening runtime scope.
-- [Phase 56]: Launch snapshot, presentation mode, and unsupported-runtime truth now live in `MdCad.Embed.Core` before WPF UI work begins. — This locks parity-critical non-visual contracts in a framework-neutral assembly first.
-- [Phase 56]: Runtime resolution, canonical runtime paths, and relaunch coordination now live in `MdCad.Embed.Core` with green shared-core tests before Avalonia or WPF rewiring. — This keeps future UI stacks on one runtime-root and lifecycle truth.
-- [Phase 56]: Windows embedded launch/start-info construction and child-HWND helper logic now live in `MdCad.Embed.Core.Windows`, while Avalonia delegates to that shared seam without changing its remaining host-surface contract. — This single-sources the Windows launch boundary before WPF backend work begins.
-- [Phase 56]: The full WPF proof host should consume `MdCad.Wpf.Control` directly, bundle its proof JSONL in output, and report only host-owned runtime/lifecycle truth. — This keeps the diagnostic harness deployment-rooted and honest about the external-process boundary.
-- [Phase 56]: WPF runtime-copy proof now builds both WPF consumer hosts inside the targeted test lane and compares their copied `mdcad-runtime` payload against the canonical Avalonia-managed bundle. — This closes the runtime-copy evidence without depending on stale prebuilt outputs.
-- [Phase 56]: Phase 56 validation must keep full/minimal WPF build proof automated while reserving real child-HWND attach/stop/relaunch checks for the full diagnostic host manual row. — This preserves compile/build truth separately from real Windows runtime proof.
-- [Phase 57]: Hierarchy delete requests must collapse to live roots before undo snapshotting or teardown. — This prevents descendant-first imported deletes from replaying unsafe order through the native delete chain.
-- [Phase 57]: Embedded crash diagnostics should write one stable `mdcad-embed-crash.log` record and derive stderr summaries from the same helper. — This keeps host-visible crash detail truthful without adding IPC.
-- [Phase 57]: The WPF backend now reuses the native stderr/log summary line when available instead of inventing a crash cause from host state.
-- [Phase 57]: MdCadEmbeddedControl keeps SetLaunchWarning as the single warning source of truth, while the full host only mirrors the already-observed detail.
-- [Phase 57]: Kept Avalonia crash-detail surfacing on the stderr plus UnexpectedSessionLoss seam.
-- [Phase 57]: Exposed a read-only UnexpectedSessionLossDetail property plus event while keeping warning ownership inside MdCadEmbeddedControl.
-- [Phase 57]: Added samples/avalonia-host.tests/NuGet.Config so the new host lane restores from nuget.org-only sources.
+- [Milestone v1.9]: Proceed with archival despite `gaps_found` milestone audit and record the accepted debt explicitly in the archive.
 
 ### Roadmap Evolution
 
-- Phase 35 added: Observable JSONL as sketch import with optional live file observer.
-- Milestone v1.6 initialized: Observable Flat JSONL Import for Large Geometry Dumps.
-- Roadmap v1.6 created: phases 36-40 map 11/11 requirements.
-- Milestone v1.6 archived to `.planning/milestones/v1.6-{ROADMAP,REQUIREMENTS}.md`.
-- Milestone v1.7 initialized: Linked Flat JSONL Large-File Refresh Stability.
-- Roadmap v1.7 created: phases 41-42 map 6/6 requirements.
-- Milestone v1.7 archived to `.planning/milestones/v1.7-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md`.
-- Milestone v1.8 initialized: Embeddable Windows JSONL Viewer.
-- Roadmap v1.8 created: phases 43-47 map 16/16 requirements.
-- Phase 48 added: Reusable Avalonia mdCAD user control.
-- Phase 49 added: Add minimal sealed Avalonia host sample and QUICKSTART for reusable control.
-- Phase 50 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
-- Phase 52.1 inserted after Phase 52: Automate Windows runtime refresh from build-vulkan with a dotnet-managed post-build helper (URGENT)
-- Phase 50 completed: backend extraction, automated relaunch lock, and approved Windows diagnostic-host proof are recorded.
-- Phase 51 planned: 3 verified execution plans plus context, research, and validation artifacts are ready for execution.
-- Phase 51 plan 01 completed: Wave 0 unsupported backend/coordinator contract tests are committed and red for the intended missing seams.
-- Phase 51 plan 02 completed: Internal unsupported backend selection, canonical message ownership, and blocked coordinator behavior are implemented and green.
-- Phase 51 completed: unsupported backend selection, blocked coordinator behavior, and truthful shell messaging are recorded.
-- Phase 52 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
-- Phase 52 plan 01 completed: the reusable control now targets plain `net10.0` and the immediate regression bundle remains green.
-- Phase 52 plan 02 completed: the minimal proof host now targets plain `net10.0` and its startup smoke is approved.
-- Phase 52 completed: the control and minimal proof host now target plain `net10.0`, and the Windows regression lane remains green.
-- Phase 52.1 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
-- Phase 52.1 plan 01 completed: the runtime refresh helper foundation, targeted tests, and green validation row 52.1-01-01 are recorded.
-- Phase 52.1 plan 02 completed: the control project now exposes an opt-in post-build refresh target and keeps output ini state preserved.
-- Phase 52.1 completed: the repo now has approved host-level proof for the automated Windows runtime refresh chain.
-- Phase 53 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
-- Phase 53 plan 01 completed: the minimal plain-net10 proof host still builds cleanly and validation row 53-01-01 is green.
-- Phase 53 plan 02 completed: the automated Windows preflight stayed green and validation row 53-02-01 is recorded.
-- Phase 53 completed: plain net10 proof, automated Windows preflight, and approved manual lifecycle proof are all recorded.
-- Phase 54 planned: 3 verified execution plans plus research and validation artifacts are ready for execution.
-- Phase 54 plan 01 completed: README now documents the plain-net10 host contract, the Windows runtime proof surface, and unsupported-platform truth.
-- Phase 54 plan 02 completed: QUICKSTART and the minimal sample now align with the plain-net10 onboarding contract.
-- Phase 54 completed: onboarding docs, sample defaults, and proof references now reflect the proven runtime boundary truthfully.
-- Phase 55 added: Viewport-only startup mode and F camera reset hotkey.
-- Phase 55 planned: 3 executable plans are ready for launch-contract, native/layout, and camera-shortcut validation work.
-- Phase 55 plan 01 completed: the control now exposes viewport-only startup intent, snapshots track it, and Windows backend launch args forward `--viewport-only`.
-- Phase 55 plan 02 completed: native launch parsing, dedicated embedded viewport-only layout persistence, and viewport-only app contract coverage are all green.
-- Phase 55 plan 03 completed: `F` now resets the camera in embedded and standalone paths, the full proof lane is green, and the committed Windows runtime bundle was refreshed to match the rebuilt native executable.
-- Phase 55 completed: viewport-only embedded startup mode and `F` camera reset are ready for phase verification.
-- Phase 56 added: Create WPF mdCAD control for net10.0-windows consumers with Avalonia-parity parameters plus full and minimal sample test projects.
-- Phase 56 plan 01 completed: `MdCad.Embed.Core` now owns launch snapshot, presentation-mode, and unsupported-runtime truth with a green standalone xUnit lane.
-- Phase 56 plan 02 completed: shared runtime resolution, canonical runtime paths, and session coordination now live in `MdCad.Embed.Core` with green shared-core tests.
-- Phase 56 plan 03 completed: shared Windows start-info construction and Win32 helper logic now live in `MdCad.Embed.Core.Windows`, and the Avalonia backend delegates to that seam with green backend proof.
-- Phase 56 plan 07 completed: the repo now has a full WPF diagnostic host with bundled proof JSONL, explicit lifecycle controls, and truthful host-owned runtime/status messaging.
-- Phase 56 plan 08 completed: the repo now has the smallest sealed WPF consumer proof host built around one project-referenced `MdCadEmbeddedControl`.
-- Phase 56 completed: WPF runtime-copy integration proof is green, the validation ledger reflects the nine-plan split, and the phase is ready for `/gsd-verify-work 56`.
-- Phase 57 added: Investigate mdCAD embedded crash when deleting imported JSONL nodes and add crash diagnostics plus surfaced crash reasons across Avalonia and WPF sample hosts.
-- Phase 57 plan 01 completed: startup-import hierarchy delete regression coverage and embedded crash-log diagnostics are green in the native proof lanes.
+- Milestone v1.9 archived: phases 50-57 plus inserted 52.1 shipped and were moved to `.planning/milestones/v1.9-ROADMAP.md`.
+- Archive-time accepted debt: missing formal verification and requirements-ledger closure evidence tracked in `.planning/v1.9-MILESTONE-AUDIT.md`.
 
-### Pending Todos
+## Next Steps
 
-- Run `/gsd-plan-phase 57` next to break down mdCAD crash reproduction, root-cause analysis, crash logging, and surfaced crash-reason handling across the embedded sample hosts.
-- Run `/gsd-verify-work 55` next to confirm the delivered viewport-only embedded startup mode and `F` camera reset against the phase goal.
-- Run `/gsd-verify-work 56` next to capture the manual WPF diagnostic-host lifecycle proof against the now-complete execution ledger.
-- Decide whether the accepted v1.8 audit gaps should become follow-up validation/cleanup work in this milestone or remain deferred tech debt.
-- Keep deferred `Clear Scene` lifecycle parity and Phase 41/42 Nyquist backfill explicit unless the new milestone exposes them as blockers.
+- Run `/gsd-new-milestone` next to define the next milestone requirements and roadmap.
+- If you want to pay down archive-time debt first, run `/gsd-verify-work 55` and `/gsd-verify-work 56`, then revisit `.planning/v1.9-MILESTONE-AUDIT.md`.
 
-### Blockers/Concerns
+## Session Checkpoint
 
-- The control owns real Win32 seams, so widening compile-time compatibility must not accidentally imply cross-platform runtime embedding support.
-- Milestone closeout must keep compile/build compatibility wording separate from Windows runtime support claims.
-
-### Quick Tasks Completed
-
-| Date       | ID         | Task | Status | Commit |
-|------------|------------|------|--------|--------|
-| 2026-05-26 | 260526-f53 | Persist selected user theme in the active ImGui ini stream across standalone and embedded modes | done | `e503ffb` |
-| 2026-05-26 | 260526-epc | Archive legacy pre-GSD agent docs under `docs/legacy` and align live docs with `.planning` | done | `0ca5ea4` |
-| 2026-05-15 | 260515-nvk | Retarget Avalonia control and sample hosts to net10 for net10 host compatibility | done | `d847033` |
-| 2026-05-05 | 260505-p42v | Create missing Phase 42 verification artifact | done | `e2ce8fe` |
-| 2026-04-14 | 260414-mkp | Enable 4x MSAA for main viewport only (pick buffer unchanged) | done | `8048247` |
-
-## Performance Metrics
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 48 P01 | 8 min | 2 tasks | 7 files |
-| Phase 48 P02 | 8 min | 2 tasks | 7 files |
-| Phase 48 P03 | 12 min | 2 tasks | 9 files |
-| Phase 48 P04 | 7 min | 3 tasks | 5 files |
-| Phase 49 P01 | 8 min | 1 tasks | 11 files |
-| Phase 56 P01 | 15 min | 1 tasks | 11 files |
-| Phase 56 P02 | 10 min | 1 tasks | 9 files |
-| Phase 56 P03 | 4 min | 1 tasks | 9 files |
-| Phase 56 P05 | 18 min | 1 tasks | 6 files |
-| Phase 56 P06 | 53 min | 1 tasks | 12 files |
-| Phase 56 P07 | 14 min | 1 tasks | 5 files |
-| Phase 56 P08 | 8 min | 1 tasks | 6 files |
-| Phase 56 P09 | 3 min | 1 tasks | 5 files |
-| Phase 57 P01 | 18 min | 2 tasks | 8 files |
-| Phase 57 P03 | 3110 | 2 tasks | 20 files |
-| Phase 57 P02 | 51min | 2 tasks | 9 files |
-
-## Session Continuity
-
-Last session: 2026-05-29T12:19:36.223Z
-Stopped at: Completed 57-02-PLAN.md
-Resume file: None
+Last session: 2026-05-29T23:59:59.000Z
+Stopped at: Archived v1.9 milestone
